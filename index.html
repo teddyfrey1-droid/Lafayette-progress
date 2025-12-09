@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V43 (Design Impact)</title>
+  <title>Heiko - Budget Master V44 (Redirect)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -32,7 +32,8 @@
         100% { transform: translateY(-400px) scale(1.2) rotate(720deg); opacity: 0; } 
     }
     @keyframes moveStripes { 0% { background-position: 0 0; } 100% { background-position: 40px 0; } }
-    
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
     /* TOAST */
     #toast { visibility: hidden; min-width: 300px; background-color: var(--success); color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 3000; left: 50%; top: 0; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; transform:translate(-50%, -100%); transition: all 0.3s; }
     #toast.show { visibility: visible; transform:translate(-50%, 20px); }
@@ -84,8 +85,17 @@
     .data-box-label { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px; }
     .data-box-value { font-size: 20px; font-weight: 900; color: #1e293b; line-height: 1; }
 
+    /* BARRE AVEC RAYURES ACTIVES */
     .progress-track { height: 30px; background: #e5e7eb; border-radius: 99px; overflow: hidden; margin-bottom: 40px; position: relative; display: flex; }
-    .progress-fill { height: 100%; background-color: var(--primary); background-image: linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent); background-size: 40px 40px; animation: moveStripes 1s linear infinite; transition: width 1s ease; position: relative; }
+    .progress-fill { 
+        height: 100%; 
+        background-color: var(--primary);
+        background-image: linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent);
+        background-size: 40px 40px; 
+        animation: moveStripes 1s linear infinite; 
+        transition: width 1s ease; 
+        position: relative; 
+    }
     .progress-fill.green-mode { background-color: var(--success); }
     .progress-overdrive { height: 100%; background: repeating-linear-gradient(45deg, var(--danger), var(--danger) 10px, #ef4444 10px, #ef4444 20px); width: 0; transition: width 1s ease; position: relative; }
     .percent-float { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); font-size: 13px; font-weight: 900; color: white; z-index: 5; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
@@ -104,7 +114,7 @@
     .earned-badge-container { margin-top: 30px; display: flex; justify-content: center; }
     .earned-badge { background: #dcfce7; color: #166534; padding: 12px 24px; border-radius: 16px; font-weight: 900; font-size: 18px; border: 2px solid #86efac; display: inline-flex; align-items: center; gap: 10px; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.15); animation: pulse-green 2s infinite; }
 
-    /* NATIVE CALENDAR */
+    /* --- NATIVE CALENDAR --- */
     .native-cal-container { margin-top: 60px; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 15px 40px -5px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
     .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     .cal-month-title { font-size: 16px; font-weight: 900; text-transform: uppercase; color: #1e293b; }
@@ -516,7 +526,7 @@
           allObjs = s.val() || {}; 
           try {
              renderDashboard(); 
-             // Force render lists for Admins/SuperAdmins on load
+             // FIX: Force render lists for Admins/SuperAdmins on load
              if(currentUser && (currentUser.role === 'admin' || currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase())) {
                  renderAdminObjs(); renderSimulator();
              }
@@ -561,6 +571,7 @@
     let simObjs = {}; 
 
     function renderSimulator() {
+        // Always rebuild to keep sync
         buildSimulatorUI();
     }
 
@@ -835,7 +846,7 @@
                const valStep = parse(p.prize);
                // Note: We show the VALUE OF THE STEP, logic is cumulative in total
                const displayVal = (valStep * userRatio).toFixed(2);
-               middleHtml += `<div class="ms-item ${u?'unlocked':''}"><div class="ms-threshold">${p.threshold}%</div><div class="ms-circle">${u?emojis[i%3]:(i+1)}</div><div class="ms-prize">+${displayVal}€</div></div>`;
+               middleHtml += `<div class="ms-item ${u?'unlocked':''}"><div class="ms-threshold">${p.threshold}%</div><div class="ms-circle">${u?emojis[i%3]:(i+1)}</div><div class="ms-prize">${displayVal}€</div></div>`;
           });
           middleHtml += `</div>`;
       }
