@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V37 (Final)</title>
+  <title>Heiko - Budget Master V35 (Final Admin)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -28,12 +28,12 @@
     /* ANIMATIONS */
     @keyframes floatMoney { 0% { transform: translateY(50px) scale(0.5) rotate(0deg); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(-300px) scale(1.5) rotate(45deg); opacity: 0; } }
     @keyframes pulse-green { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
-    @keyframes moveStripes { 0% { background-position: 0 0; } 100% { background-position: 40px 0; } }
     @keyframes slideInDown { from { transform: translate(-50%, -100%); opacity: 0; } to { transform: translate(-50%, 20px); opacity: 1; } }
     @keyframes slideOutUp { from { transform: translate(-50%, 20px); opacity: 1; } to { transform: translate(-50%, -100%); opacity: 0; } }
+    @keyframes moveStripes { 0% { background-position: 0 0; } 100% { background-position: 40px 0; } }
 
     /* TOAST */
-    #toast { visibility: hidden; min-width: 300px; background-color: var(--success); color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 3000; left: 50%; top: 0; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; }
+    #toast { visibility: hidden; min-width: 300px; background-color: var(--success); color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 3000; left: 50%; top: 0; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; transform: translateX(-50%); }
     #toast.show { visibility: visible; animation: slideInDown 0.5s forwards; }
     #toast.hide { animation: slideOutUp 0.5s forwards; }
 
@@ -53,7 +53,7 @@
     h1 { font-size: 48px; font-weight: 900; color: #1e293b; margin: 0 0 15px; letter-spacing: -1.5px; text-transform: uppercase; line-height: 1; }
     .last-update { font-size: 14px; color: var(--text-muted); background: rgba(255,255,255,0.8); padding: 8px 20px; border-radius: 30px; display: inline-block; font-weight: 600; border: 1px solid #e5e7eb; text-transform: capitalize; }
 
-    /* CARDS */
+    /* SCORE & CARDS */
     .global-score-container { margin: 40px auto; width: 260px; height: 260px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; box-shadow: 0 25px 60px rgba(0,0,0,0.08); border: 12px solid #f8fafc; position: relative; overflow: visible; }
     .global-score-value { font-size: 64px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
     .global-score-label { font-size: 13px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; margin-top: 8px; text-align: center; line-height: 1.4; letter-spacing: 1.5px; z-index: 2; position: relative; }
@@ -84,9 +84,18 @@
     .data-box-label { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px; }
     .data-box-value { font-size: 20px; font-weight: 900; color: #1e293b; line-height: 1; }
 
-    /* PROGRESS BAR */
+    /* BARRE AVEC RAYURES ACTIVES */
     .progress-track { height: 30px; background: #e5e7eb; border-radius: 99px; overflow: hidden; margin-bottom: 40px; position: relative; display: flex; }
-    .progress-fill { height: 100%; background-color: var(--primary); background-image: linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent); background-size: 40px 40px; animation: moveStripes 1s linear infinite; transition: width 1s ease; position: relative; }
+    .progress-fill { 
+        height: 100%; 
+        background-color: var(--primary);
+        /* Rayures */
+        background-image: linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent);
+        background-size: 40px 40px; 
+        animation: moveStripes 1s linear infinite; 
+        transition: width 1s ease; 
+        position: relative; 
+    }
     .progress-fill.green-mode { background-color: var(--success); }
     .progress-overdrive { height: 100%; background: repeating-linear-gradient(45deg, var(--danger), var(--danger) 10px, #ef4444 10px, #ef4444 20px); width: 0; transition: width 1s ease; position: relative; }
     .percent-float { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); font-size: 13px; font-weight: 900; color: white; z-index: 5; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
@@ -105,7 +114,7 @@
     .earned-badge-container { margin-top: 30px; display: flex; justify-content: center; }
     .earned-badge { background: #dcfce7; color: #166534; padding: 12px 24px; border-radius: 16px; font-weight: 900; font-size: 18px; border: 2px solid #86efac; display: inline-flex; align-items: center; gap: 10px; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.15); animation: pulse-green 2s infinite; }
 
-    /* NATIVE CALENDAR */
+    /* --- NATIVE CALENDAR --- */
     .native-cal-container { margin-top: 60px; background: white; border-radius: 20px; padding: 25px; box-shadow: 0 15px 40px -5px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
     .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     .cal-month-title { font-size: 18px; font-weight: 900; text-transform: uppercase; color: #1e293b; }
@@ -146,7 +155,7 @@
     .user-meta { font-size: 11px; color: #6b7280; }
     .user-gain { font-weight: 800; font-size: 13px; color: var(--success); background: #ecfdf5; padding: 2px 8px; border-radius: 6px; margin-right: 10px; }
     .total-row { background: #1e293b; color: white; padding: 15px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; font-weight: 900; margin-top: 15px; font-size: 14px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-    .budget-box { background: #f0f9ff; padding: 15px; border-radius: 12px; border: 1px solid #bae6fd; margin-bottom: 20px; }
+    .budget-box { background: #f0f9ff; padding: 15px; border-radius: 12px; border: 1px solid #bae6fd; margin-bottom: 0; }
     .budget-bar-bg { height: 10px; background: #e2e8f0; border-radius: 10px; overflow: hidden; margin-top: 5px; }
     .budget-bar-fill { height: 100%; background: var(--success); width: 0; transition: width 0.5s; }
     .budget-bar-fill.danger { background: var(--danger); }
@@ -161,15 +170,7 @@
     .section-header-large { font-size: 16px; color: var(--primary); font-weight: 900; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
     .forgot-link { display:block; margin-top:15px; font-size:11px; color:#6b7280; text-decoration:underline; cursor:pointer; }
 
-    /* ADMIN & STATUS */
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-    .status-dot.active { background-color: #10b981; box-shadow: 0 0 0 2px #d1fae5; }
-    .status-dot.pending { background-color: #ef4444; box-shadow: 0 0 0 2px #fee2e2; }
-    .status-text { font-size: 9px; text-transform: uppercase; font-weight: 800; color: #94a3b8; margin-left: 4px; }
-    .admin-tag { background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; margin-left: 5px; letter-spacing: 0.5px; }
-    .user-email-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
-
-    /* LOGS */
+    /* USER LOG GROUPS - LUDIQUE */
     .logs-wrapper { display: flex; flex-direction: column; gap: 15px; }
     .log-user-group { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
     .group-header { background: #f8fafc; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #e2e8f0; transition:0.2s; }
@@ -188,19 +189,81 @@
     .btn-clear-hist { border:none; background:#fee2e2; color:#ef4444; border-radius:4px; padding:2px 6px; font-size:10px; font-weight:700; cursor:pointer; }
     .btn-clear-hist:hover { background:#fca5a5; }
 
-    /* COCKPIT */
-    .cockpit-container { padding: 15px; border: 2px solid #e2e8f0; border-radius: 16px; background: #f8fafc; margin-bottom: 20px; }
-    .cockpit-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
-    .cockpit-gauge-container { height: 24px; background: #e2e8f0; border-radius: 99px; overflow: hidden; position: relative; margin-bottom: 10px; border:1px solid #cbd5e1; }
-    .cockpit-gauge-fill { height: 100%; width: 0; background: #3b82f6; transition: width 0.3s; }
-    .cockpit-gauge-fill.danger { background: #ef4444; animation: pulse 1s infinite; }
-    .cockpit-info { display: flex; justify-content: space-between; font-size: 12px; font-weight: 800; color: #64748b; }
-    .cockpit-obj-row { background: white; padding: 10px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 8px; }
-    .cockpit-obj-title { font-size: 12px; font-weight: 800; margin-bottom: 5px; color: #1e293b; display:flex; justify-content:space-between; }
-    .slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
-    .slider-label { font-size: 10px; font-weight: 700; width: 60px; color: #64748b; }
-    .slider-val { font-size: 11px; font-weight: 800; width: 40px; text-align: right; color: var(--primary); }
-    input[type=range] { flex: 1; accent-color: var(--primary); cursor: pointer; }
+    /* STATUS DOTS */
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .status-dot.active { background-color: #10b981; box-shadow: 0 0 0 2px #d1fae5; }
+    .status-dot.pending { background-color: #ef4444; box-shadow: 0 0 0 2px #fee2e2; }
+    .status-text { font-size: 9px; text-transform: uppercase; font-weight: 800; color: #94a3b8; margin-left: 4px; }
+    .user-email-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+    /* BUDGET MASTER PANEL */
+    .budget-master {
+      background: #ecfdf5;
+      border: 1px solid #bbf7d0;
+    }
+    .budget-master-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .budget-max-label {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #0f172a;
+    }
+    .budget-input {
+      width: 110px;
+      text-align: right;
+      font-weight: 800;
+      font-size: 16px;
+      background: #ffffff;
+      border-radius: 10px;
+    }
+    .budget-meta-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+    .budget-publish-btn {
+      margin-top: 12px;
+      background: var(--success);
+    }
+    input[type="range"].budget-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      outline: none;
+      margin: 8px 0 4px;
+    }
+    input[type="range"].budget-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--primary);
+      border: none;
+      box-shadow: 0 0 0 4px rgba(37,99,235,0.25);
+      cursor: pointer;
+    }
+    input[type="range"].budget-slider::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--primary);
+      border: none;
+      box-shadow: 0 0 0 4px rgba(37,99,235,0.25);
+      cursor: pointer;
+    }
 
     @media (max-width: 600px) { .group-body.open { grid-template-columns: 1fr; } }
   </style>
@@ -268,7 +331,7 @@
     
     <div class="tab-nav">
       <button id="btnTabTeam" onclick="switchTab('team')" class="btn-tab active">👥 Équipe</button>
-      <button id="btnTabObjs" onclick="switchTab('objs')" class="btn-tab">🎯 Pilotage</button>
+      <button id="btnTabObjs" onclick="switchTab('objs')" class="btn-tab">🎯 Objectifs</button>
       <button id="btnTabLogs" onclick="switchTab('logs')" class="btn-tab" style="display:none;">🕒 Historique</button>
     </div>
 
@@ -298,61 +361,88 @@
     </div>
 
     <div id="tab-objs" style="display:none;">
-      
-      <div class="admin-section" style="border: 2px solid var(--primary);">
-         <h3 class="section-header-large">🎛️ PILOTAGE BUDGET & PRIMES</h3>
-         
-         <div class="cockpit-container">
-            <div class="cockpit-top">
-                <label style="font-size:12px; font-weight:800; margin:0;">BUDGET MAX (€)</label>
-                <input type="number" id="simGlobalBudget" style="width:100px; text-align:right; margin:0; padding:5px;" oninput="updateSim()">
-            </div>
-            
-            <div class="cockpit-gauge-container">
-                <div class="cockpit-gauge-fill" id="simGauge"></div>
-            </div>
-            <div class="cockpit-info">
-                <span id="simUsed">0€ Engagés</span>
-                <span id="simLeft">Reste : 0€</span>
-            </div>
-         </div>
 
-         <div id="simObjList"></div>
+      <!-- PILOTAGE BUDGET & PRIMES – visible admin + super admin -->
+      <div class="admin-section budget-master" id="superAdminBudget" style="display:none;">
+        <h3 class="section-header-large">🛰️ PILOTAGE BUDGET & PRIMES</h3>
 
-         <button class="btn" onclick="publishSim()" style="background:var(--success); margin-top:15px; font-size:14px; font-weight:900;">📡 PUBLIER & APPLIQUER</button>
+        <div class="budget-master-header">
+          <div class="budget-max-label">BUDGET MAX (€)</div>
+          <input
+            type="number"
+            id="budgetInputDisplay"
+            class="budget-input"
+            placeholder="Budget mensuel"
+            oninput="onBudgetInputChange(this.value)"
+          >
+        </div>
+
+        <input
+          type="range"
+          id="budgetSlider"
+          class="budget-slider"
+          min="0"
+          max="5000"
+          step="50"
+          oninput="onBudgetSliderChange(this.value)"
+        >
+
+        <div class="budget-meta-row">
+          <span id="budgetEngaged">0€ engagés</span>
+          <span id="budgetRemaining">Reste : 0€</span>
+        </div>
+
+        <div class="budget-box" style="margin-top:6px;">
+          <div class="budget-text">
+            <span>Engagement Max Théorique (si tous les objectifs sont au max)</span>
+            <span id="budgetDisplay">0€ / 0€</span>
+          </div>
+          <div class="budget-bar-bg">
+            <div class="budget-bar-fill" id="budgetBar"></div>
+          </div>
+          <div id="budgetWarning" style="color:var(--danger); font-size:10px; margin-top:5px; display:none;">
+            ⚠️ Budget dépassé ! Impossible de publier.
+          </div>
+        </div>
+
+        <button class="btn budget-publish-btn" onclick="saveGlobalBudget()">
+          📡 PUBLIER & APPLIQUER
+        </button>
       </div>
 
       <div class="admin-section">
-        <h3 style="font-size:14px; margin-bottom:10px;">📢 Publication (On/Off)</h3>
+        <h3 style="font-size:14px; margin-bottom:10px;">📢 Publication</h3>
         <div id="pubList"></div>
       </div>
       
       <div class="admin-section">
-        <h3 class="section-header-large" style="font-size:14px;">➕ AJOUTER UN OBJECTIF</h3>
-        <input type="text" id="noName" placeholder="Nom">
-        <input type="text" id="noTarget" placeholder="Cible">
+        <h3 class="section-header-large" style="font-size:18px;">➕ CRÉER OBJECTIF</h3>
+        <input type="text" id="noName" placeholder="Nom de l'objectif (Obligatoire)">
+        <input type="text" id="noTarget" placeholder="Cible (ex: 60000) (Obligatoire)">
         
         <div class="options-row">
             <label class="check-label"><input type="checkbox" id="noPrimary" checked> ⚡ Principal</label>
-            <label class="check-label"><input type="checkbox" id="noInverse"> 📉 Inversé</label>
-            <label class="check-label"><input type="checkbox" id="noFixed" onchange="toggleCreateInputs()"> 🎁 Fixe</label>
+            <label class="check-label" title="Si coché: Moins le chiffre est haut, mieux c'est (ex: % erreur)"><input type="checkbox" id="noInverse"> 📉 Inversé</label>
+            <label class="check-label" title="Une seule prime si atteint, pas de paliers"><input type="checkbox" id="noFixed" onchange="toggleCreateInputs()"> 🎁 Prime Fixe</label>
         </div>
 
         <div id="createTiersBlock">
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:5px;"><input type="number" id="c_p1t" placeholder="%"><input type="text" id="c_p1p" placeholder="€ (1)"></div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:5px;"><input type="number" id="c_p2t" placeholder="%"><input type="text" id="c_p2p" placeholder="€ (2)"></div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px;"><input type="number" id="c_p3t" placeholder="%"><input type="text" id="c_p3p" placeholder="€ (3)"></div>
+            <label style="font-size:12px; font-weight:700; margin-bottom:5px; display:block;">3 PALIERS (Base 35h)</label>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:5px;"><input type="number" id="c_p1t" placeholder="%"><input type="text" id="c_p1p" placeholder="€ (Palier 1)"></div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:5px;"><input type="number" id="c_p2t" placeholder="%"><input type="text" id="c_p2p" placeholder="€"></div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px;"><input type="number" id="c_p3t" placeholder="%"><input type="text" id="c_p3p" placeholder="€"></div>
         </div>
 
         <div id="createFixedBlock" style="display:none;">
+             <label style="font-size:12px; font-weight:700; margin-bottom:5px; display:block;">MONTANT PRIME UNIQUE (Base 35h)</label>
              <input type="number" id="c_fixed_p" placeholder="Montant en €">
         </div>
 
-        <button class="btn" onclick="addObj()" style="margin-top:10px;">Ajouter</button>
+        <button class="btn" onclick="addObj()" style="margin-top:15px; font-size:14px;">Ajouter l'Objectif</button>
       </div>
 
       <div class="admin-section">
-        <h3 class="section-header-large" style="font-size:14px;">📝 Modifier / Supprimer</h3>
+        <h3 class="section-header-large">📝 Modifier / Supprimer</h3>
         <div id="objList"></div>
       </div>
     </div>
@@ -427,12 +517,12 @@
     let currentUser = null;
     let allUsers = {};
     let allObjs = {};
-    let allLogs = {};
+    let allLogs = {}; // STORE LOGS FOR CLEANUP
     let globalSettings = { budget: 0 };
     const BASE_HOURS = 35;
-    const SUPER_ADMIN_EMAIL = "lafayetteheiko@gmail.com"; // UPDATED FOR YOU
+    const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
 
-    // CALENDAR DATA
+    // CALENDAR DATA (FROM PDF)
     const calEvents = [
         { t: "HEIKO x STURIA", start: "2025-12-01", end: "2026-01-31", c: "evt-heiko" },
         { t: "Flyers Sturia", start: "2025-12-01", end: "2025-12-31", c: "evt-sturia" },
@@ -441,7 +531,7 @@
         { t: "BOGOF UberEats", start: "2025-12-15", end: "2025-12-21", c: "evt-uber" },
         { t: "Street Marketing", start: "2026-01-01", end: "2026-01-31", c: "evt-street" }
     ];
-    let currentCalDate = new Date(2025, 11, 1);
+    let currentCalDate = new Date(2025, 11, 1); // Dec 2025 Start
 
     // AUTH
     auth.onAuthStateChanged(user => {
@@ -451,16 +541,19 @@
         db.ref('users/' + user.uid).on('value', snap => {
           const val = snap.val();
           if(!val) {
+             // AUTO-CREATE PROFILE IF DELETED
              const def = { name: "Utilisateur", hours:35, role:'staff', email: user.email, status: 'pending' };
              db.ref('users/'+user.uid).set(def);
              currentUser = def;
           } else { 
              currentUser = val; 
+             // AUTO-UPDATE STATUS TO ACTIVE
              if(currentUser.status !== 'active') {
                  db.ref('users/'+user.uid).update({ status: 'active', lastLogin: Date.now() });
              }
           }
           currentUser.uid = user.uid; currentUser.email = user.email;
+          
           const newLogRef = db.ref("logs").push();
           newLogRef.set({ user: currentUser.name, action: "Connexion", type: "session", startTime: Date.now(), lastSeen: Date.now() });
           setInterval(() => { newLogRef.update({ lastSeen: Date.now() }); }, 60000);
@@ -500,14 +593,34 @@
           allObjs = s.val() || {}; 
           try {
              renderDashboard(); 
-             if(currentUser && (currentUser.role === 'admin' || currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase())) {
-                 renderAdminObjs(); renderSimulator();
+             if(currentUser && (currentUser.role === 'admin' || (currentUser.email && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()))) {
+                 renderAdminObjs(); checkBudget();
              }
           } catch(e) { console.error(e); }
       });
-      db.ref('users').on('value', s => { allUsers = s.val() || {}; if(currentUser?.role==='admin') { renderAdminUsers(); renderSimulator(); } });
-      db.ref('settings').on('value', s => { globalSettings = s.val() || { budget: 0 }; if(currentUser?.role==='admin') { renderSimulator(); } });
-      db.ref('logs').limitToLast(2000).on('value', s => { allLogs = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); });
+      db.ref('users').on('value', s => { 
+          allUsers = s.val() || {}; 
+          if(currentUser && currentUser.role === 'admin') { 
+              renderAdminUsers(); 
+              checkBudget(); 
+          }
+          if(currentUser && currentUser.email && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+              renderAdminUsers();
+              checkBudget();
+          }
+      });
+      db.ref('settings').on('value', s => { 
+          globalSettings = s.val() || { budget: 0 }; 
+          if(currentUser && (currentUser.role === 'admin' || (currentUser.email && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()))) {
+              checkBudget();
+          }
+      });
+      
+      // LOAD 2000 LOGS
+      db.ref('logs').limitToLast(2000).on('value', s => { 
+          allLogs = s.val() || {};
+          if(currentUser && currentUser.email && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); 
+      });
     }
 
     function updateUI() {
@@ -515,140 +628,39 @@
       document.getElementById("userName").textContent = currentUser.name;
       document.getElementById("userHours").textContent = (currentUser.hours || 35) + "h";
       const isSuperUser = (currentUser.email && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
-      document.getElementById("btnAdmin").style.display = (currentUser.role === 'admin' || isSuperUser) ? 'block' : 'none';
+      const isAdminLike = (currentUser.role === 'admin' || isSuperUser);
+      document.getElementById("btnAdmin").style.display = isAdminLike ? 'block' : 'none';
       document.getElementById("btnTabLogs").style.display = isSuperUser ? 'block' : 'none';
-      document.getElementById("superAdminBudget").style.display = isSuperUser ? 'block' : 'none';
+      document.getElementById("superAdminBudget").style.display = isAdminLike ? 'block' : 'none';
       renderDashboard();
     }
-
-    // --- COCKPIT SIMULATOR LOGIC ---
-    let simObjs = {}; // Local copy for simulation
-
-    function renderSimulator() {
-        const container = document.getElementById("simObjList");
-        if(container.innerHTML === "") { // Only render if empty to avoid reset while sliding
-             buildSimulatorUI();
-        } else {
-             document.getElementById("simGlobalBudget").value = globalSettings.budget || 0;
-             updateSim(); // refresh gauge
-        }
-    }
-
-    function buildSimulatorUI() {
-        const container = document.getElementById("simObjList");
-        container.innerHTML = "";
-        simObjs = JSON.parse(JSON.stringify(allObjs)); 
-        document.getElementById("simGlobalBudget").value = globalSettings.budget || 0;
-
-        Object.keys(simObjs).forEach(k => {
-            const o = simObjs[k];
-            if(!o.published) return; 
-
-            const div = document.createElement("div"); div.className = "cockpit-obj-row";
-            let slidersHtml = "";
-
-            if(o.isFixed) {
-                const prize = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
-                slidersHtml = `
-                  <div class="slider-row">
-                     <span class="slider-label">Prime Fixe</span>
-                     <input type="range" min="0" max="500" step="5" value="${prize}" oninput="updateObjVal('${k}', 0, this.value)">
-                     <span class="slider-val" id="val-${k}-0">${prize}€</span>
-                  </div>`;
-            } else {
-                (o.paliers || []).forEach((p, i) => {
-                    const prize = parse(p.prize);
-                    slidersHtml += `
-                      <div class="slider-row">
-                         <span class="slider-label">Palier ${p.threshold}%</span>
-                         <input type="range" min="0" max="500" step="5" value="${prize}" oninput="updateObjVal('${k}', ${i}, this.value)">
-                         <span class="slider-val" id="val-${k}-${i}">${prize}€</span>
-                      </div>`;
-                });
-            }
-
-            div.innerHTML = `<div class="cockpit-obj-title"><span>${o.name}</span></div>${slidersHtml}`;
-            container.appendChild(div);
-        });
-        updateSim();
-    }
-
-    function updateObjVal(objId, tierIdx, val) {
-        document.getElementById(`val-${objId}-${tierIdx}`).innerText = val + "€";
-        if(simObjs[objId].paliers && simObjs[objId].paliers[tierIdx]) {
-            simObjs[objId].paliers[tierIdx].prize = val;
-        }
-        updateSim();
-    }
-
-    function updateSim() {
-       const budget = parseFloat(document.getElementById("simGlobalBudget").value) || 0;
-       
-       let totalUserRatio = 0;
-       Object.values(allUsers).forEach(u => { 
-           if(u.role !== 'admin' && u.email !== SUPER_ADMIN_EMAIL) { 
-               totalUserRatio += (u.hours/BASE_HOURS);
-           }
-       });
-
-       let maxLiability = 0;
-       Object.values(simObjs).forEach(o => {
-           if(!o.published) return;
-           let maxP = 0;
-           if(o.paliers) o.paliers.forEach(p => maxP = Math.max(maxP, parse(p.prize)));
-           maxLiability += (maxP * totalUserRatio);
-       });
-
-       const pct = (budget > 0) ? (maxLiability / budget) * 100 : 0;
-       const bar = document.getElementById("simGauge");
-       bar.style.width = Math.min(pct, 100) + "%";
-       
-       if(maxLiability > budget) {
-           bar.classList.add("danger");
-           document.getElementById("simUsed").style.color = "#ef4444";
-       } else {
-           bar.classList.remove("danger");
-           document.getElementById("simUsed").style.color = "#3b82f6";
-       }
-       
-       document.getElementById("simUsed").innerText = `${maxLiability.toFixed(0)}€ Engagés`;
-       document.getElementById("simLeft").innerText = `Reste : ${(budget - maxLiability).toFixed(0)}€`;
-    }
-
-    function publishSim() {
-        if(confirm("📡 Confirmer la publication des nouveaux montants ?")) {
-            const newBudget = parseFloat(document.getElementById("simGlobalBudget").value);
-            db.ref('settings/budget').set(newBudget);
-            const updates = {};
-            Object.keys(simObjs).forEach(k => {
-                updates['objectives/' + k + '/paliers'] = simObjs[k].paliers;
-            });
-            db.ref().update(updates).then(() => {
-                showToast("✅ Pilotage Appliqué !");
-                logAction("Pilotage", "Mise à jour globale budget & primes");
-            });
-        }
-    }
-
-    // --- END COCKPIT ---
 
     /* CALENDAR LOGIC */
     function renderNativeCalendar() {
         const m = currentCalDate.getMonth();
         const y = currentCalDate.getFullYear();
         document.getElementById("calTitle").innerText = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(currentCalDate);
+        
         const firstDay = new Date(y, m, 1);
         const lastDay = new Date(y, m + 1, 0);
         const grid = document.getElementById("calGrid");
         grid.innerHTML = "";
-        let dayOfWeek = firstDay.getDay() - 1; if(dayOfWeek === -1) dayOfWeek = 6; 
+
+        let dayOfWeek = firstDay.getDay() - 1; 
+        if(dayOfWeek === -1) dayOfWeek = 6; 
+
         for(let i=0; i<dayOfWeek; i++) { grid.appendChild(document.createElement("div")); }
+
         for(let d=1; d<=lastDay.getDate(); d++) {
-            const cell = document.createElement("div"); cell.className = "cal-cell";
+            const cell = document.createElement("div");
+            cell.className = "cal-cell";
             cell.innerHTML = `<span class="cal-date">${d}</span>`;
+            
             const cellDate = new Date(y, m, d);
             calEvents.forEach(evt => {
-                const s = new Date(evt.start); const e = new Date(evt.end);
+                const s = new Date(evt.start);
+                const e = new Date(evt.end);
+                // Simple date compare ignoring time
                 if(cellDate.setHours(0,0,0,0) >= s.setHours(0,0,0,0) && cellDate.setHours(0,0,0,0) <= e.setHours(0,0,0,0)) {
                     cell.innerHTML += `<span class="cal-event-dot ${evt.c}">${evt.t}</span>`;
                 }
@@ -659,6 +671,7 @@
     function prevMonth() { currentCalDate.setMonth(currentCalDate.getMonth()-1); renderNativeCalendar(); }
     function nextMonth() { currentCalDate.setMonth(currentCalDate.getMonth()+1); renderNativeCalendar(); }
 
+    /* DASHBOARD LOGIC */
     function renderDashboard() {
       if(!currentUser) return;
       const container = document.getElementById("cardsContainer");
@@ -777,8 +790,16 @@
       return el;
     }
 
-    function toggleAdmin(show) { document.getElementById("adminPanel").classList.toggle("active", show); if(show) { renderAdminUsers(); renderSimulator(); } }
+    function toggleAdmin(show) { 
+      document.getElementById("adminPanel").classList.toggle("active", show); 
+      if(show) { 
+        renderAdminUsers(); 
+        renderAdminObjs(); 
+        checkBudget(); 
+      } 
+    }
     document.getElementById("btnAdmin").onclick = () => toggleAdmin(true);
+
     function switchTab(t) {
        document.querySelectorAll('.btn-tab').forEach(b => b.classList.remove('active'));
        if(t === 'team') document.getElementById('btnTabTeam').classList.add('active');
@@ -788,8 +809,14 @@
        document.getElementById('tab-objs').style.display = t==='objs'?'block':'none';
        document.getElementById('tab-logs').style.display = t==='logs'?'block':'none';
     }
-    function toggleCreateInputs() { document.getElementById("createTiersBlock").style.display = document.getElementById("noFixed").checked ? 'none' : 'block'; document.getElementById("createFixedBlock").style.display = document.getElementById("noFixed").checked ? 'block' : 'none'; }
-    function toggleEditInputs() { document.getElementById("editTiersBlock").style.display = document.getElementById("eoFixed").checked ? 'none' : 'block'; document.getElementById("editFixedBlock").style.display = document.getElementById("eoFixed").checked ? 'block' : 'none'; }
+    function toggleCreateInputs() { 
+      document.getElementById("createTiersBlock").style.display = document.getElementById("noFixed").checked ? 'none' : 'block'; 
+      document.getElementById("createFixedBlock").style.display = document.getElementById("noFixed").checked ? 'block' : 'none'; 
+    }
+    function toggleEditInputs() { 
+      document.getElementById("editTiersBlock").style.display = document.getElementById("eoFixed").checked ? 'none' : 'block'; 
+      document.getElementById("editFixedBlock").style.display = document.getElementById("eoFixed").checked ? 'block' : 'none'; 
+    }
 
     function addObj() {
        const name = document.getElementById("noName").value.trim();
@@ -798,16 +825,35 @@
        if(target.length < 1) { alert("⚠️ La CIBLE est obligatoire."); return; }
        const isFixed = document.getElementById("noFixed").checked;
        let paliers = [];
-       if(isFixed) { paliers = [{ threshold: 100, prize: document.getElementById("c_fixed_p").value }]; } 
-       else { paliers = [{threshold: parseFloat(document.getElementById("c_p1t").value)||50, prize: document.getElementById("c_p1p").value}, {threshold: parseFloat(document.getElementById("c_p2t").value)||100, prize: document.getElementById("c_p2p").value}, {threshold: parseFloat(document.getElementById("c_p3t").value)||120, prize: document.getElementById("c_p3p").value}]; }
+       if(isFixed) { 
+         paliers = [{ threshold: 100, prize: document.getElementById("c_fixed_p").value }]; 
+       } else { 
+         paliers = [
+           {threshold: parseFloat(document.getElementById("c_p1t").value)||50, prize: document.getElementById("c_p1p").value},
+           {threshold: parseFloat(document.getElementById("c_p2t").value)||100, prize: document.getElementById("c_p2p").value},
+           {threshold: parseFloat(document.getElementById("c_p3t").value)||120, prize: document.getElementById("c_p3p").value}
+         ]; 
+       }
        const id = "obj-" + Date.now();
-       db.ref("objectives/"+id).set({ name: name, target: target, current: 0, published: true, isPrimary: document.getElementById("noPrimary").checked, isInverse: document.getElementById("noInverse").checked, isFixed: isFixed, paliers: paliers }).then(() => { showToast("✅ Objectif Ajouté !"); });
+       db.ref("objectives/"+id).set({ 
+         name: name, 
+         target: target, 
+         current: 0, 
+         published: true, 
+         isPrimary: document.getElementById("noPrimary").checked, 
+         isInverse: document.getElementById("noInverse").checked, 
+         isFixed: isFixed, 
+         paliers: paliers 
+       }).then(() => { showToast("✅ Objectif Ajouté !"); });
        logAction("Création Objectif", name);
     }
 
     function renderAdminObjs() {
-      const pl = document.getElementById("pubList"); pl.innerHTML = "";
-      const ol = document.getElementById("objList"); ol.innerHTML = "";
+      const pl = document.getElementById("pubList"); 
+      const ol = document.getElementById("objList"); 
+      if(!pl || !ol) return;
+      pl.innerHTML = "";
+      ol.innerHTML = "";
       Object.keys(allObjs).forEach(k => {
         const o = allObjs[k];
         const d1 = document.createElement("div"); d1.className="pub-item";
@@ -832,11 +878,12 @@
       document.getElementById("eoFixed").checked = o.isFixed || false;
       toggleEditInputs(); 
       if(o.paliers && o.paliers.length > 0) {
-        if(o.isFixed) { document.getElementById("eoFixedPrize").value = o.paliers[0].prize; } 
-        else {
-            if(o.paliers[0]) { document.getElementById("p1t").value = o.paliers[0].threshold; document.getElementById("p1p").value = o.paliers[0].prize; }
-            if(o.paliers[1]) { document.getElementById("p2t").value = o.paliers[1].threshold; document.getElementById("p2p").value = o.paliers[1].prize; }
-            if(o.paliers[2]) { document.getElementById("p3t").value = o.paliers[2].threshold; document.getElementById("p3p").value = o.paliers[2].prize; }
+        if(o.isFixed) { 
+          document.getElementById("eoFixedPrize").value = o.paliers[0].prize; 
+        } else {
+          if(o.paliers[0]) { document.getElementById("p1t").value = o.paliers[0].threshold; document.getElementById("p1p").value = o.paliers[0].prize; }
+          if(o.paliers[1]) { document.getElementById("p2t").value = o.paliers[1].threshold; document.getElementById("p2p").value = o.paliers[1].prize; }
+          if(o.paliers[2]) { document.getElementById("p3t").value = o.paliers[2].threshold; document.getElementById("p3p").value = o.paliers[2].prize; }
         }
       }
       document.getElementById("eoHideTarget").checked = o.hideTarget || false;
@@ -847,20 +894,56 @@
       const id = document.getElementById("eoId").value;
       const isFixed = document.getElementById("eoFixed").checked;
       let paliers = [];
-      if(isFixed) { paliers = [{ threshold: 100, prize: document.getElementById("eoFixedPrize").value }]; } 
-      else { paliers = [{threshold: parseFloat(document.getElementById("p1t").value), prize: document.getElementById("p1p").value}, {threshold: parseFloat(document.getElementById("p2t").value), prize: document.getElementById("p2p").value}, {threshold: parseFloat(document.getElementById("p3t").value), prize: document.getElementById("p3p").value}]; }
-      db.ref("objectives/"+id).update({ name: document.getElementById("eoName").value, current: document.getElementById("eoCurrent").value, target: document.getElementById("eoTarget").value, isPrimary: document.getElementById("eoPrimary").checked, isInverse: document.getElementById("eoInverse").checked, isFixed: isFixed, hideTarget: document.getElementById("eoHideTarget").checked, hideCurrent: document.getElementById("eoHideCurrent").checked, paliers: paliers }).then(() => { showToast("✅ Objectif Modifié !"); document.getElementById("editObjPanel").classList.remove("active"); });
+      if(isFixed) { 
+        paliers = [{ threshold: 100, prize: document.getElementById("eoFixedPrize").value }]; 
+      } else { 
+        paliers = [
+          {threshold: parseFloat(document.getElementById("p1t").value), prize: document.getElementById("p1p").value},
+          {threshold: parseFloat(document.getElementById("p2t").value), prize: document.getElementById("p2p").value},
+          {threshold: parseFloat(document.getElementById("p3t").value), prize: document.getElementById("p3p").value}
+        ]; 
+      }
+      db.ref("objectives/"+id).update({ 
+        name: document.getElementById("eoName").value, 
+        current: document.getElementById("eoCurrent").value, 
+        target: document.getElementById("eoTarget").value, 
+        isPrimary: document.getElementById("eoPrimary").checked, 
+        isInverse: document.getElementById("eoInverse").checked, 
+        isFixed: isFixed, 
+        hideTarget: document.getElementById("eoHideTarget").checked, 
+        hideCurrent: document.getElementById("eoHideCurrent").checked, 
+        paliers: paliers 
+      }).then(() => { 
+        showToast("✅ Objectif Modifié !"); 
+        document.getElementById("editObjPanel").classList.remove("active"); 
+      });
       logAction("Modification", "Objectif : " + document.getElementById("eoName").value);
     }
 
-    function deleteObj(id) { if(confirm("🗑️ Supprimer ?")) { db.ref("objectives/"+id).remove().then(() => showToast("🗑️ Supprimé")); logAction("Suppression", `Objectif ${id}`); } }
-    function togglePub(id, v) { db.ref("objectives/"+id+"/published").set(v); logAction("Publication", `Objectif ${id}: ${v}`); }
+    function deleteObj(id) { 
+      if(confirm("🗑️ Supprimer ?")) { 
+        db.ref("objectives/"+id).remove().then(() => showToast("🗑️ Supprimé")); 
+        logAction("Suppression", `Objectif ${id}`); 
+      } 
+    }
+    function togglePub(id, v) { 
+      db.ref("objectives/"+id+"/published").set(v); 
+      logAction("Publication", `Objectif ${id}: ${v}`); 
+      checkBudget();
+    }
     
+    // CREATE USER
     function createUser() { 
         const email = document.getElementById("nuEmail").value; 
         const sec = firebase.initializeApp(firebaseConfig, "Sec"); 
         sec.auth().createUserWithEmailAndPassword(email, "Temp1234!").then(c => { 
-            db.ref('users/'+c.user.uid).set({ name: document.getElementById("nuName").value, hours: parseFloat(document.getElementById("nuHours").value)||35, role: document.getElementById("nuAdmin").checked?'admin':'staff', email: email, status: 'pending' }); 
+            db.ref('users/'+c.user.uid).set({ 
+              name: document.getElementById("nuName").value, 
+              hours: parseFloat(document.getElementById("nuHours").value)||35, 
+              role: document.getElementById("nuAdmin").checked?'admin':'staff', 
+              email: email, 
+              status: 'pending' 
+            }); 
             sec.auth().sendPasswordResetEmail(email); 
             sec.delete(); 
             showToast("✅ Membre invité !"); 
@@ -888,28 +971,49 @@
     }
 
     function renderAdminUsers() { 
-        const d = document.getElementById("usersList"); d.innerHTML = ""; let totalToPay = 0; 
+        const d = document.getElementById("usersList"); 
+        if(!d) return;
+        d.innerHTML = ""; 
+        let totalToPay = 0; 
         Object.keys(allUsers).forEach(k => { 
             const u = allUsers[k]; 
+            if(!u) return;
             if(u.email && u.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return; 
             const userRatio = (u.hours || 35) / BASE_HOURS; 
             let userBonus = 0; 
             
-            const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); let primOk = true; 
-            if(prims.length > 0) { primOk = prims.every(o => { const pct = getPct(o.current, o.target, o.isInverse); const th = o.isFixed ? 100 : ((o.paliers&&o.paliers[0])?o.paliers[0].threshold:100); return pct >= th; }); } 
-            Object.values(allObjs).forEach(o => { if(!o.published) return; const pct = getPct(o.current, o.target, o.isInverse); const isLocked = !o.isPrimary && !primOk; let g = 0; if(o.isFixed) { if(pct >= 100 && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); } else { if(o.paliers) o.paliers.forEach(p => { if(pct>=p.threshold) g=Math.max(g, parse(p.prize)); }); } if(!isLocked) userBonus += (g * userRatio); }); totalToPay += userBonus; 
+            const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); 
+            let primOk = true; 
+            if(prims.length > 0) { 
+              primOk = prims.every(o => { 
+                const pct = getPct(o.current, o.target, o.isInverse); 
+                const th = o.isFixed ? 100 : ((o.paliers&&o.paliers[0])?o.paliers[0].threshold:100); 
+                return pct >= th; 
+              }); 
+            } 
+
+            Object.values(allObjs).forEach(o => { 
+                if(!o || !o.published) return; 
+                const pct = getPct(o.current, o.target, o.isInverse); 
+                const isLocked = !o.isPrimary && !primOk; 
+                let g = 0; 
+                if(o.isFixed) { 
+                  if(pct >= 100 && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); 
+                } else { 
+                  if(o.paliers) o.paliers.forEach(p => { if(pct>=p.threshold) g=Math.max(g, parse(p.prize)); }); 
+                } 
+                if(!isLocked) userBonus += (g * userRatio); 
+            }); 
+            totalToPay += userBonus; 
             
             const div = document.createElement("div"); div.className = "user-item"; 
             const statusClass = (u.status === 'active') ? 'active' : 'pending';
             const statusLabel = (u.status === 'active') ? 'ACTIF' : 'EN ATTENTE';
             
-            let adminBadge = "";
-            if(u.role === 'admin') adminBadge = `<span class="admin-tag">ADMIN</span>`;
-
             div.innerHTML = `
                 <div class="user-info">
-                    <div class="user-header">
-                        <span class="user-name">${u.name} ${adminBadge}</span>
+                    <div class="user-header" style="display:flex; align-items:center; gap:8px;">
+                        <span class="user-name">${u.name}</span>
                         <div style="display:flex; align-items:center;">
                             <span class="status-dot ${statusClass}"></span>
                             <span class="status-text">${statusLabel}</span>
@@ -926,13 +1030,44 @@
                 </div>`; 
             d.appendChild(div); 
         }); 
-        const totalRow = document.createElement("div"); totalRow.className = "total-row"; totalRow.innerHTML = `<span>TOTAL</span><span>${totalToPay.toFixed(2)} €</span>`; d.appendChild(totalRow); 
+        const totalRow = document.createElement("div"); 
+        totalRow.className = "total-row"; 
+        totalRow.innerHTML = `<span>TOTAL</span><span>${totalToPay.toFixed(2)} €</span>`; 
+        d.appendChild(totalRow); 
     }
 
-    function editUser(uid) { const u = allUsers[uid]; document.getElementById("editUserPanel").classList.add("active"); document.getElementById("euId").value = uid; document.getElementById("euName").value = u.name; document.getElementById("euHours").value = u.hours; document.getElementById("euAdmin").checked = (u.role === 'admin'); }
-    function saveUser() { db.ref('users/'+document.getElementById("euId").value).update({ name: document.getElementById("euName").value, hours: parseFloat(document.getElementById("euHours").value), role: document.getElementById("euAdmin").checked ? 'admin' : 'staff' }); document.getElementById("editUserPanel").classList.remove("active"); showToast("✅ Modifié"); }
-    function deleteUser(uid) { if(confirm("Supprimer ?")) { db.ref('users/'+uid).remove(); showToast("🗑️ Supprimé"); } }
+    function editUser(uid) { 
+      const u = allUsers[uid]; 
+      if(!u) return;
+      document.getElementById("editUserPanel").classList.add("active"); 
+      document.getElementById("euId").value = uid; 
+      document.getElementById("euName").value = u.name; 
+      document.getElementById("euHours").value = u.hours; 
+      document.getElementById("euAdmin").checked = (u.role === 'admin'); 
+      const emailField = document.getElementById("euEmail");
+      if(emailField) emailField.value = u.email || "";
+    }
 
+    function saveUser() { 
+      db.ref('users/'+document.getElementById("euId").value).update({ 
+        name: document.getElementById("euName").value, 
+        hours: parseFloat(document.getElementById("euHours").value), 
+        role: document.getElementById("euAdmin").checked ? 'admin' : 'staff' 
+      }); 
+      document.getElementById("editUserPanel").classList.remove("active"); 
+      showToast("✅ Modifié"); 
+      checkBudget();
+    }
+
+    function deleteUser(uid) { 
+      if(confirm("Supprimer ?")) { 
+        db.ref('users/'+uid).remove(); 
+        showToast("🗑️ Supprimé"); 
+        checkBudget();
+      } 
+    }
+
+    // HISTORY CLEANUP FUNCTION
     function deleteUserLogs(targetName) {
         if(confirm("🗑️ Effacer tout l'historique de " + targetName + " ?")) {
             const updates = {};
@@ -944,18 +1079,26 @@
     }
 
     function renderLogs(logs) {
-      const container = document.getElementById("logsContainer"); container.innerHTML = "";
+      const container = document.getElementById("logsContainer"); 
+      if(!container) return;
+      container.innerHTML = "";
       const grouped = {};
       Object.values(logs || {}).forEach(log => {
           if(!grouped[log.user]) grouped[log.user] = { lastSeen: 0, sessions: [], actions: [] };
-          if(log.type === 'session') { grouped[log.user].sessions.push(log); if(log.lastSeen > grouped[log.user].lastSeen) grouped[log.user].lastSeen = log.lastSeen; } 
-          else { grouped[log.user].actions.push(log); if(log.time > grouped[log.user].lastSeen) grouped[log.user].lastSeen = log.time; }
+          if(log.type === 'session') { 
+            grouped[log.user].sessions.push(log); 
+            if(log.lastSeen > grouped[log.user].lastSeen) grouped[log.user].lastSeen = log.lastSeen; 
+          } else { 
+            grouped[log.user].actions.push(log); 
+            if(log.time > grouped[log.user].lastSeen) grouped[log.user].lastSeen = log.time; 
+          }
       });
       const sortedUsers = Object.keys(grouped).sort((a,b) => grouped[b].lastSeen - grouped[a].lastSeen);
       sortedUsers.forEach(uName => {
           const g = grouped[uName];
           const d = new Date(g.lastSeen);
-          g.sessions.sort((a,b) => b.startTime - a.startTime); g.actions.sort((a,b) => b.time - a.time);
+          g.sessions.sort((a,b) => b.startTime - a.startTime); 
+          g.actions.sort((a,b) => b.time - a.time);
           const div = document.createElement("div"); div.className = "log-user-group";
           div.innerHTML = `
              <div class="group-header">
@@ -967,29 +1110,170 @@
                 <div><div class="log-col-title">🛠️ Activité</div><div class="log-list" id="act-${uName}"></div></div>
              </div>`;
           container.appendChild(div);
-          const sc = document.getElementById(`sess-${uName}`); if(g.sessions.length===0) sc.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; else g.sessions.forEach(s=>{ const st=new Date(s.startTime); const m=Math.floor((s.lastSeen-s.startTime)/60000); const dt=(m>60)?Math.floor(m/60)+"h "+(m%60)+"m":m+"m"; sc.innerHTML+=`<div class="log-entry"><span class="log-dot">🟢</span><span class="log-time-s">${st.toLocaleDateString().slice(0,5)} ${st.toLocaleTimeString().slice(0,5)}</span><span class="log-dur">${dt}</span></div>`; });
-          const ac = document.getElementById(`act-${uName}`); if(g.actions.length===0) ac.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; else g.actions.forEach(a=>{ const at=new Date(a.time); ac.innerHTML+=`<div class="log-entry"><span class="log-dot">🔵</span><span class="log-time-s">${at.toLocaleDateString().slice(0,5)} ${at.toLocaleTimeString().slice(0,5)}</span><span class="log-desc">${a.action} <span style="color:#94a3b8;">${a.detail}</span></span></div>`; });
+          const sc = document.getElementById(`sess-${uName}`); 
+          if(g.sessions.length===0) sc.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; 
+          else g.sessions.forEach(s=>{ 
+            const st=new Date(s.startTime); 
+            const m=Math.floor((s.lastSeen-s.startTime)/60000); 
+            const dt=(m>60)?Math.floor(m/60)+"h "+(m%60)+"m":m+"m"; 
+            sc.innerHTML+=`<div class="log-entry"><span class="log-dot">🟢</span><span class="log-time-s">${st.toLocaleDateString().slice(0,5)} ${st.toLocaleTimeString().slice(0,5)}</span><span class="log-dur">${dt}</span></div>`; 
+          });
+          const ac = document.getElementById(`act-${uName}`); 
+          if(g.actions.length===0) ac.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; 
+          else g.actions.forEach(a=>{ 
+            const at=new Date(a.time); 
+            ac.innerHTML+=`<div class="log-entry"><span class="log-dot">🔵</span><span class="log-time-s">${at.toLocaleDateString().slice(0,5)} ${at.toLocaleTimeString().slice(0,5)}</span><span class="log-desc">${a.action} <span style="color:#94a3b8;">${a.detail}</span></span></div>`; 
+          });
       });
     }
 
-    function saveGlobalBudget() { const val = parseFloat(document.getElementById("globalBudgetInput").value); if(!isNaN(val)) { db.ref('settings/budget').set(val); showToast("💰 Sauvegardé"); } }
+    /* === BUDGET : CALCUL MAX LIABILITÉ (tous objectifs au max) === */
+    function computeMaxLiability() {
+       let totalUserRatio = 0;
+       Object.values(allUsers).forEach(u => {
+          if (!u) return;
+          if (u.email && u.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return;
+          const h = parseFloat(u.hours || BASE_HOURS);
+          totalUserRatio += h / BASE_HOURS;
+       });
+
+       let maxLiability = 0;
+       Object.values(allObjs).forEach(o => {
+          if (!o || !o.published) return;
+          let maxP = 0;
+          if (o.paliers) {
+            o.paliers.forEach(p => {
+              const v = parse(p.prize);
+              if (v > maxP) maxP = v;
+            });
+          }
+          maxLiability += maxP * totalUserRatio;
+       });
+
+       return { maxLiability, totalUserRatio };
+    }
+
     function checkBudget() {
-       const budget = globalSettings.budget || 0; let maxLiability = 0; let totalUserRatio = 0;
-       Object.values(allUsers).forEach(u => { if(!u.email || u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) totalUserRatio += (u.hours/BASE_HOURS); });
-       Object.values(allObjs).forEach(o => { if(!o.published) return; let maxP = 0; if(o.paliers) o.paliers.forEach(p => maxP = Math.max(maxP, parse(p.prize))); maxLiability += (maxP * totalUserRatio); });
-       document.getElementById("budgetDisplay").innerText = `${maxLiability.toFixed(0)}€ / ${budget}€`;
-       const pct = (maxLiability / budget) * 100; const bar = document.getElementById("budgetBar"); bar.style.width = Math.min(pct, 100) + "%";
-       if(maxLiability > budget) { bar.classList.add("danger"); document.getElementById("budgetWarning").style.display = "block"; } else { bar.classList.remove("danger"); document.getElementById("budgetWarning").style.display = "none"; }
+       const budget = globalSettings.budget || 0;
+       const { maxLiability } = computeMaxLiability();
+
+       const bar = document.getElementById("budgetBar");
+       const disp = document.getElementById("budgetDisplay");
+       const warn = document.getElementById("budgetWarning");
+       const slider = document.getElementById("budgetSlider");
+       const input = document.getElementById("budgetInputDisplay");
+       const engagedSpan = document.getElementById("budgetEngaged");
+       const remainingSpan = document.getElementById("budgetRemaining");
+       if (!bar || !disp || !warn || !slider || !input || !engagedSpan || !remainingSpan) return;
+
+       const safeBudget = isNaN(budget) ? 0 : budget;
+       const engaged = maxLiability;
+       const remaining = safeBudget - engaged;
+       const pct = safeBudget > 0 ? (engaged / safeBudget) * 100 : 0;
+
+       slider.max = Math.max(1000, engaged * 1.2, safeBudget * 1.2);
+       slider.value = safeBudget;
+       input.value = safeBudget ? safeBudget.toFixed(0) : "";
+
+       engagedSpan.textContent = engaged.toFixed(0) + "€ engagés";
+       remainingSpan.textContent =
+         (remaining >= 0 ? "Reste : " : "Dépassement : ") +
+         Math.abs(remaining).toFixed(0) + "€";
+
+       disp.textContent = engaged.toFixed(0) + "€ / " + safeBudget.toFixed(0) + "€";
+       bar.style.width = Math.min(pct, 100) + "%";
+
+       if (engaged > safeBudget && safeBudget > 0) {
+          bar.classList.add("danger");
+          warn.style.display = "block";
+       } else {
+          bar.classList.remove("danger");
+          warn.style.display = "none";
+       }
+    }
+
+    function onBudgetSliderChange(val) {
+       const v = parseFloat(val) || 0;
+       const input = document.getElementById("budgetInputDisplay");
+       if (input) input.value = v.toFixed(0);
+
+       const { maxLiability } = computeMaxLiability();
+       applyBudgetPreview(v, maxLiability);
+    }
+
+    function onBudgetInputChange(val) {
+       const v = parseFloat(val);
+       const slider = document.getElementById("budgetSlider");
+       if (!slider) return;
+       if (!isNaN(v)) {
+          slider.value = v;
+          const { maxLiability } = computeMaxLiability();
+          applyBudgetPreview(v, maxLiability);
+       }
+    }
+
+    function applyBudgetPreview(budgetValue, engagedValue) {
+       const bar = document.getElementById("budgetBar");
+       const disp = document.getElementById("budgetDisplay");
+       const warn = document.getElementById("budgetWarning");
+       const engagedSpan = document.getElementById("budgetEngaged");
+       const remainingSpan = document.getElementById("budgetRemaining");
+       if (!bar || !disp || !warn || !engagedSpan || !remainingSpan) return;
+
+       const safeBudget = isNaN(budgetValue) ? 0 : budgetValue;
+       const engaged = engagedValue || 0;
+       const remaining = safeBudget - engaged;
+       const pct = safeBudget > 0 ? (engaged / safeBudget) * 100 : 0;
+
+       engagedSpan.textContent = engaged.toFixed(0) + "€ engagés";
+       remainingSpan.textContent =
+         (remaining >= 0 ? "Reste : " : "Dépassement : ") +
+         Math.abs(remaining).toFixed(0) + "€";
+
+       disp.textContent = engaged.toFixed(0) + "€ / " + safeBudget.toFixed(0) + "€";
+       bar.style.width = Math.min(pct, 100) + "%";
+
+       if (engaged > safeBudget && safeBudget > 0) {
+          bar.classList.add("danger");
+          warn.style.display = "block";
+       } else {
+          bar.classList.remove("danger");
+          warn.style.display = "none";
+       }
+    }
+
+    function saveGlobalBudget() {
+       const slider = document.getElementById("budgetSlider");
+       const input = document.getElementById("budgetInputDisplay");
+       const raw = slider ? slider.value : (input ? input.value : null);
+       const val = parseFloat(raw);
+       if (isNaN(val) || val <= 0) {
+          alert("Veuillez définir un budget valide.");
+          return;
+       }
+       globalSettings.budget = val;
+       db.ref('settings/budget').set(val).then(() => {
+          showToast("📡 Budget publié & appliqué !");
+          logAction("Budget", "Nouveau budget max : " + val + "€");
+          checkBudget();
+       });
     }
 
     function getPct(c, t, isInverse) {
       let cv = parseFloat(String(c).replace(',', '.'));
       let tv = parseFloat(String(t).replace(',', '.'));
       if(isNaN(cv) || isNaN(tv)) return 0;
-      if(isInverse) { if(cv > tv) return 0; if(cv <= tv) return 100; return 0; }
-      if(!tv) return 0; return (cv/tv)*100;
+      if(isInverse) { 
+        if(cv > tv) return 0; 
+        if(cv <= tv) return 100; 
+        return 0; 
+      }
+      if(!tv) return 0; 
+      return (cv/tv)*100;
     }
-    function parse(s) { return parseFloat(String(s).replace(/[^0-9.]/g,''))||0; }
+    function parse(s) { 
+      return parseFloat(String(s).replace(/[^0-9.]/g,''))||0; 
+    }
   </script>
 </body>
 </html>
