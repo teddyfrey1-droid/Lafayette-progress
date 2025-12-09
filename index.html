@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V38 (Roles Final)</title>
+  <title>Heiko - Budget Master V39 (Role Perfect)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -307,13 +307,14 @@
 
     <div id="tab-objs" style="display:none;">
       
-      <div class="admin-section" id="superAdminBudget" style="border: 2px solid var(--primary); display:none;">
+      <div class="admin-section" id="superAdminBudget" style="border: 2px solid var(--primary); display:block;">
          <h3 class="section-header-large">🎛️ PILOTAGE BUDGET & PRIMES</h3>
          
          <div class="cockpit-container">
             <div class="cockpit-top">
                 <label style="font-size:12px; font-weight:800; margin:0;">BUDGET MAX (€)</label>
                 <input type="number" id="simGlobalBudget" style="width:100px; text-align:right; margin:0; padding:5px;" oninput="updateSim()">
+                <button id="btnSaveGlobalBudget" onclick="saveGlobalBudget()" style="border:none; background:var(--primary); color:white; padding:4px 8px; border-radius:4px; font-size:10px; margin-left:5px; cursor:pointer;">OK</button>
             </div>
             
             <div class="cockpit-gauge-container">
@@ -438,7 +439,6 @@
     let allLogs = {};
     let globalSettings = { budget: 0 };
     const BASE_HOURS = 35;
-    // --- UPDATED SUPER ADMIN ---
     const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
 
     // CALENDAR DATA
@@ -529,9 +529,20 @@
       // SHOW ADMIN BUTTON FOR SUPER ADMIN OR NORMAL ADMIN
       document.getElementById("btnAdmin").style.display = (currentUser.role === 'admin' || isSuperUser) ? 'block' : 'none';
       
-      // RESTRICT LOGS & BUDGET COCKPIT TO SUPER ADMIN ONLY
+      // RESTRICT LOGS TO SUPER ADMIN ONLY
       document.getElementById("btnTabLogs").style.display = isSuperUser ? 'block' : 'none';
-      document.getElementById("superAdminBudget").style.display = isSuperUser ? 'block' : 'none';
+      
+      // PERMISSION LOGIC FOR SIMULATOR
+      const globalBudgetInput = document.getElementById("simGlobalBudget");
+      const saveBudgetBtn = document.getElementById("btnSaveGlobalBudget");
+      
+      if(isSuperUser) {
+          globalBudgetInput.disabled = false;
+          saveBudgetBtn.style.display = 'inline-block';
+      } else {
+          globalBudgetInput.disabled = true;
+          saveBudgetBtn.style.display = 'none';
+      }
       
       renderDashboard();
     }
@@ -632,9 +643,14 @@
 
     function publishSim() {
         if(confirm("📡 Confirmer la publication des nouveaux montants ?")) {
-            const newBudget = parseFloat(document.getElementById("simGlobalBudget").value);
-            db.ref('settings/budget').set(newBudget);
             const updates = {};
+            
+            // Only update budget if super admin (failsafe if UI hack)
+            if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+                const newBudget = parseFloat(document.getElementById("simGlobalBudget").value);
+                db.ref('settings/budget').set(newBudget);
+            }
+
             Object.keys(simObjs).forEach(k => {
                 updates['objectives/' + k + '/paliers'] = simObjs[k].paliers;
             });
