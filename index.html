@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V34 (User Status)</title>
+  <title>Heiko - Budget Master V35 (Final Admin)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -149,19 +149,10 @@
     input:checked + .slider:before { transform: translateX(20px); }
     .pub-item { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 12px; border-bottom: 1px solid #f3f4f6; }
     .pub-name { font-weight: 700; font-size: 13px; color: #1f2937; }
-    
-    /* MODIF V34: USER ITEM ENHANCED */
     .user-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f9fafb; border-radius: 10px; margin-bottom: 8px; border: 1px solid #e5e7eb; }
     .user-info { display: flex; flex-direction: column; }
-    .user-header { display: flex; align-items: center; gap: 8px; }
-    .user-name { font-weight: 800; font-size: 14px; color: #1e293b; }
-    .user-email-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-    .status-dot.active { background-color: #10b981; box-shadow: 0 0 0 2px #d1fae5; }
-    .status-dot.pending { background-color: #ef4444; box-shadow: 0 0 0 2px #fee2e2; }
-    .status-text { font-size: 9px; text-transform: uppercase; font-weight: 800; color: #94a3b8; margin-left: 4px; }
-
-    .user-meta { font-size: 11px; color: #6b7280; margin-top: 2px; }
+    .user-name { font-weight: 700; font-size: 13px; color: #1f2937; }
+    .user-meta { font-size: 11px; color: #6b7280; }
     .user-gain { font-weight: 800; font-size: 13px; color: var(--success); background: #ecfdf5; padding: 2px 8px; border-radius: 6px; margin-right: 10px; }
     .total-row { background: #1e293b; color: white; padding: 15px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; font-weight: 900; margin-top: 15px; font-size: 14px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
     .budget-box { background: #f0f9ff; padding: 15px; border-radius: 12px; border: 1px solid #bae6fd; margin-bottom: 20px; }
@@ -185,7 +176,7 @@
     .group-header { background: #f8fafc; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #e2e8f0; transition:0.2s; }
     .group-header:hover { background: #eff6ff; }
     .group-info { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; color: #1e293b; }
-    .last-seen { font-size: 11px; color: #64748b; font-weight: 600; }
+    .last-seen { font-size: 11px; color: #64748b; font-weight: 600; display:flex; align-items:center; gap:8px; }
     .group-body { display: none; padding: 15px; background: white; gap: 20px; }
     .group-body.open { display: grid; grid-template-columns: 1fr 1fr; }
     .log-col-title { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; border-bottom: 2px solid #f1f5f9; padding-bottom: 4px; }
@@ -195,6 +186,16 @@
     .log-time-s { font-weight: 700; color: #64748b; font-size: 11px; min-width: 45px; }
     .log-desc { color: #334155; line-height: 1.3; }
     .log-dur { color: #059669; font-weight: 700; background: #ecfdf5; padding: 0 4px; border-radius: 4px; font-size: 10px; display: inline-block; margin-left: 4px; }
+    .btn-clear-hist { border:none; background:#fee2e2; color:#ef4444; border-radius:4px; padding:2px 6px; font-size:10px; font-weight:700; cursor:pointer; }
+    .btn-clear-hist:hover { background:#fca5a5; }
+
+    /* STATUS DOTS */
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .status-dot.active { background-color: #10b981; box-shadow: 0 0 0 2px #d1fae5; }
+    .status-dot.pending { background-color: #ef4444; box-shadow: 0 0 0 2px #fee2e2; }
+    .status-text { font-size: 9px; text-transform: uppercase; font-weight: 800; color: #94a3b8; margin-left: 4px; }
+    .user-email-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
+
     @media (max-width: 600px) { .group-body.open { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -204,14 +205,11 @@
 
   <div id="loginOverlay">
     <div class="login-box">
-      <h2 class="login-title">Connexion RH</h2>
+      <h2 class="login-title">Connexion Membre</h2>
       <input type="email" id="loginEmail" placeholder="Email (ex: admin@heiko.team)">
       <input type="password" id="loginPass" placeholder="Mot de passe">
       <button class="btn" id="btnLogin">Connexion</button>
       <a onclick="resetPassword()" class="forgot-link">Mot de passe oublié ?</a>
-      <div style="margin-top:30px; border-top:1px solid #eee; padding-top:20px;">
-        <button onclick="createFirstAdmin()" style="width:100%; background:#f3f4f6; border:1px solid #ddd; color:#333; font-size:11px; padding:8px; cursor:pointer;">⚡ Initialiser Admin (Si 1ère fois)</button>
-      </div>
     </div>
   </div>
 
@@ -418,6 +416,7 @@
     let currentUser = null;
     let allUsers = {};
     let allObjs = {};
+    let allLogs = {}; // STORE LOGS FOR CLEANUP
     let globalSettings = { budget: 0 };
     const BASE_HOURS = 35;
     const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
@@ -441,12 +440,13 @@
         db.ref('users/' + user.uid).on('value', snap => {
           const val = snap.val();
           if(!val) {
+             // AUTO-CREATE PROFILE IF DELETED
              const def = { name: "Utilisateur", hours:35, role:'staff', email: user.email, status: 'pending' };
              db.ref('users/'+user.uid).set(def);
              currentUser = def;
           } else { 
              currentUser = val; 
-             // IF LOGGED IN AND PENDING -> SET ACTIVE
+             // AUTO-UPDATE STATUS TO ACTIVE
              if(currentUser.status !== 'active') {
                  db.ref('users/'+user.uid).update({ status: 'active', lastLogin: Date.now() });
              }
@@ -478,13 +478,6 @@
       if (!email) email = prompt("Email pour réinitialisation :");
       if(email) auth.sendPasswordResetEmail(email).then(() => alert("Email envoyé !")).catch(e => alert(e.message));
     };
-    window.createFirstAdmin = () => {
-      const email = "admin@heiko.team"; const pass = "heiko2025";
-      auth.createUserWithEmailAndPassword(email, pass).then(c => {
-        db.ref('users/'+c.user.uid).set({ name:"Admin", hours:35, role:"admin", email:email, status: 'active' });
-        alert("Compte Admin créé !");
-      }).catch(e => alert(e.message));
-    };
 
     function logAction(action, detail) {
         db.ref("logs").push({ user: currentUser ? currentUser.name : "Inconnu", action: action, detail: detail || "", type: "action", time: Date.now() });
@@ -506,7 +499,12 @@
       });
       db.ref('users').on('value', s => { allUsers = s.val() || {}; if(currentUser?.role==='admin') { renderAdminUsers(); checkBudget(); } });
       db.ref('settings').on('value', s => { globalSettings = s.val() || { budget: 0 }; if(currentUser?.role==='admin') checkBudget(); });
-      db.ref('logs').limitToLast(500).on('value', s => { if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(s.val()||{}); });
+      
+      // LOAD 2000 LOGS
+      db.ref('logs').limitToLast(2000).on('value', s => { 
+          allLogs = s.val() || {};
+          if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); 
+      });
     }
 
     function updateUI() {
@@ -754,7 +752,7 @@
     function deleteObj(id) { if(confirm("🗑️ Supprimer ?")) { db.ref("objectives/"+id).remove().then(() => showToast("🗑️ Supprimé")); logAction("Suppression", `Objectif ${id}`); } }
     function togglePub(id, v) { db.ref("objectives/"+id+"/published").set(v); logAction("Publication", `Objectif ${id}: ${v}`); }
     
-    // MODIFIED CREATE USER TO HANDLE "ALREADY EXISTS"
+    // MODIFIED CREATE USER (INSTANT PENDING)
     function createUser() { 
         const email = document.getElementById("nuEmail").value; 
         const sec = firebase.initializeApp(firebaseConfig, "Sec"); 
@@ -795,12 +793,10 @@
             const userRatio = (u.hours || 35) / BASE_HOURS; 
             let userBonus = 0; 
             
-            // Calc bonus logic...
             const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); let primOk = true; 
             if(prims.length > 0) { primOk = prims.every(o => { const pct = getPct(o.current, o.target, o.isInverse); const th = o.isFixed ? 100 : ((o.paliers&&o.paliers[0])?o.paliers[0].threshold:100); return pct >= th; }); } 
             Object.values(allObjs).forEach(o => { if(!o.published) return; const pct = getPct(o.current, o.target, o.isInverse); const isLocked = !o.isPrimary && !primOk; let g = 0; if(o.isFixed) { if(pct >= 100 && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); } else { if(o.paliers) o.paliers.forEach(p => { if(pct>=p.threshold) g=Math.max(g, parse(p.prize)); }); } if(!isLocked) userBonus += (g * userRatio); }); totalToPay += userBonus; 
             
-            // UI Generation
             const div = document.createElement("div"); div.className = "user-item"; 
             const statusClass = (u.status === 'active') ? 'active' : 'pending';
             const statusLabel = (u.status === 'active') ? 'ACTIF' : 'EN ATTENTE';
@@ -832,6 +828,17 @@
     function saveUser() { db.ref('users/'+document.getElementById("euId").value).update({ name: document.getElementById("euName").value, hours: parseFloat(document.getElementById("euHours").value), role: document.getElementById("euAdmin").checked ? 'admin' : 'staff' }); document.getElementById("editUserPanel").classList.remove("active"); showToast("✅ Modifié"); }
     function deleteUser(uid) { if(confirm("Supprimer ?")) { db.ref('users/'+uid).remove(); showToast("🗑️ Supprimé"); } }
 
+    // HISTORY CLEANUP FUNCTION
+    function deleteUserLogs(targetName) {
+        if(confirm("🗑️ Effacer tout l'historique de " + targetName + " ?")) {
+            const updates = {};
+            Object.keys(allLogs).forEach(k => {
+                if(allLogs[k].user === targetName) updates['logs/'+k] = null;
+            });
+            db.ref().update(updates).then(() => showToast("Historique nettoyé !"));
+        }
+    }
+
     function renderLogs(logs) {
       const container = document.getElementById("logsContainer"); container.innerHTML = "";
       const grouped = {};
@@ -846,7 +853,15 @@
           const d = new Date(g.lastSeen);
           g.sessions.sort((a,b) => b.startTime - a.startTime); g.actions.sort((a,b) => b.time - a.time);
           const div = document.createElement("div"); div.className = "log-user-group";
-          div.innerHTML = `<div class="group-header" onclick="this.nextElementSibling.classList.toggle('open')"><div class="group-info">👤 ${uName}</div><div class="last-seen">${d.toLocaleString()} ▼</div></div><div class="group-body"><div><div class="log-col-title">🔌 Connexions</div><div class="log-list" id="sess-${uName}"></div></div><div><div class="log-col-title">🛠️ Activité</div><div class="log-list" id="act-${uName}"></div></div></div>`;
+          div.innerHTML = `
+             <div class="group-header">
+                <div class="group-info" onclick="this.parentElement.nextElementSibling.classList.toggle('open')" style="flex:1;">👤 ${uName} <span style="font-weight:400; font-size:11px; color:#64748b; margin-left:10px;">(Dernière: ${d.toLocaleString()})</span></div>
+                <button onclick="deleteUserLogs('${uName}')" class="btn-clear-hist" title="Effacer historique">🗑️ Effacer</button>
+             </div>
+             <div class="group-body">
+                <div><div class="log-col-title">🔌 Connexions</div><div class="log-list" id="sess-${uName}"></div></div>
+                <div><div class="log-col-title">🛠️ Activité</div><div class="log-list" id="act-${uName}"></div></div>
+             </div>`;
           container.appendChild(div);
           const sc = document.getElementById(`sess-${uName}`); if(g.sessions.length===0) sc.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; else g.sessions.forEach(s=>{ const st=new Date(s.startTime); const m=Math.floor((s.lastSeen-s.startTime)/60000); const dt=(m>60)?Math.floor(m/60)+"h "+(m%60)+"m":m+"m"; sc.innerHTML+=`<div class="log-entry"><span class="log-dot">🟢</span><span class="log-time-s">${st.toLocaleDateString().slice(0,5)} ${st.toLocaleTimeString().slice(0,5)}</span><span class="log-dur">${dt}</span></div>`; });
           const ac = document.getElementById(`act-${uName}`); if(g.actions.length===0) ac.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; else g.actions.forEach(a=>{ const at=new Date(a.time); ac.innerHTML+=`<div class="log-entry"><span class="log-dot">🔵</span><span class="log-time-s">${at.toLocaleDateString().slice(0,5)} ${at.toLocaleTimeString().slice(0,5)}</span><span class="log-desc">${a.action} <span style="color:#94a3b8;">${a.detail}</span></span></div>`; });
@@ -864,7 +879,6 @@
     }
 
     function getPct(c, t, isInverse) {
-      // REPLACE COMMA WITH DOT FOR FRENCH INPUTS
       let cv = parseFloat(String(c).replace(',', '.'));
       let tv = parseFloat(String(t).replace(',', '.'));
       if(isNaN(cv) || isNaN(tv)) return 0;
