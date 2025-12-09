@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V41 (Mobile Fix)</title>
+  <title>Heiko - Budget Master V41 (Cockpit Pro)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -72,7 +72,7 @@
     .status-badge { position: absolute; top: 0; left: 0; right: 0; padding: 12px; text-align: center; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; }
     .badge-locked { background: #fff7ed; color: #c2410c; border-bottom: 2px solid #ffedd5; }
     .badge-winner { background: #dcfce7; color: #166534; border-bottom: 2px solid #bbf7d0; }
-    .badge-ready { background: var(--accent); color: white; animation: pulse 2s infinite; }
+    .badge-ready { background: var(--accent); color: white; animation: pulse-green 2s infinite; }
 
     .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; margin-top: 25px; gap: 15px; }
     .obj-info-group { display: flex; align-items: center; flex: 1; }
@@ -117,13 +117,11 @@
     .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     .cal-month-title { font-size: 16px; font-weight: 900; text-transform: uppercase; color: #1e293b; }
     .cal-nav-btn { background: #eff6ff; border: none; width: 30px; height: 30px; border-radius: 50%; color: var(--primary); font-weight: 900; cursor: pointer; }
-    
     .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
     .cal-day-name { text-align: center; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; padding-bottom: 5px; }
     .cal-cell { background: #f8fafc; border-radius: 8px; min-height: 50px; padding: 4px; border: 1px solid #f1f5f9; position: relative; overflow: hidden; }
     .cal-date { font-size: 11px; font-weight: 800; color: #334155; margin-bottom: 2px; display: block; }
     .cal-event-dot { display: block; font-size: 8px; padding: 2px 4px; border-radius: 3px; margin-bottom: 2px; color: white; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; }
-    
     .cal-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e2e8f0; }
     .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: #64748b; }
     .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
@@ -208,11 +206,17 @@
     .cockpit-gauge-fill.danger { background: #ef4444; animation: pulse 1s infinite; }
     .cockpit-info { display: flex; justify-content: space-between; font-size: 12px; font-weight: 800; color: #64748b; }
     .cockpit-obj-row { background: white; padding: 10px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 8px; }
-    .cockpit-obj-title { font-size: 12px; font-weight: 800; margin-bottom: 5px; color: #1e293b; display:flex; justify-content:space-between; }
-    .slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
-    .slider-label { font-size: 10px; font-weight: 700; width: 60px; color: #64748b; }
-    .slider-val { font-size: 11px; font-weight: 800; width: 40px; text-align: right; color: var(--primary); }
-    input[type=range] { flex: 1; accent-color: var(--primary); cursor: pointer; }
+    .cockpit-obj-title { font-size: 13px; font-weight: 900; margin-bottom: 5px; color: #1e293b; display:flex; justify-content:space-between; align-items:center; }
+    .cockpit-obj-cost { font-size: 11px; font-weight:800; color:#3b82f6; background:#eff6ff; padding:2px 6px; border-radius:4px; }
+    .slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .slider-label { font-size: 11px; font-weight: 800; width: 70px; color: #64748b; }
+    .slider-val { font-size: 13px; font-weight: 900; width: 45px; text-align: right; color: var(--primary); }
+    input[type=range] { flex: 1; accent-color: var(--primary); cursor: pointer; height: 6px; }
+
+    /* BUDGET INPUT BIGGER */
+    #simGlobalBudget { font-size: 16px; font-weight: 900; color: #2563eb; border: 2px solid #bfdbfe; padding: 8px; width: 120px; }
+    
+    .sim-footer-total { margin-top: 15px; padding-top: 15px; border-top: 2px dashed #e2e8f0; text-align: center; color: #059669; font-weight: 900; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
 
     @media (max-width: 600px) { .group-body.open { grid-template-columns: 1fr; } }
   </style>
@@ -318,8 +322,8 @@
          <div class="cockpit-container">
             <div class="cockpit-top">
                 <label style="font-size:12px; font-weight:800; margin:0;">BUDGET MAX (€)</label>
-                <input type="number" id="simGlobalBudget" style="width:100px; text-align:right; margin:0; padding:5px;" oninput="updateSim()">
-                <button id="btnSaveGlobalBudget" onclick="saveGlobalBudget()" style="border:none; background:var(--primary); color:white; padding:4px 8px; border-radius:4px; font-size:10px; margin-left:5px; cursor:pointer;">OK</button>
+                <input type="number" id="simGlobalBudget" oninput="updateSim()">
+                <button id="btnSaveGlobalBudget" onclick="saveGlobalBudget()" style="border:none; background:var(--primary); color:white; padding:8px 12px; border-radius:6px; font-size:12px; margin-left:5px; cursor:pointer;">OK</button>
             </div>
             
             <div class="cockpit-gauge-container">
@@ -329,6 +333,8 @@
                 <span id="simUsed">0€ Engagés</span>
                 <span id="simLeft">Reste : 0€</span>
             </div>
+            
+            <div class="sim-footer-total" id="simTotalPerUser">💰 PRIME TOTALE POTENTIELLE (POUR 1 EMPLOYÉ 35H) : 0€</div>
          </div>
 
          <div id="simObjList"></div>
@@ -520,8 +526,8 @@
              }
           } catch(e) { console.error(e); }
       });
-      db.ref('users').on('value', s => { allUsers = s.val() || {}; if(currentUser && currentUser.role==='admin') { renderAdminUsers(); renderSimulator(); } });
-      db.ref('settings').on('value', s => { globalSettings = s.val() || { budget: 0 }; if(currentUser && currentUser.role==='admin') { renderSimulator(); } });
+      db.ref('users').on('value', s => { allUsers = s.val() || {}; if(currentUser && (currentUser.role==='admin' || currentUser.email === SUPER_ADMIN_EMAIL)) { renderAdminUsers(); renderSimulator(); } });
+      db.ref('settings').on('value', s => { globalSettings = s.val() || { budget: 0 }; if(currentUser && (currentUser.role==='admin' || currentUser.email === SUPER_ADMIN_EMAIL)) { renderSimulator(); } });
       db.ref('logs').limitToLast(2000).on('value', s => { allLogs = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); });
     }
 
@@ -531,15 +537,11 @@
       document.getElementById("userHours").textContent = (currentUser.hours || 35) + "h";
       
       const isSuperUser = (currentUser.email && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
-      
-      // Admin Access
       const isAdmin = (currentUser.role === 'admin' || isSuperUser);
+
       document.getElementById("btnAdmin").style.display = isAdmin ? 'block' : 'none';
-      
-      // Restrict Logs to Super Admin
       document.getElementById("btnTabLogs").style.display = isSuperUser ? 'block' : 'none';
       
-      // Permissions Budget
       const globalBudgetInput = document.getElementById("simGlobalBudget");
       const saveBudgetBtn = document.getElementById("btnSaveGlobalBudget");
       
@@ -551,7 +553,6 @@
           saveBudgetBtn.style.display = 'none';
       }
       
-      // Force render lists if admin
       if(isAdmin) {
           renderAdminObjs();
           renderSimulator();
@@ -564,13 +565,8 @@
     let simObjs = {}; 
 
     function renderSimulator() {
-        const container = document.getElementById("simObjList");
-        if(container.innerHTML === "") { 
-             buildSimulatorUI();
-        } else {
-             document.getElementById("simGlobalBudget").value = globalSettings.budget || 0;
-             updateSim(); 
-        }
+        // Just always rebuild the UI to be safe and synced
+        buildSimulatorUI();
     }
 
     function buildSimulatorUI() {
@@ -578,11 +574,28 @@
         container.innerHTML = "";
         simObjs = JSON.parse(JSON.stringify(allObjs)); 
         document.getElementById("simGlobalBudget").value = globalSettings.budget || 0;
+        
+        // CALC TOTAL POTENTIAL PER 35H
+        let totalPotential35h = 0;
 
         Object.keys(simObjs).forEach(k => {
             const o = simObjs[k];
-            // Render all published objectives
             if(!o.published) return; 
+
+            // Add to total potential
+            let maxObjPrize = 0;
+            if(o.isFixed) {
+                maxObjPrize = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
+            } else {
+                if(o.paliers) o.paliers.forEach(p => maxObjPrize = Math.max(maxObjPrize, parse(p.prize)));
+            }
+            totalPotential35h += maxObjPrize;
+
+            // Compute current cost for TEAM
+            let objTotalCost = 0;
+            let totalUserRatio = 0;
+            Object.values(allUsers).forEach(u => { totalUserRatio += (u.hours/BASE_HOURS); });
+            objTotalCost = maxObjPrize * totalUserRatio;
 
             const div = document.createElement("div"); div.className = "cockpit-obj-row";
             let slidersHtml = "";
@@ -607,9 +620,11 @@
                 });
             }
 
-            div.innerHTML = `<div class="cockpit-obj-title"><span>${o.name}</span></div>${slidersHtml}`;
+            div.innerHTML = `<div class="cockpit-obj-title"><span>${o.name}</span> <span class="cockpit-obj-cost" id="cost-${k}">Coût équipe : ${objTotalCost.toFixed(0)}€</span></div>${slidersHtml}`;
             container.appendChild(div);
         });
+        
+        document.getElementById("simTotalPerUser").innerText = `💰 PRIME TOTALE POTENTIELLE (POUR 1 EMPLOYÉ 35H) : ${totalPotential35h.toFixed(0)}€`;
         updateSim();
     }
 
@@ -625,21 +640,31 @@
        const budget = parseFloat(document.getElementById("simGlobalBudget").value) || 0;
        
        let totalUserRatio = 0;
-       // FIXED CALCULATION: INCLUDE EVERYONE (ADMINS + STAFF)
        Object.values(allUsers).forEach(u => { 
            totalUserRatio += (u.hours/BASE_HOURS);
        });
 
        let maxLiability = 0;
-       Object.values(simObjs).forEach(o => {
+       let totalPotential35h = 0;
+
+       Object.keys(simObjs).forEach(k => {
+           const o = simObjs[k];
            if(!o.published) return;
-           let objTotal = 0;
+           
+           let maxP = 0;
            if(o.isFixed) {
-               objTotal = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
+               maxP = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
            } else {
-               if(o.paliers) o.paliers.forEach(p => objTotal += parse(p.prize)); // SUM of tiers
+               if(o.paliers) o.paliers.forEach(p => maxP = Math.max(maxP, parse(p.prize)));
            }
-           maxLiability += (objTotal * totalUserRatio);
+           
+           // Update individual cost display in real time
+           const objCost = maxP * totalUserRatio;
+           const costLabel = document.getElementById(`cost-${k}`);
+           if(costLabel) costLabel.innerText = `Coût équipe : ${objCost.toFixed(0)}€`;
+
+           maxLiability += objCost;
+           totalPotential35h += maxP;
        });
 
        const pct = (budget > 0) ? (maxLiability / budget) * 100 : 0;
@@ -656,17 +681,16 @@
        
        document.getElementById("simUsed").innerText = `${maxLiability.toFixed(0)}€ Engagés`;
        document.getElementById("simLeft").innerText = `Reste : ${(budget - maxLiability).toFixed(0)}€`;
+       document.getElementById("simTotalPerUser").innerText = `💰 PRIME TOTALE POTENTIELLE (POUR 1 EMPLOYÉ 35H) : ${totalPotential35h.toFixed(0)}€`;
     }
 
     function publishSim() {
         if(confirm("📡 Confirmer la publication des nouveaux montants ?")) {
             const updates = {};
-            
             if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
                 const newBudget = parseFloat(document.getElementById("simGlobalBudget").value);
                 db.ref('settings/budget').set(newBudget);
             }
-
             Object.keys(simObjs).forEach(k => {
                 updates['objectives/' + k + '/paliers'] = simObjs[k].paliers;
             });
@@ -806,10 +830,9 @@
           (obj.paliers||[]).forEach((p, i) => {
                const u = pct >= p.threshold;
                const currentTotal = parse(p.prize);
-               const diff = currentTotal - prevVal;
-               const displayVal = (diff * userRatio).toFixed(2);
-               prevVal = currentTotal;
-               middleHtml += `<div class="ms-item ${u?'unlocked':''}"><div class="ms-threshold">${p.threshold}%</div><div class="ms-circle">${u?emojis[i%3]:(i+1)}</div><div class="ms-prize">+${displayVal}€</div></div>`;
+               // FIX DISPLAY LOGIC: Show absolute total reached
+               const displayVal = (currentTotal * userRatio).toFixed(2);
+               middleHtml += `<div class="ms-item ${u?'unlocked':''}"><div class="ms-threshold">${p.threshold}%</div><div class="ms-circle">${u?emojis[i%3]:(i+1)}</div><div class="ms-prize">${displayVal}€</div></div>`;
           });
           middleHtml += `</div>`;
       }
