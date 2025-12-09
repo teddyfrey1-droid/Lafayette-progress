@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V32 (Fix & Planning)</title>
+  <title>Heiko - Budget Master V33 (Smart Admin)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -728,7 +728,28 @@
 
     function deleteObj(id) { if(confirm("🗑️ Supprimer ?")) { db.ref("objectives/"+id).remove().then(() => showToast("🗑️ Supprimé")); logAction("Suppression", `Objectif ${id}`); } }
     function togglePub(id, v) { db.ref("objectives/"+id+"/published").set(v); logAction("Publication", `Objectif ${id}: ${v}`); }
-    function createUser() { const email = document.getElementById("nuEmail").value; const sec = firebase.initializeApp(firebaseConfig, "Sec"); sec.auth().createUserWithEmailAndPassword(email, "Temp1234!").then(c => { db.ref('users/'+c.user.uid).set({ name: document.getElementById("nuName").value, hours: parseFloat(document.getElementById("nuHours").value)||35, role: document.getElementById("nuAdmin").checked?'admin':'staff', email: email }); sec.auth().sendPasswordResetEmail(email); sec.delete(); showToast("✅ Membre invité !"); }).catch(e => { alert(e.message); sec.delete(); }); }
+    
+    function createUser() { 
+        const email = document.getElementById("nuEmail").value; 
+        const sec = firebase.initializeApp(firebaseConfig, "Sec"); 
+        sec.auth().createUserWithEmailAndPassword(email, "Temp1234!").then(c => { 
+            db.ref('users/'+c.user.uid).set({ name: document.getElementById("nuName").value, hours: parseFloat(document.getElementById("nuHours").value)||35, role: document.getElementById("nuAdmin").checked?'admin':'staff', email: email }); 
+            sec.auth().sendPasswordResetEmail(email); 
+            sec.delete(); 
+            showToast("✅ Membre invité !"); 
+        }).catch(e => { 
+            if(e.code === 'auth/email-already-in-use') {
+                sec.auth().sendPasswordResetEmail(email).then(() => {
+                    alert("⚠️ Ce membre existe déjà (archives). Un email lui a été envoyé pour réactiver son compte.");
+                    sec.delete();
+                });
+            } else {
+                alert(e.message); 
+                sec.delete();
+            }
+        }); 
+    }
+
     function resendInvite(email) { if(confirm("Renvoyer mail ?")) auth.sendPasswordResetEmail(email).then(() => showToast("📩 Envoyé !")); }
     function renderAdminUsers() { const d = document.getElementById("usersList"); d.innerHTML = ""; let totalToPay = 0; Object.keys(allUsers).forEach(k => { const u = allUsers[k]; if(u.email && u.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return; const userRatio = (u.hours || 35) / BASE_HOURS; let userBonus = 0; const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); let primOk = true; if(prims.length > 0) { primOk = prims.every(o => { const pct = getPct(o.current, o.target, o.isInverse); const th = o.isFixed ? 100 : ((o.paliers&&o.paliers[0])?o.paliers[0].threshold:100); return pct >= th; }); } Object.values(allObjs).forEach(o => { if(!o.published) return; const pct = getPct(o.current, o.target, o.isInverse); const isLocked = !o.isPrimary && !primOk; let g = 0; if(o.isFixed) { if(pct >= 100 && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); } else { if(o.paliers) o.paliers.forEach(p => { if(pct>=p.threshold) g=Math.max(g, parse(p.prize)); }); } if(!isLocked) userBonus += (g * userRatio); }); totalToPay += userBonus; const div = document.createElement("div"); div.className = "user-item"; div.innerHTML = `<div class="user-info"><div class="user-name">${u.name}</div><div class="user-meta">${u.hours}h</div></div><div class="user-actions"><div class="user-gain">${userBonus.toFixed(2)}€</div><button onclick="resendInvite('${u.email}')" class="action-btn">📩</button><button onclick="editUser('${k}')" class="action-btn">✏️</button><button onclick="deleteUser('${k}')" class="action-btn delete">🗑️</button></div>`; d.appendChild(div); }); const totalRow = document.createElement("div"); totalRow.className = "total-row"; totalRow.innerHTML = `<span>TOTAL</span><span>${totalToPay.toFixed(2)} €</span>`; d.appendChild(totalRow); }
     function editUser(uid) { const u = allUsers[uid]; document.getElementById("editUserPanel").classList.add("active"); document.getElementById("euId").value = uid; document.getElementById("euName").value = u.name; document.getElementById("euHours").value = u.hours; document.getElementById("euAdmin").checked = (u.role === 'admin'); }
