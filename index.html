@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V39 (Role Perfect)</title>
+  <title>Heiko - Budget Master V40 (Fixed)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -84,18 +84,8 @@
     .data-box-label { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px; }
     .data-box-value { font-size: 20px; font-weight: 900; color: #1e293b; line-height: 1; }
 
-    /* BARRE AVEC RAYURES ACTIVES */
     .progress-track { height: 30px; background: #e5e7eb; border-radius: 99px; overflow: hidden; margin-bottom: 40px; position: relative; display: flex; }
-    .progress-fill { 
-        height: 100%; 
-        background-color: var(--primary);
-        /* Rayures */
-        background-image: linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent);
-        background-size: 40px 40px; 
-        animation: moveStripes 1s linear infinite; 
-        transition: width 1s ease; 
-        position: relative; 
-    }
+    .progress-fill { height: 100%; background-color: var(--primary); background-image: linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent); background-size: 40px 40px; animation: moveStripes 1s linear infinite; transition: width 1s ease; position: relative; }
     .progress-fill.green-mode { background-color: var(--success); }
     .progress-overdrive { height: 100%; background: repeating-linear-gradient(45deg, var(--danger), var(--danger) 10px, #ef4444 10px, #ef4444 20px); width: 0; transition: width 1s ease; position: relative; }
     .percent-float { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); font-size: 13px; font-weight: 900; color: white; z-index: 5; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
@@ -114,16 +104,18 @@
     .earned-badge-container { margin-top: 30px; display: flex; justify-content: center; }
     .earned-badge { background: #dcfce7; color: #166534; padding: 12px 24px; border-radius: 16px; font-weight: 900; font-size: 18px; border: 2px solid #86efac; display: inline-flex; align-items: center; gap: 10px; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.15); animation: pulse-green 2s infinite; }
 
-    /* --- NATIVE CALENDAR --- */
-    .native-cal-container { margin-top: 60px; background: white; border-radius: 20px; padding: 25px; box-shadow: 0 15px 40px -5px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
+    /* --- NATIVE CALENDAR MOBILE OPTIMIZED --- */
+    .native-cal-container { margin-top: 60px; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 15px 40px -5px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
     .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    .cal-month-title { font-size: 18px; font-weight: 900; text-transform: uppercase; color: #1e293b; }
+    .cal-month-title { font-size: 16px; font-weight: 900; text-transform: uppercase; color: #1e293b; }
     .cal-nav-btn { background: #eff6ff; border: none; width: 30px; height: 30px; border-radius: 50%; color: var(--primary); font-weight: 900; cursor: pointer; }
-    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
-    .cal-day-name { text-align: center; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; padding-bottom: 10px; }
-    .cal-cell { background: #f8fafc; border-radius: 10px; min-height: 80px; padding: 8px; border: 1px solid #f1f5f9; position: relative; }
-    .cal-date { font-size: 12px; font-weight: 800; color: #334155; margin-bottom: 5px; display: block; }
-    .cal-event-dot { display: block; font-size: 10px; padding: 3px 6px; border-radius: 4px; margin-bottom: 3px; color: white; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; } /* Gap reduced for mobile */
+    .cal-day-name { text-align: center; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; padding-bottom: 5px; }
+    .cal-cell { background: #f8fafc; border-radius: 8px; min-height: 50px; padding: 4px; border: 1px solid #f1f5f9; position: relative; overflow: hidden; }
+    .cal-date { font-size: 11px; font-weight: 800; color: #334155; margin-bottom: 2px; display: block; }
+    .cal-event-dot { display: block; font-size: 8px; padding: 2px 4px; border-radius: 3px; margin-bottom: 2px; color: white; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; }
+    
     .evt-sturia { background-color: #f59e0b; }
     .evt-heiko { background-color: #3b82f6; }
     .evt-deliv { background-color: #ef4444; }
@@ -552,12 +544,8 @@
 
     function renderSimulator() {
         const container = document.getElementById("simObjList");
-        if(container.innerHTML === "") { 
-             buildSimulatorUI();
-        } else {
-             document.getElementById("simGlobalBudget").value = globalSettings.budget || 0;
-             updateSim(); 
-        }
+        // Always rebuild to keep sync
+        buildSimulatorUI();
     }
 
     function buildSimulatorUI() {
@@ -568,8 +556,8 @@
 
         Object.keys(simObjs).forEach(k => {
             const o = simObjs[k];
-            if(!o.published) return; 
-
+            // Display ALL objectives (even not published yet) to allow prep
+            
             const div = document.createElement("div"); div.className = "cockpit-obj-row";
             let slidersHtml = "";
 
@@ -611,18 +599,21 @@
        const budget = parseFloat(document.getElementById("simGlobalBudget").value) || 0;
        
        let totalUserRatio = 0;
+       // FIXED CALCULATION: INCLUDE EVERYONE (ADMINS + STAFF)
        Object.values(allUsers).forEach(u => { 
-           if(u.role !== 'admin' && u.email !== SUPER_ADMIN_EMAIL) { 
-               totalUserRatio += (u.hours/BASE_HOURS);
-           }
+           totalUserRatio += (u.hours/BASE_HOURS);
        });
 
        let maxLiability = 0;
        Object.values(simObjs).forEach(o => {
-           if(!o.published) return;
-           let maxP = 0;
-           if(o.paliers) o.paliers.forEach(p => maxP = Math.max(maxP, parse(p.prize)));
-           maxLiability += (maxP * totalUserRatio);
+           // Calc SUM of all tiers per objective (Cumulative)
+           let objTotal = 0;
+           if(o.isFixed) {
+               objTotal = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
+           } else {
+               if(o.paliers) o.paliers.forEach(p => objTotal += parse(p.prize));
+           }
+           maxLiability += (objTotal * totalUserRatio);
        });
 
        const pct = (budget > 0) ? (maxLiability / budget) * 100 : 0;
