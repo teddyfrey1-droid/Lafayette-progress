@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V40 (Calibrated)</title>
+  <title>Heiko - Budget Master V41 (Mobile Fix)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -27,8 +27,10 @@
 
     /* ANIMATIONS */
     @keyframes floatMoney { 0% { transform: translateY(50px) scale(0.5) rotate(0deg); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(-300px) scale(1.5) rotate(45deg); opacity: 0; } }
+    @keyframes pulse-green { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
+    @keyframes slideInDown { from { transform: translate(-50%, -100%); opacity: 0; } to { transform: translate(-50%, 20px); opacity: 1; } }
+    @keyframes slideOutUp { from { transform: translate(-50%, 20px); opacity: 1; } to { transform: translate(-50%, -100%); opacity: 0; } }
     @keyframes moveStripes { 0% { background-position: 0 0; } 100% { background-position: 40px 0; } }
-    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
     /* TOAST */
     #toast { visibility: hidden; min-width: 300px; background-color: var(--success); color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 3000; left: 50%; top: 0; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; transform:translate(-50%, -100%); transition: all 0.3s; }
@@ -110,25 +112,27 @@
     .earned-badge-container { margin-top: 30px; display: flex; justify-content: center; }
     .earned-badge { background: #dcfce7; color: #166534; padding: 12px 24px; border-radius: 16px; font-weight: 900; font-size: 18px; border: 2px solid #86efac; display: inline-flex; align-items: center; gap: 10px; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.15); animation: pulse-green 2s infinite; }
 
-    /* --- NATIVE CALENDAR --- */
-    .native-cal-container { margin-top: 60px; background: white; border-radius: 20px; padding: 25px; box-shadow: 0 15px 40px -5px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
+    /* --- NATIVE CALENDAR MOBILE OPTIMIZED --- */
+    .native-cal-container { margin-top: 60px; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 15px 40px -5px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
     .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    .cal-month-title { font-size: 18px; font-weight: 900; text-transform: uppercase; color: #1e293b; }
+    .cal-month-title { font-size: 16px; font-weight: 900; text-transform: uppercase; color: #1e293b; }
     .cal-nav-btn { background: #eff6ff; border: none; width: 30px; height: 30px; border-radius: 50%; color: var(--primary); font-weight: 900; cursor: pointer; }
-    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
-    .cal-day-name { text-align: center; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; padding-bottom: 10px; }
-    .cal-cell { background: #f8fafc; border-radius: 10px; min-height: 50px; padding: 4px; border: 1px solid #f1f5f9; position: relative; }
-    .cal-date { font-size: 12px; font-weight: 800; color: #334155; margin-bottom: 5px; display: block; }
-    .cal-event-dot { display: block; font-size: 9px; padding: 3px 5px; border-radius: 4px; margin-bottom: 2px; color: white; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .cal-day-name { text-align: center; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; padding-bottom: 5px; }
+    .cal-cell { background: #f8fafc; border-radius: 8px; min-height: 50px; padding: 4px; border: 1px solid #f1f5f9; position: relative; overflow: hidden; }
+    .cal-date { font-size: 11px; font-weight: 800; color: #334155; margin-bottom: 2px; display: block; }
+    .cal-event-dot { display: block; font-size: 8px; padding: 2px 4px; border-radius: 3px; margin-bottom: 2px; color: white; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; }
+    
+    .cal-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e2e8f0; }
+    .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: #64748b; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+
     .evt-sturia { background-color: #f59e0b; }
     .evt-heiko { background-color: #3b82f6; }
     .evt-deliv { background-color: #ef4444; }
     .evt-uber { background-color: #10b981; }
     .evt-street { background-color: #8b5cf6; }
-    
-    .cal-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e2e8f0; }
-    .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: #64748b; }
-    .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
 
     /* ADMIN */
     .admin-panel { position: fixed; top: 0; right: 0; bottom: 0; width: 100%; max-width: 600px; background: #f8fafc; z-index: 2000; box-shadow: -10px 0 40px rgba(0,0,0,0.1); padding: 20px; transform: translateX(100%); transition: transform 0.3s ease; overflow-y: auto; border-left: 1px solid #e5e7eb; }
@@ -621,6 +625,7 @@
        const budget = parseFloat(document.getElementById("simGlobalBudget").value) || 0;
        
        let totalUserRatio = 0;
+       // FIXED CALCULATION: INCLUDE EVERYONE (ADMINS + STAFF)
        Object.values(allUsers).forEach(u => { 
            totalUserRatio += (u.hours/BASE_HOURS);
        });
@@ -684,7 +689,7 @@
         const grid = document.getElementById("calGrid");
         const legend = document.getElementById("calLegend");
         grid.innerHTML = "";
-        legend.innerHTML = ""; // Clear old legend
+        legend.innerHTML = ""; 
 
         let dayOfWeek = firstDay.getDay() - 1; if(dayOfWeek === -1) dayOfWeek = 6; 
         for(let i=0; i<dayOfWeek; i++) { grid.appendChild(document.createElement("div")); }
@@ -1037,7 +1042,6 @@
     }
 
     function getPct(c, t, isInverse) {
-      // REPLACE COMMA WITH DOT FOR FRENCH INPUTS
       let cv = parseFloat(String(c).replace(',', '.'));
       let tv = parseFloat(String(t).replace(',', '.'));
       if(isNaN(cv) || isNaN(tv)) return 0;
