@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V40 (Fixed)</title>
+  <title>Heiko - Budget Master V40 (Calibrated)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -27,15 +27,12 @@
 
     /* ANIMATIONS */
     @keyframes floatMoney { 0% { transform: translateY(50px) scale(0.5) rotate(0deg); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(-300px) scale(1.5) rotate(45deg); opacity: 0; } }
-    @keyframes pulse-green { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
-    @keyframes slideInDown { from { transform: translate(-50%, -100%); opacity: 0; } to { transform: translate(-50%, 20px); opacity: 1; } }
-    @keyframes slideOutUp { from { transform: translate(-50%, 20px); opacity: 1; } to { transform: translate(-50%, -100%); opacity: 0; } }
     @keyframes moveStripes { 0% { background-position: 0 0; } 100% { background-position: 40px 0; } }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
     /* TOAST */
-    #toast { visibility: hidden; min-width: 300px; background-color: var(--success); color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 3000; left: 50%; top: 0; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; }
-    #toast.show { visibility: visible; animation: slideInDown 0.5s forwards; }
-    #toast.hide { animation: slideOutUp 0.5s forwards; }
+    #toast { visibility: hidden; min-width: 300px; background-color: var(--success); color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 3000; left: 50%; top: 0; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; transform:translate(-50%, -100%); transition: all 0.3s; }
+    #toast.show { visibility: visible; transform:translate(-50%, 20px); }
 
     /* LOGIN */
     #loginOverlay { position: fixed; inset: 0; background: var(--bg-gradient); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 20px; }
@@ -53,7 +50,7 @@
     h1 { font-size: 48px; font-weight: 900; color: #1e293b; margin: 0 0 15px; letter-spacing: -1.5px; text-transform: uppercase; line-height: 1; }
     .last-update { font-size: 14px; color: var(--text-muted); background: rgba(255,255,255,0.8); padding: 8px 20px; border-radius: 30px; display: inline-block; font-weight: 600; border: 1px solid #e5e7eb; text-transform: capitalize; }
 
-    /* SCORE & CARDS */
+    /* CARDS */
     .global-score-container { margin: 40px auto; width: 260px; height: 260px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; box-shadow: 0 25px 60px rgba(0,0,0,0.08); border: 12px solid #f8fafc; position: relative; overflow: visible; }
     .global-score-value { font-size: 64px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
     .global-score-label { font-size: 13px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; margin-top: 8px; text-align: center; line-height: 1.4; letter-spacing: 1.5px; z-index: 2; position: relative; }
@@ -73,7 +70,7 @@
     .status-badge { position: absolute; top: 0; left: 0; right: 0; padding: 12px; text-align: center; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; }
     .badge-locked { background: #fff7ed; color: #c2410c; border-bottom: 2px solid #ffedd5; }
     .badge-winner { background: #dcfce7; color: #166534; border-bottom: 2px solid #bbf7d0; }
-    .badge-ready { background: var(--accent); color: white; animation: pulse-green 2s infinite; }
+    .badge-ready { background: var(--accent); color: white; animation: pulse 2s infinite; }
 
     .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; margin-top: 25px; gap: 15px; }
     .obj-info-group { display: flex; align-items: center; flex: 1; }
@@ -84,8 +81,17 @@
     .data-box-label { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px; }
     .data-box-value { font-size: 20px; font-weight: 900; color: #1e293b; line-height: 1; }
 
+    /* BARRE AVEC RAYURES ACTIVES */
     .progress-track { height: 30px; background: #e5e7eb; border-radius: 99px; overflow: hidden; margin-bottom: 40px; position: relative; display: flex; }
-    .progress-fill { height: 100%; background-color: var(--primary); background-image: linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent); background-size: 40px 40px; animation: moveStripes 1s linear infinite; transition: width 1s ease; position: relative; }
+    .progress-fill { 
+        height: 100%; 
+        background-color: var(--primary);
+        background-image: linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent);
+        background-size: 40px 40px; 
+        animation: moveStripes 1s linear infinite; 
+        transition: width 1s ease; 
+        position: relative; 
+    }
     .progress-fill.green-mode { background-color: var(--success); }
     .progress-overdrive { height: 100%; background: repeating-linear-gradient(45deg, var(--danger), var(--danger) 10px, #ef4444 10px, #ef4444 20px); width: 0; transition: width 1s ease; position: relative; }
     .percent-float { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); font-size: 13px; font-weight: 900; color: white; z-index: 5; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
@@ -104,23 +110,25 @@
     .earned-badge-container { margin-top: 30px; display: flex; justify-content: center; }
     .earned-badge { background: #dcfce7; color: #166534; padding: 12px 24px; border-radius: 16px; font-weight: 900; font-size: 18px; border: 2px solid #86efac; display: inline-flex; align-items: center; gap: 10px; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.15); animation: pulse-green 2s infinite; }
 
-    /* --- NATIVE CALENDAR MOBILE OPTIMIZED --- */
-    .native-cal-container { margin-top: 60px; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 15px 40px -5px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
+    /* --- NATIVE CALENDAR --- */
+    .native-cal-container { margin-top: 60px; background: white; border-radius: 20px; padding: 25px; box-shadow: 0 15px 40px -5px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
     .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    .cal-month-title { font-size: 16px; font-weight: 900; text-transform: uppercase; color: #1e293b; }
+    .cal-month-title { font-size: 18px; font-weight: 900; text-transform: uppercase; color: #1e293b; }
     .cal-nav-btn { background: #eff6ff; border: none; width: 30px; height: 30px; border-radius: 50%; color: var(--primary); font-weight: 900; cursor: pointer; }
-    
-    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; } /* Gap reduced for mobile */
-    .cal-day-name { text-align: center; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; padding-bottom: 5px; }
-    .cal-cell { background: #f8fafc; border-radius: 8px; min-height: 50px; padding: 4px; border: 1px solid #f1f5f9; position: relative; overflow: hidden; }
-    .cal-date { font-size: 11px; font-weight: 800; color: #334155; margin-bottom: 2px; display: block; }
-    .cal-event-dot { display: block; font-size: 8px; padding: 2px 4px; border-radius: 3px; margin-bottom: 2px; color: white; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; }
-    
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+    .cal-day-name { text-align: center; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; padding-bottom: 10px; }
+    .cal-cell { background: #f8fafc; border-radius: 10px; min-height: 50px; padding: 4px; border: 1px solid #f1f5f9; position: relative; }
+    .cal-date { font-size: 12px; font-weight: 800; color: #334155; margin-bottom: 5px; display: block; }
+    .cal-event-dot { display: block; font-size: 9px; padding: 3px 5px; border-radius: 4px; margin-bottom: 2px; color: white; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .evt-sturia { background-color: #f59e0b; }
     .evt-heiko { background-color: #3b82f6; }
     .evt-deliv { background-color: #ef4444; }
     .evt-uber { background-color: #10b981; }
     .evt-street { background-color: #8b5cf6; }
+    
+    .cal-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e2e8f0; }
+    .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: #64748b; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
 
     /* ADMIN */
     .admin-panel { position: fixed; top: 0; right: 0; bottom: 0; width: 100%; max-width: 600px; background: #f8fafc; z-index: 2000; box-shadow: -10px 0 40px rgba(0,0,0,0.1); padding: 20px; transform: translateX(100%); transition: transform 0.3s ease; overflow-y: auto; border-left: 1px solid #e5e7eb; }
@@ -258,6 +266,7 @@
              <div class="cal-day-name">LUN</div><div class="cal-day-name">MAR</div><div class="cal-day-name">MER</div><div class="cal-day-name">JEU</div><div class="cal-day-name">VEN</div><div class="cal-day-name">SAM</div><div class="cal-day-name">DIM</div>
           </div>
           <div class="cal-grid" id="calGrid"></div>
+          <div class="cal-legend" id="calLegend"></div>
       </div>
     </div>
   </div>
@@ -501,13 +510,14 @@
           allObjs = s.val() || {}; 
           try {
              renderDashboard(); 
+             // FIX: Force render lists for Admins/SuperAdmins on load
              if(currentUser && (currentUser.role === 'admin' || currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase())) {
                  renderAdminObjs(); renderSimulator();
              }
           } catch(e) { console.error(e); }
       });
-      db.ref('users').on('value', s => { allUsers = s.val() || {}; if(currentUser?.role==='admin') { renderAdminUsers(); renderSimulator(); } });
-      db.ref('settings').on('value', s => { globalSettings = s.val() || { budget: 0 }; if(currentUser?.role==='admin') { renderSimulator(); } });
+      db.ref('users').on('value', s => { allUsers = s.val() || {}; if(currentUser && currentUser.role==='admin') { renderAdminUsers(); renderSimulator(); } });
+      db.ref('settings').on('value', s => { globalSettings = s.val() || { budget: 0 }; if(currentUser && currentUser.role==='admin') { renderSimulator(); } });
       db.ref('logs').limitToLast(2000).on('value', s => { allLogs = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); });
     }
 
@@ -518,13 +528,14 @@
       
       const isSuperUser = (currentUser.email && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
       
-      // SHOW ADMIN BUTTON FOR SUPER ADMIN OR NORMAL ADMIN
-      document.getElementById("btnAdmin").style.display = (currentUser.role === 'admin' || isSuperUser) ? 'block' : 'none';
+      // Admin Access
+      const isAdmin = (currentUser.role === 'admin' || isSuperUser);
+      document.getElementById("btnAdmin").style.display = isAdmin ? 'block' : 'none';
       
-      // RESTRICT LOGS TO SUPER ADMIN ONLY
+      // Restrict Logs to Super Admin
       document.getElementById("btnTabLogs").style.display = isSuperUser ? 'block' : 'none';
       
-      // PERMISSION LOGIC FOR SIMULATOR
+      // Permissions Budget
       const globalBudgetInput = document.getElementById("simGlobalBudget");
       const saveBudgetBtn = document.getElementById("btnSaveGlobalBudget");
       
@@ -536,6 +547,12 @@
           saveBudgetBtn.style.display = 'none';
       }
       
+      // Force render lists if admin
+      if(isAdmin) {
+          renderAdminObjs();
+          renderSimulator();
+      }
+
       renderDashboard();
     }
 
@@ -544,8 +561,12 @@
 
     function renderSimulator() {
         const container = document.getElementById("simObjList");
-        // Always rebuild to keep sync
-        buildSimulatorUI();
+        if(container.innerHTML === "") { 
+             buildSimulatorUI();
+        } else {
+             document.getElementById("simGlobalBudget").value = globalSettings.budget || 0;
+             updateSim(); 
+        }
     }
 
     function buildSimulatorUI() {
@@ -556,8 +577,9 @@
 
         Object.keys(simObjs).forEach(k => {
             const o = simObjs[k];
-            // Display ALL objectives (even not published yet) to allow prep
-            
+            // Render all published objectives
+            if(!o.published) return; 
+
             const div = document.createElement("div"); div.className = "cockpit-obj-row";
             let slidersHtml = "";
 
@@ -566,7 +588,7 @@
                 slidersHtml = `
                   <div class="slider-row">
                      <span class="slider-label">Prime Fixe</span>
-                     <input type="range" min="0" max="500" step="5" value="${prize}" oninput="updateObjVal('${k}', 0, this.value)">
+                     <input type="range" min="0" max="50" step="5" value="${prize}" oninput="updateObjVal('${k}', 0, this.value)">
                      <span class="slider-val" id="val-${k}-0">${prize}€</span>
                   </div>`;
             } else {
@@ -575,7 +597,7 @@
                     slidersHtml += `
                       <div class="slider-row">
                          <span class="slider-label">Palier ${p.threshold}%</span>
-                         <input type="range" min="0" max="500" step="5" value="${prize}" oninput="updateObjVal('${k}', ${i}, this.value)">
+                         <input type="range" min="0" max="30" step="5" value="${prize}" oninput="updateObjVal('${k}', ${i}, this.value)">
                          <span class="slider-val" id="val-${k}-${i}">${prize}€</span>
                       </div>`;
                 });
@@ -599,19 +621,18 @@
        const budget = parseFloat(document.getElementById("simGlobalBudget").value) || 0;
        
        let totalUserRatio = 0;
-       // FIXED CALCULATION: INCLUDE EVERYONE (ADMINS + STAFF)
        Object.values(allUsers).forEach(u => { 
            totalUserRatio += (u.hours/BASE_HOURS);
        });
 
        let maxLiability = 0;
        Object.values(simObjs).forEach(o => {
-           // Calc SUM of all tiers per objective (Cumulative)
+           if(!o.published) return;
            let objTotal = 0;
            if(o.isFixed) {
                objTotal = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
            } else {
-               if(o.paliers) o.paliers.forEach(p => objTotal += parse(p.prize));
+               if(o.paliers) o.paliers.forEach(p => objTotal += parse(p.prize)); // SUM of tiers
            }
            maxLiability += (objTotal * totalUserRatio);
        });
@@ -636,7 +657,6 @@
         if(confirm("📡 Confirmer la publication des nouveaux montants ?")) {
             const updates = {};
             
-            // Only update budget if super admin (failsafe if UI hack)
             if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
                 const newBudget = parseFloat(document.getElementById("simGlobalBudget").value);
                 db.ref('settings/budget').set(newBudget);
@@ -662,7 +682,10 @@
         const firstDay = new Date(y, m, 1);
         const lastDay = new Date(y, m + 1, 0);
         const grid = document.getElementById("calGrid");
+        const legend = document.getElementById("calLegend");
         grid.innerHTML = "";
+        legend.innerHTML = ""; // Clear old legend
+
         let dayOfWeek = firstDay.getDay() - 1; if(dayOfWeek === -1) dayOfWeek = 6; 
         for(let i=0; i<dayOfWeek; i++) { grid.appendChild(document.createElement("div")); }
         for(let d=1; d<=lastDay.getDate(); d++) {
@@ -677,6 +700,15 @@
             });
             grid.appendChild(cell);
         }
+
+        // Generate Legend
+        const uniqueEvents = [...new Map(calEvents.map(item => [item.t, item])).values()];
+        uniqueEvents.forEach(evt => {
+            const legItem = document.createElement("div");
+            legItem.className = "legend-item";
+            legItem.innerHTML = `<div class="legend-dot ${evt.c}"></div><span>${evt.t}</span>`;
+            legend.appendChild(legItem);
+        });
     }
     function prevMonth() { currentCalDate.setMonth(currentCalDate.getMonth()-1); renderNativeCalendar(); }
     function nextMonth() { currentCalDate.setMonth(currentCalDate.getMonth()+1); renderNativeCalendar(); }
@@ -1005,6 +1037,7 @@
     }
 
     function getPct(c, t, isInverse) {
+      // REPLACE COMMA WITH DOT FOR FRENCH INPUTS
       let cv = parseFloat(String(c).replace(',', '.'));
       let tv = parseFloat(String(t).replace(',', '.'));
       if(isNaN(cv) || isNaN(tv)) return 0;
