@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V33 (Smart Admin)</title>
+  <title>Heiko - Budget Master V34 (User Status)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -84,8 +84,18 @@
     .data-box-label { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px; }
     .data-box-value { font-size: 20px; font-weight: 900; color: #1e293b; line-height: 1; }
 
+    /* BARRE AVEC RAYURES ACTIVES */
     .progress-track { height: 30px; background: #e5e7eb; border-radius: 99px; overflow: hidden; margin-bottom: 40px; position: relative; display: flex; }
-    .progress-fill { height: 100%; background-color: var(--primary); background-image: linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent); background-size: 40px 40px; animation: moveStripes 1s linear infinite; transition: width 1s ease; position: relative; }
+    .progress-fill { 
+        height: 100%; 
+        background-color: var(--primary);
+        /* Rayures */
+        background-image: linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent);
+        background-size: 40px 40px; 
+        animation: moveStripes 1s linear infinite; 
+        transition: width 1s ease; 
+        position: relative; 
+    }
     .progress-fill.green-mode { background-color: var(--success); }
     .progress-overdrive { height: 100%; background: repeating-linear-gradient(45deg, var(--danger), var(--danger) 10px, #ef4444 10px, #ef4444 20px); width: 0; transition: width 1s ease; position: relative; }
     .percent-float { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); font-size: 13px; font-weight: 900; color: white; z-index: 5; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
@@ -139,10 +149,19 @@
     input:checked + .slider:before { transform: translateX(20px); }
     .pub-item { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 12px; border-bottom: 1px solid #f3f4f6; }
     .pub-name { font-weight: 700; font-size: 13px; color: #1f2937; }
+    
+    /* MODIF V34: USER ITEM ENHANCED */
     .user-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f9fafb; border-radius: 10px; margin-bottom: 8px; border: 1px solid #e5e7eb; }
     .user-info { display: flex; flex-direction: column; }
-    .user-name { font-weight: 700; font-size: 13px; color: #1f2937; }
-    .user-meta { font-size: 11px; color: #6b7280; }
+    .user-header { display: flex; align-items: center; gap: 8px; }
+    .user-name { font-weight: 800; font-size: 14px; color: #1e293b; }
+    .user-email-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .status-dot.active { background-color: #10b981; box-shadow: 0 0 0 2px #d1fae5; }
+    .status-dot.pending { background-color: #ef4444; box-shadow: 0 0 0 2px #fee2e2; }
+    .status-text { font-size: 9px; text-transform: uppercase; font-weight: 800; color: #94a3b8; margin-left: 4px; }
+
+    .user-meta { font-size: 11px; color: #6b7280; margin-top: 2px; }
     .user-gain { font-weight: 800; font-size: 13px; color: var(--success); background: #ecfdf5; padding: 2px 8px; border-radius: 6px; margin-right: 10px; }
     .total-row { background: #1e293b; color: white; padding: 15px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; font-weight: 900; margin-top: 15px; font-size: 14px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
     .budget-box { background: #f0f9ff; padding: 15px; border-radius: 12px; border: 1px solid #bae6fd; margin-bottom: 20px; }
@@ -422,10 +441,16 @@
         db.ref('users/' + user.uid).on('value', snap => {
           const val = snap.val();
           if(!val) {
-             const def = { name: "Utilisateur", hours:35, role:'staff', email: user.email };
+             const def = { name: "Utilisateur", hours:35, role:'staff', email: user.email, status: 'pending' };
              db.ref('users/'+user.uid).set(def);
              currentUser = def;
-          } else { currentUser = val; }
+          } else { 
+             currentUser = val; 
+             // IF LOGGED IN AND PENDING -> SET ACTIVE
+             if(currentUser.status !== 'active') {
+                 db.ref('users/'+user.uid).update({ status: 'active', lastLogin: Date.now() });
+             }
+          }
           currentUser.uid = user.uid; currentUser.email = user.email;
           
           const newLogRef = db.ref("logs").push();
@@ -456,7 +481,7 @@
     window.createFirstAdmin = () => {
       const email = "admin@heiko.team"; const pass = "heiko2025";
       auth.createUserWithEmailAndPassword(email, pass).then(c => {
-        db.ref('users/'+c.user.uid).set({ name:"Admin", hours:35, role:"admin", email:email });
+        db.ref('users/'+c.user.uid).set({ name:"Admin", hours:35, role:"admin", email:email, status: 'active' });
         alert("Compte Admin créé !");
       }).catch(e => alert(e.message));
     };
@@ -729,20 +754,25 @@
     function deleteObj(id) { if(confirm("🗑️ Supprimer ?")) { db.ref("objectives/"+id).remove().then(() => showToast("🗑️ Supprimé")); logAction("Suppression", `Objectif ${id}`); } }
     function togglePub(id, v) { db.ref("objectives/"+id+"/published").set(v); logAction("Publication", `Objectif ${id}: ${v}`); }
     
+    // MODIFIED CREATE USER TO HANDLE "ALREADY EXISTS"
     function createUser() { 
         const email = document.getElementById("nuEmail").value; 
         const sec = firebase.initializeApp(firebaseConfig, "Sec"); 
         sec.auth().createUserWithEmailAndPassword(email, "Temp1234!").then(c => { 
-            db.ref('users/'+c.user.uid).set({ name: document.getElementById("nuName").value, hours: parseFloat(document.getElementById("nuHours").value)||35, role: document.getElementById("nuAdmin").checked?'admin':'staff', email: email }); 
+            db.ref('users/'+c.user.uid).set({ name: document.getElementById("nuName").value, hours: parseFloat(document.getElementById("nuHours").value)||35, role: document.getElementById("nuAdmin").checked?'admin':'staff', email: email, status: 'pending' }); 
             sec.auth().sendPasswordResetEmail(email); 
             sec.delete(); 
             showToast("✅ Membre invité !"); 
         }).catch(e => { 
             if(e.code === 'auth/email-already-in-use') {
-                sec.auth().sendPasswordResetEmail(email).then(() => {
-                    alert("⚠️ Ce membre existe déjà (archives). Un email lui a été envoyé pour réactiver son compte.");
+                if(confirm("⚠️ Ce membre existe déjà ! Voulez-vous lui Renvoyer l'email d'invitation ?")) {
+                    sec.auth().sendPasswordResetEmail(email).then(() => {
+                        showToast("📩 Invitation renvoyée !");
+                        sec.delete();
+                    });
+                } else {
                     sec.delete();
-                });
+                }
             } else {
                 alert(e.message); 
                 sec.delete();
@@ -750,8 +780,54 @@
         }); 
     }
 
-    function resendInvite(email) { if(confirm("Renvoyer mail ?")) auth.sendPasswordResetEmail(email).then(() => showToast("📩 Envoyé !")); }
-    function renderAdminUsers() { const d = document.getElementById("usersList"); d.innerHTML = ""; let totalToPay = 0; Object.keys(allUsers).forEach(k => { const u = allUsers[k]; if(u.email && u.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return; const userRatio = (u.hours || 35) / BASE_HOURS; let userBonus = 0; const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); let primOk = true; if(prims.length > 0) { primOk = prims.every(o => { const pct = getPct(o.current, o.target, o.isInverse); const th = o.isFixed ? 100 : ((o.paliers&&o.paliers[0])?o.paliers[0].threshold:100); return pct >= th; }); } Object.values(allObjs).forEach(o => { if(!o.published) return; const pct = getPct(o.current, o.target, o.isInverse); const isLocked = !o.isPrimary && !primOk; let g = 0; if(o.isFixed) { if(pct >= 100 && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); } else { if(o.paliers) o.paliers.forEach(p => { if(pct>=p.threshold) g=Math.max(g, parse(p.prize)); }); } if(!isLocked) userBonus += (g * userRatio); }); totalToPay += userBonus; const div = document.createElement("div"); div.className = "user-item"; div.innerHTML = `<div class="user-info"><div class="user-name">${u.name}</div><div class="user-meta">${u.hours}h</div></div><div class="user-actions"><div class="user-gain">${userBonus.toFixed(2)}€</div><button onclick="resendInvite('${u.email}')" class="action-btn">📩</button><button onclick="editUser('${k}')" class="action-btn">✏️</button><button onclick="deleteUser('${k}')" class="action-btn delete">🗑️</button></div>`; d.appendChild(div); }); const totalRow = document.createElement("div"); totalRow.className = "total-row"; totalRow.innerHTML = `<span>TOTAL</span><span>${totalToPay.toFixed(2)} €</span>`; d.appendChild(totalRow); }
+    function resendInvite(email) { 
+        if(confirm("Renvoyer le mail d'activation à " + email + " ?")) {
+            auth.sendPasswordResetEmail(email).then(() => showToast("📩 Envoyé !")).catch(e => alert(e.message)); 
+        }
+    }
+
+    // MODIFIED RENDER USERS (DOT + EMAIL)
+    function renderAdminUsers() { 
+        const d = document.getElementById("usersList"); d.innerHTML = ""; let totalToPay = 0; 
+        Object.keys(allUsers).forEach(k => { 
+            const u = allUsers[k]; 
+            if(u.email && u.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return; 
+            const userRatio = (u.hours || 35) / BASE_HOURS; 
+            let userBonus = 0; 
+            
+            // Calc bonus logic...
+            const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); let primOk = true; 
+            if(prims.length > 0) { primOk = prims.every(o => { const pct = getPct(o.current, o.target, o.isInverse); const th = o.isFixed ? 100 : ((o.paliers&&o.paliers[0])?o.paliers[0].threshold:100); return pct >= th; }); } 
+            Object.values(allObjs).forEach(o => { if(!o.published) return; const pct = getPct(o.current, o.target, o.isInverse); const isLocked = !o.isPrimary && !primOk; let g = 0; if(o.isFixed) { if(pct >= 100 && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); } else { if(o.paliers) o.paliers.forEach(p => { if(pct>=p.threshold) g=Math.max(g, parse(p.prize)); }); } if(!isLocked) userBonus += (g * userRatio); }); totalToPay += userBonus; 
+            
+            // UI Generation
+            const div = document.createElement("div"); div.className = "user-item"; 
+            const statusClass = (u.status === 'active') ? 'active' : 'pending';
+            const statusLabel = (u.status === 'active') ? 'ACTIF' : 'EN ATTENTE';
+            
+            div.innerHTML = `
+                <div class="user-info">
+                    <div class="user-header">
+                        <span class="user-name">${u.name}</span>
+                        <div style="display:flex; align-items:center;">
+                            <span class="status-dot ${statusClass}"></span>
+                            <span class="status-text">${statusLabel}</span>
+                        </div>
+                    </div>
+                    <div class="user-email-sub">${u.email}</div>
+                    <div class="user-meta">${u.hours}h</div>
+                </div>
+                <div class="user-actions">
+                    <div class="user-gain">${userBonus.toFixed(2)}€</div>
+                    <button onclick="resendInvite('${u.email}')" class="action-btn" title="Renvoyer Invitation">📩</button>
+                    <button onclick="editUser('${k}')" class="action-btn" title="Modifier">✏️</button>
+                    <button onclick="deleteUser('${k}')" class="action-btn delete" title="Supprimer">🗑️</button>
+                </div>`; 
+            d.appendChild(div); 
+        }); 
+        const totalRow = document.createElement("div"); totalRow.className = "total-row"; totalRow.innerHTML = `<span>TOTAL</span><span>${totalToPay.toFixed(2)} €</span>`; d.appendChild(totalRow); 
+    }
+
     function editUser(uid) { const u = allUsers[uid]; document.getElementById("editUserPanel").classList.add("active"); document.getElementById("euId").value = uid; document.getElementById("euName").value = u.name; document.getElementById("euHours").value = u.hours; document.getElementById("euAdmin").checked = (u.role === 'admin'); }
     function saveUser() { db.ref('users/'+document.getElementById("euId").value).update({ name: document.getElementById("euName").value, hours: parseFloat(document.getElementById("euHours").value), role: document.getElementById("euAdmin").checked ? 'admin' : 'staff' }); document.getElementById("editUserPanel").classList.remove("active"); showToast("✅ Modifié"); }
     function deleteUser(uid) { if(confirm("Supprimer ?")) { db.ref('users/'+uid).remove(); showToast("🗑️ Supprimé"); } }
