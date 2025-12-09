@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V35 (Final Admin)</title>
+  <title>Heiko - Budget Master V36 (Cockpit)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -189,12 +189,25 @@
     .btn-clear-hist { border:none; background:#fee2e2; color:#ef4444; border-radius:4px; padding:2px 6px; font-size:10px; font-weight:700; cursor:pointer; }
     .btn-clear-hist:hover { background:#fca5a5; }
 
-    /* STATUS DOTS */
     .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
     .status-dot.active { background-color: #10b981; box-shadow: 0 0 0 2px #d1fae5; }
     .status-dot.pending { background-color: #ef4444; box-shadow: 0 0 0 2px #fee2e2; }
     .status-text { font-size: 9px; text-transform: uppercase; font-weight: 800; color: #94a3b8; margin-left: 4px; }
     .user-email-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+    /* NEW: COCKPIT SIMULATOR */
+    .cockpit-container { padding: 15px; border: 2px solid #e2e8f0; border-radius: 16px; background: #f8fafc; margin-bottom: 20px; }
+    .cockpit-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+    .cockpit-gauge-container { height: 24px; background: #e2e8f0; border-radius: 99px; overflow: hidden; position: relative; margin-bottom: 10px; border:1px solid #cbd5e1; }
+    .cockpit-gauge-fill { height: 100%; width: 0; background: #3b82f6; transition: width 0.3s; }
+    .cockpit-gauge-fill.danger { background: #ef4444; animation: pulse 1s infinite; }
+    .cockpit-info { display: flex; justify-content: space-between; font-size: 12px; font-weight: 800; color: #64748b; }
+    .cockpit-obj-row { background: white; padding: 10px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 8px; }
+    .cockpit-obj-title { font-size: 12px; font-weight: 800; margin-bottom: 5px; color: #1e293b; display:flex; justify-content:space-between; }
+    .slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+    .slider-label { font-size: 10px; font-weight: 700; width: 60px; color: #64748b; }
+    .slider-val { font-size: 11px; font-weight: 800; width: 40px; text-align: right; color: var(--primary); }
+    input[type=range] { flex: 1; accent-color: var(--primary); cursor: pointer; }
 
     @media (max-width: 600px) { .group-body.open { grid-template-columns: 1fr; } }
   </style>
@@ -262,7 +275,7 @@
     
     <div class="tab-nav">
       <button id="btnTabTeam" onclick="switchTab('team')" class="btn-tab active">👥 Équipe</button>
-      <button id="btnTabObjs" onclick="switchTab('objs')" class="btn-tab">🎯 Objectifs</button>
+      <button id="btnTabObjs" onclick="switchTab('objs')" class="btn-tab">🎯 Pilotage</button>
       <button id="btnTabLogs" onclick="switchTab('logs')" class="btn-tab" style="display:none;">🕒 Historique</button>
     </div>
 
@@ -292,56 +305,61 @@
     </div>
 
     <div id="tab-objs" style="display:none;">
-      <div class="admin-section" id="superAdminBudget" style="display:none; border:2px solid #f59e0b;">
-         <h3 style="font-size:14px; margin-bottom:10px; color:#b45309;">💰 Budget Global (Super Admin)</h3>
-         <input type="number" id="globalBudgetInput" placeholder="Budget Max Mensuel (€)">
-         <button class="btn" onclick="saveGlobalBudget()" style="background:#f59e0b;">Définir le Budget</button>
-      </div>
+      
+      <div class="admin-section" style="border: 2px solid var(--primary);">
+         <h3 class="section-header-large">🎛️ PILOTAGE BUDGET & PRIMES</h3>
+         
+         <div class="cockpit-container">
+            <div class="cockpit-top">
+                <label style="font-size:12px; font-weight:800; margin:0;">BUDGET MAX (€)</label>
+                <input type="number" id="simGlobalBudget" style="width:100px; text-align:right; margin:0; padding:5px;" oninput="updateSim()">
+            </div>
+            
+            <div class="cockpit-gauge-container">
+                <div class="cockpit-gauge-fill" id="simGauge"></div>
+            </div>
+            <div class="cockpit-info">
+                <span id="simUsed">0€ Engagés</span>
+                <span id="simLeft">Reste : 0€</span>
+            </div>
+         </div>
 
-      <div class="budget-box">
-         <div class="budget-text">
-            <span>Engagement Max Théorique</span>
-            <span id="budgetDisplay">0€ / 0€</span>
-         </div>
-         <div class="budget-bar-bg">
-            <div class="budget-bar-fill" id="budgetBar"></div>
-         </div>
-         <div id="budgetWarning" style="color:var(--danger); font-size:10px; margin-top:5px; display:none;">⚠️ Budget dépassé ! Impossible de publier.</div>
+         <div id="simObjList"></div>
+
+         <button class="btn" onclick="publishSim()" style="background:var(--success); margin-top:15px; font-size:14px; font-weight:900;">📡 PUBLIER & APPLIQUER</button>
       </div>
 
       <div class="admin-section">
-        <h3 style="font-size:14px; margin-bottom:10px;">📢 Publication</h3>
+        <h3 style="font-size:14px; margin-bottom:10px;">📢 Publication (On/Off)</h3>
         <div id="pubList"></div>
       </div>
       
       <div class="admin-section">
-        <h3 class="section-header-large" style="font-size:18px;">➕ CRÉER OBJECTIF</h3>
-        <input type="text" id="noName" placeholder="Nom de l'objectif (Obligatoire)">
-        <input type="text" id="noTarget" placeholder="Cible (ex: 60000) (Obligatoire)">
+        <h3 class="section-header-large" style="font-size:14px;">➕ AJOUTER UN OBJECTIF</h3>
+        <input type="text" id="noName" placeholder="Nom">
+        <input type="text" id="noTarget" placeholder="Cible">
         
         <div class="options-row">
             <label class="check-label"><input type="checkbox" id="noPrimary" checked> ⚡ Principal</label>
-            <label class="check-label" title="Si coché: Moins le chiffre est haut, mieux c'est (ex: % erreur)"><input type="checkbox" id="noInverse"> 📉 Inversé</label>
-            <label class="check-label" title="Une seule prime si atteint, pas de paliers"><input type="checkbox" id="noFixed" onchange="toggleCreateInputs()"> 🎁 Prime Fixe</label>
+            <label class="check-label"><input type="checkbox" id="noInverse"> 📉 Inversé</label>
+            <label class="check-label"><input type="checkbox" id="noFixed" onchange="toggleCreateInputs()"> 🎁 Fixe</label>
         </div>
 
         <div id="createTiersBlock">
-            <label style="font-size:12px; font-weight:700; margin-bottom:5px; display:block;">3 PALIERS (Base 35h)</label>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:5px;"><input type="number" id="c_p1t" placeholder="%"><input type="text" id="c_p1p" placeholder="€ (Palier 1)"></div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:5px;"><input type="number" id="c_p2t" placeholder="%"><input type="text" id="c_p2p" placeholder="€"></div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px;"><input type="number" id="c_p3t" placeholder="%"><input type="text" id="c_p3p" placeholder="€"></div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:5px;"><input type="number" id="c_p1t" placeholder="%"><input type="text" id="c_p1p" placeholder="€ (1)"></div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:5px;"><input type="number" id="c_p2t" placeholder="%"><input type="text" id="c_p2p" placeholder="€ (2)"></div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px;"><input type="number" id="c_p3t" placeholder="%"><input type="text" id="c_p3p" placeholder="€ (3)"></div>
         </div>
 
         <div id="createFixedBlock" style="display:none;">
-             <label style="font-size:12px; font-weight:700; margin-bottom:5px; display:block;">MONTANT PRIME UNIQUE (Base 35h)</label>
              <input type="number" id="c_fixed_p" placeholder="Montant en €">
         </div>
 
-        <button class="btn" onclick="addObj()" style="margin-top:15px; font-size:14px;">Ajouter l'Objectif</button>
+        <button class="btn" onclick="addObj()" style="margin-top:10px;">Ajouter</button>
       </div>
 
       <div class="admin-section">
-        <h3 class="section-header-large">📝 Modifier / Supprimer</h3>
+        <h3 class="section-header-large" style="font-size:14px;">📝 Modifier / Supprimer</h3>
         <div id="objList"></div>
       </div>
     </div>
@@ -375,7 +393,7 @@
     <div class="options-row">
         <label class="check-label"><input type="checkbox" id="eoPrimary"> ⚡ Principal</label>
         <label class="check-label"><input type="checkbox" id="eoInverse"> 📉 Inversé</label>
-        <label class="check-label"><input type="checkbox" id="eoFixed" onchange="toggleEditInputs()"> 🎁 Prime Fixe</label>
+        <label class="check-label"><input type="checkbox" id="eoFixed" onchange="toggleEditInputs()"> 🎁 Fixe</label>
     </div>
 
     <div id="editTiersBlock">
@@ -416,12 +434,12 @@
     let currentUser = null;
     let allUsers = {};
     let allObjs = {};
-    let allLogs = {}; // STORE LOGS FOR CLEANUP
+    let allLogs = {};
     let globalSettings = { budget: 0 };
     const BASE_HOURS = 35;
     const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
 
-    // CALENDAR DATA (FROM PDF)
+    // CALENDAR DATA
     const calEvents = [
         { t: "HEIKO x STURIA", start: "2025-12-01", end: "2026-01-31", c: "evt-heiko" },
         { t: "Flyers Sturia", start: "2025-12-01", end: "2025-12-31", c: "evt-sturia" },
@@ -430,7 +448,7 @@
         { t: "BOGOF UberEats", start: "2025-12-15", end: "2025-12-21", c: "evt-uber" },
         { t: "Street Marketing", start: "2026-01-01", end: "2026-01-31", c: "evt-street" }
     ];
-    let currentCalDate = new Date(2025, 11, 1); // Dec 2025 Start
+    let currentCalDate = new Date(2025, 11, 1);
 
     // AUTH
     auth.onAuthStateChanged(user => {
@@ -440,19 +458,16 @@
         db.ref('users/' + user.uid).on('value', snap => {
           const val = snap.val();
           if(!val) {
-             // AUTO-CREATE PROFILE IF DELETED
              const def = { name: "Utilisateur", hours:35, role:'staff', email: user.email, status: 'pending' };
              db.ref('users/'+user.uid).set(def);
              currentUser = def;
           } else { 
              currentUser = val; 
-             // AUTO-UPDATE STATUS TO ACTIVE
              if(currentUser.status !== 'active') {
                  db.ref('users/'+user.uid).update({ status: 'active', lastLogin: Date.now() });
              }
           }
           currentUser.uid = user.uid; currentUser.email = user.email;
-          
           const newLogRef = db.ref("logs").push();
           newLogRef.set({ user: currentUser.name, action: "Connexion", type: "session", startTime: Date.now(), lastSeen: Date.now() });
           setInterval(() => { newLogRef.update({ lastSeen: Date.now() }); }, 60000);
@@ -493,18 +508,13 @@
           try {
              renderDashboard(); 
              if(currentUser && (currentUser.role === 'admin' || currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase())) {
-                 renderAdminObjs(); checkBudget();
+                 renderAdminObjs(); renderSimulator();
              }
           } catch(e) { console.error(e); }
       });
-      db.ref('users').on('value', s => { allUsers = s.val() || {}; if(currentUser?.role==='admin') { renderAdminUsers(); checkBudget(); } });
-      db.ref('settings').on('value', s => { globalSettings = s.val() || { budget: 0 }; if(currentUser?.role==='admin') checkBudget(); });
-      
-      // LOAD 2000 LOGS
-      db.ref('logs').limitToLast(2000).on('value', s => { 
-          allLogs = s.val() || {};
-          if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); 
-      });
+      db.ref('users').on('value', s => { allUsers = s.val() || {}; if(currentUser?.role==='admin') { renderAdminUsers(); renderSimulator(); } });
+      db.ref('settings').on('value', s => { globalSettings = s.val() || { budget: 0 }; if(currentUser?.role==='admin') { renderSimulator(); } });
+      db.ref('logs').limitToLast(2000).on('value', s => { allLogs = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); });
     }
 
     function updateUI() {
@@ -518,32 +528,141 @@
       renderDashboard();
     }
 
+    // --- COCKPIT SIMULATOR LOGIC ---
+    let simObjs = {}; // Local copy for simulation
+
+    function renderSimulator() {
+        // Init logic only once or on data update if not editing
+        const container = document.getElementById("simObjList");
+        if(container.innerHTML === "") { // Only render if empty to avoid reset while sliding
+             buildSimulatorUI();
+        } else {
+             // Just update max budget input if changed externally
+             document.getElementById("simGlobalBudget").value = globalSettings.budget || 0;
+             updateSim(); // refresh gauge
+        }
+    }
+
+    function buildSimulatorUI() {
+        const container = document.getElementById("simObjList");
+        container.innerHTML = "";
+        simObjs = JSON.parse(JSON.stringify(allObjs)); // Deep copy
+        document.getElementById("simGlobalBudget").value = globalSettings.budget || 0;
+
+        Object.keys(simObjs).forEach(k => {
+            const o = simObjs[k];
+            if(!o.published) return; // Only published in cockpit? Or all? Let's say all published.
+
+            const div = document.createElement("div"); div.className = "cockpit-obj-row";
+            let slidersHtml = "";
+
+            if(o.isFixed) {
+                const prize = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
+                slidersHtml = `
+                  <div class="slider-row">
+                     <span class="slider-label">Prime Fixe</span>
+                     <input type="range" min="0" max="500" step="5" value="${prize}" oninput="updateObjVal('${k}', 0, this.value)">
+                     <span class="slider-val" id="val-${k}-0">${prize}€</span>
+                  </div>`;
+            } else {
+                (o.paliers || []).forEach((p, i) => {
+                    const prize = parse(p.prize);
+                    slidersHtml += `
+                      <div class="slider-row">
+                         <span class="slider-label">Palier ${p.threshold}%</span>
+                         <input type="range" min="0" max="500" step="5" value="${prize}" oninput="updateObjVal('${k}', ${i}, this.value)">
+                         <span class="slider-val" id="val-${k}-${i}">${prize}€</span>
+                      </div>`;
+                });
+            }
+
+            div.innerHTML = `<div class="cockpit-obj-title"><span>${o.name}</span></div>${slidersHtml}`;
+            container.appendChild(div);
+        });
+        updateSim();
+    }
+
+    function updateObjVal(objId, tierIdx, val) {
+        document.getElementById(`val-${objId}-${tierIdx}`).innerText = val + "€";
+        if(simObjs[objId].paliers && simObjs[objId].paliers[tierIdx]) {
+            simObjs[objId].paliers[tierIdx].prize = val;
+        }
+        updateSim();
+    }
+
+    function updateSim() {
+       const budget = parseFloat(document.getElementById("simGlobalBudget").value) || 0;
+       
+       // Calculate Total Engagement
+       let totalUserRatio = 0;
+       Object.values(allUsers).forEach(u => { 
+           if(u.role !== 'admin' && u.email !== SUPER_ADMIN_EMAIL) { // Exclude super admin from cost? usually admins are excluded from standard pools or included. Let's include staff.
+               totalUserRatio += (u.hours/BASE_HOURS);
+           }
+       });
+
+       let maxLiability = 0;
+       Object.values(simObjs).forEach(o => {
+           if(!o.published) return;
+           let maxP = 0;
+           if(o.paliers) o.paliers.forEach(p => maxP = Math.max(maxP, parse(p.prize)));
+           maxLiability += (maxP * totalUserRatio);
+       });
+
+       // Update UI
+       const pct = (budget > 0) ? (maxLiability / budget) * 100 : 0;
+       const bar = document.getElementById("simGauge");
+       bar.style.width = Math.min(pct, 100) + "%";
+       
+       if(maxLiability > budget) {
+           bar.classList.add("danger");
+           document.getElementById("simUsed").style.color = "#ef4444";
+       } else {
+           bar.classList.remove("danger");
+           document.getElementById("simUsed").style.color = "#3b82f6";
+       }
+       
+       document.getElementById("simUsed").innerText = `${maxLiability.toFixed(0)}€ Engagés`;
+       document.getElementById("simLeft").innerText = `Reste : ${(budget - maxLiability).toFixed(0)}€`;
+    }
+
+    function publishSim() {
+        if(confirm("📡 Confirmer la publication des nouveaux montants ?")) {
+            // Save Budget
+            const newBudget = parseFloat(document.getElementById("simGlobalBudget").value);
+            db.ref('settings/budget').set(newBudget);
+
+            // Save Objectives
+            const updates = {};
+            Object.keys(simObjs).forEach(k => {
+                updates['objectives/' + k + '/paliers'] = simObjs[k].paliers;
+            });
+            db.ref().update(updates).then(() => {
+                showToast("✅ Pilotage Appliqué !");
+                logAction("Pilotage", "Mise à jour globale budget & primes");
+            });
+        }
+    }
+
+    // --- END COCKPIT ---
+
     /* CALENDAR LOGIC */
     function renderNativeCalendar() {
         const m = currentCalDate.getMonth();
         const y = currentCalDate.getFullYear();
         document.getElementById("calTitle").innerText = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(currentCalDate);
-        
         const firstDay = new Date(y, m, 1);
         const lastDay = new Date(y, m + 1, 0);
         const grid = document.getElementById("calGrid");
         grid.innerHTML = "";
-
-        let dayOfWeek = firstDay.getDay() - 1; 
-        if(dayOfWeek === -1) dayOfWeek = 6; 
-
+        let dayOfWeek = firstDay.getDay() - 1; if(dayOfWeek === -1) dayOfWeek = 6; 
         for(let i=0; i<dayOfWeek; i++) { grid.appendChild(document.createElement("div")); }
-
         for(let d=1; d<=lastDay.getDate(); d++) {
-            const cell = document.createElement("div");
-            cell.className = "cal-cell";
+            const cell = document.createElement("div"); cell.className = "cal-cell";
             cell.innerHTML = `<span class="cal-date">${d}</span>`;
-            
             const cellDate = new Date(y, m, d);
             calEvents.forEach(evt => {
-                const s = new Date(evt.start);
-                const e = new Date(evt.end);
-                // Simple date compare ignoring time
+                const s = new Date(evt.start); const e = new Date(evt.end);
                 if(cellDate.setHours(0,0,0,0) >= s.setHours(0,0,0,0) && cellDate.setHours(0,0,0,0) <= e.setHours(0,0,0,0)) {
                     cell.innerHTML += `<span class="cal-event-dot ${evt.c}">${evt.t}</span>`;
                 }
@@ -554,7 +673,6 @@
     function prevMonth() { currentCalDate.setMonth(currentCalDate.getMonth()-1); renderNativeCalendar(); }
     function nextMonth() { currentCalDate.setMonth(currentCalDate.getMonth()+1); renderNativeCalendar(); }
 
-    /* DASHBOARD LOGIC */
     function renderDashboard() {
       if(!currentUser) return;
       const container = document.getElementById("cardsContainer");
@@ -673,7 +791,7 @@
       return el;
     }
 
-    function toggleAdmin(show) { document.getElementById("adminPanel").classList.toggle("active", show); if(show) { renderAdminUsers(); renderAdminObjs(); checkBudget(); } }
+    function toggleAdmin(show) { document.getElementById("adminPanel").classList.toggle("active", show); if(show) { renderAdminUsers(); renderSimulator(); } }
     document.getElementById("btnAdmin").onclick = () => toggleAdmin(true);
     function switchTab(t) {
        document.querySelectorAll('.btn-tab').forEach(b => b.classList.remove('active'));
@@ -752,7 +870,6 @@
     function deleteObj(id) { if(confirm("🗑️ Supprimer ?")) { db.ref("objectives/"+id).remove().then(() => showToast("🗑️ Supprimé")); logAction("Suppression", `Objectif ${id}`); } }
     function togglePub(id, v) { db.ref("objectives/"+id+"/published").set(v); logAction("Publication", `Objectif ${id}: ${v}`); }
     
-    // MODIFIED CREATE USER (INSTANT PENDING)
     function createUser() { 
         const email = document.getElementById("nuEmail").value; 
         const sec = firebase.initializeApp(firebaseConfig, "Sec"); 
@@ -784,7 +901,6 @@
         }
     }
 
-    // MODIFIED RENDER USERS (DOT + EMAIL)
     function renderAdminUsers() { 
         const d = document.getElementById("usersList"); d.innerHTML = ""; let totalToPay = 0; 
         Object.keys(allUsers).forEach(k => { 
@@ -828,7 +944,6 @@
     function saveUser() { db.ref('users/'+document.getElementById("euId").value).update({ name: document.getElementById("euName").value, hours: parseFloat(document.getElementById("euHours").value), role: document.getElementById("euAdmin").checked ? 'admin' : 'staff' }); document.getElementById("editUserPanel").classList.remove("active"); showToast("✅ Modifié"); }
     function deleteUser(uid) { if(confirm("Supprimer ?")) { db.ref('users/'+uid).remove(); showToast("🗑️ Supprimé"); } }
 
-    // HISTORY CLEANUP FUNCTION
     function deleteUserLogs(targetName) {
         if(confirm("🗑️ Effacer tout l'historique de " + targetName + " ?")) {
             const updates = {};
@@ -873,9 +988,9 @@
        const budget = globalSettings.budget || 0; let maxLiability = 0; let totalUserRatio = 0;
        Object.values(allUsers).forEach(u => { if(!u.email || u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) totalUserRatio += (u.hours/BASE_HOURS); });
        Object.values(allObjs).forEach(o => { if(!o.published) return; let maxP = 0; if(o.paliers) o.paliers.forEach(p => maxP = Math.max(maxP, parse(p.prize))); maxLiability += (maxP * totalUserRatio); });
-       document.getElementById("budgetDisplay").innerText = `${maxLiability.toFixed(0)}€ / ${budget}€`;
-       const pct = (maxLiability / budget) * 100; const bar = document.getElementById("budgetBar"); bar.style.width = Math.min(pct, 100) + "%";
-       if(maxLiability > budget) { bar.classList.add("danger"); document.getElementById("budgetWarning").style.display = "block"; } else { bar.classList.remove("danger"); document.getElementById("budgetWarning").style.display = "none"; }
+       // REMOVED: Automatic bar update from checkBudget (now handled by Simulator) or we can keep it as read-only.
+       // Keeping the budget warning logic for loadData:
+       if(maxLiability > budget) { document.getElementById("budgetWarning").style.display = "block"; } else { document.getElementById("budgetWarning").style.display = "none"; }
     }
 
     function getPct(c, t, isInverse) {
