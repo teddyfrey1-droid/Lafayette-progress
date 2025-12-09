@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V45 (Ultimate UI)</title>
+  <title>Heiko - Budget Master V46 (Perfect UI)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -27,9 +27,9 @@
 
     /* ANIMATIONS */
     @keyframes floatMoney { 
-        0% { transform: translateY(80px) scale(0) rotate(0deg); opacity: 0; } 
-        20% { opacity: 1; transform: translateY(20px) scale(1) rotate(20deg); } 
-        100% { transform: translateY(-300px) scale(1.5) rotate(360deg); opacity: 0; } 
+        0% { transform: translateY(50px) scale(0.5) rotate(0deg); opacity: 0; } 
+        20% { opacity: 1; transform: translateY(0px) scale(1) rotate(10deg); } 
+        100% { transform: translateY(-300px) scale(1.3) rotate(360deg); opacity: 0; } 
     }
     @keyframes moveStripes { 0% { background-position: 0 0; } 100% { background-position: 40px 0; } }
     @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
@@ -56,10 +56,12 @@
 
     /* CARDS */
     .global-score-container { margin: 40px auto; width: 260px; height: 260px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; box-shadow: 0 25px 60px rgba(0,0,0,0.08); border: 12px solid #f8fafc; position: relative; overflow: visible; }
-    .global-score-value { font-size: 54px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; } /* REDUIT LÉGÈREMENT */
+    .global-score-value { font-size: 58px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
     .global-score-label { font-size: 13px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; margin-top: 8px; text-align: center; line-height: 1.4; letter-spacing: 1.5px; z-index: 2; position: relative; }
-    .money-rain { position: absolute; inset: 0; pointer-events: none; z-index: 1; border-radius:50%; overflow:hidden; }
-    .bill { position: absolute; font-size: 28px; opacity: 0; user-select:none; }
+    
+    /* MONEY RAIN - FREEDOM */
+    .money-rain { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: visible; }
+    .bill { position: absolute; font-size: 32px; opacity: 0; user-select:none; }
 
     .objectives-wrapper { display: flex; flex-direction: column; gap: 50px; }
     .category-title { font-size: 24px; font-weight: 900; text-transform: uppercase; color: var(--text-main); margin: 0 0 25px; display: flex; align-items: center; gap: 15px; letter-spacing: 1px; }
@@ -74,7 +76,7 @@
     .status-badge { position: absolute; top: 0; left: 0; right: 0; padding: 12px; text-align: center; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; }
     .badge-locked { background: #fff7ed; color: #c2410c; border-bottom: 2px solid #ffedd5; }
     .badge-winner { background: #dcfce7; color: #166534; border-bottom: 2px solid #bbf7d0; }
-    .badge-ready { background: var(--accent); color: white; animation: pulse 2s infinite; }
+    .badge-ready { background: var(--accent); color: white; animation: pulse-green 2s infinite; }
 
     .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; margin-top: 25px; gap: 15px; }
     .obj-info-group { display: flex; align-items: center; flex: 1; }
@@ -85,7 +87,7 @@
     .data-box-label { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px; }
     .data-box-value { font-size: 20px; font-weight: 900; color: #1e293b; line-height: 1; }
 
-    /* BARRE AVEC RAYURES ACTIVES (Bleu et Rouge) */
+    /* BARRE ANIMÉE */
     .progress-track { height: 30px; background: #e5e7eb; border-radius: 99px; overflow: hidden; margin-bottom: 40px; position: relative; display: flex; }
     .progress-fill { 
         height: 100%; 
@@ -125,7 +127,7 @@
     .earned-badge-container { margin-top: 30px; display: flex; justify-content: center; }
     .earned-badge { background: #dcfce7; color: #166534; padding: 12px 24px; border-radius: 16px; font-weight: 900; font-size: 18px; border: 2px solid #86efac; display: inline-flex; align-items: center; gap: 10px; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.15); animation: pulse-green 2s infinite; }
 
-    /* --- NATIVE CALENDAR --- */
+    /* NATIVE CALENDAR */
     .native-cal-container { margin-top: 60px; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 15px 40px -5px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
     .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     .cal-month-title { font-size: 16px; font-weight: 900; text-transform: uppercase; color: #1e293b; }
@@ -214,24 +216,28 @@
     .cockpit-gauge-container { height: 28px; background: #e2e8f0; border-radius: 99px; overflow: hidden; position: relative; margin-bottom: 10px; border:1px solid #cbd5e1; }
     .cockpit-gauge-fill { height: 100%; width: 0; background: #3b82f6; transition: width 0.3s; }
     .cockpit-gauge-fill.danger { background: #ef4444; animation: pulse 1s infinite; }
-    .cockpit-info { display: flex; justify-content: space-between; font-size: 16px; font-weight: 900; color: #1e293b; }
     
-    .cockpit-obj-row { background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 12px; }
+    /* REDUIT */
+    .cockpit-info { display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #64748b; }
+    
+    /* AERATION */
+    .cockpit-obj-row { background: white; padding: 25px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 15px; }
+    
     .cockpit-obj-title { font-size: 18px; font-weight: 900; margin-bottom: 15px; color: #1e293b; display:flex; justify-content:space-between; align-items:center; }
     .cockpit-obj-cost { font-size: 11px; font-weight:800; color:#3b82f6; background:#eff6ff; padding:3px 8px; border-radius:6px; }
     
-    .slider-row { display: flex; align-items: center; gap: 15px; margin-bottom: 10px; }
+    .slider-row { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
     .slider-label { font-size: 13px; font-weight: 800; width: 90px; color: #475569; }
-    .slider-val { font-size: 18px; font-weight: 900; width: 60px; text-align: right; color: var(--primary); }
+    .slider-val { font-size: 14px; font-weight: 900; width: 50px; text-align: right; color: var(--primary); }
     input[type=range] { flex: 1; accent-color: var(--primary); cursor: pointer; height: 16px; margin:0; padding:0; width:100%; }
 
-    #simGlobalBudget { font-size: 14px; font-weight: 800; color: #2563eb; border: 2px solid #bfdbfe; padding: 5px; width: 90px; border-radius: 6px; }
+    #simGlobalBudget { text-align: center; font-size: 14px; font-weight: 800; color: #2563eb; border: 2px solid #bfdbfe; padding: 5px; width: 90px; border-radius: 6px; }
     .budget-label-small { font-size: 11px; font-weight: 700; color: #64748b; }
     
     /* TOTAL 35H BOX */
     .sim-total-box { margin-top: 20px; padding: 15px; border: 2px solid #2563eb; border-radius: 12px; background: white; text-align: center; box-shadow:0 4px 15px rgba(37,99,235,0.1); margin-bottom: 10px; }
     .sim-total-label { font-size: 13px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
-    .sim-total-value { font-size: 36px; font-weight: 900; color: #1e293b; }
+    .sim-total-value { font-size: 24px; font-weight: 900; color: #1e293b; }
 
     @media (max-width: 600px) { .group-body.open { grid-template-columns: 1fr; } }
   </style>
@@ -359,7 +365,7 @@
             </div>
          </div>
 
-         <button class="btn" onclick="publishSim()" style="background:var(--success); margin-top:5px; font-size:13px; padding:12px;">📡 PUBLIER LES AJUSTEMENTS</button>
+         <button class="btn" onclick="publishSim()" style="background:var(--success); margin-top:5px; font-size:13px; padding:12px;">📡 PUBLIER</button>
       </div>
 
       <div class="admin-section">
@@ -598,7 +604,6 @@
 
         Object.keys(simObjs).forEach(k => {
             const o = simObjs[k];
-            // Render all published objectives
             if(!o.published) return; 
 
             // Calc Max Potential for one person (Cumulative)
@@ -752,7 +757,6 @@
             grid.appendChild(cell);
         }
 
-        // Generate Legend
         const uniqueEvents = [...new Map(calEvents.map(item => [item.t, item])).values()];
         uniqueEvents.forEach(evt => {
             const legItem = document.createElement("div");
@@ -853,11 +857,12 @@
       } else {
           middleHtml = `<div class="milestones">`;
           const emojis = ['🥳','🚀','🔥'];
-          
-          // Cumulative Visual for Steps
+          // Show Cumulative Sum for display clarity on card
+          let runningTotal = 0;
           (obj.paliers||[]).forEach((p, i) => {
                const u = pct >= p.threshold;
                const valStep = parse(p.prize);
+               // Note: We show the VALUE OF THE STEP, logic is cumulative in total
                const displayVal = (valStep * userRatio).toFixed(2);
                middleHtml += `<div class="ms-item ${u?'unlocked':''}"><div class="ms-threshold">${p.threshold}%</div><div class="ms-circle">${u?emojis[i%3]:(i+1)}</div><div class="ms-prize">${displayVal}€</div></div>`;
           });
