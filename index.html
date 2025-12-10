@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V51 (Calibrated)</title>
+  <title>Heiko - Budget Master V52 (Bouton Idée Orange)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -15,7 +15,7 @@
       --bg-gradient: linear-gradient(135deg, #fffaf4 0%, #f3f4f6 100%);
       --card-bg: #ffffff;
       --primary: #2563eb; --primary-dark: #1e40af;
-      --accent: #f59e0b;
+      --accent: #f59e0b; /* C'est ce orange qu'on utilise pour le bouton */
       --success: #10b981; --success-dark: #047857;
       --danger: #ef4444;
       --text-main: #1f2937; --text-muted: #6b7280;
@@ -38,16 +38,24 @@
     #toast { visibility: hidden; min-width: 300px; background-color: var(--success); color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 3000; left: 50%; top: 0; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; transform:translate(-50%, -100%); transition: all 0.3s; }
     #toast.show { visibility: visible; transform:translate(-50%, 20px); }
 
-    /* FEEDBACK BUTTON */
+    /* FEEDBACK BUTTON - VOYANT & PLUS GRAND */
     .feedback-btn {
         position: fixed; top: 50%; right: 0; transform: translateY(-50%);
-        background: white; border: 1px solid #e2e8f0; border-right: none;
-        padding: 10px 15px; border-radius: 20px 0 0 20px;
-        box-shadow: -2px 2px 10px rgba(0,0,0,0.05); cursor: pointer; z-index: 1000;
-        font-weight: 800; color: var(--primary); font-size: 12px;
-        display: flex; align-items: center; gap: 8px; transition: 0.2s;
+        background: var(--accent); /* Fond Orange */
+        color: white; /* Texte Blanc */
+        border: none;
+        padding: 15px 20px; /* Plus grand */
+        border-radius: 30px 0 0 30px;
+        box-shadow: -4px 4px 15px rgba(245, 158, 11, 0.3); /* Ombre orange */
+        cursor: pointer; z-index: 1000;
+        font-weight: 900; font-size: 14px; /* Police plus grande */
+        display: flex; align-items: center; gap: 10px; transition: all 0.3s ease;
     }
-    .feedback-btn:hover { padding-right: 20px; background: #eff6ff; }
+    .feedback-btn:hover { 
+        padding-right: 25px; 
+        background: #d97706; /* Orange un peu plus foncé au survol */
+        transform: translateY(-50%) scale(1.05);
+    }
     
     /* FEEDBACK MODAL */
     #feedbackModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2500; align-items: center; justify-content: center; padding: 20px; }
