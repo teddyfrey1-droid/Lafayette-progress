@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V46 (Perfect UI)</title>
+  <title>Heiko - Budget Master V48 (Redirect Pro)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -27,8 +27,8 @@
 
     /* ANIMATIONS */
     @keyframes floatMoney { 
-        0% { transform: translateY(50px) scale(0.5) rotate(0deg); opacity: 0; } 
-        20% { opacity: 1; transform: translateY(0px) scale(1) rotate(10deg); } 
+        0% { transform: translateY(80px) scale(0) rotate(0deg); opacity: 0; } 
+        20% { opacity: 1; transform: translateY(20px) scale(1) rotate(20deg); } 
         100% { transform: translateY(-300px) scale(1.3) rotate(360deg); opacity: 0; } 
     }
     @keyframes moveStripes { 0% { background-position: 0 0; } 100% { background-position: 40px 0; } }
@@ -48,7 +48,8 @@
     .user-welcome { font-size: 20px; font-weight: 900; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
     .user-badge { background: #dbeafe; color: var(--primary); padding: 6px 14px; border-radius: 30px; font-size: 13px; text-transform: uppercase; font-weight: 900; letter-spacing: 0.5px; }
     
-    .container { max-width: 1000px; margin: 0 auto; padding-bottom: 120px; }
+    .container { max-width: 1200px; margin: 0 auto; padding-bottom: 120px; }
+    
     header { text-align: center; margin-bottom: 60px; position: relative; z-index: 10; } 
     .header-pill { display: inline-flex; align-items: center; gap: 8px; background: #eff6ff; padding: 8px 18px; border-radius: 50px; font-size: 12px; font-weight: 900; color: var(--primary); margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
     h1 { font-size: 48px; font-weight: 900; color: #1e293b; margin: 0 0 15px; letter-spacing: -1.5px; text-transform: uppercase; line-height: 1; }
@@ -58,8 +59,6 @@
     .global-score-container { margin: 40px auto; width: 260px; height: 260px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; box-shadow: 0 25px 60px rgba(0,0,0,0.08); border: 12px solid #f8fafc; position: relative; overflow: visible; }
     .global-score-value { font-size: 58px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
     .global-score-label { font-size: 13px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; margin-top: 8px; text-align: center; line-height: 1.4; letter-spacing: 1.5px; z-index: 2; position: relative; }
-    
-    /* MONEY RAIN - FREEDOM */
     .money-rain { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: visible; }
     .bill { position: absolute; font-size: 32px; opacity: 0; user-select:none; }
 
@@ -87,7 +86,7 @@
     .data-box-label { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px; }
     .data-box-value { font-size: 20px; font-weight: 900; color: #1e293b; line-height: 1; }
 
-    /* BARRE ANIMÉE */
+    /* BARRE AVEC RAYURES ACTIVES */
     .progress-track { height: 30px; background: #e5e7eb; border-radius: 99px; overflow: hidden; margin-bottom: 40px; position: relative; display: flex; }
     .progress-fill { 
         height: 100%; 
@@ -127,7 +126,7 @@
     .earned-badge-container { margin-top: 30px; display: flex; justify-content: center; }
     .earned-badge { background: #dcfce7; color: #166534; padding: 12px 24px; border-radius: 16px; font-weight: 900; font-size: 18px; border: 2px solid #86efac; display: inline-flex; align-items: center; gap: 10px; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.15); animation: pulse-green 2s infinite; }
 
-    /* NATIVE CALENDAR */
+    /* --- NATIVE CALENDAR --- */
     .native-cal-container { margin-top: 60px; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 15px 40px -5px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
     .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     .cal-month-title { font-size: 16px; font-weight: 900; text-transform: uppercase; color: #1e293b; }
@@ -177,7 +176,7 @@
     .budget-bar-fill.danger { background: var(--danger); }
     .budget-text { font-size: 12px; font-weight: 700; color: #0369a1; display: flex; justify-content: space-between; }
     .options-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; background: #eff6ff; padding: 15px; border-radius: 12px; }
-    .check-label { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; color: #334155; cursor: pointer; padding: 5px; border-radius: 6px; transition: background 0.2s; }
+    .check-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; color: #334155; cursor: pointer; padding: 5px; border-radius: 6px; transition: background 0.2s; }
     .check-label:hover { background: #dbeafe; }
     .check-label input { width: 18px; height: 18px; margin: 0; cursor: pointer; accent-color: var(--primary); transform: scale(1.1); }
     .action-btn { font-size: 18px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; width: 36px; height: 36px; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; }
@@ -239,6 +238,9 @@
     .sim-total-label { font-size: 13px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
     .sim-total-value { font-size: 24px; font-weight: 900; color: #1e293b; }
 
+    /* CENTERED PLANNING TITLE */
+    .planning-title { text-align: center; justify-content: center; }
+
     @media (max-width: 600px) { .group-body.open { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -285,7 +287,9 @@
         <div style="text-align:center; color:#9ca3af; margin-top:50px;">Chargement des données...</div>
       </div>
 
-      <div class="native-cal-container">
+      <div class="category-title planning-title" style="margin-top:60px;">Planning 📅</div>
+
+      <div class="native-cal-container" style="margin-top:20px;">
           <div class="cal-header">
              <button class="cal-nav-btn" onclick="prevMonth()">❮</button>
              <div class="cal-month-title" id="calTitle">DÉCEMBRE 2025</div>
@@ -591,6 +595,7 @@
     let simObjs = {}; 
 
     function renderSimulator() {
+        // Always rebuild to keep sync
         buildSimulatorUI();
     }
 
@@ -600,10 +605,12 @@
         simObjs = JSON.parse(JSON.stringify(allObjs)); 
         document.getElementById("simGlobalBudget").value = globalSettings.budget || 0;
         
+        // CALC TOTAL POTENTIAL PER 35H (Cumulative Logic)
         let totalPotential35h = 0;
 
         Object.keys(simObjs).forEach(k => {
             const o = simObjs[k];
+            // Render all published objectives
             if(!o.published) return; 
 
             // Calc Max Potential for one person (Cumulative)
@@ -864,7 +871,7 @@
                const valStep = parse(p.prize);
                // Note: We show the VALUE OF THE STEP, logic is cumulative in total
                const displayVal = (valStep * userRatio).toFixed(2);
-               middleHtml += `<div class="ms-item ${u?'unlocked':''}"><div class="ms-threshold">${p.threshold}%</div><div class="ms-circle">${u?emojis[i%3]:(i+1)}</div><div class="ms-prize">${displayVal}€</div></div>`;
+               middleHtml += `<div class="ms-item ${u?'unlocked':''}"><div class="ms-threshold">${p.threshold}%</div><div class="ms-circle">${u?emojis[i%3]:(i+1)}</div><div class="ms-prize">+${displayVal}€</div></div>`;
           });
           middleHtml += `</div>`;
       }
