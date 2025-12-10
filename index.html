@@ -217,7 +217,7 @@
     .admin-tag { background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; margin-left: 5px; letter-spacing: 0.5px; }
     .user-email-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
 
-    /* LOGS - FOLDER STYLE */
+    /* LOGS */
     .logs-wrapper { display: flex; flex-direction: column; gap: 10px; }
     .log-user-group { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
     .group-header { padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #e2e8f0; transition:0.2s; }
@@ -247,10 +247,12 @@
     .cockpit-gauge-fill.danger { background: #ef4444; animation: pulse 1s infinite; }
     .cockpit-info { display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #64748b; }
     
+    /* MORE SPACE */
     .cockpit-obj-row { padding: 30px 20px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
     .cockpit-obj-title { font-size: 18px; font-weight: 900; margin-bottom: 25px; color: #1e293b; display:flex; justify-content:space-between; align-items:center; }
     .cockpit-obj-cost { font-size: 11px; font-weight:900; color:#1e40af; background:#dbeafe; padding:4px 10px; border-radius:50px; border:1px solid #bfdbfe; }
     
+    /* MEGA SLIDER */
     .slider-row { display: flex; flex-direction:column; align-items: flex-start; gap: 10px; margin-bottom: 25px; }
     .slider-row:last-child { margin-bottom:0; }
     .slider-label-line { display:flex; justify-content:space-between; width:100%; margin-bottom:5px; }
@@ -1121,7 +1123,7 @@
         const sec = firebase.initializeApp(firebaseConfig, "Sec"); 
         
         var actionCodeSettings = {
-          url: 'https://lafayette-progress.onrender.com', // REDIRECT URL
+          url: 'https://lafayette-progress.onrender.com', 
           handleCodeInApp: false
         };
 
@@ -1161,10 +1163,8 @@
         const d = document.getElementById("usersList"); d.innerHTML = ""; let totalToPay = 0; 
         let staffCount = 0;
         
-        // Filter out super admin and collect all users except super admin
         const staff = Object.keys(allUsers).map(k => allUsers[k]).filter(u => u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase());
 
-        // Update staff count
         document.getElementById("staffCountBadge").innerText = staff.length;
 
         staff.forEach(u => { 
@@ -1300,7 +1300,7 @@
       });
     }
 
-    function saveGlobalBudget() { const val = parseFloat(document.getElementById("globalBudgetInput").value); if(!isNaN(val)) { db.ref('settings/budget').set(val); showToast("💰 Sauvegardé"); } }
+    function saveGlobalBudget() { const val = parseFloat(document.getElementById("simGlobalBudget").value); if(!isNaN(val)) { db.ref('settings/budget').set(val); showToast("💰 Sauvegardé"); } }
     function checkBudget() {
        const budget = globalSettings.budget || 0; let maxLiability = 0; let totalUserRatio = 0;
        Object.values(allUsers).forEach(u => { if(!u.email || u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) totalUserRatio += (u.hours/BASE_HOURS); });
