@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V56 (Slider & History Fix)</title>
+  <title>Heiko - Budget Master V57 (Unlimited Staff)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -210,25 +210,6 @@
     .admin-tag { background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; margin-left: 5px; letter-spacing: 0.5px; }
     .user-email-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
 
-    /* LOGS */
-    .logs-wrapper { display: flex; flex-direction: column; gap: 15px; }
-    .log-user-group { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
-    .group-header { background: #f8fafc; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #e2e8f0; transition:0.2s; }
-    .group-header:hover { background: #eff6ff; }
-    .group-info { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; color: #1e293b; }
-    .last-seen { font-size: 11px; color: #64748b; font-weight: 600; display:flex; align-items:center; gap:8px; }
-    .group-body { display: none; padding: 15px; background: white; gap: 20px; }
-    .group-body.open { display: grid; grid-template-columns: 1fr 1fr; }
-    .log-col-title { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; border-bottom: 2px solid #f1f5f9; padding-bottom: 4px; }
-    .log-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
-    .log-entry { font-size: 12px; display: flex; align-items: flex-start; gap: 6px; }
-    .log-dot { font-size: 8px; margin-top: 4px; }
-    .log-time-s { font-weight: 700; color: #64748b; font-size: 11px; min-width: 45px; }
-    .log-desc { color: #334155; line-height: 1.3; }
-    .log-dur { color: #059669; font-weight: 700; background: #ecfdf5; padding: 0 4px; border-radius: 4px; font-size: 10px; display: inline-block; margin-left: 4px; }
-    .btn-clear-hist { border:none; background:#fee2e2; color:#ef4444; border-radius:4px; padding:2px 6px; font-size:10px; font-weight:700; cursor:pointer; }
-    .btn-clear-hist:hover { background:#fca5a5; }
-    
     /* COCKPIT - MEGA SLIDERS */
     .cockpit-container { padding: 25px; border: 3px solid #e2e8f0; border-radius: 20px; background: #f8fafc; margin-bottom: 20px; }
     .cockpit-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
@@ -237,19 +218,16 @@
     .cockpit-gauge-fill.danger { background: #ef4444; animation: pulse 1s infinite; }
     .cockpit-info { display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #64748b; }
     
-    /* MORE SPACE */
     .cockpit-obj-row { background: white; padding: 30px 20px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
     .cockpit-obj-title { font-size: 18px; font-weight: 900; margin-bottom: 25px; color: #1e293b; display:flex; justify-content:space-between; align-items:center; }
     .cockpit-obj-cost { font-size: 11px; font-weight:800; color:#3b82f6; background:#eff6ff; padding:3px 8px; border-radius:6px; }
     
-    /* MEGA SLIDER */
     .slider-row { display: flex; flex-direction:column; align-items: flex-start; gap: 10px; margin-bottom: 25px; }
     .slider-row:last-child { margin-bottom:0; }
     .slider-label-line { display:flex; justify-content:space-between; width:100%; margin-bottom:5px; }
     .slider-label { font-size: 14px; font-weight: 800; color: #475569; }
     .slider-val { font-size: 16px; font-weight: 900; color: var(--primary); }
     
-    /* FIX V56: RESET SLIDER STYLE */
     input[type=range] { 
         width: 100%; 
         -webkit-appearance: none;
@@ -259,61 +237,19 @@
         margin: 0; 
         padding: 0;
         cursor: pointer;
-        display: block; /* Force block to fill width */
+        display: block; 
     }
-    
-    /* Chrome/Safari/Edge Track */
-    input[type=range]::-webkit-slider-runnable-track {
-        width: 100%;
-        height: 14px;
-        background: #e2e8f0;
-        border-radius: 10px;
-        border: none;
-    }
-    
-    /* Chrome/Safari/Edge Thumb */
-    input[type=range]::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        appearance: none;
-        width: 32px; 
-        height: 32px;
-        border-radius: 50%;
-        background: var(--primary);
-        cursor: pointer;
-        box-shadow: 0 4px 12px rgba(37,99,235,0.4);
-        border: 2px solid white;
-        margin-top: -9px; /* Centers thumb on track */
-    }
-
-    /* Firefox Track */
-    input[type=range]::-moz-range-track {
-        width: 100%;
-        height: 14px;
-        background: #e2e8f0;
-        border-radius: 10px;
-        border: none;
-    }
-
-    /* Firefox Thumb */
-    input[type=range]::-moz-range-thumb {
-        width: 32px; 
-        height: 32px;
-        border: 2px solid white;
-        border-radius: 50%;
-        background: var(--primary);
-        cursor: pointer;
-        box-shadow: 0 4px 12px rgba(37,99,235,0.4);
-    }
+    input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 14px; background: #e2e8f0; border-radius: 10px; border: none; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 32px; height: 32px; border-radius: 50%; background: var(--primary); cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.4); border: 2px solid white; margin-top: -9px; }
+    input[type=range]::-moz-range-track { width: 100%; height: 14px; background: #e2e8f0; border-radius: 10px; border: none; }
+    input[type=range]::-moz-range-thumb { width: 32px; height: 32px; border: 2px solid white; border-radius: 50%; background: var(--primary); cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.4); }
 
     #simGlobalBudget { text-align: center; font-size: 14px; font-weight: 800; color: #2563eb; border: 2px solid #bfdbfe; padding: 5px; width: 90px; border-radius: 6px; }
     .budget-label-small { font-size: 11px; font-weight: 700; color: #64748b; }
     
-    /* TOTAL 35H BOX */
     .sim-total-box { margin-top: 20px; padding: 15px; border: 2px solid #2563eb; border-radius: 12px; background: white; text-align: center; box-shadow:0 4px 15px rgba(37,99,235,0.1); margin-bottom: 10px; }
     .sim-total-label { font-size: 13px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
     .sim-total-value { font-size: 24px; font-weight: 900; color: #1e293b; }
-
-    /* CENTERED PLANNING TITLE */
     .planning-title { text-align: center; justify-content: center; margin-left: auto; margin-right: auto; width: 100%; }
 
     @media (max-width: 600px) { .group-body.open { grid-template-columns: 1fr; } }
@@ -414,17 +350,20 @@
         <input type="email" id="nuEmail" placeholder="Email">
         <div style="margin-bottom:10px; margin-top:10px;"><input type="checkbox" id="nuAdmin" style="width:auto; vertical-align:middle;"> <label style="font-size:12px;">Admin ?</label></div>
         <button class="btn" onclick="createUser()">Inviter le membre (Email auto)</button>
-      </div>
-      <div class="admin-section">
-        <h3 class="section-header-large">Effectif & Primes</h3>
-        <div id="usersList"></div>
+        <div class="admin-section" style="margin-top:20px; border:none; box-shadow:none; padding:0;">
+             <div style="font-size:13px; font-weight:800; color:#334155; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                 <span>EFFECTIF TOTAL</span>
+                 <span id="staffCountBadge" style="background:#eff6ff; color:var(--primary); padding:2px 8px; border-radius:10px;">0</span>
+             </div>
+             <div id="usersList"></div>
+        </div>
       </div>
     </div>
 
     <div id="tab-logs" style="display:none;">
       <div class="admin-section">
         <h3 class="section-header-large">🕒 Activité par Utilisateur</h3>
-        <div style="font-size:11px; color:#666; margin-bottom:15px;">Cliquez sur un nom pour voir le détail <span style="font-size:10px;">▼</span></div>
+        <div style="font-size:11px; color:#666; margin-bottom:15px;">Cliquez sur un nom pour voir le détail.</div>
         <div id="logsContainer" class="logs-wrapper"></div>
       </div>
     </div>
@@ -658,7 +597,12 @@
              }
           } catch(e) { console.error(e); }
       });
-      db.ref('users').on('value', s => { allUsers = s.val() || {}; if(currentUser && (currentUser.role==='admin' || currentUser.email === SUPER_ADMIN_EMAIL)) { renderAdminUsers(); renderSimulator(); } });
+      db.ref('users').on('value', s => { 
+          allUsers = s.val() || {}; 
+          if(currentUser && (currentUser.role==='admin' || currentUser.email === SUPER_ADMIN_EMAIL)) { 
+              renderAdminUsers(); renderSimulator(); 
+          } 
+      });
       db.ref('settings').on('value', s => { globalSettings = s.val() || { budget: 0 }; if(currentUser && (currentUser.role==='admin' || currentUser.email === SUPER_ADMIN_EMAIL)) { renderSimulator(); } });
       db.ref('logs').limitToLast(2000).on('value', s => { allLogs = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); });
       db.ref('feedbacks').on('value', s => { allFeedbacks = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderFeedbacks(allFeedbacks); });
@@ -721,16 +665,22 @@
     // --- COCKPIT SIMULATOR LOGIC ---
     let simObjs = {}; 
 
-    function renderSimulator() { buildSimulatorUI(); }
+    function renderSimulator() {
+        buildSimulatorUI();
+    }
+
     function buildSimulatorUI() {
         const container = document.getElementById("simObjList");
         container.innerHTML = "";
         simObjs = JSON.parse(JSON.stringify(allObjs)); 
         document.getElementById("simGlobalBudget").value = globalSettings.budget || 0;
+        
         let totalPotential35h = 0;
+
         Object.keys(simObjs).forEach(k => {
             const o = simObjs[k];
             if(!o.published) return; 
+
             let maxObjPrize = 0;
             if(o.isFixed) {
                 maxObjPrize = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
@@ -738,61 +688,98 @@
                 if(o.paliers) o.paliers.forEach(p => maxObjPrize += parse(p.prize));
             }
             totalPotential35h += maxObjPrize;
+
             let objTotalCost = 0;
             let totalUserRatio = 0;
             Object.values(allUsers).forEach(u => { totalUserRatio += (u.hours/BASE_HOURS); });
             objTotalCost = maxObjPrize * totalUserRatio;
+
             const div = document.createElement("div"); div.className = "cockpit-obj-row";
             let slidersHtml = "";
+
             if(o.isFixed) {
                 const prize = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
-                slidersHtml = `<div class="slider-row"><div class="slider-label-line"><span class="slider-label">Prime Fixe</span><span class="slider-val" id="val-${k}-0">${prize}€</span></div><input type="range" min="0" max="50" step="5" value="${prize}" oninput="updateObjVal('${k}', 0, this.value)"></div>`;
+                slidersHtml = `
+                  <div class="slider-row">
+                     <div class="slider-label-line"><span class="slider-label">Prime Fixe</span><span class="slider-val" id="val-${k}-0">${prize}€</span></div>
+                     <input type="range" min="0" max="50" step="5" value="${prize}" oninput="updateObjVal('${k}', 0, this.value)">
+                  </div>`;
             } else {
                 (o.paliers || []).forEach((p, i) => {
                     const prize = parse(p.prize);
                     let label = `Palier ${p.threshold}`;
                     if(o.isNumeric) label += ""; else label += "%";
-                    slidersHtml += `<div class="slider-row"><div class="slider-label-line"><span class="slider-label">${label}</span><span class="slider-val" id="val-${k}-${i}">${prize}€</span></div><input type="range" min="0" max="30" step="5" value="${prize}" oninput="updateObjVal('${k}', ${i}, this.value)"></div>`;
+                    slidersHtml += `
+                      <div class="slider-row">
+                         <div class="slider-label-line"><span class="slider-label">${label}</span><span class="slider-val" id="val-${k}-${i}">${prize}€</span></div>
+                         <input type="range" min="0" max="30" step="5" value="${prize}" oninput="updateObjVal('${k}', ${i}, this.value)">
+                      </div>`;
                 });
             }
+
             div.innerHTML = `<div class="cockpit-obj-title"><span>${o.name}</span> <span class="cockpit-obj-cost" id="cost-${k}">Coût équipe : ${objTotalCost.toFixed(0)}€</span></div>${slidersHtml}`;
             container.appendChild(div);
         });
+        
         document.getElementById("simTotalPerUser").innerText = `${totalPotential35h.toFixed(0)}€`;
         updateSim();
     }
+
     function updateObjVal(objId, tierIdx, val) {
         document.getElementById(`val-${objId}-${tierIdx}`).innerText = val + "€";
-        if(simObjs[objId].paliers && simObjs[objId].paliers[tierIdx]) { simObjs[objId].paliers[tierIdx].prize = val; }
+        if(simObjs[objId].paliers && simObjs[objId].paliers[tierIdx]) {
+            simObjs[objId].paliers[tierIdx].prize = val;
+        }
         updateSim();
     }
+
     function updateSim() {
        const budget = parseFloat(document.getElementById("simGlobalBudget").value) || 0;
+       
        let totalUserRatio = 0;
-       Object.values(allUsers).forEach(u => { totalUserRatio += (u.hours/BASE_HOURS); });
+       Object.values(allUsers).forEach(u => { 
+           totalUserRatio += (u.hours/BASE_HOURS);
+       });
+
        let maxLiability = 0;
        let totalPotential35h = 0;
+
        Object.keys(simObjs).forEach(k => {
            const o = simObjs[k];
            if(!o.published) return;
+           
            let maxP = 0;
-           if(o.isFixed) { maxP = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0; } 
-           else { if(o.paliers) o.paliers.forEach(p => maxP += parse(p.prize)); }
+           if(o.isFixed) {
+               maxP = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
+           } else {
+               if(o.paliers) o.paliers.forEach(p => maxP += parse(p.prize));
+           }
+           
            const objCost = maxP * totalUserRatio;
            const costLabel = document.getElementById(`cost-${k}`);
            if(costLabel) costLabel.innerText = `Coût équipe : ${objCost.toFixed(0)}€`;
+
            maxLiability += objCost;
            totalPotential35h += maxP;
        });
+
        const pct = (budget > 0) ? (maxLiability / budget) * 100 : 0;
        const bar = document.getElementById("simGauge");
        bar.style.width = Math.min(pct, 100) + "%";
-       if(maxLiability > budget) { bar.classList.add("danger"); document.getElementById("simUsed").style.color = "#ef4444"; } 
-       else { bar.classList.remove("danger"); document.getElementById("simUsed").style.color = "#3b82f6"; }
+       
+       if(maxLiability > budget) {
+           bar.classList.add("danger");
+           document.getElementById("simUsed").style.color = "#ef4444";
+       } else {
+           bar.classList.remove("danger");
+           document.getElementById("simUsed").style.color = "#3b82f6";
+       }
+       
        document.getElementById("simUsed").innerText = `${maxLiability.toFixed(0)}€ Engagés`;
        document.getElementById("simLeft").innerText = `Reste : ${(budget - maxLiability).toFixed(0)}€`;
        document.getElementById("simTotalPerUser").innerText = `${totalPotential35h.toFixed(0)}€`;
     }
+
     function publishSim() {
         if(confirm("📡 Confirmer la publication des nouveaux montants ?")) {
             const updates = {};
@@ -800,11 +787,19 @@
                 const newBudget = parseFloat(document.getElementById("simGlobalBudget").value);
                 db.ref('settings/budget').set(newBudget);
             }
-            Object.keys(simObjs).forEach(k => { updates['objectives/' + k + '/paliers'] = simObjs[k].paliers; });
-            db.ref().update(updates).then(() => { showToast("✅ Pilotage Appliqué !"); logAction("Pilotage", "Mise à jour globale budget & primes"); });
+            Object.keys(simObjs).forEach(k => {
+                updates['objectives/' + k + '/paliers'] = simObjs[k].paliers;
+            });
+            db.ref().update(updates).then(() => {
+                showToast("✅ Pilotage Appliqué !");
+                logAction("Pilotage", "Mise à jour globale budget & primes");
+            });
         }
     }
 
+    // --- END COCKPIT ---
+
+    /* CALENDAR LOGIC */
     function renderNativeCalendar() {
         const m = currentCalDate.getMonth();
         const y = currentCalDate.getFullYear();
@@ -1146,8 +1141,17 @@
         }
     }
 
+    // MODIFIED RENDER USERS (DOT + EMAIL)
     function renderAdminUsers() { 
         const d = document.getElementById("usersList"); d.innerHTML = ""; let totalToPay = 0; 
+        
+        // Count staff
+        let staffCount = 0;
+        Object.values(allUsers).forEach(u => {
+           if(u.role !== 'admin' && u.email !== SUPER_ADMIN_EMAIL) staffCount++;
+        });
+        document.getElementById("staffCountBadge").innerText = staffCount;
+
         Object.keys(allUsers).forEach(k => { 
             const u = allUsers[k]; 
             if(u.email && u.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return; 
@@ -1156,14 +1160,12 @@
             
             const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); let primOk = true; 
             if(prims.length > 0) { primOk = prims.every(o => { 
+                 const pct = getPct(o.current, o.target, o.isInverse); 
                  let threshold = 100;
                  if(o.isFixed) threshold = 100;
                  else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold;
                  if(o.isNumeric) return parseFloat(o.current) >= threshold;
-                 else {
-                     const pct = getPct(o.current, o.target, o.isInverse); 
-                     return pct >= threshold;
-                 }
+                 else return pct >= threshold;
             }); } 
             
             Object.values(allObjs).forEach(o => { if(!o.published) return; 
@@ -1229,11 +1231,6 @@
         }
     }
 
-    function toggleUserLogs(id) {
-        const el = document.getElementById(id);
-        if(el) el.classList.toggle('open');
-    }
-
     function renderLogs(logs) {
       const container = document.getElementById("logsContainer"); container.innerHTML = "";
       const grouped = {};
@@ -1243,7 +1240,6 @@
           else { grouped[log.user].actions.push(log); if(log.time > grouped[log.user].lastSeen) grouped[log.user].lastSeen = log.time; }
       });
       const sortedUsers = Object.keys(grouped).sort((a,b) => grouped[b].lastSeen - grouped[a].lastSeen);
-      
       sortedUsers.forEach(uName => {
           const g = grouped[uName];
           const d = new Date(g.lastSeen);
@@ -1280,6 +1276,11 @@
               ac.innerHTML+=`<div class="log-entry"><span class="log-dot">🔵</span><span class="log-time-s">${at.toLocaleDateString().slice(0,5)} ${at.toLocaleTimeString().slice(0,5)}</span><span class="log-desc">${a.action} <span style="color:#94a3b8;">${a.detail}</span></span></div>`; 
           });
       });
+    }
+
+    function toggleUserLogs(id) {
+        const el = document.getElementById(id);
+        if(el) el.classList.toggle('open');
     }
 
     function saveGlobalBudget() { const val = parseFloat(document.getElementById("globalBudgetInput").value); if(!isNaN(val)) { db.ref('settings/budget').set(val); showToast("💰 Sauvegardé"); } }
