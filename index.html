@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V49 (Mega Sliders)</title>
+  <title>Heiko - Budget Master V49 (Redirect & Mega)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -28,7 +28,7 @@
     /* ANIMATIONS */
     @keyframes floatMoney { 
         0% { transform: translateY(80px) scale(0) rotate(0deg); opacity: 0; } 
-        20% { opacity: 1; transform: translateY(20px) scale(1) rotate(20deg); } 
+        20% { opacity: 1; transform: translateY(0px) scale(1) rotate(10deg); } 
         100% { transform: translateY(-300px) scale(1.3) rotate(360deg); opacity: 0; } 
     }
     @keyframes moveStripes { 0% { background-position: 0 0; } 100% { background-position: 40px 0; } }
@@ -209,7 +209,7 @@
     .log-dur { color: #059669; font-weight: 700; background: #ecfdf5; padding: 0 4px; border-radius: 4px; font-size: 10px; display: inline-block; margin-left: 4px; }
     .btn-clear-hist { border:none; background:#fee2e2; color:#ef4444; border-radius:4px; padding:2px 6px; font-size:10px; font-weight:700; cursor:pointer; }
     
-    /* COCKPIT - FONT SIZE XXL & MEGA SLIDERS */
+    /* COCKPIT - MEGA SLIDERS */
     .cockpit-container { padding: 25px; border: 3px solid #e2e8f0; border-radius: 20px; background: #f8fafc; margin-bottom: 20px; }
     .cockpit-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
     .cockpit-gauge-container { height: 28px; background: #e2e8f0; border-radius: 99px; overflow: hidden; position: relative; margin-bottom: 10px; border:1px solid #cbd5e1; }
@@ -218,20 +218,21 @@
     .cockpit-info { display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #64748b; }
     
     /* MORE SPACE */
-    .cockpit-obj-row { background: white; padding: 25px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px; }
-    .cockpit-obj-title { font-size: 18px; font-weight: 900; margin-bottom: 20px; color: #1e293b; display:flex; justify-content:space-between; align-items:center; }
+    .cockpit-obj-row { background: white; padding: 30px 20px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
+    .cockpit-obj-title { font-size: 18px; font-weight: 900; margin-bottom: 25px; color: #1e293b; display:flex; justify-content:space-between; align-items:center; }
     .cockpit-obj-cost { font-size: 11px; font-weight:800; color:#3b82f6; background:#eff6ff; padding:3px 8px; border-radius:6px; }
     
     /* MEGA SLIDER */
-    .slider-row { display: flex; flex-direction:column; align-items: flex-start; gap: 8px; margin-bottom: 20px; }
-    .slider-label-line { display:flex; justify-content:space-between; width:100%; }
+    .slider-row { display: flex; flex-direction:column; align-items: flex-start; gap: 10px; margin-bottom: 25px; }
+    .slider-row:last-child { margin-bottom:0; }
+    .slider-label-line { display:flex; justify-content:space-between; width:100%; margin-bottom:5px; }
     .slider-label { font-size: 14px; font-weight: 800; color: #475569; }
     .slider-val { font-size: 16px; font-weight: 900; color: var(--primary); }
     
     input[type=range] { 
         width: 100%; 
         appearance: none; 
-        height: 12px; 
+        height: 14px; /* Thicker track */
         background: #e2e8f0; 
         border-radius: 10px; 
         outline: none; 
@@ -239,12 +240,13 @@
     input[type=range]::-webkit-slider-thumb {
         -webkit-appearance: none;
         appearance: none;
-        width: 28px; /* MEGA THUMB */
-        height: 28px;
+        width: 32px; /* MEGA THUMB */
+        height: 32px;
         border-radius: 50%;
         background: var(--primary);
         cursor: pointer;
-        box-shadow: 0 4px 10px rgba(37,99,235,0.3);
+        box-shadow: 0 4px 12px rgba(37,99,235,0.4);
+        border: 2px solid white;
     }
 
     #simGlobalBudget { text-align: center; font-size: 14px; font-weight: 800; color: #2563eb; border: 2px solid #bfdbfe; padding: 5px; width: 90px; border-radius: 6px; }
@@ -612,6 +614,7 @@
     let simObjs = {}; 
 
     function renderSimulator() {
+        // Always rebuild to keep sync
         buildSimulatorUI();
     }
 
@@ -626,6 +629,7 @@
 
         Object.keys(simObjs).forEach(k => {
             const o = simObjs[k];
+            // Render all published objectives
             if(!o.published) return; 
 
             // Calc Max Potential for one person (Cumulative)
@@ -732,10 +736,12 @@
     function publishSim() {
         if(confirm("📡 Confirmer la publication des nouveaux montants ?")) {
             const updates = {};
+            
             if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
                 const newBudget = parseFloat(document.getElementById("simGlobalBudget").value);
                 db.ref('settings/budget').set(newBudget);
             }
+
             Object.keys(simObjs).forEach(k => {
                 updates['objectives/' + k + '/paliers'] = simObjs[k].paliers;
             });
@@ -996,18 +1002,26 @@
     function deleteObj(id) { if(confirm("🗑️ Supprimer ?")) { db.ref("objectives/"+id).remove().then(() => showToast("🗑️ Supprimé")); logAction("Suppression", `Objectif ${id}`); } }
     function togglePub(id, v) { db.ref("objectives/"+id+"/published").set(v); logAction("Publication", `Objectif ${id}: ${v}`); }
     
+    // MODIFIED CREATE USER (INSTANT PENDING)
     function createUser() { 
         const email = document.getElementById("nuEmail").value; 
         const sec = firebase.initializeApp(firebaseConfig, "Sec"); 
+        
+        // REDIRECT CONFIG
+        var actionCodeSettings = {
+          url: 'https://lafayette-progress.onrender.com', // REDIRECT URL
+          handleCodeInApp: false
+        };
+
         sec.auth().createUserWithEmailAndPassword(email, "Temp1234!").then(c => { 
             db.ref('users/'+c.user.uid).set({ name: document.getElementById("nuName").value, hours: parseFloat(document.getElementById("nuHours").value)||35, role: document.getElementById("nuAdmin").checked?'admin':'staff', email: email, status: 'pending' }); 
-            sec.auth().sendPasswordResetEmail(email); 
+            sec.auth().sendPasswordResetEmail(email, actionCodeSettings); 
             sec.delete(); 
             showToast("✅ Membre invité !"); 
         }).catch(e => { 
             if(e.code === 'auth/email-already-in-use') {
                 if(confirm("⚠️ Ce membre existe déjà ! Voulez-vous lui Renvoyer l'email d'invitation ?")) {
-                    sec.auth().sendPasswordResetEmail(email).then(() => {
+                    sec.auth().sendPasswordResetEmail(email, actionCodeSettings).then(() => {
                         showToast("📩 Invitation renvoyée !");
                         sec.delete();
                     });
@@ -1022,11 +1036,16 @@
     }
 
     function resendInvite(email) { 
+        var actionCodeSettings = {
+          url: 'https://lafayette-progress.onrender.com',
+          handleCodeInApp: false
+        };
         if(confirm("Renvoyer le mail d'activation à " + email + " ?")) {
-            auth.sendPasswordResetEmail(email).then(() => showToast("📩 Envoyé !")).catch(e => alert(e.message)); 
+            auth.sendPasswordResetEmail(email, actionCodeSettings).then(() => showToast("📩 Envoyé !")).catch(e => alert(e.message)); 
         }
     }
 
+    // MODIFIED RENDER USERS (DOT + EMAIL)
     function renderAdminUsers() { 
         const d = document.getElementById("usersList"); d.innerHTML = ""; let totalToPay = 0; 
         Object.keys(allUsers).forEach(k => { 
