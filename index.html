@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Lafayette - Dashboard Suivi Lafayette</title>
+  <title>Heiko - Budget Master V58 (Staff Display Fix)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <style>
-    /* --- DESIGN LAFAYETTE --- */
+    /* --- DESIGN HEIKO LAFAYETTE --- */
     :root {
       --bg-gradient: linear-gradient(135deg, #fffaf4 0%, #f3f4f6 100%);
       --card-bg: #ffffff;
@@ -57,7 +57,7 @@
     textarea.fb-input { width: 100%; height: 120px; padding: 12px; border: 2px solid #e2e8f0; border-radius: 12px; resize: none; font-family: inherit; font-size: 14px; margin-bottom: 15px; outline: none; }
     textarea.fb-input:focus { border-color: var(--primary); }
 
-    /* LOGIN - MODIF V57 */
+    /* LOGIN */
     #loginOverlay { position: fixed; inset: 0; background: var(--bg-gradient); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 20px; }
     .login-box { background: white; padding: 40px; border-radius: var(--radius); box-shadow: 0 20px 60px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; border: 1px solid #e2e8f0; }
     .login-title { font-size: 24px; font-weight: 900; color: #1e293b; margin-bottom: 20px; }
@@ -75,7 +75,14 @@
     .last-update { font-size: 14px; color: var(--text-muted); background: rgba(255,255,255,0.8); padding: 8px 20px; border-radius: 30px; display: inline-block; font-weight: 600; border: 1px solid #e5e7eb; text-transform: capitalize; }
 
     /* CARDS */
-    .global-score-container { margin: 40px auto; width: 260px; height: 260px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; box-shadow: 0 25px 60px rgba(0,0,0,0.08); border: 12px solid #f8fafc; position: relative; overflow: visible; }
+    .global-score-container { 
+        margin: 40px auto; width: 260px; height: 260px; 
+        background: white; 
+        border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; 
+        box-shadow: 0 25px 60px rgba(0,0,0,0.08), inset 0 0 0 10px #e2e8f0; 
+        border: 12px solid #cbd5e1; 
+        position: relative; overflow: visible; 
+    }
     .global-score-value { font-size: 58px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
     .global-score-label { font-size: 13px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; margin-top: 8px; text-align: center; line-height: 1.4; letter-spacing: 1.5px; z-index: 2; position: relative; }
     .money-rain { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: visible; }
@@ -210,15 +217,14 @@
     .admin-tag { background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; margin-left: 5px; letter-spacing: 0.5px; }
     .user-email-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
 
-    /* LOGS */
+    /* LOGS - FOLDER STYLE */
     .logs-wrapper { display: flex; flex-direction: column; gap: 10px; }
     .log-user-group { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
-    .group-header { background: #f8fafc; padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #e2e8f0; transition:0.2s; }
+    .group-header { padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #e2e8f0; transition:0.2s; }
     .group-header:hover { background: #eff6ff; }
     .group-info { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 14px; color: #1e293b; }
     .last-seen { font-size: 11px; color: #64748b; font-weight: 600; display:flex; align-items:center; gap:8px; }
     
-    /* THE FOLDER CONTENT - OPEN/CLOSE */
     .group-body { display: none; padding: 20px; background: white; gap: 20px; border-top:1px solid #e2e8f0; }
     .group-body.open { display: grid; grid-template-columns: 1fr 1fr; }
     
@@ -1153,17 +1159,16 @@
 
     function renderAdminUsers() { 
         const d = document.getElementById("usersList"); d.innerHTML = ""; let totalToPay = 0; 
-        
-        // Count staff
         let staffCount = 0;
-        Object.values(allUsers).forEach(u => {
-           if(u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) staffCount++;
-        });
-        document.getElementById("staffCountBadge").innerText = staffCount;
+        
+        // Filter out super admin and collect all users except super admin
+        const staff = Object.keys(allUsers).map(k => allUsers[k]).filter(u => u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase());
 
-        Object.keys(allUsers).forEach(k => { 
-            const u = allUsers[k]; 
-            if(u.email && u.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return; 
+        // Update staff count
+        document.getElementById("staffCountBadge").innerText = staff.length;
+
+        staff.forEach(u => { 
+            staffCount++;
             const userRatio = (u.hours || 35) / BASE_HOURS; 
             let userBonus = 0; 
             
@@ -1200,6 +1205,7 @@
             }); 
             totalToPay += userBonus; 
             
+            const uid = Object.keys(allUsers).find(key => allUsers[key] === u);
             const div = document.createElement("div"); div.className = "user-item"; 
             const statusClass = (u.status === 'active') ? 'active' : 'pending';
             const statusLabel = (u.status === 'active') ? 'ACTIF' : 'EN ATTENTE';
@@ -1220,8 +1226,8 @@
                 <div class="user-actions">
                     <div class="user-gain">${userBonus.toFixed(2)}€</div>
                     <button onclick="resendInvite('${u.email}')" class="action-btn" title="Renvoyer Invitation">📩</button>
-                    <button onclick="editUser('${k}')" class="action-btn" title="Modifier">✏️</button>
-                    <button onclick="deleteUser('${k}')" class="action-btn delete" title="Supprimer">🗑️</button>
+                    <button onclick="editUser('${uid}')" class="action-btn" title="Modifier">✏️</button>
+                    <button onclick="deleteUser('${uid}')" class="action-btn delete" title="Supprimer">🗑️</button>
                 </div>`; 
             d.appendChild(div); 
         }); 
