@@ -110,11 +110,30 @@
     .data-box-label { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px; }
     .data-box-value { font-size: 20px; font-weight: 900; color: #1e293b; line-height: 1; }
 
-    /* BARRE */
+    /* BARRE AVEC RAYURES ACTIVES */
     .progress-track { height: 30px; background: #e5e7eb; border-radius: 99px; overflow: hidden; margin-bottom: 40px; position: relative; display: flex; }
-    .progress-fill { height: 100%; background-color: var(--primary); background-image: linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent); background-size: 40px 40px; animation: moveStripes 1s linear infinite; transition: width 1s ease; position: relative; }
+    .progress-fill { 
+        height: 100%; 
+        background-color: var(--primary);
+        background-image: linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent);
+        background-size: 40px 40px; 
+        animation: moveStripes 1s linear infinite; 
+        transition: width 1s ease; 
+        position: relative; 
+    }
     .progress-fill.green-mode { background-color: var(--success); }
-    .progress-overdrive { height: 100%; width: 0; background-color: var(--danger); background-image: linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent); background-size: 40px 40px; animation: moveStripes 1s linear infinite; transition: width 1s ease; position: relative; }
+    
+    .progress-overdrive { 
+        height: 100%; 
+        width: 0;
+        background-color: var(--danger); 
+        background-image: linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent);
+        background-size: 40px 40px; 
+        animation: moveStripes 1s linear infinite; 
+        transition: width 1s ease; 
+        position: relative; 
+    }
+    
     .percent-float { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); font-size: 13px; font-weight: 900; color: white; z-index: 5; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
 
     .milestones { display: flex; justify-content: space-between; position: relative; padding: 0 10px; }
@@ -131,7 +150,7 @@
     .earned-badge-container { margin-top: 30px; display: flex; justify-content: center; }
     .earned-badge { background: #dcfce7; color: #166534; padding: 12px 24px; border-radius: 16px; font-weight: 900; font-size: 18px; border: 2px solid #86efac; display: inline-flex; align-items: center; gap: 10px; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.15); animation: pulse-green 2s infinite; }
 
-    /* NATIVE CALENDAR */
+    /* --- NATIVE CALENDAR --- */
     .native-cal-container { margin-top: 60px; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 15px 40px -5px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
     .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     .cal-month-title { font-size: 16px; font-weight: 900; text-transform: uppercase; color: #1e293b; }
@@ -169,9 +188,12 @@
     input:checked + .slider:before { transform: translateX(20px); }
     .pub-item { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 12px; border-bottom: 1px solid #f3f4f6; }
     .pub-name { font-weight: 700; font-size: 13px; color: #1f2937; }
+    
+    /* FIX V61: USER HEADER ALIGNMENT */
     .user-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f9fafb; border-radius: 10px; margin-bottom: 8px; border: 1px solid #e5e7eb; }
-    .user-info { display: flex; flex-direction: column; }
-    .user-header { display:flex; align-items:center; }
+    .user-info { display: flex; flex-direction: column; width: 100%; }
+    .user-header { display:flex; justify-content: space-between; align-items:center; width: 100%; }
+    
     .user-name { font-weight: 700; font-size: 13px; color: #1f2937; }
     .user-meta { font-size: 11px; color: #6b7280; }
     .user-gain { font-weight: 800; font-size: 13px; color: var(--success); background: #ecfdf5; padding: 2px 8px; border-radius: 6px; margin-right: 10px; }
@@ -210,14 +232,16 @@
     
     .log-col-title { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; border-bottom: 2px solid #f1f5f9; padding-bottom: 5px; }
     .log-list { display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; }
+    
     .log-entry { font-size: 12px; display: flex; align-items: flex-start; gap: 8px; border-bottom: 1px solid #f8fafc; padding-bottom: 4px; }
     .log-dot { font-size: 10px; margin-top: 3px; }
     .log-time-s { font-weight: 700; color: #64748b; font-size: 11px; min-width: 80px; }
     .log-desc { color: #334155; line-height: 1.3; }
     .log-dur { color: #059669; font-weight: 700; background: #ecfdf5; padding: 1px 6px; border-radius: 4px; font-size: 10px; display: inline-block; }
+    
     .btn-clear-hist { border:none; background:#fee2e2; color:#ef4444; border-radius:4px; padding:4px 8px; font-size:10px; font-weight:700; cursor:pointer; }
     
-    /* COCKPIT */
+    /* COCKPIT - MEGA SLIDERS */
     .cockpit-container { padding: 25px; border: 3px solid #e2e8f0; border-radius: 20px; background: #f8fafc; margin-bottom: 20px; }
     .cockpit-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
     .cockpit-gauge-container { height: 28px; background: #e2e8f0; border-radius: 99px; overflow: hidden; position: relative; margin-bottom: 10px; border:1px solid #cbd5e1; }
@@ -235,7 +259,17 @@
     .slider-label { font-size: 14px; font-weight: 800; color: #475569; }
     .slider-val { font-size: 16px; font-weight: 900; color: var(--primary); }
     
-    input[type=range] { width: 100%; -webkit-appearance: none; appearance: none; height: 14px; background: transparent; margin: 0; padding: 0; cursor: pointer; display: block; }
+    input[type=range] { 
+        width: 100%; 
+        -webkit-appearance: none;
+        appearance: none; 
+        height: 14px; 
+        background: transparent;
+        margin: 0; 
+        padding: 0;
+        cursor: pointer;
+        display: block; 
+    }
     input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 14px; background: #e2e8f0; border-radius: 10px; border: none; }
     input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 32px; height: 32px; border-radius: 50%; background: var(--primary); cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.4); border: 2px solid white; margin-top: -9px; }
     input[type=range]::-moz-range-track { width: 100%; height: 14px; background: #e2e8f0; border-radius: 10px; border: none; }
@@ -247,6 +281,8 @@
     .sim-total-box { margin-top: 20px; padding: 15px; border: 2px solid #2563eb; border-radius: 12px; background: white; text-align: center; box-shadow:0 4px 15px rgba(37,99,235,0.1); margin-bottom: 10px; }
     .sim-total-label { font-size: 13px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
     .sim-total-value { font-size: 24px; font-weight: 900; color: #1e293b; }
+
+    /* CENTERED PLANNING TITLE */
     .planning-title { text-align: center; justify-content: center; margin-left: auto; margin-right: auto; width: 100%; }
 
     @media (max-width: 600px) { .group-body.open { grid-template-columns: 1fr; } }
@@ -257,6 +293,7 @@
   <div id="topBanner" class="admin-section" style="display:none; background:#fff7ed; color:#c2410c; text-align:center; font-weight:700; border:1px solid #fed7aa; margin-bottom:20px;"></div>
 
   <div class="feedback-btn" onclick="document.getElementById('feedbackModal').style.display='flex'">💡 Une idée ?</div>
+
   <div id="feedbackModal">
       <div class="fb-box">
           <div class="fb-title">💡 Boîte à idées</div>
@@ -312,6 +349,7 @@
       </div>
 
       <div class="category-title planning-title" style="margin-top:60px;">Planning 📅</div>
+
       <div class="native-cal-container" style="margin-top:20px;">
           <div class="cal-header">
              <button class="cal-nav-btn" onclick="prevMonth()">❮</button>
@@ -476,12 +514,14 @@
       <input type="text" id="eoCurrent" placeholder="Actuel">
       <input type="text" id="eoTarget" placeholder="Cible">
     </div>
+
     <div class="options-row">
         <label class="check-label"><input type="checkbox" id="eoPrimary"> ⚡ Principal</label>
         <label class="check-label"><input type="checkbox" id="eoInverse"> 📉 Inversé</label>
         <label class="check-label"><input type="checkbox" id="eoNumeric"> 🔢 Nombre</label>
         <label class="check-label"><input type="checkbox" id="eoFixed" onchange="toggleEditInputs()"> 🎁 Prime Fixe</label>
     </div>
+
     <div id="editTiersBlock">
         <label style="font-size:11px; font-weight:700;">PALIERS (Montants dans Pilotage)</label>
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px; margin-bottom:5px;">
@@ -490,7 +530,9 @@
             <input type="number" id="p3t" placeholder="% P3">
         </div>
     </div>
-    <input type="hidden" id="p1p"><input type="hidden" id="p2p"><input type="hidden" id="p3p"><input type="hidden" id="eoFixedPrize">
+    <input type="hidden" id="p1p"><input type="hidden" id="p2p"><input type="hidden" id="p3p">
+    <input type="hidden" id="eoFixedPrize">
+
     <div style="margin-bottom:10px; display:flex; gap:15px; margin-top:10px;">
       <span><input type="checkbox" id="eoHideTarget" style="width:auto; vertical-align:middle;"> <label style="font-size:12px;">Masquer Cible</label></span>
       <span><input type="checkbox" id="eoHideCurrent" style="width:auto; vertical-align:middle;"> <label style="font-size:12px;">Masquer Valeur</label></span>
@@ -500,6 +542,7 @@
   </div>
 
   <script>
+    // CONFIG
     const firebaseConfig = {
       apiKey: "AIzaSyAGaitqmFwExvJ9ZUpkdUdCKAqqDOP2cdQ",
       authDomain: "objectif-restaurant.firebaseapp.com",
@@ -522,6 +565,7 @@
     const BASE_HOURS = 35;
     const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
 
+    // CALENDAR DATA
     const calEvents = [
         { t: "HEIKO x STURIA", start: "2025-12-01", end: "2026-01-31", c: "evt-heiko" },
         { t: "Flyers Sturia", start: "2025-12-01", end: "2025-12-31", c: "evt-sturia" },
@@ -532,6 +576,7 @@
     ];
     let currentCalDate = new Date(2025, 11, 1);
 
+    // AUTH
     auth.onAuthStateChanged(user => {
       if (user) {
         document.getElementById("loginOverlay").style.display = "none";
@@ -609,6 +654,8 @@
              b.textContent = globalSettings.banner;
              b.style.display = 'block';
              document.getElementById("simBannerMsg").value = globalSettings.banner;
+          } else {
+             document.getElementById("topBanner").style.display = 'none';
           }
           if(currentUser && (currentUser.role==='admin' || currentUser.email === SUPER_ADMIN_EMAIL)) { renderSimulator(); } 
       });
@@ -691,7 +738,7 @@
             totalPotential35h += maxObjPrize;
             let objTotalCost = 0;
             let totalUserRatio = 0;
-            Object.values(allUsers).forEach(u => { if(u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) totalUserRatio += (u.hours/BASE_HOURS); });
+            Object.values(allUsers).forEach(u => { if(u.email && u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) totalUserRatio += (u.hours/BASE_HOURS); });
             objTotalCost = maxObjPrize * totalUserRatio;
             const div = document.createElement("div"); div.className = "cockpit-obj-row";
             let slidersHtml = "";
@@ -720,7 +767,7 @@
     function updateSim() {
        const budget = parseFloat(document.getElementById("simGlobalBudget").value) || 0;
        let totalUserRatio = 0;
-       Object.values(allUsers).forEach(u => { if(u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) totalUserRatio += (u.hours/BASE_HOURS); });
+       Object.values(allUsers).forEach(u => { if(u.email && u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) totalUserRatio += (u.hours/BASE_HOURS); });
        let maxLiability = 0;
        let totalPotential35h = 0;
        Object.keys(simObjs).forEach(k => {
@@ -742,6 +789,7 @@
        else { bar.classList.remove("danger"); document.getElementById("simUsed").style.color = "#3b82f6"; }
        document.getElementById("simUsed").innerText = `${maxLiability.toFixed(0)}€ Engagés`;
        document.getElementById("simLeft").innerText = `Reste : ${(budget - maxLiability).toFixed(0)}€`;
+       document.getElementById("simTotalPerUser").innerText = `${totalPotential35h.toFixed(0)}€`;
     }
     function publishSim() {
         if(confirm("📡 Confirmer la publication des nouveaux montants ?")) {
@@ -990,14 +1038,14 @@
        logAction("Création Objectif", name);
     }
 
-    // CORRECTION V59 - ITERATION FIABLE
     function renderAdminUsers() { 
         const d = document.getElementById("usersList"); d.innerHTML = ""; let totalToPay = 0; 
         let staffCount = 0;
         
-        Object.keys(allUsers).forEach(uid => { 
+        // CORRECTION V60 : Assure que TOUS les membres (sauf Super Admin) s'affichent
+        Object.keys(allUsers).forEach(uid => {
             const u = allUsers[uid];
-            // Skip Super Admin
+            // Skip Super Admin email
             if (u.email && u.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return;
             
             staffCount++;
@@ -1016,7 +1064,8 @@
                  }
             }); } 
             
-            Object.values(allObjs).forEach(o => { if(!o.published) return; 
+            Object.values(allObjs).forEach(o => { 
+                if(!o.published) return; 
                 const pct = getPct(o.current, o.target, o.isInverse); 
                 const isLocked = !o.isPrimary && !primOk; 
                 let g = 0; 
