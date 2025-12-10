@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V53 (Numeric & Sliders)</title>
+  <title>Heiko - Budget Master V54 (Logic Fix)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -210,25 +210,7 @@
     .admin-tag { background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; margin-left: 5px; letter-spacing: 0.5px; }
     .user-email-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
 
-    /* LOGS */
-    .logs-wrapper { display: flex; flex-direction: column; gap: 15px; }
-    .log-user-group { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
-    .group-header { background: #f8fafc; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #e2e8f0; transition:0.2s; }
-    .group-header:hover { background: #eff6ff; }
-    .group-info { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; color: #1e293b; }
-    .last-seen { font-size: 11px; color: #64748b; font-weight: 600; display:flex; align-items:center; gap:8px; }
-    .group-body { display: none; padding: 15px; background: white; gap: 20px; }
-    .group-body.open { display: grid; grid-template-columns: 1fr 1fr; }
-    .log-col-title { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; border-bottom: 2px solid #f1f5f9; padding-bottom: 4px; }
-    .log-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
-    .log-entry { font-size: 12px; display: flex; align-items: flex-start; gap: 6px; }
-    .log-dot { font-size: 8px; margin-top: 4px; }
-    .log-time-s { font-weight: 700; color: #64748b; font-size: 11px; min-width: 45px; }
-    .log-desc { color: #334155; line-height: 1.3; }
-    .log-dur { color: #059669; font-weight: 700; background: #ecfdf5; padding: 0 4px; border-radius: 4px; font-size: 10px; display: inline-block; margin-left: 4px; }
-    .btn-clear-hist { border:none; background:#fee2e2; color:#ef4444; border-radius:4px; padding:2px 6px; font-size:10px; font-weight:700; cursor:pointer; }
-    
-    /* COCKPIT - MEGA SLIDERS */
+    /* COCKPIT - MEGA SLIDERS & VISIBILITY */
     .cockpit-container { padding: 25px; border: 3px solid #e2e8f0; border-radius: 20px; background: #f8fafc; margin-bottom: 20px; }
     .cockpit-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
     .cockpit-gauge-container { height: 28px; background: #e2e8f0; border-radius: 99px; overflow: hidden; position: relative; margin-bottom: 10px; border:1px solid #cbd5e1; }
@@ -236,40 +218,27 @@
     .cockpit-gauge-fill.danger { background: #ef4444; animation: pulse 1s infinite; }
     .cockpit-info { display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #64748b; }
     
-    /* MORE SPACE */
     .cockpit-obj-row { background: white; padding: 30px 20px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
-    .cockpit-obj-title { font-size: 18px; font-weight: 900; margin-bottom: 25px; color: #1e293b; display:flex; justify-content:space-between; align-items:center; }
-    .cockpit-obj-cost { font-size: 11px; font-weight:800; color:#3b82f6; background:#eff6ff; padding:3px 8px; border-radius:6px; }
     
-    /* MEGA SLIDER */
+    /* MODIFIED: Cost Label - CLEARER */
+    .cockpit-obj-cost { font-size: 11px; font-weight:900; color:#1e40af; background:#dbeafe; padding:4px 10px; border-radius:50px; border:1px solid #bfdbfe; }
+    
+    .cockpit-obj-title { font-size: 18px; font-weight: 900; margin-bottom: 25px; color: #1e293b; display:flex; justify-content:space-between; align-items:center; }
+    
     .slider-row { display: flex; flex-direction:column; align-items: flex-start; gap: 10px; margin-bottom: 25px; }
     .slider-row:last-child { margin-bottom:0; }
     .slider-label-line { display:flex; justify-content:space-between; width:100%; margin-bottom:5px; }
     .slider-label { font-size: 14px; font-weight: 800; color: #475569; }
     .slider-val { font-size: 16px; font-weight: 900; color: var(--primary); }
     
-    /* NEW CSS FOR SLIDER REMOVING MARGINS */
     input[type=range] { 
         width: 100%; 
-        -webkit-appearance: none;
         appearance: none; 
         height: 14px; 
-        background: transparent;
-        margin: 0; 
-        padding: 0;
-        cursor: pointer;
+        background: #e2e8f0; 
+        border-radius: 10px; 
+        outline: none; 
     }
-    
-    /* Chrome/Safari/Edge Track */
-    input[type=range]::-webkit-slider-runnable-track {
-        width: 100%;
-        height: 14px;
-        background: #e2e8f0;
-        border-radius: 10px;
-        border: none;
-    }
-    
-    /* Chrome/Safari/Edge Thumb */
     input[type=range]::-webkit-slider-thumb {
         -webkit-appearance: none;
         appearance: none;
@@ -280,39 +249,17 @@
         cursor: pointer;
         box-shadow: 0 4px 12px rgba(37,99,235,0.4);
         border: 2px solid white;
-        margin-top: -9px; /* Centers thumb on track */
-    }
-
-    /* Firefox Track */
-    input[type=range]::-moz-range-track {
-        width: 100%;
-        height: 14px;
-        background: #e2e8f0;
-        border-radius: 10px;
-        border: none;
-    }
-
-    /* Firefox Thumb */
-    input[type=range]::-moz-range-thumb {
-        width: 32px; 
-        height: 32px;
-        border: 2px solid white;
-        border-radius: 50%;
-        background: var(--primary);
-        cursor: pointer;
-        box-shadow: 0 4px 12px rgba(37,99,235,0.4);
     }
 
     #simGlobalBudget { text-align: center; font-size: 14px; font-weight: 800; color: #2563eb; border: 2px solid #bfdbfe; padding: 5px; width: 90px; border-radius: 6px; }
     .budget-label-small { font-size: 11px; font-weight: 700; color: #64748b; }
     
-    /* TOTAL 35H BOX */
     .sim-total-box { margin-top: 20px; padding: 15px; border: 2px solid #2563eb; border-radius: 12px; background: white; text-align: center; box-shadow:0 4px 15px rgba(37,99,235,0.1); margin-bottom: 10px; }
     .sim-total-label { font-size: 13px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
     .sim-total-value { font-size: 24px; font-weight: 900; color: #1e293b; }
 
-    /* CENTERED PLANNING TITLE */
-    .planning-title { text-align: center; justify-content: center; margin-left: auto; margin-right: auto; width: 100%; }
+    /* CENTERED PLANNING TITLE - FORCED */
+    .planning-title { text-align: center; justify-content: center; width:100%; display:block; margin: 60px auto 20px auto; }
 
     @media (max-width: 600px) { .group-body.open { grid-template-columns: 1fr; } }
   </style>
@@ -374,9 +321,9 @@
         <div style="text-align:center; color:#9ca3af; margin-top:50px;">Chargement des données...</div>
       </div>
 
-      <div class="category-title planning-title" style="margin-top:60px;">Planning 📅</div>
+      <div class="category-title planning-title">Planning 📅</div>
 
-      <div class="native-cal-container" style="margin-top:20px;">
+      <div class="native-cal-container">
           <div class="cal-header">
              <button class="cal-nav-btn" onclick="prevMonth()">❮</button>
              <div class="cal-month-title" id="calTitle">DÉCEMBRE 2025</div>
@@ -410,7 +357,7 @@
           <input type="number" id="nuHours" placeholder="Heures">
         </div>
         <input type="email" id="nuEmail" placeholder="Email">
-        <div style="margin-bottom:10px; margin-top:10px;"><input type="checkbox" id="nuAdmin" style="width:auto; vertical-align:middle;"> <label style="font-size:12px;">Admin ?</label></div>
+        <div style="margin-bottom:10px; margin-top:10px;"><input type="checkbox" id="nuAdmin" style="width:auto; vertical-align:middle;"> <label style="font-size:12px;">Ajouter comme Admin</label></div>
         <button class="btn" onclick="createUser()">Inviter le membre (Email auto)</button>
       </div>
       <div class="admin-section">
@@ -597,10 +544,9 @@
         document.getElementById("loginOverlay").style.display = "none";
         document.getElementById("appContent").style.display = "block";
         
-        // CHECK IF REDIRECTED FROM EMAIL
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('mode') === 'resetPassword') {
-            // Already handled by Firebase Auth UI, just let them login
+            // Already handled by Firebase Auth UI
         }
 
         db.ref('users/' + user.uid).on('value', snap => {
@@ -735,7 +681,6 @@
     let simObjs = {}; 
 
     function renderSimulator() {
-        // Always rebuild to keep sync
         buildSimulatorUI();
     }
 
@@ -778,7 +723,7 @@
                 (o.paliers || []).forEach((p, i) => {
                     const prize = parse(p.prize);
                     let label = `Palier ${p.threshold}`;
-                    if(o.isNumeric) label += ""; // No % if numeric
+                    if(o.isNumeric) label += ""; 
                     else label += "%";
 
                     slidersHtml += `
@@ -923,8 +868,16 @@
       if(prims.length > 0) {
         primOk = prims.every(o => {
            const pct = getPct(o.current, o.target, o.isInverse);
-           const threshold = (o.isFixed) ? 100 : ((o.paliers && o.paliers[0]) ? o.paliers[0].threshold : 100);
-           return pct >= threshold;
+           let threshold = 100;
+           if(o.isFixed) threshold = 100;
+           else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold;
+
+           // LOGIC FIX V54: Numeric Comparison
+           if(o.isNumeric) {
+               return parseFloat(o.current) >= threshold;
+           } else {
+               return pct >= threshold;
+           }
         });
       }
 
@@ -942,10 +895,20 @@
         const isLocked = !o.isPrimary && !primOk;
         if(!isLocked) {
              if(o.isFixed) {
-                 if(pct >= 100 && o.paliers && o.paliers[0]) totalMyGain += (parse(o.paliers[0].prize) * ratio);
+                 // Check numeric vs pct
+                 let win = false;
+                 if(o.isNumeric) win = parseFloat(o.current) >= o.target;
+                 else win = pct >= 100;
+
+                 if(win && o.paliers && o.paliers[0]) totalMyGain += (parse(o.paliers[0].prize) * ratio);
              } else {
-                 // Cumulative Gain
-                 if(o.paliers) o.paliers.forEach(p => { if(pct >= p.threshold) totalMyGain += (parse(p.prize) * ratio); });
+                 if(o.paliers) o.paliers.forEach(p => { 
+                     let unlocked = false;
+                     if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold;
+                     else unlocked = pct >= p.threshold;
+                     
+                     if(unlocked) totalMyGain += (parse(p.prize) * ratio); 
+                 });
              }
         }
       });
@@ -954,7 +917,6 @@
       const rainContainer = document.getElementById("moneyRain");
       rainContainer.innerHTML = "";
       if(totalMyGain > 0) {
-          // MORE BILLS
          for(let i=0; i<30; i++) {
             const bill = document.createElement("div"); bill.className = "bill"; bill.textContent = "💸";
             bill.style.left = Math.random()*100 + "%";
@@ -969,9 +931,19 @@
 
     function createCard(obj, isLocked, userRatio, isPrimary) {
       const pct = getPct(obj.current, obj.target, obj.isInverse);
+      
       let isWin = false;
-      if(obj.isFixed) isWin = pct >= 100;
-      else isWin = (obj.paliers && obj.paliers[0]) ? pct >= obj.paliers[0].threshold : pct >= 100;
+      // LOGIC FIX V54: Determine Win
+      if(obj.isFixed) {
+          if(obj.isNumeric) isWin = parseFloat(obj.current) >= obj.target;
+          else isWin = pct >= 100;
+      } else {
+          // Win if first tier reached
+          if(obj.paliers && obj.paliers[0]) {
+              if(obj.isNumeric) isWin = parseFloat(obj.current) >= obj.paliers[0].threshold;
+              else isWin = pct >= obj.paliers[0].threshold;
+          }
+      }
 
       const el = document.createElement("div");
       let cls = "card"; if(isLocked) cls += " is-locked"; if(isWin && !isLocked) cls += " is-winner";
@@ -985,10 +957,19 @@
       let earnedBadge = "";
       let myGain = 0;
       if(obj.isFixed) { 
-          if(pct >= 100 && obj.paliers && obj.paliers[0]) myGain = parse(obj.paliers[0].prize); 
+          let win = false;
+          if(obj.isNumeric) win = parseFloat(obj.current) >= obj.target;
+          else win = pct >= 100;
+
+          if(win && obj.paliers && obj.paliers[0]) myGain = parse(obj.paliers[0].prize); 
       } else { 
-          // Cumulative Calculation
-          if(obj.paliers) obj.paliers.forEach(p => { if(pct >= p.threshold) myGain += parse(p.prize); }); 
+          if(obj.paliers) obj.paliers.forEach(p => { 
+             let unlocked = false;
+             if(obj.isNumeric) unlocked = parseFloat(obj.current) >= p.threshold;
+             else unlocked = pct >= p.threshold;
+
+             if(unlocked) myGain += parse(p.prize); 
+          }); 
       }
 
       if(!isLocked && myGain > 0) earnedBadge = `<div class="earned-badge-container"><div class="earned-badge">💶 Prime gagnée : ${(myGain*userRatio).toFixed(2)}€</div></div>`;
@@ -1000,29 +981,29 @@
       } else {
           middleHtml = `<div class="milestones">`;
           const emojis = ['🥳','🚀','🔥'];
-          // Show Cumulative Sum for display clarity on card
-          let runningTotal = 0;
           (obj.paliers||[]).forEach((p, i) => {
-               const u = pct >= p.threshold;
+               let u = false;
+               // LOGIC FIX V54: Milestone Unlocked
+               if(obj.isNumeric) u = parseFloat(obj.current) >= p.threshold;
+               else u = pct >= p.threshold;
+
                const valStep = parse(p.prize);
-               // Note: We show the VALUE OF THE STEP, logic is cumulative in total
                const displayVal = (valStep * userRatio).toFixed(2);
-               // Show absolute NUMBER instead of % if isNumeric
+               
                let labelTh = p.threshold + "%";
-               if(obj.isNumeric) labelTh = p.threshold;
+               if(obj.isNumeric) labelTh = p.threshold; // No %
 
                middleHtml += `<div class="ms-item ${u?'unlocked':''}"><div class="ms-threshold">${labelTh}</div><div class="ms-circle">${u?emojis[i%3]:(i+1)}</div><div class="ms-prize">+${displayVal}€</div></div>`;
           });
           middleHtml += `</div>`;
       }
 
-      // DISPLAY NUMERIC vs %
       let targetVal = obj.hideTarget ? '<span style="font-size:20px;">🔒</span>' : obj.target + (obj.isInverse ? '%' : '');
       let currentVal = obj.hideCurrent ? '<span style="font-size:20px;">🔒</span>' : obj.current + (obj.isInverse ? '%' : '');
       
       if(obj.isNumeric) {
-          targetVal = obj.target; // No %
-          currentVal = obj.current; // No %
+          targetVal = obj.target; 
+          currentVal = obj.current; 
       }
 
       let percentDisplay = pct.toFixed(1) + '%';
@@ -1208,6 +1189,7 @@
         }
     }
 
+    // MODIFIED RENDER USERS (DOT + EMAIL)
     function renderAdminUsers() { 
         const d = document.getElementById("usersList"); d.innerHTML = ""; let totalToPay = 0; 
         Object.keys(allUsers).forEach(k => { 
