@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V58 (Merged Admin)</title>
+  <title>Heiko - Budget Master V59 (Alerts & UI Polish)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -31,12 +31,36 @@
         20% { opacity: 1; transform: translateY(0px) scale(1) rotate(10deg); } 
         100% { transform: translateY(-300px) scale(1.3) rotate(360deg); opacity: 0; } 
     }
-    @keyframes moveStripes { 0% { background-position: 0 0; } 100% { background-position: 40px 0; } }
+    @keyframes moveStripes { 0% { background-position: 0 0; } 100% { background-position: 30px 0; } }
     @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+    
+    /* Animation pour l'alerte du haut */
+    @keyframes slideDownUp {
+        0% { transform: translate(-50%, -150%); opacity: 0; }
+        10% { transform: translate(-50%, 20px); opacity: 1; }
+        90% { transform: translate(-50%, 20px); opacity: 1; }
+        100% { transform: translate(-50%, -150%); opacity: 0; }
+    }
 
     /* TOAST */
     #toast { visibility: hidden; min-width: 300px; background-color: var(--success); color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 3000; left: 50%; top: 0; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; transform:translate(-50%, -100%); transition: all 0.3s; }
     #toast.show { visibility: visible; transform:translate(-50%, 20px); }
+
+    /* ALERT TOP (NEWS) */
+    #topAlert {
+        position: fixed; top: 0; left: 50%; transform: translate(-50%, -150%);
+        background: white; z-index: 4000;
+        padding: 15px 25px; border-radius: 50px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        display: flex; align-items: center; gap: 15px;
+        border: 2px solid #3b82f6;
+        min-width: 320px;
+    }
+    #topAlert.trigger { animation: slideDownUp 6s forwards ease-in-out; }
+    .alert-icon { font-size: 20px; }
+    .alert-content { display: flex; flex-direction: column; }
+    .alert-title { font-weight: 900; color: #1e293b; font-size: 13px; text-transform: uppercase; }
+    .alert-desc { font-size: 12px; color: #64748b; }
 
     /* FEEDBACK BUTTON */
     .feedback-btn {
@@ -85,8 +109,22 @@
     h1 { font-size: 48px; font-weight: 900; color: #1e293b; margin: 0 0 15px; letter-spacing: -1.5px; text-transform: uppercase; line-height: 1; }
     .last-update { font-size: 14px; color: var(--text-muted); background: rgba(255,255,255,0.8); padding: 8px 20px; border-radius: 30px; display: inline-block; font-weight: 600; border: 1px solid #e5e7eb; text-transform: capitalize; }
 
-    /* CARDS */
-    .global-score-container { margin: 40px auto; width: 260px; height: 260px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; box-shadow: 0 25px 60px rgba(0,0,0,0.08); border: 12px solid #f8fafc; position: relative; overflow: visible; }
+    /* CARDS & CIRCLE SCORE STYLE UPDATE */
+    .global-score-container { 
+        margin: 40px auto; 
+        width: 260px; height: 260px; 
+        border-radius: 50%; 
+        display: flex; align-items: center; justify-content: center; flex-direction: column; 
+        position: relative; overflow: visible;
+        /* NEW STYLE */
+        background: white;
+        border: 8px solid white; /* Inner spacer */
+        outline: 4px solid transparent;
+        background: linear-gradient(white, white) padding-box,
+                    linear-gradient(135deg, #e0f2fe 0%, #cbd5e1 50%, #e0f2fe 100%) border-box; /* Gradient border */
+        box-shadow: 0 25px 50px rgba(148, 163, 184, 0.3), inset 0 0 20px rgba(241, 245, 249, 0.5); 
+    }
+    
     .global-score-value { font-size: 58px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
     .global-score-label { font-size: 13px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; margin-top: 8px; text-align: center; line-height: 1.4; letter-spacing: 1.5px; z-index: 2; position: relative; }
     .money-rain { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: visible; }
@@ -118,6 +156,8 @@
 
     /* BARRE AVEC RAYURES ACTIVES */
     .progress-track { height: 30px; background: #e5e7eb; border-radius: 99px; overflow: hidden; margin-bottom: 40px; position: relative; display: flex; }
+    
+    /* DEFAULT FILL */
     .progress-fill { 
         height: 100%; 
         background-color: var(--primary);
@@ -127,7 +167,20 @@
         transition: width 1s ease; 
         position: relative; 
     }
-    .progress-fill.green-mode { background-color: var(--success); }
+    
+    /* WINNER FILL (ANIMATED) */
+    .card.is-winner .progress-fill {
+        background: repeating-linear-gradient(
+            45deg,
+            #10b981,
+            #10b981 10px,
+            #34d399 10px,
+            #34d399 20px
+        );
+        background-size: 28px 28px;
+        animation: moveStripes 0.8s linear infinite; /* FASTER & SMOOTHER */
+        box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+    }
     
     .progress-overdrive { 
         height: 100%; 
@@ -331,6 +384,14 @@
   </style>
 </head>
 <body>
+
+  <div id="topAlert">
+      <div class="alert-icon">📣</div>
+      <div class="alert-content">
+          <div class="alert-title">NOUVEAUTÉ !</div>
+          <div class="alert-desc" id="topAlertText">...</div>
+      </div>
+  </div>
 
   <div class="feedback-btn" onclick="document.getElementById('feedbackModal').style.display='flex'">💡 Une idée ?</div>
 
@@ -711,12 +772,35 @@
       db.ref('logs').limitToLast(2000).on('value', s => { allLogs = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); });
       db.ref('feedbacks').on('value', s => { allFeedbacks = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderFeedbacks(allFeedbacks); });
       
-      // LOAD UPDATES
+      // LOAD UPDATES & CHECK ALERT
       db.ref('updates').on('value', s => { 
           allUpdates = s.val() || {}; 
           renderUpdatesPublic();
+          checkNewUpdates(allUpdates);
           if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderUpdatesAdmin();
       });
+    }
+
+    // CHECK FOR NEW UPDATES TO SHOW ALERT
+    function checkNewUpdates(updates) {
+        const arr = Object.values(updates).sort((a,b) => b.date - a.date);
+        if(arr.length === 0) return;
+        const latest = arr[0];
+        // Use unique key combination of Title + Date to ensure ID uniqueness even if re-created
+        const latestId = latest.title + "_" + latest.date;
+        const lastSeen = localStorage.getItem('heiko_last_update_seen');
+        
+        if(latestId !== lastSeen) {
+            // Trigger Alert
+            const alertBox = document.getElementById("topAlert");
+            document.getElementById("topAlertText").textContent = latest.title;
+            alertBox.classList.remove("trigger");
+            void alertBox.offsetWidth; // Force reflow
+            alertBox.classList.add("trigger");
+            
+            // Save as seen
+            localStorage.setItem('heiko_last_update_seen', latestId);
+        }
     }
 
     function updateUI() {
