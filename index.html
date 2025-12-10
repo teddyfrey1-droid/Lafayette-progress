@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V57 (Unlimited Staff)</title>
+  <title>Lafayette - Dashboard Suivi Lafayette</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <style>
-    /* --- DESIGN HEIKO LAFAYETTE --- */
+    /* --- DESIGN LAFAYETTE --- */
     :root {
       --bg-gradient: linear-gradient(135deg, #fffaf4 0%, #f3f4f6 100%);
       --card-bg: #ffffff;
@@ -57,7 +57,7 @@
     textarea.fb-input { width: 100%; height: 120px; padding: 12px; border: 2px solid #e2e8f0; border-radius: 12px; resize: none; font-family: inherit; font-size: 14px; margin-bottom: 15px; outline: none; }
     textarea.fb-input:focus { border-color: var(--primary); }
 
-    /* LOGIN */
+    /* LOGIN - MODIF V57 */
     #loginOverlay { position: fixed; inset: 0; background: var(--bg-gradient); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 20px; }
     .login-box { background: white; padding: 40px; border-radius: var(--radius); box-shadow: 0 20px 60px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; border: 1px solid #e2e8f0; }
     .login-title { font-size: 24px; font-weight: 900; color: #1e293b; margin-bottom: 20px; }
@@ -210,6 +210,29 @@
     .admin-tag { background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; margin-left: 5px; letter-spacing: 0.5px; }
     .user-email-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
 
+    /* LOGS */
+    .logs-wrapper { display: flex; flex-direction: column; gap: 10px; }
+    .log-user-group { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
+    .group-header { background: #f8fafc; padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #e2e8f0; transition:0.2s; }
+    .group-header:hover { background: #eff6ff; }
+    .group-info { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 14px; color: #1e293b; }
+    .last-seen { font-size: 11px; color: #64748b; font-weight: 600; display:flex; align-items:center; gap:8px; }
+    
+    /* THE FOLDER CONTENT - OPEN/CLOSE */
+    .group-body { display: none; padding: 20px; background: white; gap: 20px; border-top:1px solid #e2e8f0; }
+    .group-body.open { display: grid; grid-template-columns: 1fr 1fr; }
+    
+    .log-col-title { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; border-bottom: 2px solid #f1f5f9; padding-bottom: 5px; }
+    .log-list { display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; }
+    
+    .log-entry { font-size: 12px; display: flex; align-items: flex-start; gap: 8px; border-bottom: 1px solid #f8fafc; padding-bottom: 4px; }
+    .log-dot { font-size: 10px; margin-top: 3px; }
+    .log-time-s { font-weight: 700; color: #64748b; font-size: 11px; min-width: 80px; }
+    .log-desc { color: #334155; line-height: 1.3; }
+    .log-dur { color: #059669; font-weight: 700; background: #ecfdf5; padding: 1px 6px; border-radius: 4px; font-size: 10px; display: inline-block; }
+    
+    .btn-clear-hist { border:none; background:#fee2e2; color:#ef4444; border-radius:4px; padding:4px 8px; font-size:10px; font-weight:700; cursor:pointer; }
+    
     /* COCKPIT - MEGA SLIDERS */
     .cockpit-container { padding: 25px; border: 3px solid #e2e8f0; border-radius: 20px; background: #f8fafc; margin-bottom: 20px; }
     .cockpit-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
@@ -218,9 +241,9 @@
     .cockpit-gauge-fill.danger { background: #ef4444; animation: pulse 1s infinite; }
     .cockpit-info { display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #64748b; }
     
-    .cockpit-obj-row { background: white; padding: 30px 20px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
+    .cockpit-obj-row { padding: 30px 20px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
     .cockpit-obj-title { font-size: 18px; font-weight: 900; margin-bottom: 25px; color: #1e293b; display:flex; justify-content:space-between; align-items:center; }
-    .cockpit-obj-cost { font-size: 11px; font-weight:800; color:#3b82f6; background:#eff6ff; padding:3px 8px; border-radius:6px; }
+    .cockpit-obj-cost { font-size: 11px; font-weight:900; color:#1e40af; background:#dbeafe; padding:4px 10px; border-radius:50px; border:1px solid #bfdbfe; }
     
     .slider-row { display: flex; flex-direction:column; align-items: flex-start; gap: 10px; margin-bottom: 25px; }
     .slider-row:last-child { margin-bottom:0; }
@@ -275,8 +298,8 @@
 
   <div id="loginOverlay">
     <div class="login-box">
-      <h2 class="login-title">Connexion Membre</h2>
-      <input type="email" id="loginEmail" placeholder="Email (ex: admin@heiko.team)">
+      <h2 class="login-title">Dashboard Suivi Lafayette</h2>
+      <input type="email" id="loginEmail" placeholder="Email">
       <input type="password" id="loginPass" placeholder="Mot de passe">
       <button class="btn" id="btnLogin">Connexion</button>
       <a onclick="resetPassword()" class="forgot-link">Mot de passe oublié ?</a>
@@ -348,15 +371,12 @@
           <input type="number" id="nuHours" placeholder="Heures">
         </div>
         <input type="email" id="nuEmail" placeholder="Email">
-        <div style="margin-bottom:10px; margin-top:10px;"><input type="checkbox" id="nuAdmin" style="width:auto; vertical-align:middle;"> <label style="font-size:12px;">Admin ?</label></div>
+        <div style="margin-bottom:10px; margin-top:10px;"><input type="checkbox" id="nuAdmin" style="width:auto; vertical-align:middle;"> <label style="font-size:12px;">Ajouter comme Admin</label></div>
         <button class="btn" onclick="createUser()">Inviter le membre (Email auto)</button>
-        <div class="admin-section" style="margin-top:20px; border:none; box-shadow:none; padding:0;">
-             <div style="font-size:13px; font-weight:800; color:#334155; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
-                 <span>EFFECTIF TOTAL</span>
-                 <span id="staffCountBadge" style="background:#eff6ff; color:var(--primary); padding:2px 8px; border-radius:10px;">0</span>
-             </div>
-             <div id="usersList"></div>
-        </div>
+      </div>
+      <div class="admin-section">
+        <h3 class="section-header-large">Effectif & Primes</h3>
+        <div id="usersList"></div>
       </div>
     </div>
 
@@ -639,7 +659,6 @@
       renderDashboard();
     }
 
-    // --- FEEDBACK LOGIC ---
     function sendFeedback() {
         const txt = document.getElementById("fbContent").value.trim();
         if(!txt) return;
@@ -662,13 +681,8 @@
         });
     }
 
-    // --- COCKPIT SIMULATOR LOGIC ---
     let simObjs = {}; 
-
-    function renderSimulator() {
-        buildSimulatorUI();
-    }
-
+    function renderSimulator() { buildSimulatorUI(); }
     function buildSimulatorUI() {
         const container = document.getElementById("simObjList");
         container.innerHTML = "";
@@ -787,9 +801,7 @@
                 const newBudget = parseFloat(document.getElementById("simGlobalBudget").value);
                 db.ref('settings/budget').set(newBudget);
             }
-            Object.keys(simObjs).forEach(k => {
-                updates['objectives/' + k + '/paliers'] = simObjs[k].paliers;
-            });
+            Object.keys(simObjs).forEach(k => { updates['objectives/' + k + '/paliers'] = simObjs[k].paliers; });
             db.ref().update(updates).then(() => {
                 showToast("✅ Pilotage Appliqué !");
                 logAction("Pilotage", "Mise à jour globale budget & primes");
@@ -797,9 +809,6 @@
         }
     }
 
-    // --- END COCKPIT ---
-
-    /* CALENDAR LOGIC */
     function renderNativeCalendar() {
         const m = currentCalDate.getMonth();
         const y = currentCalDate.getFullYear();
@@ -997,6 +1006,7 @@
        if(t === 'objs') document.getElementById('btnTabObjs').classList.add('active');
        if(t === 'logs') document.getElementById('btnTabLogs').classList.add('active');
        if(t === 'feedbacks') document.getElementById('btnTabFeedbacks').classList.add('active');
+       
        document.getElementById('tab-team').style.display = t==='team'?'block':'none';
        document.getElementById('tab-objs').style.display = t==='objs'?'block':'none';
        document.getElementById('tab-logs').style.display = t==='logs'?'block':'none';
@@ -1141,14 +1151,13 @@
         }
     }
 
-    // MODIFIED RENDER USERS (DOT + EMAIL)
     function renderAdminUsers() { 
         const d = document.getElementById("usersList"); d.innerHTML = ""; let totalToPay = 0; 
         
         // Count staff
         let staffCount = 0;
         Object.values(allUsers).forEach(u => {
-           if(u.role !== 'admin' && u.email !== SUPER_ADMIN_EMAIL) staffCount++;
+           if(u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) staffCount++;
         });
         document.getElementById("staffCountBadge").innerText = staffCount;
 
@@ -1160,12 +1169,14 @@
             
             const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); let primOk = true; 
             if(prims.length > 0) { primOk = prims.every(o => { 
-                 const pct = getPct(o.current, o.target, o.isInverse); 
                  let threshold = 100;
                  if(o.isFixed) threshold = 100;
                  else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold;
                  if(o.isNumeric) return parseFloat(o.current) >= threshold;
-                 else return pct >= threshold;
+                 else {
+                     const pct = getPct(o.current, o.target, o.isInverse); 
+                     return pct >= threshold;
+                 }
             }); } 
             
             Object.values(allObjs).forEach(o => { if(!o.published) return; 
@@ -1231,6 +1242,11 @@
         }
     }
 
+    function toggleUserLogs(id) {
+        const el = document.getElementById(id);
+        if(el) el.classList.toggle('open');
+    }
+
     function renderLogs(logs) {
       const container = document.getElementById("logsContainer"); container.innerHTML = "";
       const grouped = {};
@@ -1240,18 +1256,18 @@
           else { grouped[log.user].actions.push(log); if(log.time > grouped[log.user].lastSeen) grouped[log.user].lastSeen = log.time; }
       });
       const sortedUsers = Object.keys(grouped).sort((a,b) => grouped[b].lastSeen - grouped[a].lastSeen);
+      
       sortedUsers.forEach(uName => {
           const g = grouped[uName];
           const d = new Date(g.lastSeen);
           g.sessions.sort((a,b) => b.startTime - a.startTime); g.actions.sort((a,b) => b.time - a.time);
           
-          // Generate Safe ID
           const safeId = 'log-group-' + uName.replace(/[^a-zA-Z0-9]/g, '');
 
           const div = document.createElement("div"); div.className = "log-user-group";
           div.innerHTML = `
              <div class="group-header">
-                <div class="group-info" onclick="toggleUserLogs('${safeId}')" style="flex:1;">
+                <div class="group-info" onclick="toggleUserLogs('${safeId}')" style="flex:1; cursor:pointer;">
                    👤 ${uName} <span style="font-weight:400; font-size:11px; color:#64748b; margin-left:10px;">(Dernière: ${d.toLocaleString()}) ▼</span>
                 </div>
                 <button onclick="deleteUserLogs('${uName}')" class="btn-clear-hist" title="Effacer historique">🗑️ Effacer</button>
@@ -1266,21 +1282,16 @@
           if(g.sessions.length===0) sc.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; 
           else g.sessions.forEach(s=>{ 
               const st=new Date(s.startTime); const m=Math.floor((s.lastSeen-s.startTime)/60000); const dt=(m>60)?Math.floor(m/60)+"h "+(m%60)+"m":m+"m"; 
-              sc.innerHTML+=`<div class="log-entry"><span class="log-dot">🟢</span><span class="log-time-s">${st.toLocaleDateString().slice(0,5)} ${st.toLocaleTimeString().slice(0,5)}</span><span class="log-dur">${dt}</span></div>`; 
+              sc.innerHTML+=`<div class="log-entry"><span class="log-dot" style="color:var(--success);">🟢</span><span class="log-time-s">${st.toLocaleDateString().slice(0,5)} ${st.toLocaleTimeString().slice(0,5)}</span><span class="log-dur">${dt}</span></div>`; 
           });
 
           const ac = document.getElementById(`act-${safeId}`); 
           if(g.actions.length===0) ac.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; 
           else g.actions.forEach(a=>{ 
               const at=new Date(a.time); 
-              ac.innerHTML+=`<div class="log-entry"><span class="log-dot">🔵</span><span class="log-time-s">${at.toLocaleDateString().slice(0,5)} ${at.toLocaleTimeString().slice(0,5)}</span><span class="log-desc">${a.action} <span style="color:#94a3b8;">${a.detail}</span></span></div>`; 
+              ac.innerHTML+=`<div class="log-entry"><span class="log-dot" style="color:var(--primary);">🔵</span><span class="log-time-s">${at.toLocaleDateString().slice(0,5)} ${at.toLocaleTimeString().slice(0,5)}</span><span class="log-desc">${a.action} <span style="color:#94a3b8;">${a.detail}</span></span></div>`; 
           });
       });
-    }
-
-    function toggleUserLogs(id) {
-        const el = document.getElementById(id);
-        if(el) el.classList.toggle('open');
     }
 
     function saveGlobalBudget() { const val = parseFloat(document.getElementById("globalBudgetInput").value); if(!isNaN(val)) { db.ref('settings/budget').set(val); showToast("💰 Sauvegardé"); } }
