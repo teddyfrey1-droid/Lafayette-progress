@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V52 (Bouton Idée Orange)</title>
+  <title>Heiko - Budget Master V53 (Numeric & Sliders)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -15,7 +15,7 @@
       --bg-gradient: linear-gradient(135deg, #fffaf4 0%, #f3f4f6 100%);
       --card-bg: #ffffff;
       --primary: #2563eb; --primary-dark: #1e40af;
-      --accent: #f59e0b; /* C'est ce orange qu'on utilise pour le bouton */
+      --accent: #f59e0b;
       --success: #10b981; --success-dark: #047857;
       --danger: #ef4444;
       --text-main: #1f2937; --text-muted: #6b7280;
@@ -38,24 +38,17 @@
     #toast { visibility: hidden; min-width: 300px; background-color: var(--success); color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 3000; left: 50%; top: 0; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; transform:translate(-50%, -100%); transition: all 0.3s; }
     #toast.show { visibility: visible; transform:translate(-50%, 20px); }
 
-    /* FEEDBACK BUTTON - VOYANT & PLUS GRAND */
+    /* FEEDBACK BUTTON */
     .feedback-btn {
         position: fixed; top: 50%; right: 0; transform: translateY(-50%);
-        background: var(--accent); /* Fond Orange */
-        color: white; /* Texte Blanc */
-        border: none;
-        padding: 15px 20px; /* Plus grand */
-        border-radius: 30px 0 0 30px;
-        box-shadow: -4px 4px 15px rgba(245, 158, 11, 0.3); /* Ombre orange */
+        background: var(--accent); color: white; border: none;
+        padding: 15px 20px; border-radius: 30px 0 0 30px;
+        box-shadow: -4px 4px 15px rgba(245, 158, 11, 0.3);
         cursor: pointer; z-index: 1000;
-        font-weight: 900; font-size: 14px; /* Police plus grande */
+        font-weight: 900; font-size: 14px;
         display: flex; align-items: center; gap: 10px; transition: all 0.3s ease;
     }
-    .feedback-btn:hover { 
-        padding-right: 25px; 
-        background: #d97706; /* Orange un peu plus foncé au survol */
-        transform: translateY(-50%) scale(1.05);
-    }
+    .feedback-btn:hover { padding-right: 25px; background: #d97706; transform: translateY(-50%) scale(1.05); }
     
     /* FEEDBACK MODAL */
     #feedbackModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2500; align-items: center; justify-content: center; padding: 20px; }
@@ -255,14 +248,28 @@
     .slider-label { font-size: 14px; font-weight: 800; color: #475569; }
     .slider-val { font-size: 16px; font-weight: 900; color: var(--primary); }
     
+    /* NEW CSS FOR SLIDER REMOVING MARGINS */
     input[type=range] { 
         width: 100%; 
+        -webkit-appearance: none;
         appearance: none; 
         height: 14px; 
-        background: #e2e8f0; 
-        border-radius: 10px; 
-        outline: none; 
+        background: transparent;
+        margin: 0; 
+        padding: 0;
+        cursor: pointer;
     }
+    
+    /* Chrome/Safari/Edge Track */
+    input[type=range]::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 14px;
+        background: #e2e8f0;
+        border-radius: 10px;
+        border: none;
+    }
+    
+    /* Chrome/Safari/Edge Thumb */
     input[type=range]::-webkit-slider-thumb {
         -webkit-appearance: none;
         appearance: none;
@@ -273,6 +280,27 @@
         cursor: pointer;
         box-shadow: 0 4px 12px rgba(37,99,235,0.4);
         border: 2px solid white;
+        margin-top: -9px; /* Centers thumb on track */
+    }
+
+    /* Firefox Track */
+    input[type=range]::-moz-range-track {
+        width: 100%;
+        height: 14px;
+        background: #e2e8f0;
+        border-radius: 10px;
+        border: none;
+    }
+
+    /* Firefox Thumb */
+    input[type=range]::-moz-range-thumb {
+        width: 32px; 
+        height: 32px;
+        border: 2px solid white;
+        border-radius: 50%;
+        background: var(--primary);
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(37,99,235,0.4);
     }
 
     #simGlobalBudget { text-align: center; font-size: 14px; font-weight: 800; color: #2563eb; border: 2px solid #bfdbfe; padding: 5px; width: 90px; border-radius: 6px; }
@@ -452,6 +480,7 @@
         <div class="options-row">
             <label class="check-label"><input type="checkbox" id="noPrimary" checked> ⚡ Principal</label>
             <label class="check-label"><input type="checkbox" id="noInverse"> 📉 Inversé</label>
+            <label class="check-label"><input type="checkbox" id="noNumeric"> 🔢 Nombre</label>
             <label class="check-label"><input type="checkbox" id="noFixed" onchange="toggleCreateInputs()"> 🎁 Fixe</label>
         </div>
 
@@ -504,6 +533,7 @@
     <div class="options-row">
         <label class="check-label"><input type="checkbox" id="eoPrimary"> ⚡ Principal</label>
         <label class="check-label"><input type="checkbox" id="eoInverse"> 📉 Inversé</label>
+        <label class="check-label"><input type="checkbox" id="eoNumeric"> 🔢 Nombre</label>
         <label class="check-label"><input type="checkbox" id="eoFixed" onchange="toggleEditInputs()"> 🎁 Prime Fixe</label>
     </div>
 
@@ -566,6 +596,13 @@
       if (user) {
         document.getElementById("loginOverlay").style.display = "none";
         document.getElementById("appContent").style.display = "block";
+        
+        // CHECK IF REDIRECTED FROM EMAIL
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('mode') === 'resetPassword') {
+            // Already handled by Firebase Auth UI, just let them login
+        }
+
         db.ref('users/' + user.uid).on('value', snap => {
           const val = snap.val();
           if(!val) {
@@ -589,7 +626,6 @@
       } else {
         document.getElementById("loginOverlay").style.display = "flex";
         document.getElementById("appContent").style.display = "none";
-        // Check for redirect param to auto login flow if implemented
       }
     });
 
@@ -741,9 +777,13 @@
             } else {
                 (o.paliers || []).forEach((p, i) => {
                     const prize = parse(p.prize);
+                    let label = `Palier ${p.threshold}`;
+                    if(o.isNumeric) label += ""; // No % if numeric
+                    else label += "%";
+
                     slidersHtml += `
                       <div class="slider-row">
-                         <div class="slider-label-line"><span class="slider-label">Palier ${p.threshold}%</span><span class="slider-val" id="val-${k}-${i}">${prize}€</span></div>
+                         <div class="slider-label-line"><span class="slider-label">${label}</span><span class="slider-val" id="val-${k}-${i}">${prize}€</span></div>
                          <input type="range" min="0" max="30" step="5" value="${prize}" oninput="updateObjVal('${k}', ${i}, this.value)">
                       </div>`;
                 });
@@ -784,7 +824,6 @@
            if(o.isFixed) {
                maxP = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
            } else {
-               // Cumulative Logic: Sum of all tiers
                if(o.paliers) o.paliers.forEach(p => maxP += parse(p.prize));
            }
            
@@ -968,13 +1007,31 @@
                const valStep = parse(p.prize);
                // Note: We show the VALUE OF THE STEP, logic is cumulative in total
                const displayVal = (valStep * userRatio).toFixed(2);
-               middleHtml += `<div class="ms-item ${u?'unlocked':''}"><div class="ms-threshold">${p.threshold}%</div><div class="ms-circle">${u?emojis[i%3]:(i+1)}</div><div class="ms-prize">+${displayVal}€</div></div>`;
+               // Show absolute NUMBER instead of % if isNumeric
+               let labelTh = p.threshold + "%";
+               if(obj.isNumeric) labelTh = p.threshold;
+
+               middleHtml += `<div class="ms-item ${u?'unlocked':''}"><div class="ms-threshold">${labelTh}</div><div class="ms-circle">${u?emojis[i%3]:(i+1)}</div><div class="ms-prize">+${displayVal}€</div></div>`;
           });
           middleHtml += `</div>`;
       }
 
+      // DISPLAY NUMERIC vs %
       let targetVal = obj.hideTarget ? '<span style="font-size:20px;">🔒</span>' : obj.target + (obj.isInverse ? '%' : '');
       let currentVal = obj.hideCurrent ? '<span style="font-size:20px;">🔒</span>' : obj.current + (obj.isInverse ? '%' : '');
+      
+      if(obj.isNumeric) {
+          targetVal = obj.target; // No %
+          currentVal = obj.current; // No %
+      }
+
+      let percentDisplay = pct.toFixed(1) + '%';
+      if(obj.isNumeric) {
+          percentDisplay = `${Math.floor(obj.current)} / ${obj.target}`;
+      } else if(obj.isInverse && pct >= 100) {
+          percentDisplay = 'SUCCÈS';
+      }
+
       const w1 = Math.min(pct, 100);
       const w2 = pct > 100 ? Math.min(pct - 100, 100) : 0;
 
@@ -990,7 +1047,7 @@
           </div>
         </div>
         <div class="data-boxes-row"><div class="data-box"><span class="data-box-label">ACTUEL</span><span class="data-box-value">${currentVal}</span></div><div class="data-box"><span class="data-box-label">CIBLE ${obj.isInverse ? '(MAX)' : ''}</span><span class="data-box-value">${targetVal}</span></div></div>
-        <div class="progress-track"><div class="percent-float">${obj.isInverse && pct >= 100 ? 'SUCCÈS' : pct.toFixed(1)+'%'}</div><div class="progress-fill ${isWin?'green-mode':''}" style="width:${w1}%"></div><div class="progress-overdrive" style="width:${w2}%"></div></div>
+        <div class="progress-track"><div class="percent-float">${percentDisplay}</div><div class="progress-fill ${isWin?'green-mode':''}" style="width:${w1}%"></div><div class="progress-overdrive" style="width:${w2}%"></div></div>
         ${middleHtml}${earnedBadge}`;
       return el;
     }
@@ -1018,12 +1075,24 @@
        if(name.length < 2) { alert("⚠️ Le NOM est obligatoire."); return; }
        if(target.length < 1) { alert("⚠️ La CIBLE est obligatoire."); return; }
        const isFixed = document.getElementById("noFixed").checked;
+       const isNumeric = document.getElementById("noNumeric").checked;
+       
        let paliers = [];
-       // Default 0€ prices, set in Pilotage
        if(isFixed) { paliers = [{ threshold: 100, prize: "0" }]; } 
        else { paliers = [{threshold: parseFloat(document.getElementById("c_p1t").value)||50, prize: "0"}, {threshold: parseFloat(document.getElementById("c_p2t").value)||100, prize: "0"}, {threshold: parseFloat(document.getElementById("c_p3t").value)||120, prize: "0"}]; }
+       
        const id = "obj-" + Date.now();
-       db.ref("objectives/"+id).set({ name: name, target: target, current: 0, published: true, isPrimary: document.getElementById("noPrimary").checked, isInverse: document.getElementById("noInverse").checked, isFixed: isFixed, paliers: paliers }).then(() => { showToast("✅ Objectif Ajouté !"); });
+       db.ref("objectives/"+id).set({ 
+           name: name, 
+           target: target, 
+           current: 0, 
+           published: true, 
+           isPrimary: document.getElementById("noPrimary").checked, 
+           isInverse: document.getElementById("noInverse").checked, 
+           isFixed: isFixed, 
+           isNumeric: isNumeric,
+           paliers: paliers 
+       }).then(() => { showToast("✅ Objectif Ajouté !"); });
        logAction("Création Objectif", name);
     }
 
@@ -1052,6 +1121,8 @@
       document.getElementById("eoPrimary").checked = o.isPrimary;
       document.getElementById("eoInverse").checked = o.isInverse || false;
       document.getElementById("eoFixed").checked = o.isFixed || false;
+      document.getElementById("eoNumeric").checked = o.isNumeric || false;
+      
       toggleEditInputs(); 
       if(o.paliers && o.paliers.length > 0) {
         if(o.isFixed) { document.getElementById("eoFixedPrize").value = o.paliers[0].prize; } 
@@ -1078,7 +1149,18 @@
               {threshold: parseFloat(document.getElementById("p3t").value), prize: oldP[2]?oldP[2].prize:"0"}
           ]; 
       }
-      db.ref("objectives/"+id).update({ name: document.getElementById("eoName").value, current: document.getElementById("eoCurrent").value, target: document.getElementById("eoTarget").value, isPrimary: document.getElementById("eoPrimary").checked, isInverse: document.getElementById("eoInverse").checked, isFixed: isFixed, hideTarget: document.getElementById("eoHideTarget").checked, hideCurrent: document.getElementById("eoHideCurrent").checked, paliers: paliers }).then(() => { showToast("✅ Objectif Modifié !"); document.getElementById("editObjPanel").classList.remove("active"); });
+      db.ref("objectives/"+id).update({ 
+          name: document.getElementById("eoName").value, 
+          current: document.getElementById("eoCurrent").value, 
+          target: document.getElementById("eoTarget").value, 
+          isPrimary: document.getElementById("eoPrimary").checked, 
+          isInverse: document.getElementById("eoInverse").checked, 
+          isFixed: isFixed, 
+          isNumeric: document.getElementById("eoNumeric").checked,
+          hideTarget: document.getElementById("eoHideTarget").checked, 
+          hideCurrent: document.getElementById("eoHideCurrent").checked, 
+          paliers: paliers 
+      }).then(() => { showToast("✅ Objectif Modifié !"); document.getElementById("editObjPanel").classList.remove("active"); });
       logAction("Modification", "Objectif : " + document.getElementById("eoName").value);
     }
 
@@ -1089,7 +1171,6 @@
         const email = document.getElementById("nuEmail").value; 
         const sec = firebase.initializeApp(firebaseConfig, "Sec"); 
         
-        // REDIRECT CONFIG
         var actionCodeSettings = {
           url: 'https://lafayette-progress.onrender.com', // REDIRECT URL
           handleCodeInApp: false
@@ -1127,7 +1208,6 @@
         }
     }
 
-    // MODIFIED RENDER USERS (DOT + EMAIL)
     function renderAdminUsers() { 
         const d = document.getElementById("usersList"); d.innerHTML = ""; let totalToPay = 0; 
         Object.keys(allUsers).forEach(k => { 
