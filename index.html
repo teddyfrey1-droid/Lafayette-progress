@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V55 (Clean History)</title>
+  <title>Heiko - Budget Master V56 (Slider & History Fix)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -74,15 +74,8 @@
     h1 { font-size: 48px; font-weight: 900; color: #1e293b; margin: 0 0 15px; letter-spacing: -1.5px; text-transform: uppercase; line-height: 1; }
     .last-update { font-size: 14px; color: var(--text-muted); background: rgba(255,255,255,0.8); padding: 8px 20px; border-radius: 30px; display: inline-block; font-weight: 600; border: 1px solid #e5e7eb; text-transform: capitalize; }
 
-    /* CARDS - MODIF CERCLE GRISÉ */
-    .global-score-container { 
-        margin: 40px auto; width: 260px; height: 260px; 
-        background: white; /* Intérieur blanc */
-        border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; 
-        box-shadow: 0 25px 60px rgba(0,0,0,0.08), inset 0 0 0 10px #e2e8f0; /* Ombre interne grise */
-        border: 12px solid #cbd5e1; /* Contour Gris plus foncé */
-        position: relative; overflow: visible; 
-    }
+    /* CARDS */
+    .global-score-container { margin: 40px auto; width: 260px; height: 260px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; box-shadow: 0 25px 60px rgba(0,0,0,0.08); border: 12px solid #f8fafc; position: relative; overflow: visible; }
     .global-score-value { font-size: 58px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
     .global-score-label { font-size: 13px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; margin-top: 8px; text-align: center; line-height: 1.4; letter-spacing: 1.5px; z-index: 2; position: relative; }
     .money-rain { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: visible; }
@@ -217,55 +210,110 @@
     .admin-tag { background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; margin-left: 5px; letter-spacing: 0.5px; }
     .user-email-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
 
-    /* LOGS - FOLDER STYLE */
-    .logs-wrapper { display: flex; flex-direction: column; gap: 10px; }
+    /* LOGS */
+    .logs-wrapper { display: flex; flex-direction: column; gap: 15px; }
     .log-user-group { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
-    .group-header { background: #f8fafc; padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #e2e8f0; transition:0.2s; }
+    .group-header { background: #f8fafc; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #e2e8f0; transition:0.2s; }
     .group-header:hover { background: #eff6ff; }
-    .group-info { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 14px; color: #1e293b; }
+    .group-info { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; color: #1e293b; }
     .last-seen { font-size: 11px; color: #64748b; font-weight: 600; display:flex; align-items:center; gap:8px; }
-    
-    /* THE FOLDER CONTENT - CLOSED BY DEFAULT */
-    .group-body { display: none; padding: 20px; background: white; gap: 20px; border-top:1px solid #e2e8f0; }
+    .group-body { display: none; padding: 15px; background: white; gap: 20px; }
     .group-body.open { display: grid; grid-template-columns: 1fr 1fr; }
-    
-    .log-col-title { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; border-bottom: 2px solid #f1f5f9; padding-bottom: 5px; }
-    .log-list { display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; }
-    
-    .log-entry { font-size: 12px; display: flex; align-items: flex-start; gap: 8px; border-bottom: 1px solid #f8fafc; padding-bottom: 4px; }
-    .log-dot { font-size: 10px; margin-top: 3px; }
-    .log-time-s { font-weight: 700; color: #64748b; font-size: 11px; min-width: 80px; }
+    .log-col-title { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; border-bottom: 2px solid #f1f5f9; padding-bottom: 4px; }
+    .log-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+    .log-entry { font-size: 12px; display: flex; align-items: flex-start; gap: 6px; }
+    .log-dot { font-size: 8px; margin-top: 4px; }
+    .log-time-s { font-weight: 700; color: #64748b; font-size: 11px; min-width: 45px; }
     .log-desc { color: #334155; line-height: 1.3; }
-    .log-dur { color: #059669; font-weight: 700; background: #ecfdf5; padding: 1px 6px; border-radius: 4px; font-size: 10px; display: inline-block; }
-    
-    .btn-clear-hist { border:none; background:#fee2e2; color:#ef4444; border-radius:4px; padding:4px 8px; font-size:10px; font-weight:700; cursor:pointer; }
+    .log-dur { color: #059669; font-weight: 700; background: #ecfdf5; padding: 0 4px; border-radius: 4px; font-size: 10px; display: inline-block; margin-left: 4px; }
+    .btn-clear-hist { border:none; background:#fee2e2; color:#ef4444; border-radius:4px; padding:2px 6px; font-size:10px; font-weight:700; cursor:pointer; }
     .btn-clear-hist:hover { background:#fca5a5; }
     
-    /* COCKPIT */
+    /* COCKPIT - MEGA SLIDERS */
     .cockpit-container { padding: 25px; border: 3px solid #e2e8f0; border-radius: 20px; background: #f8fafc; margin-bottom: 20px; }
     .cockpit-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
     .cockpit-gauge-container { height: 28px; background: #e2e8f0; border-radius: 99px; overflow: hidden; position: relative; margin-bottom: 10px; border:1px solid #cbd5e1; }
     .cockpit-gauge-fill { height: 100%; width: 0; background: #3b82f6; transition: width 0.3s; }
     .cockpit-gauge-fill.danger { background: #ef4444; animation: pulse 1s infinite; }
     .cockpit-info { display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #64748b; }
+    
+    /* MORE SPACE */
     .cockpit-obj-row { background: white; padding: 30px 20px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
     .cockpit-obj-title { font-size: 18px; font-weight: 900; margin-bottom: 25px; color: #1e293b; display:flex; justify-content:space-between; align-items:center; }
     .cockpit-obj-cost { font-size: 11px; font-weight:800; color:#3b82f6; background:#eff6ff; padding:3px 8px; border-radius:6px; }
     
+    /* MEGA SLIDER */
     .slider-row { display: flex; flex-direction:column; align-items: flex-start; gap: 10px; margin-bottom: 25px; }
     .slider-row:last-child { margin-bottom:0; }
     .slider-label-line { display:flex; justify-content:space-between; width:100%; margin-bottom:5px; }
     .slider-label { font-size: 14px; font-weight: 800; color: #475569; }
     .slider-val { font-size: 16px; font-weight: 900; color: var(--primary); }
     
-    input[type=range] { width: 100%; appearance: none; height: 14px; background: #e2e8f0; border-radius: 10px; outline: none; }
-    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 32px; height: 32px; border-radius: 50%; background: var(--primary); cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.4); border: 2px solid white; }
+    /* FIX V56: RESET SLIDER STYLE */
+    input[type=range] { 
+        width: 100%; 
+        -webkit-appearance: none;
+        appearance: none; 
+        height: 14px; 
+        background: transparent;
+        margin: 0; 
+        padding: 0;
+        cursor: pointer;
+        display: block; /* Force block to fill width */
+    }
     
+    /* Chrome/Safari/Edge Track */
+    input[type=range]::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 14px;
+        background: #e2e8f0;
+        border-radius: 10px;
+        border: none;
+    }
+    
+    /* Chrome/Safari/Edge Thumb */
+    input[type=range]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 32px; 
+        height: 32px;
+        border-radius: 50%;
+        background: var(--primary);
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(37,99,235,0.4);
+        border: 2px solid white;
+        margin-top: -9px; /* Centers thumb on track */
+    }
+
+    /* Firefox Track */
+    input[type=range]::-moz-range-track {
+        width: 100%;
+        height: 14px;
+        background: #e2e8f0;
+        border-radius: 10px;
+        border: none;
+    }
+
+    /* Firefox Thumb */
+    input[type=range]::-moz-range-thumb {
+        width: 32px; 
+        height: 32px;
+        border: 2px solid white;
+        border-radius: 50%;
+        background: var(--primary);
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(37,99,235,0.4);
+    }
+
     #simGlobalBudget { text-align: center; font-size: 14px; font-weight: 800; color: #2563eb; border: 2px solid #bfdbfe; padding: 5px; width: 90px; border-radius: 6px; }
     .budget-label-small { font-size: 11px; font-weight: 700; color: #64748b; }
+    
+    /* TOTAL 35H BOX */
     .sim-total-box { margin-top: 20px; padding: 15px; border: 2px solid #2563eb; border-radius: 12px; background: white; text-align: center; box-shadow:0 4px 15px rgba(37,99,235,0.1); margin-bottom: 10px; }
     .sim-total-label { font-size: 13px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
     .sim-total-value { font-size: 24px; font-weight: 900; color: #1e293b; }
+
+    /* CENTERED PLANNING TITLE */
     .planning-title { text-align: center; justify-content: center; margin-left: auto; margin-right: auto; width: 100%; }
 
     @media (max-width: 600px) { .group-body.open { grid-template-columns: 1fr; } }
@@ -274,6 +322,7 @@
 <body>
 
   <div class="feedback-btn" onclick="document.getElementById('feedbackModal').style.display='flex'">💡 Une idée ?</div>
+
   <div id="feedbackModal">
       <div class="fb-box">
           <div class="fb-title">💡 Boîte à idées</div>
@@ -328,6 +377,7 @@
       </div>
 
       <div class="category-title planning-title" style="margin-top:60px;">Planning 📅</div>
+
       <div class="native-cal-container" style="margin-top:20px;">
           <div class="cal-header">
              <button class="cal-nav-btn" onclick="prevMonth()">❮</button>
@@ -362,7 +412,7 @@
           <input type="number" id="nuHours" placeholder="Heures">
         </div>
         <input type="email" id="nuEmail" placeholder="Email">
-        <div style="margin-bottom:10px; margin-top:10px;"><input type="checkbox" id="nuAdmin" style="width:auto; vertical-align:middle;"> <label style="font-size:12px;">Ajouter comme Admin</label></div>
+        <div style="margin-bottom:10px; margin-top:10px;"><input type="checkbox" id="nuAdmin" style="width:auto; vertical-align:middle;"> <label style="font-size:12px;">Admin ?</label></div>
         <button class="btn" onclick="createUser()">Inviter le membre (Email auto)</button>
       </div>
       <div class="admin-section">
@@ -374,7 +424,7 @@
     <div id="tab-logs" style="display:none;">
       <div class="admin-section">
         <h3 class="section-header-large">🕒 Activité par Utilisateur</h3>
-        <div style="font-size:11px; color:#666; margin-bottom:15px;">Cliquez sur un nom pour voir le détail.</div>
+        <div style="font-size:11px; color:#666; margin-bottom:15px;">Cliquez sur un nom pour voir le détail <span style="font-size:10px;">▼</span></div>
         <div id="logsContainer" class="logs-wrapper"></div>
       </div>
     </div>
@@ -387,8 +437,10 @@
     </div>
 
     <div id="tab-objs" style="display:none;">
+      
       <div class="admin-section" id="superAdminBudget" style="border: 2px solid var(--primary); display:block;">
          <h3 class="section-header-large">🎛️ PILOTAGE BUDGET & PRIMES</h3>
+         
          <div class="cockpit-container">
             <div class="cockpit-top">
                 <label class="budget-label-small">BUDGET MAX (€)</label>
@@ -397,14 +449,23 @@
                    <button id="btnSaveGlobalBudget" onclick="saveGlobalBudget()" style="border:none; background:var(--primary); color:white; padding:6px 10px; border-radius:6px; font-size:11px; margin-left:5px; cursor:pointer;">OK</button>
                 </div>
             </div>
-            <div class="cockpit-gauge-container"><div class="cockpit-gauge-fill" id="simGauge"></div></div>
-            <div class="cockpit-info"><span id="simUsed">0€ Engagés</span><span id="simLeft">Reste : 0€</span></div>
+            
+            <div class="cockpit-gauge-container">
+                <div class="cockpit-gauge-fill" id="simGauge"></div>
+            </div>
+            <div class="cockpit-info">
+                <span id="simUsed">0€ Engagés</span>
+                <span id="simLeft">Reste : 0€</span>
+            </div>
+            
             <div id="simObjList" style="margin-top:20px;"></div>
+
             <div class="sim-total-box">
                 <div class="sim-total-label">💰 PRIME TOTALE (POUR 1 EMPLOYÉ 35H)</div>
                 <div class="sim-total-value" id="simTotalPerUser">0€</div>
             </div>
          </div>
+
          <button class="btn" onclick="publishSim()" style="background:var(--success); margin-top:5px; font-size:13px; padding:12px;">📡 PUBLIER</button>
       </div>
 
@@ -417,12 +478,14 @@
         <h3 class="section-header-large" style="font-size:14px;">➕ AJOUTER UN OBJECTIF</h3>
         <input type="text" id="noName" placeholder="Nom">
         <input type="text" id="noTarget" placeholder="Cible">
+        
         <div class="options-row">
             <label class="check-label"><input type="checkbox" id="noPrimary" checked> ⚡ Principal</label>
             <label class="check-label"><input type="checkbox" id="noInverse"> 📉 Inversé</label>
             <label class="check-label"><input type="checkbox" id="noNumeric"> 🔢 Nombre</label>
             <label class="check-label"><input type="checkbox" id="noFixed" onchange="toggleCreateInputs()"> 🎁 Fixe</label>
         </div>
+
         <div id="createTiersBlock">
             <div style="display:grid; grid-template-columns:1fr; gap:5px; margin-bottom:5px;">
                 <label style="font-size:13px;font-weight:900; margin-bottom:5px; color:#1e293b;">Seuils (Montants définis dans Pilotage)</label>
@@ -433,6 +496,7 @@
                 </div>
             </div>
         </div>
+
         <button class="btn" onclick="addObj()" style="margin-top:10px;">Ajouter</button>
       </div>
 
@@ -467,12 +531,14 @@
       <input type="text" id="eoCurrent" placeholder="Actuel">
       <input type="text" id="eoTarget" placeholder="Cible">
     </div>
+
     <div class="options-row">
         <label class="check-label"><input type="checkbox" id="eoPrimary"> ⚡ Principal</label>
         <label class="check-label"><input type="checkbox" id="eoInverse"> 📉 Inversé</label>
         <label class="check-label"><input type="checkbox" id="eoNumeric"> 🔢 Nombre</label>
         <label class="check-label"><input type="checkbox" id="eoFixed" onchange="toggleEditInputs()"> 🎁 Prime Fixe</label>
     </div>
+
     <div id="editTiersBlock">
         <label style="font-size:11px; font-weight:700;">PALIERS (Montants dans Pilotage)</label>
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px; margin-bottom:5px;">
@@ -481,7 +547,9 @@
             <input type="number" id="p3t" placeholder="% P3">
         </div>
     </div>
-    <input type="hidden" id="p1p"><input type="hidden" id="p2p"><input type="hidden" id="p3p"><input type="hidden" id="eoFixedPrize">
+    <input type="hidden" id="p1p"><input type="hidden" id="p2p"><input type="hidden" id="p3p">
+    <input type="hidden" id="eoFixedPrize">
+
     <div style="margin-bottom:10px; display:flex; gap:15px; margin-top:10px;">
       <span><input type="checkbox" id="eoHideTarget" style="width:auto; vertical-align:middle;"> <label style="font-size:12px;">Masquer Cible</label></span>
       <span><input type="checkbox" id="eoHideCurrent" style="width:auto; vertical-align:middle;"> <label style="font-size:12px;">Masquer Valeur</label></span>
@@ -491,6 +559,7 @@
   </div>
 
   <script>
+    // CONFIG
     const firebaseConfig = {
       apiKey: "AIzaSyAGaitqmFwExvJ9ZUpkdUdCKAqqDOP2cdQ",
       authDomain: "objectif-restaurant.firebaseapp.com",
@@ -524,12 +593,13 @@
     ];
     let currentCalDate = new Date(2025, 11, 1);
 
+    // AUTH
     auth.onAuthStateChanged(user => {
       if (user) {
         document.getElementById("loginOverlay").style.display = "none";
         document.getElementById("appContent").style.display = "block";
         const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('mode') === 'resetPassword') { /* handled by Firebase */ }
+        if (urlParams.get('mode') === 'resetPassword') { /* Handled */ }
 
         db.ref('users/' + user.uid).on('value', snap => {
           const val = snap.val();
@@ -625,6 +695,7 @@
       renderDashboard();
     }
 
+    // --- FEEDBACK LOGIC ---
     function sendFeedback() {
         const txt = document.getElementById("fbContent").value.trim();
         if(!txt) return;
@@ -647,7 +718,9 @@
         });
     }
 
+    // --- COCKPIT SIMULATOR LOGIC ---
     let simObjs = {}; 
+
     function renderSimulator() { buildSimulatorUI(); }
     function buildSimulatorUI() {
         const container = document.getElementById("simObjList");
@@ -948,7 +1021,17 @@
        if(isFixed) { paliers = [{ threshold: 100, prize: "0" }]; } 
        else { paliers = [{threshold: parseFloat(document.getElementById("c_p1t").value)||50, prize: "0"}, {threshold: parseFloat(document.getElementById("c_p2t").value)||100, prize: "0"}, {threshold: parseFloat(document.getElementById("c_p3t").value)||120, prize: "0"}]; }
        const id = "obj-" + Date.now();
-       db.ref("objectives/"+id).set({ name: name, target: target, current: 0, published: true, isPrimary: document.getElementById("noPrimary").checked, isInverse: document.getElementById("noInverse").checked, isFixed: isFixed, isNumeric: isNumeric, paliers: paliers }).then(() => { showToast("✅ Objectif Ajouté !"); });
+       db.ref("objectives/"+id).set({ 
+           name: name, 
+           target: target, 
+           current: 0, 
+           published: true, 
+           isPrimary: document.getElementById("noPrimary").checked, 
+           isInverse: document.getElementById("noInverse").checked, 
+           isFixed: isFixed, 
+           isNumeric: isNumeric,
+           paliers: paliers 
+       }).then(() => { showToast("✅ Objectif Ajouté !"); });
        logAction("Création Objectif", name);
     }
 
@@ -1004,7 +1087,18 @@
               {threshold: parseFloat(document.getElementById("p3t").value), prize: oldP[2]?oldP[2].prize:"0"}
           ]; 
       }
-      db.ref("objectives/"+id).update({ name: document.getElementById("eoName").value, current: document.getElementById("eoCurrent").value, target: document.getElementById("eoTarget").value, isPrimary: document.getElementById("eoPrimary").checked, isInverse: document.getElementById("eoInverse").checked, isFixed: isFixed, isNumeric: document.getElementById("eoNumeric").checked, hideTarget: document.getElementById("eoHideTarget").checked, hideCurrent: document.getElementById("eoHideCurrent").checked, paliers: paliers }).then(() => { showToast("✅ Objectif Modifié !"); document.getElementById("editObjPanel").classList.remove("active"); });
+      db.ref("objectives/"+id).update({ 
+          name: document.getElementById("eoName").value, 
+          current: document.getElementById("eoCurrent").value, 
+          target: document.getElementById("eoTarget").value, 
+          isPrimary: document.getElementById("eoPrimary").checked, 
+          isInverse: document.getElementById("eoInverse").checked, 
+          isFixed: isFixed, 
+          isNumeric: document.getElementById("eoNumeric").checked,
+          hideTarget: document.getElementById("eoHideTarget").checked, 
+          hideCurrent: document.getElementById("eoHideCurrent").checked, 
+          paliers: paliers 
+      }).then(() => { showToast("✅ Objectif Modifié !"); document.getElementById("editObjPanel").classList.remove("active"); });
       logAction("Modification", "Objectif : " + document.getElementById("eoName").value);
     }
 
@@ -1062,12 +1156,14 @@
             
             const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); let primOk = true; 
             if(prims.length > 0) { primOk = prims.every(o => { 
-                 const pct = getPct(o.current, o.target, o.isInverse); 
                  let threshold = 100;
                  if(o.isFixed) threshold = 100;
                  else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold;
                  if(o.isNumeric) return parseFloat(o.current) >= threshold;
-                 else return pct >= threshold;
+                 else {
+                     const pct = getPct(o.current, o.target, o.isInverse); 
+                     return pct >= threshold;
+                 }
             }); } 
             
             Object.values(allObjs).forEach(o => { if(!o.published) return; 
@@ -1133,6 +1229,11 @@
         }
     }
 
+    function toggleUserLogs(id) {
+        const el = document.getElementById(id);
+        if(el) el.classList.toggle('open');
+    }
+
     function renderLogs(logs) {
       const container = document.getElementById("logsContainer"); container.innerHTML = "";
       const grouped = {};
@@ -1142,23 +1243,42 @@
           else { grouped[log.user].actions.push(log); if(log.time > grouped[log.user].lastSeen) grouped[log.user].lastSeen = log.time; }
       });
       const sortedUsers = Object.keys(grouped).sort((a,b) => grouped[b].lastSeen - grouped[a].lastSeen);
+      
       sortedUsers.forEach(uName => {
           const g = grouped[uName];
           const d = new Date(g.lastSeen);
           g.sessions.sort((a,b) => b.startTime - a.startTime); g.actions.sort((a,b) => b.time - a.time);
+          
+          // Generate Safe ID
+          const safeId = 'log-group-' + uName.replace(/[^a-zA-Z0-9]/g, '');
+
           const div = document.createElement("div"); div.className = "log-user-group";
           div.innerHTML = `
-             <div class="group-header" onclick="this.parentElement.nextElementSibling.classList.toggle('open')">
-                <div class="group-info">👤 ${uName} <span style="font-weight:400; font-size:11px; color:#64748b; margin-left:10px;">(Dernière: ${d.toLocaleString()})</span></div>
+             <div class="group-header">
+                <div class="group-info" onclick="toggleUserLogs('${safeId}')" style="flex:1;">
+                   👤 ${uName} <span style="font-weight:400; font-size:11px; color:#64748b; margin-left:10px;">(Dernière: ${d.toLocaleString()}) ▼</span>
+                </div>
                 <button onclick="deleteUserLogs('${uName}')" class="btn-clear-hist" title="Effacer historique">🗑️ Effacer</button>
              </div>
-             <div class="group-body">
-                <div><div class="log-col-title">🔌 Connexions</div><div class="log-list" id="sess-${uName}"></div></div>
-                <div><div class="log-col-title">🛠️ Activité</div><div class="log-list" id="act-${uName}"></div></div>
+             <div class="group-body" id="${safeId}">
+                <div><div class="log-col-title">🔌 Connexions</div><div class="log-list" id="sess-${safeId}"></div></div>
+                <div><div class="log-col-title">🛠️ Activité</div><div class="log-list" id="act-${safeId}"></div></div>
              </div>`;
           container.appendChild(div);
-          const sc = document.getElementById(`sess-${uName}`); if(g.sessions.length===0) sc.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; else g.sessions.forEach(s=>{ const st=new Date(s.startTime); const m=Math.floor((s.lastSeen-s.startTime)/60000); const dt=(m>60)?Math.floor(m/60)+"h "+(m%60)+"m":m+"m"; sc.innerHTML+=`<div class="log-entry"><span class="log-dot">🟢</span><span class="log-time-s">${st.toLocaleDateString().slice(0,5)} ${st.toLocaleTimeString().slice(0,5)}</span><span class="log-dur">${dt}</span></div>`; });
-          const ac = document.getElementById(`act-${uName}`); if(g.actions.length===0) ac.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; else g.actions.forEach(a=>{ const at=new Date(a.time); ac.innerHTML+=`<div class="log-entry"><span class="log-dot">🔵</span><span class="log-time-s">${at.toLocaleDateString().slice(0,5)} ${at.toLocaleTimeString().slice(0,5)}</span><span class="log-desc">${a.action} <span style="color:#94a3b8;">${a.detail}</span></span></div>`; });
+          
+          const sc = document.getElementById(`sess-${safeId}`); 
+          if(g.sessions.length===0) sc.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; 
+          else g.sessions.forEach(s=>{ 
+              const st=new Date(s.startTime); const m=Math.floor((s.lastSeen-s.startTime)/60000); const dt=(m>60)?Math.floor(m/60)+"h "+(m%60)+"m":m+"m"; 
+              sc.innerHTML+=`<div class="log-entry"><span class="log-dot">🟢</span><span class="log-time-s">${st.toLocaleDateString().slice(0,5)} ${st.toLocaleTimeString().slice(0,5)}</span><span class="log-dur">${dt}</span></div>`; 
+          });
+
+          const ac = document.getElementById(`act-${safeId}`); 
+          if(g.actions.length===0) ac.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; 
+          else g.actions.forEach(a=>{ 
+              const at=new Date(a.time); 
+              ac.innerHTML+=`<div class="log-entry"><span class="log-dot">🔵</span><span class="log-time-s">${at.toLocaleDateString().slice(0,5)} ${at.toLocaleTimeString().slice(0,5)}</span><span class="log-desc">${a.action} <span style="color:#94a3b8;">${a.detail}</span></span></div>`; 
+          });
       });
     }
 
@@ -1166,7 +1286,7 @@
     function checkBudget() {
        const budget = globalSettings.budget || 0; let maxLiability = 0; let totalUserRatio = 0;
        Object.values(allUsers).forEach(u => { if(!u.email || u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) totalUserRatio += (u.hours/BASE_HOURS); });
-       Object.values(allObjs).forEach(o => { if(!o.published) return; let maxP = 0; if(o.paliers) o.paliers.forEach(p => maxP = Math.max(maxP, parse(p.prize))); maxLiability += (maxP * totalUserRatio); });
+       Object.values(allObjs).forEach(o => { if(!o.published) return; let maxP = 0; if(o.paliers) o.paliers.forEach(p => maxP += parse(p.prize)); maxLiability += (maxP * totalUserRatio); });
        const pct = (maxLiability / budget) * 100; const bar = document.getElementById("simGauge"); bar.style.width = Math.min(pct, 100) + "%";
        if(maxLiability > budget) { bar.classList.add("danger"); document.getElementById("simUsed").style.color = "#ef4444"; } 
        else { bar.classList.remove("danger"); document.getElementById("simUsed").style.color = "#3b82f6"; }
