@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V54 (Logic Fix)</title>
+  <title>Heiko - Budget Master V55 (Clean History)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -74,8 +74,15 @@
     h1 { font-size: 48px; font-weight: 900; color: #1e293b; margin: 0 0 15px; letter-spacing: -1.5px; text-transform: uppercase; line-height: 1; }
     .last-update { font-size: 14px; color: var(--text-muted); background: rgba(255,255,255,0.8); padding: 8px 20px; border-radius: 30px; display: inline-block; font-weight: 600; border: 1px solid #e5e7eb; text-transform: capitalize; }
 
-    /* CARDS */
-    .global-score-container { margin: 40px auto; width: 260px; height: 260px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; box-shadow: 0 25px 60px rgba(0,0,0,0.08); border: 12px solid #f8fafc; position: relative; overflow: visible; }
+    /* CARDS - MODIF CERCLE GRISÉ */
+    .global-score-container { 
+        margin: 40px auto; width: 260px; height: 260px; 
+        background: white; /* Intérieur blanc */
+        border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; 
+        box-shadow: 0 25px 60px rgba(0,0,0,0.08), inset 0 0 0 10px #e2e8f0; /* Ombre interne grise */
+        border: 12px solid #cbd5e1; /* Contour Gris plus foncé */
+        position: relative; overflow: visible; 
+    }
     .global-score-value { font-size: 58px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
     .global-score-label { font-size: 13px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; margin-top: 8px; text-align: center; line-height: 1.4; letter-spacing: 1.5px; z-index: 2; position: relative; }
     .money-rain { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: visible; }
@@ -210,20 +217,40 @@
     .admin-tag { background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; margin-left: 5px; letter-spacing: 0.5px; }
     .user-email-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
 
-    /* COCKPIT - MEGA SLIDERS & VISIBILITY */
+    /* LOGS - FOLDER STYLE */
+    .logs-wrapper { display: flex; flex-direction: column; gap: 10px; }
+    .log-user-group { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
+    .group-header { background: #f8fafc; padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #e2e8f0; transition:0.2s; }
+    .group-header:hover { background: #eff6ff; }
+    .group-info { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 14px; color: #1e293b; }
+    .last-seen { font-size: 11px; color: #64748b; font-weight: 600; display:flex; align-items:center; gap:8px; }
+    
+    /* THE FOLDER CONTENT - CLOSED BY DEFAULT */
+    .group-body { display: none; padding: 20px; background: white; gap: 20px; border-top:1px solid #e2e8f0; }
+    .group-body.open { display: grid; grid-template-columns: 1fr 1fr; }
+    
+    .log-col-title { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; border-bottom: 2px solid #f1f5f9; padding-bottom: 5px; }
+    .log-list { display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; }
+    
+    .log-entry { font-size: 12px; display: flex; align-items: flex-start; gap: 8px; border-bottom: 1px solid #f8fafc; padding-bottom: 4px; }
+    .log-dot { font-size: 10px; margin-top: 3px; }
+    .log-time-s { font-weight: 700; color: #64748b; font-size: 11px; min-width: 80px; }
+    .log-desc { color: #334155; line-height: 1.3; }
+    .log-dur { color: #059669; font-weight: 700; background: #ecfdf5; padding: 1px 6px; border-radius: 4px; font-size: 10px; display: inline-block; }
+    
+    .btn-clear-hist { border:none; background:#fee2e2; color:#ef4444; border-radius:4px; padding:4px 8px; font-size:10px; font-weight:700; cursor:pointer; }
+    .btn-clear-hist:hover { background:#fca5a5; }
+    
+    /* COCKPIT */
     .cockpit-container { padding: 25px; border: 3px solid #e2e8f0; border-radius: 20px; background: #f8fafc; margin-bottom: 20px; }
     .cockpit-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
     .cockpit-gauge-container { height: 28px; background: #e2e8f0; border-radius: 99px; overflow: hidden; position: relative; margin-bottom: 10px; border:1px solid #cbd5e1; }
     .cockpit-gauge-fill { height: 100%; width: 0; background: #3b82f6; transition: width 0.3s; }
     .cockpit-gauge-fill.danger { background: #ef4444; animation: pulse 1s infinite; }
     .cockpit-info { display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #64748b; }
-    
     .cockpit-obj-row { background: white; padding: 30px 20px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
-    
-    /* MODIFIED: Cost Label - CLEARER */
-    .cockpit-obj-cost { font-size: 11px; font-weight:900; color:#1e40af; background:#dbeafe; padding:4px 10px; border-radius:50px; border:1px solid #bfdbfe; }
-    
     .cockpit-obj-title { font-size: 18px; font-weight: 900; margin-bottom: 25px; color: #1e293b; display:flex; justify-content:space-between; align-items:center; }
+    .cockpit-obj-cost { font-size: 11px; font-weight:800; color:#3b82f6; background:#eff6ff; padding:3px 8px; border-radius:6px; }
     
     .slider-row { display: flex; flex-direction:column; align-items: flex-start; gap: 10px; margin-bottom: 25px; }
     .slider-row:last-child { margin-bottom:0; }
@@ -231,35 +258,15 @@
     .slider-label { font-size: 14px; font-weight: 800; color: #475569; }
     .slider-val { font-size: 16px; font-weight: 900; color: var(--primary); }
     
-    input[type=range] { 
-        width: 100%; 
-        appearance: none; 
-        height: 14px; 
-        background: #e2e8f0; 
-        border-radius: 10px; 
-        outline: none; 
-    }
-    input[type=range]::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        appearance: none;
-        width: 32px; 
-        height: 32px;
-        border-radius: 50%;
-        background: var(--primary);
-        cursor: pointer;
-        box-shadow: 0 4px 12px rgba(37,99,235,0.4);
-        border: 2px solid white;
-    }
-
+    input[type=range] { width: 100%; appearance: none; height: 14px; background: #e2e8f0; border-radius: 10px; outline: none; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 32px; height: 32px; border-radius: 50%; background: var(--primary); cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.4); border: 2px solid white; }
+    
     #simGlobalBudget { text-align: center; font-size: 14px; font-weight: 800; color: #2563eb; border: 2px solid #bfdbfe; padding: 5px; width: 90px; border-radius: 6px; }
     .budget-label-small { font-size: 11px; font-weight: 700; color: #64748b; }
-    
     .sim-total-box { margin-top: 20px; padding: 15px; border: 2px solid #2563eb; border-radius: 12px; background: white; text-align: center; box-shadow:0 4px 15px rgba(37,99,235,0.1); margin-bottom: 10px; }
     .sim-total-label { font-size: 13px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
     .sim-total-value { font-size: 24px; font-weight: 900; color: #1e293b; }
-
-    /* CENTERED PLANNING TITLE - FORCED */
-    .planning-title { text-align: center; justify-content: center; width:100%; display:block; margin: 60px auto 20px auto; }
+    .planning-title { text-align: center; justify-content: center; margin-left: auto; margin-right: auto; width: 100%; }
 
     @media (max-width: 600px) { .group-body.open { grid-template-columns: 1fr; } }
   </style>
@@ -267,7 +274,6 @@
 <body>
 
   <div class="feedback-btn" onclick="document.getElementById('feedbackModal').style.display='flex'">💡 Une idée ?</div>
-
   <div id="feedbackModal">
       <div class="fb-box">
           <div class="fb-title">💡 Boîte à idées</div>
@@ -321,9 +327,8 @@
         <div style="text-align:center; color:#9ca3af; margin-top:50px;">Chargement des données...</div>
       </div>
 
-      <div class="category-title planning-title">Planning 📅</div>
-
-      <div class="native-cal-container">
+      <div class="category-title planning-title" style="margin-top:60px;">Planning 📅</div>
+      <div class="native-cal-container" style="margin-top:20px;">
           <div class="cal-header">
              <button class="cal-nav-btn" onclick="prevMonth()">❮</button>
              <div class="cal-month-title" id="calTitle">DÉCEMBRE 2025</div>
@@ -382,10 +387,8 @@
     </div>
 
     <div id="tab-objs" style="display:none;">
-      
       <div class="admin-section" id="superAdminBudget" style="border: 2px solid var(--primary); display:block;">
          <h3 class="section-header-large">🎛️ PILOTAGE BUDGET & PRIMES</h3>
-         
          <div class="cockpit-container">
             <div class="cockpit-top">
                 <label class="budget-label-small">BUDGET MAX (€)</label>
@@ -394,23 +397,14 @@
                    <button id="btnSaveGlobalBudget" onclick="saveGlobalBudget()" style="border:none; background:var(--primary); color:white; padding:6px 10px; border-radius:6px; font-size:11px; margin-left:5px; cursor:pointer;">OK</button>
                 </div>
             </div>
-            
-            <div class="cockpit-gauge-container">
-                <div class="cockpit-gauge-fill" id="simGauge"></div>
-            </div>
-            <div class="cockpit-info">
-                <span id="simUsed">0€ Engagés</span>
-                <span id="simLeft">Reste : 0€</span>
-            </div>
-            
+            <div class="cockpit-gauge-container"><div class="cockpit-gauge-fill" id="simGauge"></div></div>
+            <div class="cockpit-info"><span id="simUsed">0€ Engagés</span><span id="simLeft">Reste : 0€</span></div>
             <div id="simObjList" style="margin-top:20px;"></div>
-
             <div class="sim-total-box">
                 <div class="sim-total-label">💰 PRIME TOTALE (POUR 1 EMPLOYÉ 35H)</div>
                 <div class="sim-total-value" id="simTotalPerUser">0€</div>
             </div>
          </div>
-
          <button class="btn" onclick="publishSim()" style="background:var(--success); margin-top:5px; font-size:13px; padding:12px;">📡 PUBLIER</button>
       </div>
 
@@ -423,14 +417,12 @@
         <h3 class="section-header-large" style="font-size:14px;">➕ AJOUTER UN OBJECTIF</h3>
         <input type="text" id="noName" placeholder="Nom">
         <input type="text" id="noTarget" placeholder="Cible">
-        
         <div class="options-row">
             <label class="check-label"><input type="checkbox" id="noPrimary" checked> ⚡ Principal</label>
             <label class="check-label"><input type="checkbox" id="noInverse"> 📉 Inversé</label>
             <label class="check-label"><input type="checkbox" id="noNumeric"> 🔢 Nombre</label>
             <label class="check-label"><input type="checkbox" id="noFixed" onchange="toggleCreateInputs()"> 🎁 Fixe</label>
         </div>
-
         <div id="createTiersBlock">
             <div style="display:grid; grid-template-columns:1fr; gap:5px; margin-bottom:5px;">
                 <label style="font-size:13px;font-weight:900; margin-bottom:5px; color:#1e293b;">Seuils (Montants définis dans Pilotage)</label>
@@ -441,7 +433,6 @@
                 </div>
             </div>
         </div>
-
         <button class="btn" onclick="addObj()" style="margin-top:10px;">Ajouter</button>
       </div>
 
@@ -476,14 +467,12 @@
       <input type="text" id="eoCurrent" placeholder="Actuel">
       <input type="text" id="eoTarget" placeholder="Cible">
     </div>
-
     <div class="options-row">
         <label class="check-label"><input type="checkbox" id="eoPrimary"> ⚡ Principal</label>
         <label class="check-label"><input type="checkbox" id="eoInverse"> 📉 Inversé</label>
         <label class="check-label"><input type="checkbox" id="eoNumeric"> 🔢 Nombre</label>
         <label class="check-label"><input type="checkbox" id="eoFixed" onchange="toggleEditInputs()"> 🎁 Prime Fixe</label>
     </div>
-
     <div id="editTiersBlock">
         <label style="font-size:11px; font-weight:700;">PALIERS (Montants dans Pilotage)</label>
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px; margin-bottom:5px;">
@@ -492,9 +481,7 @@
             <input type="number" id="p3t" placeholder="% P3">
         </div>
     </div>
-    <input type="hidden" id="p1p"><input type="hidden" id="p2p"><input type="hidden" id="p3p">
-    <input type="hidden" id="eoFixedPrize">
-
+    <input type="hidden" id="p1p"><input type="hidden" id="p2p"><input type="hidden" id="p3p"><input type="hidden" id="eoFixedPrize">
     <div style="margin-bottom:10px; display:flex; gap:15px; margin-top:10px;">
       <span><input type="checkbox" id="eoHideTarget" style="width:auto; vertical-align:middle;"> <label style="font-size:12px;">Masquer Cible</label></span>
       <span><input type="checkbox" id="eoHideCurrent" style="width:auto; vertical-align:middle;"> <label style="font-size:12px;">Masquer Valeur</label></span>
@@ -504,7 +491,6 @@
   </div>
 
   <script>
-    // CONFIG
     const firebaseConfig = {
       apiKey: "AIzaSyAGaitqmFwExvJ9ZUpkdUdCKAqqDOP2cdQ",
       authDomain: "objectif-restaurant.firebaseapp.com",
@@ -538,16 +524,12 @@
     ];
     let currentCalDate = new Date(2025, 11, 1);
 
-    // AUTH
     auth.onAuthStateChanged(user => {
       if (user) {
         document.getElementById("loginOverlay").style.display = "none";
         document.getElementById("appContent").style.display = "block";
-        
         const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('mode') === 'resetPassword') {
-            // Already handled by Firebase Auth UI
-        }
+        if (urlParams.get('mode') === 'resetPassword') { /* handled by Firebase */ }
 
         db.ref('users/' + user.uid).on('value', snap => {
           const val = snap.val();
@@ -643,15 +625,10 @@
       renderDashboard();
     }
 
-    // --- FEEDBACK LOGIC ---
     function sendFeedback() {
         const txt = document.getElementById("fbContent").value.trim();
         if(!txt) return;
-        db.ref('feedbacks').push({
-            user: currentUser.name,
-            msg: txt,
-            time: Date.now()
-        }).then(() => {
+        db.ref('feedbacks').push({ user: currentUser.name, msg: txt, time: Date.now() }).then(() => {
             showToast("Message envoyé ! Merci 💡");
             document.getElementById("fbContent").value = "";
             document.getElementById("feedbackModal").style.display = 'none';
@@ -659,43 +636,28 @@
     }
 
     function renderFeedbacks(feeds) {
-        const container = document.getElementById("feedbacksContainer");
-        container.innerHTML = "";
+        const container = document.getElementById("feedbacksContainer"); container.innerHTML = "";
         const arr = Object.values(feeds).sort((a,b) => b.time - a.time);
-        if(arr.length === 0) container.innerHTML = "<div style='color:#999;font-style:italic;'>Aucun avis pour le moment.</div>";
+        if(arr.length === 0) container.innerHTML = "<div style='color:#999;font-style:italic;'>Aucun avis.</div>";
         arr.forEach(f => {
             const d = new Date(f.time);
             const div = document.createElement("div"); div.className = "log-user-group";
-            div.innerHTML = `
-               <div class="group-header" style="cursor:default;">
-                  <div class="group-info">💬 ${f.user}</div>
-                  <div class="last-seen">${d.toLocaleString()}</div>
-               </div>
-               <div style="padding:15px; font-size:13px; line-height:1.4;">${f.msg}</div>
-            `;
+            div.innerHTML = `<div class="group-header" style="cursor:default;"><div class="group-info">💬 ${f.user}</div><div class="last-seen">${d.toLocaleString()}</div></div><div style="padding:15px; font-size:13px; line-height:1.4;">${f.msg}</div>`;
             container.appendChild(div);
         });
     }
 
-    // --- COCKPIT SIMULATOR LOGIC ---
     let simObjs = {}; 
-
-    function renderSimulator() {
-        buildSimulatorUI();
-    }
-
+    function renderSimulator() { buildSimulatorUI(); }
     function buildSimulatorUI() {
         const container = document.getElementById("simObjList");
         container.innerHTML = "";
         simObjs = JSON.parse(JSON.stringify(allObjs)); 
         document.getElementById("simGlobalBudget").value = globalSettings.budget || 0;
-        
         let totalPotential35h = 0;
-
         Object.keys(simObjs).forEach(k => {
             const o = simObjs[k];
             if(!o.published) return; 
-
             let maxObjPrize = 0;
             if(o.isFixed) {
                 maxObjPrize = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
@@ -703,122 +665,73 @@
                 if(o.paliers) o.paliers.forEach(p => maxObjPrize += parse(p.prize));
             }
             totalPotential35h += maxObjPrize;
-
             let objTotalCost = 0;
             let totalUserRatio = 0;
             Object.values(allUsers).forEach(u => { totalUserRatio += (u.hours/BASE_HOURS); });
             objTotalCost = maxObjPrize * totalUserRatio;
-
             const div = document.createElement("div"); div.className = "cockpit-obj-row";
             let slidersHtml = "";
-
             if(o.isFixed) {
                 const prize = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
-                slidersHtml = `
-                  <div class="slider-row">
-                     <div class="slider-label-line"><span class="slider-label">Prime Fixe</span><span class="slider-val" id="val-${k}-0">${prize}€</span></div>
-                     <input type="range" min="0" max="50" step="5" value="${prize}" oninput="updateObjVal('${k}', 0, this.value)">
-                  </div>`;
+                slidersHtml = `<div class="slider-row"><div class="slider-label-line"><span class="slider-label">Prime Fixe</span><span class="slider-val" id="val-${k}-0">${prize}€</span></div><input type="range" min="0" max="50" step="5" value="${prize}" oninput="updateObjVal('${k}', 0, this.value)"></div>`;
             } else {
                 (o.paliers || []).forEach((p, i) => {
                     const prize = parse(p.prize);
                     let label = `Palier ${p.threshold}`;
-                    if(o.isNumeric) label += ""; 
-                    else label += "%";
-
-                    slidersHtml += `
-                      <div class="slider-row">
-                         <div class="slider-label-line"><span class="slider-label">${label}</span><span class="slider-val" id="val-${k}-${i}">${prize}€</span></div>
-                         <input type="range" min="0" max="30" step="5" value="${prize}" oninput="updateObjVal('${k}', ${i}, this.value)">
-                      </div>`;
+                    if(o.isNumeric) label += ""; else label += "%";
+                    slidersHtml += `<div class="slider-row"><div class="slider-label-line"><span class="slider-label">${label}</span><span class="slider-val" id="val-${k}-${i}">${prize}€</span></div><input type="range" min="0" max="30" step="5" value="${prize}" oninput="updateObjVal('${k}', ${i}, this.value)"></div>`;
                 });
             }
-
             div.innerHTML = `<div class="cockpit-obj-title"><span>${o.name}</span> <span class="cockpit-obj-cost" id="cost-${k}">Coût équipe : ${objTotalCost.toFixed(0)}€</span></div>${slidersHtml}`;
             container.appendChild(div);
         });
-        
         document.getElementById("simTotalPerUser").innerText = `${totalPotential35h.toFixed(0)}€`;
         updateSim();
     }
-
     function updateObjVal(objId, tierIdx, val) {
         document.getElementById(`val-${objId}-${tierIdx}`).innerText = val + "€";
-        if(simObjs[objId].paliers && simObjs[objId].paliers[tierIdx]) {
-            simObjs[objId].paliers[tierIdx].prize = val;
-        }
+        if(simObjs[objId].paliers && simObjs[objId].paliers[tierIdx]) { simObjs[objId].paliers[tierIdx].prize = val; }
         updateSim();
     }
-
     function updateSim() {
        const budget = parseFloat(document.getElementById("simGlobalBudget").value) || 0;
-       
        let totalUserRatio = 0;
-       Object.values(allUsers).forEach(u => { 
-           totalUserRatio += (u.hours/BASE_HOURS);
-       });
-
+       Object.values(allUsers).forEach(u => { totalUserRatio += (u.hours/BASE_HOURS); });
        let maxLiability = 0;
        let totalPotential35h = 0;
-
        Object.keys(simObjs).forEach(k => {
            const o = simObjs[k];
            if(!o.published) return;
-           
            let maxP = 0;
-           if(o.isFixed) {
-               maxP = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
-           } else {
-               if(o.paliers) o.paliers.forEach(p => maxP += parse(p.prize));
-           }
-           
+           if(o.isFixed) { maxP = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0; } 
+           else { if(o.paliers) o.paliers.forEach(p => maxP += parse(p.prize)); }
            const objCost = maxP * totalUserRatio;
            const costLabel = document.getElementById(`cost-${k}`);
            if(costLabel) costLabel.innerText = `Coût équipe : ${objCost.toFixed(0)}€`;
-
            maxLiability += objCost;
            totalPotential35h += maxP;
        });
-
        const pct = (budget > 0) ? (maxLiability / budget) * 100 : 0;
        const bar = document.getElementById("simGauge");
        bar.style.width = Math.min(pct, 100) + "%";
-       
-       if(maxLiability > budget) {
-           bar.classList.add("danger");
-           document.getElementById("simUsed").style.color = "#ef4444";
-       } else {
-           bar.classList.remove("danger");
-           document.getElementById("simUsed").style.color = "#3b82f6";
-       }
-       
+       if(maxLiability > budget) { bar.classList.add("danger"); document.getElementById("simUsed").style.color = "#ef4444"; } 
+       else { bar.classList.remove("danger"); document.getElementById("simUsed").style.color = "#3b82f6"; }
        document.getElementById("simUsed").innerText = `${maxLiability.toFixed(0)}€ Engagés`;
        document.getElementById("simLeft").innerText = `Reste : ${(budget - maxLiability).toFixed(0)}€`;
        document.getElementById("simTotalPerUser").innerText = `${totalPotential35h.toFixed(0)}€`;
     }
-
     function publishSim() {
         if(confirm("📡 Confirmer la publication des nouveaux montants ?")) {
             const updates = {};
-            
             if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
                 const newBudget = parseFloat(document.getElementById("simGlobalBudget").value);
                 db.ref('settings/budget').set(newBudget);
             }
-
-            Object.keys(simObjs).forEach(k => {
-                updates['objectives/' + k + '/paliers'] = simObjs[k].paliers;
-            });
-            db.ref().update(updates).then(() => {
-                showToast("✅ Pilotage Appliqué !");
-                logAction("Pilotage", "Mise à jour globale budget & primes");
-            });
+            Object.keys(simObjs).forEach(k => { updates['objectives/' + k + '/paliers'] = simObjs[k].paliers; });
+            db.ref().update(updates).then(() => { showToast("✅ Pilotage Appliqué !"); logAction("Pilotage", "Mise à jour globale budget & primes"); });
         }
     }
 
-    // --- END COCKPIT ---
-
-    /* CALENDAR LOGIC */
     function renderNativeCalendar() {
         const m = currentCalDate.getMonth();
         const y = currentCalDate.getFullYear();
@@ -829,7 +742,6 @@
         const legend = document.getElementById("calLegend");
         grid.innerHTML = "";
         legend.innerHTML = ""; 
-
         let dayOfWeek = firstDay.getDay() - 1; if(dayOfWeek === -1) dayOfWeek = 6; 
         for(let i=0; i<dayOfWeek; i++) { grid.appendChild(document.createElement("div")); }
         for(let d=1; d<=lastDay.getDate(); d++) {
@@ -844,7 +756,6 @@
             });
             grid.appendChild(cell);
         }
-
         const uniqueEvents = [...new Map(calEvents.map(item => [item.t, item])).values()];
         uniqueEvents.forEach(evt => {
             const legItem = document.createElement("div");
@@ -867,15 +778,12 @@
       let primOk = true;
       if(prims.length > 0) {
         primOk = prims.every(o => {
-           const pct = getPct(o.current, o.target, o.isInverse);
            let threshold = 100;
            if(o.isFixed) threshold = 100;
            else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold;
-
-           // LOGIC FIX V54: Numeric Comparison
-           if(o.isNumeric) {
-               return parseFloat(o.current) >= threshold;
-           } else {
+           if(o.isNumeric) return parseFloat(o.current) >= threshold;
+           else {
+               const pct = getPct(o.current, o.target, o.isInverse);
                return pct >= threshold;
            }
         });
@@ -895,18 +803,15 @@
         const isLocked = !o.isPrimary && !primOk;
         if(!isLocked) {
              if(o.isFixed) {
-                 // Check numeric vs pct
                  let win = false;
                  if(o.isNumeric) win = parseFloat(o.current) >= o.target;
                  else win = pct >= 100;
-
                  if(win && o.paliers && o.paliers[0]) totalMyGain += (parse(o.paliers[0].prize) * ratio);
              } else {
                  if(o.paliers) o.paliers.forEach(p => { 
                      let unlocked = false;
                      if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold;
                      else unlocked = pct >= p.threshold;
-                     
                      if(unlocked) totalMyGain += (parse(p.prize) * ratio); 
                  });
              }
@@ -931,14 +836,11 @@
 
     function createCard(obj, isLocked, userRatio, isPrimary) {
       const pct = getPct(obj.current, obj.target, obj.isInverse);
-      
       let isWin = false;
-      // LOGIC FIX V54: Determine Win
       if(obj.isFixed) {
           if(obj.isNumeric) isWin = parseFloat(obj.current) >= obj.target;
           else isWin = pct >= 100;
       } else {
-          // Win if first tier reached
           if(obj.paliers && obj.paliers[0]) {
               if(obj.isNumeric) isWin = parseFloat(obj.current) >= obj.paliers[0].threshold;
               else isWin = pct >= obj.paliers[0].threshold;
@@ -960,14 +862,12 @@
           let win = false;
           if(obj.isNumeric) win = parseFloat(obj.current) >= obj.target;
           else win = pct >= 100;
-
           if(win && obj.paliers && obj.paliers[0]) myGain = parse(obj.paliers[0].prize); 
       } else { 
           if(obj.paliers) obj.paliers.forEach(p => { 
              let unlocked = false;
              if(obj.isNumeric) unlocked = parseFloat(obj.current) >= p.threshold;
              else unlocked = pct >= p.threshold;
-
              if(unlocked) myGain += parse(p.prize); 
           }); 
       }
@@ -983,16 +883,12 @@
           const emojis = ['🥳','🚀','🔥'];
           (obj.paliers||[]).forEach((p, i) => {
                let u = false;
-               // LOGIC FIX V54: Milestone Unlocked
                if(obj.isNumeric) u = parseFloat(obj.current) >= p.threshold;
                else u = pct >= p.threshold;
-
                const valStep = parse(p.prize);
                const displayVal = (valStep * userRatio).toFixed(2);
-               
                let labelTh = p.threshold + "%";
-               if(obj.isNumeric) labelTh = p.threshold; // No %
-
+               if(obj.isNumeric) labelTh = p.threshold; 
                middleHtml += `<div class="ms-item ${u?'unlocked':''}"><div class="ms-threshold">${labelTh}</div><div class="ms-circle">${u?emojis[i%3]:(i+1)}</div><div class="ms-prize">+${displayVal}€</div></div>`;
           });
           middleHtml += `</div>`;
@@ -1000,18 +896,10 @@
 
       let targetVal = obj.hideTarget ? '<span style="font-size:20px;">🔒</span>' : obj.target + (obj.isInverse ? '%' : '');
       let currentVal = obj.hideCurrent ? '<span style="font-size:20px;">🔒</span>' : obj.current + (obj.isInverse ? '%' : '');
-      
-      if(obj.isNumeric) {
-          targetVal = obj.target; 
-          currentVal = obj.current; 
-      }
-
+      if(obj.isNumeric) { targetVal = obj.target; currentVal = obj.current; }
       let percentDisplay = pct.toFixed(1) + '%';
-      if(obj.isNumeric) {
-          percentDisplay = `${Math.floor(obj.current)} / ${obj.target}`;
-      } else if(obj.isInverse && pct >= 100) {
-          percentDisplay = 'SUCCÈS';
-      }
+      if(obj.isNumeric) { percentDisplay = `${Math.floor(obj.current)} / ${obj.target}`; } 
+      else if(obj.isInverse && pct >= 100) { percentDisplay = 'SUCCÈS'; }
 
       const w1 = Math.min(pct, 100);
       const w2 = pct > 100 ? Math.min(pct - 100, 100) : 0;
@@ -1041,7 +929,6 @@
        if(t === 'objs') document.getElementById('btnTabObjs').classList.add('active');
        if(t === 'logs') document.getElementById('btnTabLogs').classList.add('active');
        if(t === 'feedbacks') document.getElementById('btnTabFeedbacks').classList.add('active');
-       
        document.getElementById('tab-team').style.display = t==='team'?'block':'none';
        document.getElementById('tab-objs').style.display = t==='objs'?'block':'none';
        document.getElementById('tab-logs').style.display = t==='logs'?'block':'none';
@@ -1057,23 +944,11 @@
        if(target.length < 1) { alert("⚠️ La CIBLE est obligatoire."); return; }
        const isFixed = document.getElementById("noFixed").checked;
        const isNumeric = document.getElementById("noNumeric").checked;
-       
        let paliers = [];
        if(isFixed) { paliers = [{ threshold: 100, prize: "0" }]; } 
        else { paliers = [{threshold: parseFloat(document.getElementById("c_p1t").value)||50, prize: "0"}, {threshold: parseFloat(document.getElementById("c_p2t").value)||100, prize: "0"}, {threshold: parseFloat(document.getElementById("c_p3t").value)||120, prize: "0"}]; }
-       
        const id = "obj-" + Date.now();
-       db.ref("objectives/"+id).set({ 
-           name: name, 
-           target: target, 
-           current: 0, 
-           published: true, 
-           isPrimary: document.getElementById("noPrimary").checked, 
-           isInverse: document.getElementById("noInverse").checked, 
-           isFixed: isFixed, 
-           isNumeric: isNumeric,
-           paliers: paliers 
-       }).then(() => { showToast("✅ Objectif Ajouté !"); });
+       db.ref("objectives/"+id).set({ name: name, target: target, current: 0, published: true, isPrimary: document.getElementById("noPrimary").checked, isInverse: document.getElementById("noInverse").checked, isFixed: isFixed, isNumeric: isNumeric, paliers: paliers }).then(() => { showToast("✅ Objectif Ajouté !"); });
        logAction("Création Objectif", name);
     }
 
@@ -1103,7 +978,6 @@
       document.getElementById("eoInverse").checked = o.isInverse || false;
       document.getElementById("eoFixed").checked = o.isFixed || false;
       document.getElementById("eoNumeric").checked = o.isNumeric || false;
-      
       toggleEditInputs(); 
       if(o.paliers && o.paliers.length > 0) {
         if(o.isFixed) { document.getElementById("eoFixedPrize").value = o.paliers[0].prize; } 
@@ -1130,18 +1004,7 @@
               {threshold: parseFloat(document.getElementById("p3t").value), prize: oldP[2]?oldP[2].prize:"0"}
           ]; 
       }
-      db.ref("objectives/"+id).update({ 
-          name: document.getElementById("eoName").value, 
-          current: document.getElementById("eoCurrent").value, 
-          target: document.getElementById("eoTarget").value, 
-          isPrimary: document.getElementById("eoPrimary").checked, 
-          isInverse: document.getElementById("eoInverse").checked, 
-          isFixed: isFixed, 
-          isNumeric: document.getElementById("eoNumeric").checked,
-          hideTarget: document.getElementById("eoHideTarget").checked, 
-          hideCurrent: document.getElementById("eoHideCurrent").checked, 
-          paliers: paliers 
-      }).then(() => { showToast("✅ Objectif Modifié !"); document.getElementById("editObjPanel").classList.remove("active"); });
+      db.ref("objectives/"+id).update({ name: document.getElementById("eoName").value, current: document.getElementById("eoCurrent").value, target: document.getElementById("eoTarget").value, isPrimary: document.getElementById("eoPrimary").checked, isInverse: document.getElementById("eoInverse").checked, isFixed: isFixed, isNumeric: document.getElementById("eoNumeric").checked, hideTarget: document.getElementById("eoHideTarget").checked, hideCurrent: document.getElementById("eoHideCurrent").checked, paliers: paliers }).then(() => { showToast("✅ Objectif Modifié !"); document.getElementById("editObjPanel").classList.remove("active"); });
       logAction("Modification", "Objectif : " + document.getElementById("eoName").value);
     }
 
@@ -1189,7 +1052,6 @@
         }
     }
 
-    // MODIFIED RENDER USERS (DOT + EMAIL)
     function renderAdminUsers() { 
         const d = document.getElementById("usersList"); d.innerHTML = ""; let totalToPay = 0; 
         Object.keys(allUsers).forEach(k => { 
@@ -1199,15 +1061,40 @@
             let userBonus = 0; 
             
             const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); let primOk = true; 
-            if(prims.length > 0) { primOk = prims.every(o => { const pct = getPct(o.current, o.target, o.isInverse); const th = o.isFixed ? 100 : ((o.paliers&&o.paliers[0])?o.paliers[0].threshold:100); return pct >= th; }); } 
-            Object.values(allObjs).forEach(o => { if(!o.published) return; const pct = getPct(o.current, o.target, o.isInverse); const isLocked = !o.isPrimary && !primOk; let g = 0; if(o.isFixed) { if(pct >= 100 && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); } else { if(o.paliers) o.paliers.forEach(p => { if(pct>=p.threshold) g += parse(p.prize); }); } if(!isLocked) userBonus += (g * userRatio); }); totalToPay += userBonus; 
+            if(prims.length > 0) { primOk = prims.every(o => { 
+                 const pct = getPct(o.current, o.target, o.isInverse); 
+                 let threshold = 100;
+                 if(o.isFixed) threshold = 100;
+                 else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold;
+                 if(o.isNumeric) return parseFloat(o.current) >= threshold;
+                 else return pct >= threshold;
+            }); } 
+            
+            Object.values(allObjs).forEach(o => { if(!o.published) return; 
+                const pct = getPct(o.current, o.target, o.isInverse); 
+                const isLocked = !o.isPrimary && !primOk; 
+                let g = 0; 
+                if(o.isFixed) { 
+                    let win = false;
+                    if(o.isNumeric) win = parseFloat(o.current) >= o.target;
+                    else win = pct >= 100;
+                    if(win && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); 
+                } else { 
+                    if(o.paliers) o.paliers.forEach(p => { 
+                        let unlocked = false;
+                        if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold;
+                        else unlocked = pct >= p.threshold;
+                        if(unlocked) g += parse(p.prize); 
+                    }); 
+                } 
+                if(!isLocked) userBonus += (g * userRatio); 
+            }); 
+            totalToPay += userBonus; 
             
             const div = document.createElement("div"); div.className = "user-item"; 
             const statusClass = (u.status === 'active') ? 'active' : 'pending';
             const statusLabel = (u.status === 'active') ? 'ACTIF' : 'EN ATTENTE';
-            
-            let adminBadge = "";
-            if(u.role === 'admin') adminBadge = `<span class="admin-tag">ADMIN</span>`;
+            let adminBadge = ""; if(u.role === 'admin') adminBadge = `<span class="admin-tag">ADMIN</span>`;
 
             div.innerHTML = `
                 <div class="user-info">
@@ -1261,8 +1148,8 @@
           g.sessions.sort((a,b) => b.startTime - a.startTime); g.actions.sort((a,b) => b.time - a.time);
           const div = document.createElement("div"); div.className = "log-user-group";
           div.innerHTML = `
-             <div class="group-header">
-                <div class="group-info" onclick="this.parentElement.nextElementSibling.classList.toggle('open')" style="flex:1;">👤 ${uName} <span style="font-weight:400; font-size:11px; color:#64748b; margin-left:10px;">(Dernière: ${d.toLocaleString()})</span></div>
+             <div class="group-header" onclick="this.parentElement.nextElementSibling.classList.toggle('open')">
+                <div class="group-info">👤 ${uName} <span style="font-weight:400; font-size:11px; color:#64748b; margin-left:10px;">(Dernière: ${d.toLocaleString()})</span></div>
                 <button onclick="deleteUserLogs('${uName}')" class="btn-clear-hist" title="Effacer historique">🗑️ Effacer</button>
              </div>
              <div class="group-body">
@@ -1279,10 +1166,12 @@
     function checkBudget() {
        const budget = globalSettings.budget || 0; let maxLiability = 0; let totalUserRatio = 0;
        Object.values(allUsers).forEach(u => { if(!u.email || u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) totalUserRatio += (u.hours/BASE_HOURS); });
-       Object.values(allObjs).forEach(o => { if(!o.published) return; let maxP = 0; if(o.paliers) o.paliers.forEach(p => maxP += parse(p.prize)); maxLiability += (maxP * totalUserRatio); });
-       document.getElementById("budgetDisplay").innerText = `${maxLiability.toFixed(0)}€ / ${budget}€`;
-       const pct = (maxLiability / budget) * 100; const bar = document.getElementById("budgetBar"); bar.style.width = Math.min(pct, 100) + "%";
-       if(maxLiability > budget) { bar.classList.add("danger"); document.getElementById("budgetWarning").style.display = "block"; } else { bar.classList.remove("danger"); document.getElementById("budgetWarning").style.display = "none"; }
+       Object.values(allObjs).forEach(o => { if(!o.published) return; let maxP = 0; if(o.paliers) o.paliers.forEach(p => maxP = Math.max(maxP, parse(p.prize))); maxLiability += (maxP * totalUserRatio); });
+       const pct = (maxLiability / budget) * 100; const bar = document.getElementById("simGauge"); bar.style.width = Math.min(pct, 100) + "%";
+       if(maxLiability > budget) { bar.classList.add("danger"); document.getElementById("simUsed").style.color = "#ef4444"; } 
+       else { bar.classList.remove("danger"); document.getElementById("simUsed").style.color = "#3b82f6"; }
+       document.getElementById("simUsed").innerText = `${maxLiability.toFixed(0)}€ Engagés`;
+       document.getElementById("simLeft").innerText = `Reste : ${(budget - maxLiability).toFixed(0)}€`;
     }
 
     function getPct(c, t, isInverse) {
