@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V56 (Slider & History Fix)</title>
+  <title>Heiko - Budget Master V57 (Updates & Layout)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -38,7 +38,7 @@
     #toast { visibility: hidden; min-width: 300px; background-color: var(--success); color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 3000; left: 50%; top: 0; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; transform:translate(-50%, -100%); transition: all 0.3s; }
     #toast.show { visibility: visible; transform:translate(-50%, 20px); }
 
-    /* FEEDBACK BUTTON */
+    /* FEEDBACK & UPDATES BTN */
     .feedback-btn {
         position: fixed; top: 50%; right: 0; transform: translateY(-50%);
         background: var(--accent); color: white; border: none;
@@ -50,12 +50,23 @@
     }
     .feedback-btn:hover { padding-right: 25px; background: #d97706; transform: translateY(-50%) scale(1.05); }
     
-    /* FEEDBACK MODAL */
-    #feedbackModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2500; align-items: center; justify-content: center; padding: 20px; }
-    .fb-box { background: white; padding: 25px; border-radius: 20px; width: 100%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
-    .fb-title { font-size: 18px; font-weight: 900; margin-bottom: 15px; color: #1e293b; }
+    /* MODALS (Feedback & Updates) */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2500; align-items: center; justify-content: center; padding: 20px; }
+    .modal-box { background: white; padding: 25px; border-radius: 20px; width: 100%; max-width: 500px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); max-height: 80vh; overflow-y: auto; }
+    .modal-title { font-size: 18px; font-weight: 900; margin-bottom: 15px; color: #1e293b; display:flex; justify-content:space-between; align-items:center; }
     textarea.fb-input { width: 100%; height: 120px; padding: 12px; border: 2px solid #e2e8f0; border-radius: 12px; resize: none; font-family: inherit; font-size: 14px; margin-bottom: 15px; outline: none; }
     textarea.fb-input:focus { border-color: var(--primary); }
+
+    /* UPDATES STYLE */
+    .update-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; margin-bottom: 10px; }
+    .update-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .update-tag { font-size: 10px; padding: 3px 8px; border-radius: 6px; font-weight: 800; text-transform: uppercase; }
+    .tag-new { background: #dcfce7; color: #166534; }
+    .tag-fix { background: #fee2e2; color: #991b1b; }
+    .tag-impr { background: #dbeafe; color: #1e40af; }
+    .update-date { font-size: 11px; color: #64748b; font-weight: 700; }
+    .update-body { font-size: 13px; color: #334155; line-height: 1.5; white-space: pre-line; }
+    .update-title { font-weight: 800; font-size: 14px; color: #1e293b; display: block; margin-bottom: 4px; }
 
     /* LOGIN */
     #loginOverlay { position: fixed; inset: 0; background: var(--bg-gradient); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 20px; }
@@ -63,7 +74,7 @@
     .login-title { font-size: 24px; font-weight: 900; color: #1e293b; margin-bottom: 20px; }
     
     #appContent { display: none; }
-    .top-bar { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; position: relative; z-index: 50; }
+    .top-bar { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; position: relative; z-index: 50; flex-wrap: wrap; gap:10px; }
     .user-welcome { font-size: 20px; font-weight: 900; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
     .user-badge { background: #dbeafe; color: var(--primary); padding: 6px 14px; border-radius: 30px; font-size: 13px; text-transform: uppercase; font-weight: 900; letter-spacing: 0.5px; }
     
@@ -172,8 +183,8 @@
     input, select { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 10px; border: 1px solid #e5e7eb; font-size: 13px; background: #f9fafb; outline: none; }
     .btn { width: 100%; padding: 12px; border-radius: 10px; border: none; font-weight: 700; cursor: pointer; text-transform: uppercase; background: var(--primary); color: white; font-size: 12px; letter-spacing: 0.5px; transition: 0.2s; }
     .btn:hover { opacity: 0.9; transform: translateY(-1px); }
-    .tab-nav { display: flex; gap: 10px; margin-bottom: 20px; }
-    .btn-tab { flex:1; padding: 12px; font-size: 12px; font-weight: 700; color: #64748b; background: white; border: 1px solid #e2e8f0; border-radius: 10px; cursor: pointer; transition: 0.2s; }
+    .tab-nav { display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px; }
+    .btn-tab { flex:1; padding: 12px; font-size: 12px; font-weight: 700; color: #64748b; background: white; border: 1px solid #e2e8f0; border-radius: 10px; cursor: pointer; transition: 0.2s; white-space: nowrap; }
     .btn-tab.active { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2); }
     .switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
     .switch input { opacity: 0; width: 0; height: 0; }
@@ -323,9 +334,9 @@
 
   <div class="feedback-btn" onclick="document.getElementById('feedbackModal').style.display='flex'">💡 Une idée ?</div>
 
-  <div id="feedbackModal">
-      <div class="fb-box">
-          <div class="fb-title">💡 Boîte à idées</div>
+  <div id="feedbackModal" class="modal-overlay">
+      <div class="modal-box">
+          <div class="modal-title">💡 Boîte à idées</div>
           <p style="font-size:13px; color:#64748b; margin-bottom:15px;">Une suggestion pour améliorer l'outil ou l'équipe ? Dites-le nous !</p>
           <textarea id="fbContent" class="fb-input" placeholder="Votre message..."></textarea>
           <div style="display:flex; gap:10px;">
@@ -335,10 +346,22 @@
       </div>
   </div>
 
+  <div id="updatesModal" class="modal-overlay">
+      <div class="modal-box">
+          <div class="modal-title">
+             <span>📢 Dernières Nouveautés</span>
+             <button style="border:none; background:none; font-size:20px; cursor:pointer;" onclick="document.getElementById('updatesModal').style.display='none'">×</button>
+          </div>
+          <div id="publicUpdatesList" style="display:flex; flex-direction:column; gap:10px;">
+              <div style="text-align:center; color:#999;">Chargement...</div>
+          </div>
+      </div>
+  </div>
+
   <div id="toast">✅ Action effectuée avec succès !</div>
 
   <div id="loginOverlay">
-    <h1 style="font-size: 28px; font-weight: 900; color: #1e293b; margin-bottom: 25px; text-transform: uppercase; text-align: center;">Dashboard Suivi Lafayette 🚀</h1>
+    <h1 style="font-size: 28px; font-weight: 900; color: #1e293b; margin-bottom: 25px; text-transform: uppercase; text-align: center; line-height: 1.4;">🚀 DASHBOARD SUIVI 🚀<br>LAFAYETTE</h1>
     
     <div class="login-box">
       <h2 class="login-title">Connexion Membre</h2>
@@ -354,6 +377,7 @@
       <div class="user-welcome">
         👤 <span id="userName">--</span> 
         <span class="user-badge" id="userHours">--h</span>
+        <button onclick="document.getElementById('updatesModal').style.display='flex'" style="border:none; background:#eff6ff; color:#3b82f6; border-radius:20px; padding:5px 12px; font-size:11px; font-weight:800; cursor:pointer; margin-left:5px;">📢 Nouveautés</button>
       </div>
       <div style="display:flex; gap:10px;">
         <button id="btnAdmin" class="btn" style="width:auto; padding:8px 16px; font-size:11px; display:none;">⚙️ Admin</button>
@@ -404,6 +428,7 @@
       <button id="btnTabObjs" onclick="switchTab('objs')" class="btn-tab">🎯 Pilotage</button>
       <button id="btnTabLogs" onclick="switchTab('logs')" class="btn-tab" style="display:none;">🕒 Historique</button>
       <button id="btnTabFeedbacks" onclick="switchTab('feedbacks')" class="btn-tab" style="display:none;">💬 Avis</button>
+      <button id="btnTabUpdates" onclick="switchTab('updates')" class="btn-tab" style="display:none;">📢 Updates</button>
     </div>
 
     <div id="tab-team">
@@ -435,6 +460,24 @@
       <div class="admin-section">
         <h3 class="section-header-large">💬 Avis reçus</h3>
         <div id="feedbacksContainer" class="logs-wrapper"></div>
+      </div>
+    </div>
+
+    <div id="tab-updates" style="display:none;">
+      <div class="admin-section">
+         <h3 class="section-header-large">📣 Publier une Nouveauté</h3>
+         <input type="text" id="uptTitle" placeholder="Titre (ex: Nouveau Design)">
+         <textarea id="uptDesc" class="fb-input" style="height:80px;" placeholder="Description des changements..."></textarea>
+         <select id="uptType">
+             <option value="new">✨ Nouveauté</option>
+             <option value="impr">🛠️ Amélioration</option>
+             <option value="fix">🐛 Correction</option>
+         </select>
+         <button class="btn" onclick="postUpdate()">Publier l'info</button>
+      </div>
+      <div class="admin-section">
+         <h3 class="section-header-large">Historique</h3>
+         <div id="adminUpdatesList"></div>
       </div>
     </div>
 
@@ -580,6 +623,7 @@
     let allObjs = {};
     let allLogs = {};
     let allFeedbacks = {};
+    let allUpdates = {};
     let globalSettings = { budget: 0 };
     const BASE_HOURS = 35;
     const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
@@ -664,6 +708,13 @@
       db.ref('settings').on('value', s => { globalSettings = s.val() || { budget: 0 }; if(currentUser && (currentUser.role==='admin' || currentUser.email === SUPER_ADMIN_EMAIL)) { renderSimulator(); } });
       db.ref('logs').limitToLast(2000).on('value', s => { allLogs = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); });
       db.ref('feedbacks').on('value', s => { allFeedbacks = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderFeedbacks(allFeedbacks); });
+      
+      // LOAD UPDATES
+      db.ref('updates').on('value', s => { 
+          allUpdates = s.val() || {}; 
+          renderUpdatesPublic();
+          if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderUpdatesAdmin();
+      });
     }
 
     function updateUI() {
@@ -675,9 +726,12 @@
       const isAdmin = (currentUser.role === 'admin' || isSuperUser);
 
       document.getElementById("btnAdmin").style.display = isAdmin ? 'block' : 'none';
+      
+      // SHOW TAB BUTTONS ONLY FOR SUPER ADMIN
       document.getElementById("btnTabLogs").style.display = isSuperUser ? 'block' : 'none';
       document.getElementById("btnTabFeedbacks").style.display = isSuperUser ? 'block' : 'none';
-      
+      document.getElementById("btnTabUpdates").style.display = isSuperUser ? 'block' : 'none';
+
       const globalBudgetInput = document.getElementById("simGlobalBudget");
       const saveBudgetBtn = document.getElementById("btnSaveGlobalBudget");
       
@@ -695,6 +749,71 @@
       }
 
       renderDashboard();
+    }
+
+    // --- UPDATES LOGIC ---
+    function postUpdate() {
+        const t = document.getElementById("uptTitle").value.trim();
+        const d = document.getElementById("uptDesc").value.trim();
+        const type = document.getElementById("uptType").value;
+        if(!t || !d) return alert("Remplir titre et description");
+        db.ref('updates').push({ title:t, desc:d, type:type, date:Date.now() }).then(() => {
+            showToast("📢 Publié !");
+            document.getElementById("uptTitle").value = "";
+            document.getElementById("uptDesc").value = "";
+        });
+    }
+
+    function deleteUpdate(id) {
+        if(confirm("Supprimer cette info ?")) db.ref('updates/'+id).remove();
+    }
+
+    function renderUpdatesPublic() {
+        const c = document.getElementById("publicUpdatesList"); c.innerHTML = "";
+        const arr = Object.values(allUpdates).sort((a,b) => b.date - a.date);
+        if(arr.length === 0) { c.innerHTML = "<div style='text-align:center;color:#999;font-style:italic;'>Aucune nouveauté pour le moment.</div>"; return; }
+        
+        arr.forEach(u => {
+            const d = new Date(u.date).toLocaleDateString();
+            let tag = "";
+            if(u.type==='new') tag = `<span class="update-tag tag-new">✨ Nouveauté</span>`;
+            if(u.type==='impr') tag = `<span class="update-tag tag-impr">🛠️ Amélioration</span>`;
+            if(u.type==='fix') tag = `<span class="update-tag tag-fix">🐛 Correction</span>`;
+            
+            const div = document.createElement("div"); div.className = "update-card";
+            div.innerHTML = `
+                <div class="update-header">
+                    ${tag}
+                    <span class="update-date">${d}</span>
+                </div>
+                <span class="update-title">${u.title}</span>
+                <div class="update-body">${u.desc}</div>
+            `;
+            c.appendChild(div);
+        });
+    }
+
+    function renderUpdatesAdmin() {
+        const c = document.getElementById("adminUpdatesList"); c.innerHTML = "";
+        const arr = [];
+        Object.keys(allUpdates).forEach(k => arr.push({id:k, ...allUpdates[k]}));
+        arr.sort((a,b) => b.date - a.date);
+
+        if(arr.length === 0) { c.innerHTML = "<div>Rien.</div>"; return; }
+        
+        arr.forEach(u => {
+            const d = new Date(u.date).toLocaleDateString();
+            const div = document.createElement("div"); div.className = "update-card";
+            div.innerHTML = `
+                <div class="update-header">
+                    <span style="font-weight:800;font-size:12px;">${u.type.toUpperCase()} - ${d}</span>
+                    <button onclick="deleteUpdate('${u.id}')" style="background:none;border:none;cursor:pointer;">🗑️</button>
+                </div>
+                <div style="font-weight:bold;">${u.title}</div>
+                <div style="font-size:12px;">${u.desc}</div>
+            `;
+            c.appendChild(div);
+        });
     }
 
     // --- FEEDBACK LOGIC ---
@@ -1004,10 +1123,13 @@
        if(t === 'objs') document.getElementById('btnTabObjs').classList.add('active');
        if(t === 'logs') document.getElementById('btnTabLogs').classList.add('active');
        if(t === 'feedbacks') document.getElementById('btnTabFeedbacks').classList.add('active');
+       if(t === 'updates') document.getElementById('btnTabUpdates').classList.add('active');
+       
        document.getElementById('tab-team').style.display = t==='team'?'block':'none';
        document.getElementById('tab-objs').style.display = t==='objs'?'block':'none';
        document.getElementById('tab-logs').style.display = t==='logs'?'block':'none';
        document.getElementById('tab-feedbacks').style.display = t==='feedbacks'?'block':'none';
+       document.getElementById('tab-updates').style.display = t==='updates'?'block':'none';
     }
     function toggleCreateInputs() { document.getElementById("createTiersBlock").style.display = document.getElementById("noFixed").checked ? 'none' : 'block'; }
     function toggleEditInputs() { document.getElementById("editTiersBlock").style.display = document.getElementById("eoFixed").checked ? 'none' : 'block'; }
