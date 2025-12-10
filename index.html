@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V57 (Updates & Layout)</title>
+  <title>Heiko - Budget Master V58 (Merged Admin)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -38,7 +38,7 @@
     #toast { visibility: hidden; min-width: 300px; background-color: var(--success); color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 3000; left: 50%; top: 0; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; transform:translate(-50%, -100%); transition: all 0.3s; }
     #toast.show { visibility: visible; transform:translate(-50%, 20px); }
 
-    /* FEEDBACK & UPDATES BTN */
+    /* FEEDBACK BUTTON */
     .feedback-btn {
         position: fixed; top: 50%; right: 0; transform: translateY(-50%);
         background: var(--accent); color: white; border: none;
@@ -50,7 +50,7 @@
     }
     .feedback-btn:hover { padding-right: 25px; background: #d97706; transform: translateY(-50%) scale(1.05); }
     
-    /* MODALS (Feedback & Updates) */
+    /* MODALS */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2500; align-items: center; justify-content: center; padding: 20px; }
     .modal-box { background: white; padding: 25px; border-radius: 20px; width: 100%; max-width: 500px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); max-height: 80vh; overflow-y: auto; }
     .modal-title { font-size: 18px; font-weight: 900; margin-bottom: 15px; color: #1e293b; display:flex; justify-content:space-between; align-items:center; }
@@ -427,8 +427,7 @@
       <button id="btnTabTeam" onclick="switchTab('team')" class="btn-tab active">👥 Équipe</button>
       <button id="btnTabObjs" onclick="switchTab('objs')" class="btn-tab">🎯 Pilotage</button>
       <button id="btnTabLogs" onclick="switchTab('logs')" class="btn-tab" style="display:none;">🕒 Historique</button>
-      <button id="btnTabFeedbacks" onclick="switchTab('feedbacks')" class="btn-tab" style="display:none;">💬 Avis</button>
-      <button id="btnTabUpdates" onclick="switchTab('updates')" class="btn-tab" style="display:none;">📢 Updates</button>
+      <button id="btnTabFeedbacks" onclick="switchTab('feedbacks')" class="btn-tab" style="display:none;">💬 Avis & News</button>
     </div>
 
     <div id="tab-team">
@@ -457,27 +456,30 @@
     </div>
     
     <div id="tab-feedbacks" style="display:none;">
-      <div class="admin-section">
-        <h3 class="section-header-large">💬 Avis reçus</h3>
-        <div id="feedbacksContainer" class="logs-wrapper"></div>
-      </div>
-    </div>
-
-    <div id="tab-updates" style="display:none;">
-      <div class="admin-section">
-         <h3 class="section-header-large">📣 Publier une Nouveauté</h3>
-         <input type="text" id="uptTitle" placeholder="Titre (ex: Nouveau Design)">
+      
+      <div class="admin-section" style="border-left:4px solid var(--accent);">
+         <h3 class="section-header-large" style="color:var(--accent);">📢 Gérer les Nouveautés</h3>
+         <div style="font-size:11px; color:#64748b; margin-bottom:10px;">Ajoutez, Modifiez ou Supprimez les annonces visibles par l'équipe.</div>
+         
+         <input type="hidden" id="uptId"> <input type="text" id="uptTitle" placeholder="Titre (ex: Nouveau Design)">
          <textarea id="uptDesc" class="fb-input" style="height:80px;" placeholder="Description des changements..."></textarea>
          <select id="uptType">
              <option value="new">✨ Nouveauté</option>
              <option value="impr">🛠️ Amélioration</option>
              <option value="fix">🐛 Correction</option>
          </select>
-         <button class="btn" onclick="postUpdate()">Publier l'info</button>
-      </div>
-      <div class="admin-section">
-         <h3 class="section-header-large">Historique</h3>
+         
+         <div style="display:flex; gap:10px; margin-bottom:20px;">
+             <button class="btn" id="btnSaveUpdate" onclick="saveUpdate()">Publier l'info</button>
+             <button class="btn" id="btnCancelUpdate" onclick="cancelUpdateEdit()" style="background:#e2e8f0; color:#475569; display:none;">Annuler</button>
+         </div>
+
          <div id="adminUpdatesList"></div>
+      </div>
+
+      <div class="admin-section">
+        <h3 class="section-header-large">💬 Avis reçus de l'équipe</h3>
+        <div id="feedbacksContainer" class="logs-wrapper"></div>
       </div>
     </div>
 
@@ -730,7 +732,6 @@
       // SHOW TAB BUTTONS ONLY FOR SUPER ADMIN
       document.getElementById("btnTabLogs").style.display = isSuperUser ? 'block' : 'none';
       document.getElementById("btnTabFeedbacks").style.display = isSuperUser ? 'block' : 'none';
-      document.getElementById("btnTabUpdates").style.display = isSuperUser ? 'block' : 'none';
 
       const globalBudgetInput = document.getElementById("simGlobalBudget");
       const saveBudgetBtn = document.getElementById("btnSaveGlobalBudget");
@@ -751,21 +752,59 @@
       renderDashboard();
     }
 
-    // --- UPDATES LOGIC ---
-    function postUpdate() {
+    // --- UPDATES LOGIC (CREATE, EDIT, DELETE) ---
+    function saveUpdate() {
+        const id = document.getElementById("uptId").value; // Empty if creation, filled if edit
         const t = document.getElementById("uptTitle").value.trim();
         const d = document.getElementById("uptDesc").value.trim();
         const type = document.getElementById("uptType").value;
+
         if(!t || !d) return alert("Remplir titre et description");
-        db.ref('updates').push({ title:t, desc:d, type:type, date:Date.now() }).then(() => {
-            showToast("📢 Publié !");
-            document.getElementById("uptTitle").value = "";
-            document.getElementById("uptDesc").value = "";
-        });
+
+        if(id) {
+            // MODE MODIFICATION
+            db.ref('updates/' + id).update({ title:t, desc:d, type:type }).then(() => {
+                showToast("✅ Mise à jour modifiée !");
+                cancelUpdateEdit();
+            });
+        } else {
+            // MODE CREATION
+            db.ref('updates').push({ title:t, desc:d, type:type, date:Date.now() }).then(() => {
+                showToast("📢 Publié !");
+                cancelUpdateEdit();
+            });
+        }
+    }
+
+    function editUpdate(id) {
+        const u = allUpdates[id];
+        if(!u) return;
+        document.getElementById("uptId").value = id;
+        document.getElementById("uptTitle").value = u.title;
+        document.getElementById("uptDesc").value = u.desc;
+        document.getElementById("uptType").value = u.type;
+        
+        document.getElementById("btnSaveUpdate").textContent = "💾 Enregistrer Modification";
+        document.getElementById("btnSaveUpdate").style.background = "#f59e0b"; // Orange for edit
+        document.getElementById("btnCancelUpdate").style.display = "inline-block";
+        document.querySelector('.admin-section').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function cancelUpdateEdit() {
+        document.getElementById("uptId").value = "";
+        document.getElementById("uptTitle").value = "";
+        document.getElementById("uptDesc").value = "";
+        
+        document.getElementById("btnSaveUpdate").textContent = "Publier l'info";
+        document.getElementById("btnSaveUpdate").style.background = "var(--primary)";
+        document.getElementById("btnCancelUpdate").style.display = "none";
     }
 
     function deleteUpdate(id) {
-        if(confirm("Supprimer cette info ?")) db.ref('updates/'+id).remove();
+        if(confirm("Supprimer cette info ?")) {
+            db.ref('updates/'+id).remove();
+            if(document.getElementById("uptId").value === id) cancelUpdateEdit();
+        }
     }
 
     function renderUpdatesPublic() {
@@ -799,18 +838,22 @@
         Object.keys(allUpdates).forEach(k => arr.push({id:k, ...allUpdates[k]}));
         arr.sort((a,b) => b.date - a.date);
 
-        if(arr.length === 0) { c.innerHTML = "<div>Rien.</div>"; return; }
+        if(arr.length === 0) { c.innerHTML = "<div style='color:#ccc; font-style:italic;'>Aucune publication.</div>"; return; }
         
         arr.forEach(u => {
             const d = new Date(u.date).toLocaleDateString();
             const div = document.createElement("div"); div.className = "update-card";
+            div.style.background = "white";
             div.innerHTML = `
                 <div class="update-header">
                     <span style="font-weight:800;font-size:12px;">${u.type.toUpperCase()} - ${d}</span>
-                    <button onclick="deleteUpdate('${u.id}')" style="background:none;border:none;cursor:pointer;">🗑️</button>
+                    <div style="display:flex; gap:10px;">
+                        <button onclick="editUpdate('${u.id}')" style="background:none;border:none;cursor:pointer;font-size:14px;">✏️</button>
+                        <button onclick="deleteUpdate('${u.id}')" style="background:none;border:none;cursor:pointer;font-size:14px;">🗑️</button>
+                    </div>
                 </div>
                 <div style="font-weight:bold;">${u.title}</div>
-                <div style="font-size:12px;">${u.desc}</div>
+                <div style="font-size:12px; color:#666;">${u.desc.substring(0,50)}...</div>
             `;
             c.appendChild(div);
         });
@@ -1123,13 +1166,11 @@
        if(t === 'objs') document.getElementById('btnTabObjs').classList.add('active');
        if(t === 'logs') document.getElementById('btnTabLogs').classList.add('active');
        if(t === 'feedbacks') document.getElementById('btnTabFeedbacks').classList.add('active');
-       if(t === 'updates') document.getElementById('btnTabUpdates').classList.add('active');
        
        document.getElementById('tab-team').style.display = t==='team'?'block':'none';
        document.getElementById('tab-objs').style.display = t==='objs'?'block':'none';
        document.getElementById('tab-logs').style.display = t==='logs'?'block':'none';
        document.getElementById('tab-feedbacks').style.display = t==='feedbacks'?'block':'none';
-       document.getElementById('tab-updates').style.display = t==='updates'?'block':'none';
     }
     function toggleCreateInputs() { document.getElementById("createTiersBlock").style.display = document.getElementById("noFixed").checked ? 'none' : 'block'; }
     function toggleEditInputs() { document.getElementById("editTiersBlock").style.display = document.getElementById("eoFixed").checked ? 'none' : 'block'; }
