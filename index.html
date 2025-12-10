@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V48 (Redirect Pro)</title>
+  <title>Heiko - Budget Master V49 (Mega Sliders)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -209,26 +209,43 @@
     .log-dur { color: #059669; font-weight: 700; background: #ecfdf5; padding: 0 4px; border-radius: 4px; font-size: 10px; display: inline-block; margin-left: 4px; }
     .btn-clear-hist { border:none; background:#fee2e2; color:#ef4444; border-radius:4px; padding:2px 6px; font-size:10px; font-weight:700; cursor:pointer; }
     
-    /* COCKPIT - FONT SIZE XXL */
-    .cockpit-container { padding: 20px; border: 3px solid #e2e8f0; border-radius: 20px; background: #f8fafc; margin-bottom: 20px; }
-    .cockpit-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+    /* COCKPIT - FONT SIZE XXL & MEGA SLIDERS */
+    .cockpit-container { padding: 25px; border: 3px solid #e2e8f0; border-radius: 20px; background: #f8fafc; margin-bottom: 20px; }
+    .cockpit-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
     .cockpit-gauge-container { height: 28px; background: #e2e8f0; border-radius: 99px; overflow: hidden; position: relative; margin-bottom: 10px; border:1px solid #cbd5e1; }
     .cockpit-gauge-fill { height: 100%; width: 0; background: #3b82f6; transition: width 0.3s; }
     .cockpit-gauge-fill.danger { background: #ef4444; animation: pulse 1s infinite; }
-    
-    /* REDUIT */
     .cockpit-info { display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #64748b; }
     
-    /* AERATION */
-    .cockpit-obj-row { background: white; padding: 25px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 15px; }
-    
-    .cockpit-obj-title { font-size: 18px; font-weight: 900; margin-bottom: 15px; color: #1e293b; display:flex; justify-content:space-between; align-items:center; }
+    /* MORE SPACE */
+    .cockpit-obj-row { background: white; padding: 25px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px; }
+    .cockpit-obj-title { font-size: 18px; font-weight: 900; margin-bottom: 20px; color: #1e293b; display:flex; justify-content:space-between; align-items:center; }
     .cockpit-obj-cost { font-size: 11px; font-weight:800; color:#3b82f6; background:#eff6ff; padding:3px 8px; border-radius:6px; }
     
-    .slider-row { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
-    .slider-label { font-size: 13px; font-weight: 800; width: 90px; color: #475569; }
-    .slider-val { font-size: 14px; font-weight: 900; width: 50px; text-align: right; color: var(--primary); }
-    input[type=range] { flex: 1; accent-color: var(--primary); cursor: pointer; height: 16px; margin:0; padding:0; width:100%; }
+    /* MEGA SLIDER */
+    .slider-row { display: flex; flex-direction:column; align-items: flex-start; gap: 8px; margin-bottom: 20px; }
+    .slider-label-line { display:flex; justify-content:space-between; width:100%; }
+    .slider-label { font-size: 14px; font-weight: 800; color: #475569; }
+    .slider-val { font-size: 16px; font-weight: 900; color: var(--primary); }
+    
+    input[type=range] { 
+        width: 100%; 
+        appearance: none; 
+        height: 12px; 
+        background: #e2e8f0; 
+        border-radius: 10px; 
+        outline: none; 
+    }
+    input[type=range]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 28px; /* MEGA THUMB */
+        height: 28px;
+        border-radius: 50%;
+        background: var(--primary);
+        cursor: pointer;
+        box-shadow: 0 4px 10px rgba(37,99,235,0.3);
+    }
 
     #simGlobalBudget { text-align: center; font-size: 14px; font-weight: 800; color: #2563eb; border: 2px solid #bfdbfe; padding: 5px; width: 90px; border-radius: 6px; }
     .budget-label-small { font-size: 11px; font-weight: 700; color: #64748b; }
@@ -595,7 +612,6 @@
     let simObjs = {}; 
 
     function renderSimulator() {
-        // Always rebuild to keep sync
         buildSimulatorUI();
     }
 
@@ -610,7 +626,6 @@
 
         Object.keys(simObjs).forEach(k => {
             const o = simObjs[k];
-            // Render all published objectives
             if(!o.published) return; 
 
             // Calc Max Potential for one person (Cumulative)
@@ -636,18 +651,16 @@
                 const prize = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
                 slidersHtml = `
                   <div class="slider-row">
-                     <span class="slider-label">Prime Fixe</span>
+                     <div class="slider-label-line"><span class="slider-label">Prime Fixe</span><span class="slider-val" id="val-${k}-0">${prize}€</span></div>
                      <input type="range" min="0" max="50" step="5" value="${prize}" oninput="updateObjVal('${k}', 0, this.value)">
-                     <span class="slider-val" id="val-${k}-0">${prize}€</span>
                   </div>`;
             } else {
                 (o.paliers || []).forEach((p, i) => {
                     const prize = parse(p.prize);
                     slidersHtml += `
                       <div class="slider-row">
-                         <span class="slider-label">Palier ${p.threshold}%</span>
+                         <div class="slider-label-line"><span class="slider-label">Palier ${p.threshold}%</span><span class="slider-val" id="val-${k}-${i}">${prize}€</span></div>
                          <input type="range" min="0" max="30" step="5" value="${prize}" oninput="updateObjVal('${k}', ${i}, this.value)">
-                         <span class="slider-val" id="val-${k}-${i}">${prize}€</span>
                       </div>`;
                 });
             }
@@ -719,12 +732,10 @@
     function publishSim() {
         if(confirm("📡 Confirmer la publication des nouveaux montants ?")) {
             const updates = {};
-            
             if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
                 const newBudget = parseFloat(document.getElementById("simGlobalBudget").value);
                 db.ref('settings/budget').set(newBudget);
             }
-
             Object.keys(simObjs).forEach(k => {
                 updates['objectives/' + k + '/paliers'] = simObjs[k].paliers;
             });
