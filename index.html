@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Heiko - Budget Master V56 (Slider & History Fix)</title>
+  <title>Lafayette - Dashboard Suivi</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -33,6 +33,7 @@
     }
     @keyframes moveStripes { 0% { background-position: 0 0; } 100% { background-position: 40px 0; } }
     @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+    @keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
     /* TOAST */
     #toast { visibility: hidden; min-width: 300px; background-color: var(--success); color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 3000; left: 50%; top: 0; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; transform:translate(-50%, -100%); transition: all 0.3s; }
@@ -60,7 +61,11 @@
     /* LOGIN */
     #loginOverlay { position: fixed; inset: 0; background: var(--bg-gradient); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 20px; }
     .login-box { background: white; padding: 40px; border-radius: var(--radius); box-shadow: 0 20px 60px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; border: 1px solid #e2e8f0; }
-    .login-title { font-size: 24px; font-weight: 900; color: #1e293b; margin-bottom: 20px; }
+    .login-header-text { font-size: 28px; font-weight: 900; color: #1e293b; margin-bottom: 30px; text-align: center; line-height: 1.2; text-transform: uppercase; letter-spacing: -1px; text-shadow: 0 2px 10px rgba(0,0,0,0.05); animation: slideDown 0.8s ease-out; }
+    .login-title { font-size: 14px; font-weight: 700; color: #64748b; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
+
+    /* BANNER INFO */
+    #infoBanner { display: none; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; padding: 15px; border-radius: 16px; margin-bottom: 20px; text-align: center; font-size: 13px; font-weight: 700; box-shadow: 0 4px 6px rgba(0,0,0,0.02); animation: slideDown 0.5s ease; width: 100%; max-width: 1200px; margin: 0 auto 20px auto; }
     
     #appContent { display: none; }
     .top-bar { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; position: relative; z-index: 50; }
@@ -75,7 +80,7 @@
     .last-update { font-size: 14px; color: var(--text-muted); background: rgba(255,255,255,0.8); padding: 8px 20px; border-radius: 30px; display: inline-block; font-weight: 600; border: 1px solid #e5e7eb; text-transform: capitalize; }
 
     /* CARDS */
-    .global-score-container { margin: 40px auto; width: 260px; height: 260px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; box-shadow: 0 25px 60px rgba(0,0,0,0.08); border: 12px solid #f8fafc; position: relative; overflow: visible; }
+    .global-score-container { margin: 40px auto; width: 260px; height: 260px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; box-shadow: 0 25px 60px rgba(0,0,0,0.08), inset 0 0 0 10px #e2e8f0; border: 12px solid #cbd5e1; position: relative; overflow: visible; }
     .global-score-value { font-size: 58px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
     .global-score-label { font-size: 13px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; margin-top: 8px; text-align: center; line-height: 1.4; letter-spacing: 1.5px; z-index: 2; position: relative; }
     .money-rain { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: visible; }
@@ -105,30 +110,11 @@
     .data-box-label { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px; }
     .data-box-value { font-size: 20px; font-weight: 900; color: #1e293b; line-height: 1; }
 
-    /* BARRE AVEC RAYURES ACTIVES */
+    /* BARRE */
     .progress-track { height: 30px; background: #e5e7eb; border-radius: 99px; overflow: hidden; margin-bottom: 40px; position: relative; display: flex; }
-    .progress-fill { 
-        height: 100%; 
-        background-color: var(--primary);
-        background-image: linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent);
-        background-size: 40px 40px; 
-        animation: moveStripes 1s linear infinite; 
-        transition: width 1s ease; 
-        position: relative; 
-    }
+    .progress-fill { height: 100%; background-color: var(--primary); background-image: linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent); background-size: 40px 40px; animation: moveStripes 1s linear infinite; transition: width 1s ease; position: relative; }
     .progress-fill.green-mode { background-color: var(--success); }
-    
-    .progress-overdrive { 
-        height: 100%; 
-        width: 0;
-        background-color: var(--danger); 
-        background-image: linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent);
-        background-size: 40px 40px; 
-        animation: moveStripes 1s linear infinite; 
-        transition: width 1s ease; 
-        position: relative; 
-    }
-    
+    .progress-overdrive { height: 100%; width: 0; background-color: var(--danger); background-image: linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent); background-size: 40px 40px; animation: moveStripes 1s linear infinite; transition: width 1s ease; position: relative; }
     .percent-float { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); font-size: 13px; font-weight: 900; color: white; z-index: 5; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
 
     .milestones { display: flex; justify-content: space-between; position: relative; padding: 0 10px; }
@@ -145,7 +131,7 @@
     .earned-badge-container { margin-top: 30px; display: flex; justify-content: center; }
     .earned-badge { background: #dcfce7; color: #166534; padding: 12px 24px; border-radius: 16px; font-weight: 900; font-size: 18px; border: 2px solid #86efac; display: inline-flex; align-items: center; gap: 10px; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.15); animation: pulse-green 2s infinite; }
 
-    /* --- NATIVE CALENDAR --- */
+    /* NATIVE CALENDAR */
     .native-cal-container { margin-top: 60px; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 15px 40px -5px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
     .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     .cal-month-title { font-size: 16px; font-weight: 900; text-transform: uppercase; color: #1e293b; }
@@ -185,6 +171,7 @@
     .pub-name { font-weight: 700; font-size: 13px; color: #1f2937; }
     .user-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f9fafb; border-radius: 10px; margin-bottom: 8px; border: 1px solid #e5e7eb; }
     .user-info { display: flex; flex-direction: column; }
+    .user-header { display:flex; align-items:center; }
     .user-name { font-weight: 700; font-size: 13px; color: #1f2937; }
     .user-meta { font-size: 11px; color: #6b7280; }
     .user-gain { font-weight: 800; font-size: 13px; color: var(--success); background: #ecfdf5; padding: 2px 8px; border-radius: 6px; margin-right: 10px; }
@@ -211,25 +198,26 @@
     .user-email-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
 
     /* LOGS */
-    .logs-wrapper { display: flex; flex-direction: column; gap: 15px; }
+    .logs-wrapper { display: flex; flex-direction: column; gap: 10px; }
     .log-user-group { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
-    .group-header { background: #f8fafc; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #e2e8f0; transition:0.2s; }
+    .group-header { padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #e2e8f0; transition:0.2s; }
     .group-header:hover { background: #eff6ff; }
-    .group-info { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; color: #1e293b; }
+    .group-info { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 14px; color: #1e293b; }
     .last-seen { font-size: 11px; color: #64748b; font-weight: 600; display:flex; align-items:center; gap:8px; }
-    .group-body { display: none; padding: 15px; background: white; gap: 20px; }
-    .group-body.open { display: grid; grid-template-columns: 1fr 1fr; }
-    .log-col-title { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; border-bottom: 2px solid #f1f5f9; padding-bottom: 4px; }
-    .log-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
-    .log-entry { font-size: 12px; display: flex; align-items: flex-start; gap: 6px; }
-    .log-dot { font-size: 8px; margin-top: 4px; }
-    .log-time-s { font-weight: 700; color: #64748b; font-size: 11px; min-width: 45px; }
-    .log-desc { color: #334155; line-height: 1.3; }
-    .log-dur { color: #059669; font-weight: 700; background: #ecfdf5; padding: 0 4px; border-radius: 4px; font-size: 10px; display: inline-block; margin-left: 4px; }
-    .btn-clear-hist { border:none; background:#fee2e2; color:#ef4444; border-radius:4px; padding:2px 6px; font-size:10px; font-weight:700; cursor:pointer; }
-    .btn-clear-hist:hover { background:#fca5a5; }
     
-    /* COCKPIT - MEGA SLIDERS */
+    .group-body { display: none; padding: 20px; background: white; gap: 20px; border-top:1px solid #e2e8f0; }
+    .group-body.open { display: grid; grid-template-columns: 1fr 1fr; }
+    
+    .log-col-title { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; border-bottom: 2px solid #f1f5f9; padding-bottom: 5px; }
+    .log-list { display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; }
+    .log-entry { font-size: 12px; display: flex; align-items: flex-start; gap: 8px; border-bottom: 1px solid #f8fafc; padding-bottom: 4px; }
+    .log-dot { font-size: 10px; margin-top: 3px; }
+    .log-time-s { font-weight: 700; color: #64748b; font-size: 11px; min-width: 80px; }
+    .log-desc { color: #334155; line-height: 1.3; }
+    .log-dur { color: #059669; font-weight: 700; background: #ecfdf5; padding: 1px 6px; border-radius: 4px; font-size: 10px; display: inline-block; }
+    .btn-clear-hist { border:none; background:#fee2e2; color:#ef4444; border-radius:4px; padding:4px 8px; font-size:10px; font-weight:700; cursor:pointer; }
+    
+    /* COCKPIT */
     .cockpit-container { padding: 25px; border: 3px solid #e2e8f0; border-radius: 20px; background: #f8fafc; margin-bottom: 20px; }
     .cockpit-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
     .cockpit-gauge-container { height: 28px; background: #e2e8f0; border-radius: 99px; overflow: hidden; position: relative; margin-bottom: 10px; border:1px solid #cbd5e1; }
@@ -237,83 +225,28 @@
     .cockpit-gauge-fill.danger { background: #ef4444; animation: pulse 1s infinite; }
     .cockpit-info { display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #64748b; }
     
-    /* MORE SPACE */
-    .cockpit-obj-row { background: white; padding: 30px 20px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
+    .cockpit-obj-row { padding: 30px 20px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
     .cockpit-obj-title { font-size: 18px; font-weight: 900; margin-bottom: 25px; color: #1e293b; display:flex; justify-content:space-between; align-items:center; }
-    .cockpit-obj-cost { font-size: 11px; font-weight:800; color:#3b82f6; background:#eff6ff; padding:3px 8px; border-radius:6px; }
+    .cockpit-obj-cost { font-size: 11px; font-weight:900; color:#1e40af; background:#dbeafe; padding:4px 10px; border-radius:50px; border:1px solid #bfdbfe; }
     
-    /* MEGA SLIDER */
     .slider-row { display: flex; flex-direction:column; align-items: flex-start; gap: 10px; margin-bottom: 25px; }
     .slider-row:last-child { margin-bottom:0; }
     .slider-label-line { display:flex; justify-content:space-between; width:100%; margin-bottom:5px; }
     .slider-label { font-size: 14px; font-weight: 800; color: #475569; }
     .slider-val { font-size: 16px; font-weight: 900; color: var(--primary); }
     
-    /* FIX V56: RESET SLIDER STYLE */
-    input[type=range] { 
-        width: 100%; 
-        -webkit-appearance: none;
-        appearance: none; 
-        height: 14px; 
-        background: transparent;
-        margin: 0; 
-        padding: 0;
-        cursor: pointer;
-        display: block; /* Force block to fill width */
-    }
-    
-    /* Chrome/Safari/Edge Track */
-    input[type=range]::-webkit-slider-runnable-track {
-        width: 100%;
-        height: 14px;
-        background: #e2e8f0;
-        border-radius: 10px;
-        border: none;
-    }
-    
-    /* Chrome/Safari/Edge Thumb */
-    input[type=range]::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        appearance: none;
-        width: 32px; 
-        height: 32px;
-        border-radius: 50%;
-        background: var(--primary);
-        cursor: pointer;
-        box-shadow: 0 4px 12px rgba(37,99,235,0.4);
-        border: 2px solid white;
-        margin-top: -9px; /* Centers thumb on track */
-    }
-
-    /* Firefox Track */
-    input[type=range]::-moz-range-track {
-        width: 100%;
-        height: 14px;
-        background: #e2e8f0;
-        border-radius: 10px;
-        border: none;
-    }
-
-    /* Firefox Thumb */
-    input[type=range]::-moz-range-thumb {
-        width: 32px; 
-        height: 32px;
-        border: 2px solid white;
-        border-radius: 50%;
-        background: var(--primary);
-        cursor: pointer;
-        box-shadow: 0 4px 12px rgba(37,99,235,0.4);
-    }
+    input[type=range] { width: 100%; -webkit-appearance: none; appearance: none; height: 14px; background: transparent; margin: 0; padding: 0; cursor: pointer; display: block; }
+    input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 14px; background: #e2e8f0; border-radius: 10px; border: none; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 32px; height: 32px; border-radius: 50%; background: var(--primary); cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.4); border: 2px solid white; margin-top: -9px; }
+    input[type=range]::-moz-range-track { width: 100%; height: 14px; background: #e2e8f0; border-radius: 10px; border: none; }
+    input[type=range]::-moz-range-thumb { width: 32px; height: 32px; border: 2px solid white; border-radius: 50%; background: var(--primary); cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.4); }
 
     #simGlobalBudget { text-align: center; font-size: 14px; font-weight: 800; color: #2563eb; border: 2px solid #bfdbfe; padding: 5px; width: 90px; border-radius: 6px; }
     .budget-label-small { font-size: 11px; font-weight: 700; color: #64748b; }
     
-    /* TOTAL 35H BOX */
     .sim-total-box { margin-top: 20px; padding: 15px; border: 2px solid #2563eb; border-radius: 12px; background: white; text-align: center; box-shadow:0 4px 15px rgba(37,99,235,0.1); margin-bottom: 10px; }
     .sim-total-label { font-size: 13px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
     .sim-total-value { font-size: 24px; font-weight: 900; color: #1e293b; }
-
-    /* CENTERED PLANNING TITLE */
     .planning-title { text-align: center; justify-content: center; margin-left: auto; margin-right: auto; width: 100%; }
 
     @media (max-width: 600px) { .group-body.open { grid-template-columns: 1fr; } }
@@ -321,8 +254,9 @@
 </head>
 <body>
 
-  <div class="feedback-btn" onclick="document.getElementById('feedbackModal').style.display='flex'">💡 Une idée ?</div>
+  <div id="topBanner" class="admin-section" style="display:none; background:#fff7ed; color:#c2410c; text-align:center; font-weight:700; border:1px solid #fed7aa; margin-bottom:20px;"></div>
 
+  <div class="feedback-btn" onclick="document.getElementById('feedbackModal').style.display='flex'">💡 Une idée ?</div>
   <div id="feedbackModal">
       <div class="fb-box">
           <div class="fb-title">💡 Boîte à idées</div>
@@ -338,9 +272,10 @@
   <div id="toast">✅ Action effectuée avec succès !</div>
 
   <div id="loginOverlay">
+    <h1 class="login-header-text">Dashboard Suivi<br>Lafayette 🚀🚀</h1>
     <div class="login-box">
       <h2 class="login-title">Connexion Membre</h2>
-      <input type="email" id="loginEmail" placeholder="Email (ex: admin@heiko.team)">
+      <input type="email" id="loginEmail" placeholder="Email">
       <input type="password" id="loginPass" placeholder="Mot de passe">
       <button class="btn" id="btnLogin">Connexion</button>
       <a onclick="resetPassword()" class="forgot-link">Mot de passe oublié ?</a>
@@ -377,7 +312,6 @@
       </div>
 
       <div class="category-title planning-title" style="margin-top:60px;">Planning 📅</div>
-
       <div class="native-cal-container" style="margin-top:20px;">
           <div class="cal-header">
              <button class="cal-nav-btn" onclick="prevMonth()">❮</button>
@@ -412,12 +346,15 @@
           <input type="number" id="nuHours" placeholder="Heures">
         </div>
         <input type="email" id="nuEmail" placeholder="Email">
-        <div style="margin-bottom:10px; margin-top:10px;"><input type="checkbox" id="nuAdmin" style="width:auto; vertical-align:middle;"> <label style="font-size:12px;">Admin ?</label></div>
+        <div style="margin-bottom:10px; margin-top:10px;"><input type="checkbox" id="nuAdmin" style="width:auto; vertical-align:middle;"> <label style="font-size:12px;">Ajouter comme Admin</label></div>
         <button class="btn" onclick="createUser()">Inviter le membre (Email auto)</button>
       </div>
       <div class="admin-section">
-        <h3 class="section-header-large">Effectif & Primes</h3>
-        <div id="usersList"></div>
+         <div style="font-size:13px; font-weight:800; color:#334155; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+             <span>EFFECTIF TOTAL</span>
+             <span id="staffCountBadge" style="background:#eff6ff; color:var(--primary); padding:2px 8px; border-radius:10px;">0</span>
+         </div>
+         <div id="usersList"></div>
       </div>
     </div>
 
@@ -450,6 +387,14 @@
                 </div>
             </div>
             
+            <div style="margin-bottom:10px;">
+                <label class="budget-label-small">MESSAGE DU BANDEAU (Info Équipe)</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="text" id="simBannerMsg" placeholder="Ex: Bienvenue sur l'outil !" style="margin:0;">
+                    <button onclick="saveBannerMsg()" style="border:none; background:#eff6ff; color:var(--primary); font-weight:bold; padding:0 10px; border-radius:6px; cursor:pointer;">Mettre à jour</button>
+                </div>
+            </div>
+
             <div class="cockpit-gauge-container">
                 <div class="cockpit-gauge-fill" id="simGauge"></div>
             </div>
@@ -531,14 +476,12 @@
       <input type="text" id="eoCurrent" placeholder="Actuel">
       <input type="text" id="eoTarget" placeholder="Cible">
     </div>
-
     <div class="options-row">
         <label class="check-label"><input type="checkbox" id="eoPrimary"> ⚡ Principal</label>
         <label class="check-label"><input type="checkbox" id="eoInverse"> 📉 Inversé</label>
         <label class="check-label"><input type="checkbox" id="eoNumeric"> 🔢 Nombre</label>
         <label class="check-label"><input type="checkbox" id="eoFixed" onchange="toggleEditInputs()"> 🎁 Prime Fixe</label>
     </div>
-
     <div id="editTiersBlock">
         <label style="font-size:11px; font-weight:700;">PALIERS (Montants dans Pilotage)</label>
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px; margin-bottom:5px;">
@@ -547,9 +490,7 @@
             <input type="number" id="p3t" placeholder="% P3">
         </div>
     </div>
-    <input type="hidden" id="p1p"><input type="hidden" id="p2p"><input type="hidden" id="p3p">
-    <input type="hidden" id="eoFixedPrize">
-
+    <input type="hidden" id="p1p"><input type="hidden" id="p2p"><input type="hidden" id="p3p"><input type="hidden" id="eoFixedPrize">
     <div style="margin-bottom:10px; display:flex; gap:15px; margin-top:10px;">
       <span><input type="checkbox" id="eoHideTarget" style="width:auto; vertical-align:middle;"> <label style="font-size:12px;">Masquer Cible</label></span>
       <span><input type="checkbox" id="eoHideCurrent" style="width:auto; vertical-align:middle;"> <label style="font-size:12px;">Masquer Valeur</label></span>
@@ -559,7 +500,6 @@
   </div>
 
   <script>
-    // CONFIG
     const firebaseConfig = {
       apiKey: "AIzaSyAGaitqmFwExvJ9ZUpkdUdCKAqqDOP2cdQ",
       authDomain: "objectif-restaurant.firebaseapp.com",
@@ -578,11 +518,10 @@
     let allObjs = {};
     let allLogs = {};
     let allFeedbacks = {};
-    let globalSettings = { budget: 0 };
+    let globalSettings = { budget: 0, banner: "" };
     const BASE_HOURS = 35;
     const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
 
-    // CALENDAR DATA
     const calEvents = [
         { t: "HEIKO x STURIA", start: "2025-12-01", end: "2026-01-31", c: "evt-heiko" },
         { t: "Flyers Sturia", start: "2025-12-01", end: "2025-12-31", c: "evt-sturia" },
@@ -593,7 +532,6 @@
     ];
     let currentCalDate = new Date(2025, 11, 1);
 
-    // AUTH
     auth.onAuthStateChanged(user => {
       if (user) {
         document.getElementById("loginOverlay").style.display = "none";
@@ -658,8 +596,22 @@
              }
           } catch(e) { console.error(e); }
       });
-      db.ref('users').on('value', s => { allUsers = s.val() || {}; if(currentUser && (currentUser.role==='admin' || currentUser.email === SUPER_ADMIN_EMAIL)) { renderAdminUsers(); renderSimulator(); } });
-      db.ref('settings').on('value', s => { globalSettings = s.val() || { budget: 0 }; if(currentUser && (currentUser.role==='admin' || currentUser.email === SUPER_ADMIN_EMAIL)) { renderSimulator(); } });
+      db.ref('users').on('value', s => { 
+          allUsers = s.val() || {}; 
+          if(currentUser && (currentUser.role==='admin' || currentUser.email === SUPER_ADMIN_EMAIL)) { 
+              renderAdminUsers(); renderSimulator(); 
+          } 
+      });
+      db.ref('settings').on('value', s => { 
+          globalSettings = s.val() || { budget: 0 }; 
+          if(globalSettings.banner) {
+             const b = document.getElementById("topBanner");
+             b.textContent = globalSettings.banner;
+             b.style.display = 'block';
+             document.getElementById("simBannerMsg").value = globalSettings.banner;
+          }
+          if(currentUser && (currentUser.role==='admin' || currentUser.email === SUPER_ADMIN_EMAIL)) { renderSimulator(); } 
+      });
       db.ref('logs').limitToLast(2000).on('value', s => { allLogs = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); });
       db.ref('feedbacks').on('value', s => { allFeedbacks = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderFeedbacks(allFeedbacks); });
     }
@@ -682,9 +634,11 @@
       if(isSuperUser) {
           globalBudgetInput.disabled = false;
           saveBudgetBtn.style.display = 'inline-block';
+          document.getElementById("simBannerMsg").disabled = false;
       } else {
           globalBudgetInput.disabled = true;
           saveBudgetBtn.style.display = 'none';
+          document.getElementById("simBannerMsg").disabled = true;
       }
       
       if(isAdmin) {
@@ -695,7 +649,6 @@
       renderDashboard();
     }
 
-    // --- FEEDBACK LOGIC ---
     function sendFeedback() {
         const txt = document.getElementById("fbContent").value.trim();
         if(!txt) return;
@@ -718,9 +671,7 @@
         });
     }
 
-    // --- COCKPIT SIMULATOR LOGIC ---
     let simObjs = {}; 
-
     function renderSimulator() { buildSimulatorUI(); }
     function buildSimulatorUI() {
         const container = document.getElementById("simObjList");
@@ -740,7 +691,7 @@
             totalPotential35h += maxObjPrize;
             let objTotalCost = 0;
             let totalUserRatio = 0;
-            Object.values(allUsers).forEach(u => { totalUserRatio += (u.hours/BASE_HOURS); });
+            Object.values(allUsers).forEach(u => { if(u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) totalUserRatio += (u.hours/BASE_HOURS); });
             objTotalCost = maxObjPrize * totalUserRatio;
             const div = document.createElement("div"); div.className = "cockpit-obj-row";
             let slidersHtml = "";
@@ -769,7 +720,7 @@
     function updateSim() {
        const budget = parseFloat(document.getElementById("simGlobalBudget").value) || 0;
        let totalUserRatio = 0;
-       Object.values(allUsers).forEach(u => { totalUserRatio += (u.hours/BASE_HOURS); });
+       Object.values(allUsers).forEach(u => { if(u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) totalUserRatio += (u.hours/BASE_HOURS); });
        let maxLiability = 0;
        let totalPotential35h = 0;
        Object.keys(simObjs).forEach(k => {
@@ -791,7 +742,6 @@
        else { bar.classList.remove("danger"); document.getElementById("simUsed").style.color = "#3b82f6"; }
        document.getElementById("simUsed").innerText = `${maxLiability.toFixed(0)}€ Engagés`;
        document.getElementById("simLeft").innerText = `Reste : ${(budget - maxLiability).toFixed(0)}€`;
-       document.getElementById("simTotalPerUser").innerText = `${totalPotential35h.toFixed(0)}€`;
     }
     function publishSim() {
         if(confirm("📡 Confirmer la publication des nouveaux montants ?")) {
@@ -803,6 +753,11 @@
             Object.keys(simObjs).forEach(k => { updates['objectives/' + k + '/paliers'] = simObjs[k].paliers; });
             db.ref().update(updates).then(() => { showToast("✅ Pilotage Appliqué !"); logAction("Pilotage", "Mise à jour globale budget & primes"); });
         }
+    }
+    function saveBannerMsg() {
+        const msg = document.getElementById("simBannerMsg").value.trim();
+        if(msg) { db.ref('settings/banner').set(msg); showToast("Bandeau mis à jour !"); }
+        else { db.ref('settings/banner').remove(); showToast("Bandeau supprimé"); }
     }
 
     function renderNativeCalendar() {
@@ -1035,122 +990,17 @@
        logAction("Création Objectif", name);
     }
 
-    function renderAdminObjs() {
-      const pl = document.getElementById("pubList"); pl.innerHTML = "";
-      const ol = document.getElementById("objList"); ol.innerHTML = "";
-      Object.keys(allObjs).forEach(k => {
-        const o = allObjs[k];
-        const d1 = document.createElement("div"); d1.className="pub-item";
-        d1.innerHTML = `<span class="pub-name">${o.name}</span><label class="switch"><input type="checkbox" ${o.published?'checked':''} onchange="togglePub('${k}', this.checked)"><span class="slider"></span></label>`;
-        pl.appendChild(d1);
-        const d2 = document.createElement("div"); d2.className="user-item";
-        d2.id = "row-" + k; 
-        d2.innerHTML = `<span>${o.name} ${o.isInverse?'📉':''} ${o.isFixed?'🎁':''}</span><div style="display:flex; gap:10px;"><button onclick="openEditObj('${k}')" class="action-btn">✏️</button> <button onclick="deleteObj('${k}')" class="action-btn delete">🗑️</button></div>`;
-        ol.appendChild(d2);
-      });
-    }
-
-    function openEditObj(id) {
-      const o = allObjs[id];
-      document.getElementById("editObjPanel").classList.add("active");
-      document.getElementById("eoId").value = id;
-      document.getElementById("eoName").value = o.name;
-      document.getElementById("eoCurrent").value = o.current;
-      document.getElementById("eoTarget").value = o.target;
-      document.getElementById("eoPrimary").checked = o.isPrimary;
-      document.getElementById("eoInverse").checked = o.isInverse || false;
-      document.getElementById("eoFixed").checked = o.isFixed || false;
-      document.getElementById("eoNumeric").checked = o.isNumeric || false;
-      toggleEditInputs(); 
-      if(o.paliers && o.paliers.length > 0) {
-        if(o.isFixed) { document.getElementById("eoFixedPrize").value = o.paliers[0].prize; } 
-        else {
-            if(o.paliers[0]) { document.getElementById("p1t").value = o.paliers[0].threshold; document.getElementById("p1p").value = o.paliers[0].prize; }
-            if(o.paliers[1]) { document.getElementById("p2t").value = o.paliers[1].threshold; document.getElementById("p2p").value = o.paliers[1].prize; }
-            if(o.paliers[2]) { document.getElementById("p3t").value = o.paliers[2].threshold; document.getElementById("p3p").value = o.paliers[2].prize; }
-        }
-      }
-      document.getElementById("eoHideTarget").checked = o.hideTarget || false;
-      document.getElementById("eoHideCurrent").checked = o.hideCurrent || false;
-    }
-
-    function saveObj() {
-      const id = document.getElementById("eoId").value;
-      const isFixed = document.getElementById("eoFixed").checked;
-      let paliers = [];
-      const oldP = allObjs[id].paliers || [];
-      if(isFixed) { paliers = [{ threshold: 100, prize: oldP[0]?oldP[0].prize:"0" }]; } 
-      else { 
-          paliers = [
-              {threshold: parseFloat(document.getElementById("p1t").value), prize: oldP[0]?oldP[0].prize:"0"}, 
-              {threshold: parseFloat(document.getElementById("p2t").value), prize: oldP[1]?oldP[1].prize:"0"}, 
-              {threshold: parseFloat(document.getElementById("p3t").value), prize: oldP[2]?oldP[2].prize:"0"}
-          ]; 
-      }
-      db.ref("objectives/"+id).update({ 
-          name: document.getElementById("eoName").value, 
-          current: document.getElementById("eoCurrent").value, 
-          target: document.getElementById("eoTarget").value, 
-          isPrimary: document.getElementById("eoPrimary").checked, 
-          isInverse: document.getElementById("eoInverse").checked, 
-          isFixed: isFixed, 
-          isNumeric: document.getElementById("eoNumeric").checked,
-          hideTarget: document.getElementById("eoHideTarget").checked, 
-          hideCurrent: document.getElementById("eoHideCurrent").checked, 
-          paliers: paliers 
-      }).then(() => { showToast("✅ Objectif Modifié !"); document.getElementById("editObjPanel").classList.remove("active"); });
-      logAction("Modification", "Objectif : " + document.getElementById("eoName").value);
-    }
-
-    function deleteObj(id) { if(confirm("🗑️ Supprimer ?")) { db.ref("objectives/"+id).remove().then(() => showToast("🗑️ Supprimé")); logAction("Suppression", `Objectif ${id}`); } }
-    function togglePub(id, v) { db.ref("objectives/"+id+"/published").set(v); logAction("Publication", `Objectif ${id}: ${v}`); }
-    
-    function createUser() { 
-        const email = document.getElementById("nuEmail").value; 
-        const sec = firebase.initializeApp(firebaseConfig, "Sec"); 
-        
-        var actionCodeSettings = {
-          url: 'https://lafayette-progress.onrender.com', // REDIRECT URL
-          handleCodeInApp: false
-        };
-
-        sec.auth().createUserWithEmailAndPassword(email, "Temp1234!").then(c => { 
-            db.ref('users/'+c.user.uid).set({ name: document.getElementById("nuName").value, hours: parseFloat(document.getElementById("nuHours").value)||35, role: document.getElementById("nuAdmin").checked?'admin':'staff', email: email, status: 'pending' }); 
-            sec.auth().sendPasswordResetEmail(email, actionCodeSettings); 
-            sec.delete(); 
-            showToast("✅ Membre invité !"); 
-        }).catch(e => { 
-            if(e.code === 'auth/email-already-in-use') {
-                if(confirm("⚠️ Ce membre existe déjà ! Voulez-vous lui Renvoyer l'email d'invitation ?")) {
-                    sec.auth().sendPasswordResetEmail(email, actionCodeSettings).then(() => {
-                        showToast("📩 Invitation renvoyée !");
-                        sec.delete();
-                    });
-                } else {
-                    sec.delete();
-                }
-            } else {
-                alert(e.message); 
-                sec.delete();
-            }
-        }); 
-    }
-
-    function resendInvite(email) { 
-        var actionCodeSettings = {
-          url: 'https://lafayette-progress.onrender.com',
-          handleCodeInApp: false
-        };
-        if(confirm("Renvoyer le mail d'activation à " + email + " ?")) {
-            auth.sendPasswordResetEmail(email, actionCodeSettings).then(() => showToast("📩 Envoyé !")).catch(e => alert(e.message)); 
-        }
-    }
-
+    // CORRECTION V59 - ITERATION FIABLE
     function renderAdminUsers() { 
         const d = document.getElementById("usersList"); d.innerHTML = ""; let totalToPay = 0; 
-        Object.keys(allUsers).forEach(k => { 
-            const u = allUsers[k]; 
-            if(u.email && u.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return; 
+        let staffCount = 0;
+        
+        Object.keys(allUsers).forEach(uid => { 
+            const u = allUsers[uid];
+            // Skip Super Admin
+            if (u.email && u.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return;
+            
+            staffCount++;
             const userRatio = (u.hours || 35) / BASE_HOURS; 
             let userBonus = 0; 
             
@@ -1207,15 +1057,19 @@
                 <div class="user-actions">
                     <div class="user-gain">${userBonus.toFixed(2)}€</div>
                     <button onclick="resendInvite('${u.email}')" class="action-btn" title="Renvoyer Invitation">📩</button>
-                    <button onclick="editUser('${k}')" class="action-btn" title="Modifier">✏️</button>
-                    <button onclick="deleteUser('${k}')" class="action-btn delete" title="Supprimer">🗑️</button>
+                    <button onclick="editUser('${uid}')" class="action-btn" title="Modifier">✏️</button>
+                    <button onclick="deleteUser('${uid}')" class="action-btn delete" title="Supprimer">🗑️</button>
                 </div>`; 
             d.appendChild(div); 
         }); 
+        
+        // Update badge count
+        document.getElementById("staffCountBadge").innerText = staffCount;
+        
         const totalRow = document.createElement("div"); totalRow.className = "total-row"; totalRow.innerHTML = `<span>TOTAL</span><span>${totalToPay.toFixed(2)} €</span>`; d.appendChild(totalRow); 
     }
 
-    function editUser(uid) { const u = allUsers[uid]; document.getElementById("editUserPanel").classList.add("active"); document.getElementById("euId").value = uid; document.getElementById("euName").value = u.name; document.getElementById("euHours").value = u.hours; document.getElementById("euAdmin").checked = (u.role === 'admin'); }
+    function editUser(uid) { const u = allUsers[uid]; document.getElementById("editUserPanel").classList.add("active"); document.getElementById("euId").value = uid; document.getElementById("euName").value = u.name; document.getElementById("euHours").value = u.hours; document.getElementById("euEmail").value = u.email; document.getElementById("euAdmin").checked = (u.role === 'admin'); }
     function saveUser() { db.ref('users/'+document.getElementById("euId").value).update({ name: document.getElementById("euName").value, hours: parseFloat(document.getElementById("euHours").value), role: document.getElementById("euAdmin").checked ? 'admin' : 'staff' }); document.getElementById("editUserPanel").classList.remove("active"); showToast("✅ Modifié"); }
     function deleteUser(uid) { if(confirm("Supprimer ?")) { db.ref('users/'+uid).remove(); showToast("🗑️ Supprimé"); } }
 
@@ -1249,13 +1103,12 @@
           const d = new Date(g.lastSeen);
           g.sessions.sort((a,b) => b.startTime - a.startTime); g.actions.sort((a,b) => b.time - a.time);
           
-          // Generate Safe ID
           const safeId = 'log-group-' + uName.replace(/[^a-zA-Z0-9]/g, '');
 
           const div = document.createElement("div"); div.className = "log-user-group";
           div.innerHTML = `
              <div class="group-header">
-                <div class="group-info" onclick="toggleUserLogs('${safeId}')" style="flex:1;">
+                <div class="group-info" onclick="toggleUserLogs('${safeId}')" style="flex:1; cursor:pointer;">
                    👤 ${uName} <span style="font-weight:400; font-size:11px; color:#64748b; margin-left:10px;">(Dernière: ${d.toLocaleString()}) ▼</span>
                 </div>
                 <button onclick="deleteUserLogs('${uName}')" class="btn-clear-hist" title="Effacer historique">🗑️ Effacer</button>
@@ -1270,19 +1123,19 @@
           if(g.sessions.length===0) sc.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; 
           else g.sessions.forEach(s=>{ 
               const st=new Date(s.startTime); const m=Math.floor((s.lastSeen-s.startTime)/60000); const dt=(m>60)?Math.floor(m/60)+"h "+(m%60)+"m":m+"m"; 
-              sc.innerHTML+=`<div class="log-entry"><span class="log-dot">🟢</span><span class="log-time-s">${st.toLocaleDateString().slice(0,5)} ${st.toLocaleTimeString().slice(0,5)}</span><span class="log-dur">${dt}</span></div>`; 
+              sc.innerHTML+=`<div class="log-entry"><span class="log-dot" style="color:var(--success);">🟢</span><span class="log-time-s">${st.toLocaleDateString().slice(0,5)} ${st.toLocaleTimeString().slice(0,5)}</span><span class="log-dur">${dt}</span></div>`; 
           });
 
           const ac = document.getElementById(`act-${safeId}`); 
           if(g.actions.length===0) ac.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; 
           else g.actions.forEach(a=>{ 
               const at=new Date(a.time); 
-              ac.innerHTML+=`<div class="log-entry"><span class="log-dot">🔵</span><span class="log-time-s">${at.toLocaleDateString().slice(0,5)} ${at.toLocaleTimeString().slice(0,5)}</span><span class="log-desc">${a.action} <span style="color:#94a3b8;">${a.detail}</span></span></div>`; 
+              ac.innerHTML+=`<div class="log-entry"><span class="log-dot" style="color:var(--primary);">🔵</span><span class="log-time-s">${at.toLocaleDateString().slice(0,5)} ${at.toLocaleTimeString().slice(0,5)}</span><span class="log-desc">${a.action} <span style="color:#94a3b8;">${a.detail}</span></span></div>`; 
           });
       });
     }
 
-    function saveGlobalBudget() { const val = parseFloat(document.getElementById("globalBudgetInput").value); if(!isNaN(val)) { db.ref('settings/budget').set(val); showToast("💰 Sauvegardé"); } }
+    function saveGlobalBudget() { const val = parseFloat(document.getElementById("simGlobalBudget").value); if(!isNaN(val)) { db.ref('settings/budget').set(val); showToast("💰 Sauvegardé"); } }
     function checkBudget() {
        const budget = globalSettings.budget || 0; let maxLiability = 0; let totalUserRatio = 0;
        Object.values(allUsers).forEach(u => { if(!u.email || u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) totalUserRatio += (u.hours/BASE_HOURS); });
@@ -1302,6 +1155,11 @@
       if(!tv) return 0; return (cv/tv)*100;
     }
     function parse(s) { return parseFloat(String(s).replace(/[^0-9.]/g,''))||0; }
+    function saveBannerMsg() {
+        const msg = document.getElementById("simBannerMsg").value.trim();
+        if(msg) { db.ref('settings/banner').set(msg); showToast("Bandeau mis à jour !"); }
+        else { db.ref('settings/banner').remove(); showToast("Bandeau supprimé"); }
+    }
   </script>
 </body>
 </html>
