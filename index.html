@@ -1,4 +1,5 @@
-<<!DOCTYPE html>
+<!DOCTYPE html>
+DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
@@ -9,7 +10,6 @@
   <meta name="theme-color" content="#2563eb">
   <meta name="mobile-web-app-capable" content="yes">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%232563eb'/%3E%3Cstop offset='50%25' style='stop-color:%238b5cf6'/%3E%3Cstop offset='100%25' style='stop-color:%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23g)'/%3E%3Ctext x='50' y='70' font-family='Arial,sans-serif' font-size='55' fill='white' text-anchor='middle'%3E🚀%3C/text%3E%3C/svg%3E">
-  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%232563eb'/%3E%3Cstop offset='50%25' style='stop-color:%238b5cf6'/%3E%3Cstop offset='100%25' style='stop-color:%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23g)'/%3E%3Ctext x='50' y='70' font-family='Arial,sans-serif' font-size='55' fill='white' text-anchor='middle'%3E🚀%3C/text%3E%3C/svg%3E">
   
   <title>Heiko - Budget Master V61 (Animated Borders)</title>
   
@@ -90,30 +90,17 @@
     #toast { visibility: hidden; min-width: 300px; background-color: var(--success); color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 3000; left: 50%; top: 0; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; transform:translate(-50%, -100%); transition: all 0.3s; }
     #toast.show { visibility: visible; transform:translate(-50%, 20px); }
 
-    /* DARK MODE TOGGLE */
+    /* DARK MODE TOGGLE BTN - CHANGED POSITION & ICON */
     .theme-toggle {
-        position: fixed; bottom: 20px; right: 20px;
+        position: fixed; bottom: 20px; right: 20px; /* MOVE TO RIGHT */
         z-index: 9999;
         background: var(--card-bg); border: 2px solid var(--border-color);
-        width: 70px; height: 32px; border-radius: 50px;
-        display: flex; align-items: center; padding: 3px;
-        cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        transition: all 0.3s ease;
-    }
-    .theme-toggle-slider {
-        width: 24px; height: 24px; border-radius: 50%; 
-        background: var(--primary);
-        position: absolute; left: 4px; 
-        transition: all 0.3s ease;
+        width: 50px; height: 50px; border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
-        font-size: 14px; 
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        font-size: 24px; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        transition: 0.3s;
     }
-    body.dark-mode .theme-toggle-slider { 
-        left: calc(100% - 28px); 
-        background: #fbbf24; 
-    }
-    .theme-toggle:hover { transform: scale(1.05); }
+    .theme-toggle:hover { transform: scale(1.1); }
 
     /* FEEDBACK BUTTON */
     .feedback-btn {
@@ -172,7 +159,7 @@
     body.dark-mode .last-update { background: rgba(0,0,0,0.3); }
 
     
-    /* ========== ANIMATION CERCLE - 6 SECONDES ========== */
+    /* ========== ANIMATIONS CERCLE - ROTATION 6 SECONDES ========== */
     @keyframes circleRotate {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
@@ -195,6 +182,7 @@
                         inset 0 0 50px rgba(239, 68, 68, 0.3);
         }
     }
+
 /* --- NOUVEAU STYLE CERCLE CENTRAL --- */
     .global-score-container { 
         margin: 40px auto; 
@@ -500,7 +488,7 @@
     .planning-title { text-align: center; justify-content: center; margin-left: auto; margin-right: auto; width: 100%; }
 
     @media (max-width: 600px) { .group-body.open { grid-template-columns: 1fr; } }
-
+  
     /* ========== CÉLÉBRATIONS ========== */
     @keyframes confettiFall {
         0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
@@ -520,16 +508,12 @@
         50% { transform: scale(1.1) rotate(2deg); }
         75% { transform: scale(1.05) rotate(-1deg); }
     }
-    .card-celebrating {
-        animation: cardVictory 0.6s ease-out;
-    }
-  </style>
+    .card-celebrating { animation: cardVictory 0.6s ease-out; }
+</style>
 </head>
 <body>
 
-  <div class="theme-toggle" onclick="toggleDarkMode()">
-    <div class="theme-toggle-slider"><span class="toggle-icon">☀️</span></div>
-  </div>
+  <div class="theme-toggle" onclick="toggleDarkMode()"><div class="theme-toggle-slider"><span class="toggle-icon">☀️</span></div></div>
 
   <div id="topAlert">
       <div class="alert-icon">📣</div>
@@ -854,23 +838,13 @@
     let currentCalDate = new Date(2025, 11, 1);
 
     // INITIALIZE THEME
-    if(localStorage.getItem('heiko_dark_mode') === null) {
-        localStorage.setItem('heiko_dark_mode', 'true');
-    }
     if(localStorage.getItem('heiko_dark_mode') === 'true') {
         document.body.classList.add('dark-mode');
     }
-    window.addEventListener('DOMContentLoaded', function() {
-        const icon = document.querySelector('.toggle-icon');
-        if(icon) icon.textContent = document.body.classList.contains('dark-mode') ? '☀️' : '🌙';
-    });
 
     function toggleDarkMode() {
         document.body.classList.toggle('dark-mode');
-        const isDark = document.body.classList.contains('dark-mode');
-        localStorage.setItem('heiko_dark_mode', isDark);
-        const icon = document.querySelector('.toggle-icon');
-        if(icon) icon.textContent = isDark ? '☀️' : '🌙';
+        localStorage.setItem('heiko_dark_mode', document.body.classList.contains('dark-mode'));
     }
 
     // AUTH
@@ -1741,47 +1715,35 @@
     function parse(s) { return parseFloat(String(s).replace(/[^0-9.]/g,''))||0; }
   
 
-    // ========== CÉLÉBRATIONS ==========
-    function triggerCelebration(message) {
-        message = message || '🎉 Objectif validé!';
-        const colors = ['#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4'];
-
-        for(let i = 0; i < 60; i++) {
+    function triggerCelebration(msg) {
+        msg = msg || '🎉 Objectif validé!';
+        var colors = ['#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4'];
+        for(var i = 0; i < 60; i++) {
             setTimeout(function() {
-                const confetti = document.createElement('div');
-                confetti.className = 'confetti';
-                confetti.style.left = Math.random() * 100 + '%';
-                confetti.style.top = '-50px';
-                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-                confetti.style.animation = 'confettiFall ' + (2.5 + Math.random() * 2) + 's ease-out';
-                document.body.appendChild(confetti);
-
-                setTimeout(function() {
-                    confetti.remove();
-                }, 5000);
+                var c = document.createElement('div');
+                c.className = 'confetti';
+                c.style.left = Math.random() * 100 + '%';
+                c.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                c.style.animation = 'confettiFall ' + (2.5 + Math.random() * 2) + 's ease-out';
+                document.body.appendChild(c);
+                setTimeout(function() { c.remove(); }, 5000);
             }, i * 40);
         }
-
-        showToast(message);
+        showToast(msg);
     }
 
-    // Activer célébration au clic sur cartes
     window.addEventListener('DOMContentLoaded', function() {
-        const cards = document.querySelectorAll('.card');
-        cards.forEach(function(card) {
+        document.querySelectorAll('.card').forEach(function(card) {
             card.addEventListener('click', function() {
                 if(!this.classList.contains('card-celebrating')) {
                     this.classList.add('card-celebrating');
-                    triggerCelebration('🎉 Bravo! +50€ débloqué!');
-
-                    setTimeout(function() {
-                        card.classList.remove('card-celebrating');
-                    }, 600);
+                    triggerCelebration('🎉 Bravo! +50€!');
+                    var self = this;
+                    setTimeout(function() { self.classList.remove('card-celebrating'); }, 600);
                 }
             });
         });
     });
-
-  </script>
+</script>
 </body>
 </html>
