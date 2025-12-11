@@ -89,9 +89,11 @@ html>
     #toast { visibility: hidden; min-width: 300px; background-color: var(--success); color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 3000; left: 50%; top: 0; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; transform:translate(-50%, -100%); transition: all 0.3s; }
     #toast.show { visibility: visible; transform:translate(-50%, 20px); }
 
-    /* DARK MODE TOGGLE - BARRE ARRONDIE AVEC CURSEUR */
+    /* DARK MODE TOGGLE - BARRE ARRONDIE AVEC CURSEUR FIXE */
     .theme-toggle {
-        position: fixed; bottom: 20px; right: 20px;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
         z-index: 9999;
         background: var(--card-bg);
         border: 2px solid var(--border-color);
@@ -101,7 +103,6 @@ html>
         cursor: pointer;
         box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         transition: all 0.3s ease;
-        position: relative;
         display: flex;
         align-items: center;
         padding: 3px;
