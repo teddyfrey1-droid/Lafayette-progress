@@ -1248,13 +1248,18 @@
         }
       });
 
-      // Calcul du max possible pour l'utilisateur
+      // Calcul du max possible pour l'utilisateur (toutes primes confondues)
       let maxPossible = 0;
-      allObjectives.forEach(obj => {
-        if (obj.milestone1) maxPossible += (obj.milestone1.prize / 35) * currentUser.hours;
-        if (obj.milestone2) maxPossible += (obj.milestone2.prize / 35) * currentUser.hours;
-        if (obj.milestone3) maxPossible += (obj.milestone3.prize / 35) * currentUser.hours;
-        if (obj.fixedBonus) maxPossible += (obj.fixedBonus / 35) * currentUser.hours;
+      Object.keys(allObjs).forEach(key => {
+        const o = allObjs[key];
+        if(!o.published) return;
+        if(o.isFixed) {
+          if(o.paliers && o.paliers[0]) maxPossible += (parse(o.paliers[0].prize) * ratio);
+        } else {
+          if(o.paliers) o.paliers.forEach(p => {
+            maxPossible += (parse(p.prize) * ratio);
+          });
+        }
       });
 
       // Mise à jour du montant affiché
