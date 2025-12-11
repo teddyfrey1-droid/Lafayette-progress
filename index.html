@@ -792,32 +792,6 @@
         labelNight.style.opacity = '0.4';
         localStorage.setItem('theme', 'light');
       }
-
-    // FONCTION EFFET SQUID GAME - BILLETS + REMPLISSAGE
-    function updateSquidGameCircle(userTotal, maxPossible) {
-      const percent = maxPossible > 0 ? Math.min(100, (userTotal / maxPossible) * 100) : 0;
-      const fill = document.getElementById('scoreFill');
-      const moneyRain = document.getElementById('moneyRain');
-
-      // Remplissage du bas du cercle (tas de billets)
-      fill.style.height = Math.max(20, Math.min(90, 20 + percent * 0.7)) + '%';
-
-      // Génération des billets qui tombent
-      moneyRain.innerHTML = '';
-      const billsCount = Math.min(12, Math.max(3, Math.round(percent / 8)));
-
-      for (let i = 0; i < billsCount; i++) {
-        const bill = document.createElement('div');
-        bill.className = 'bill';
-        bill.textContent = '💶';
-        const side = Math.random() < 0.5 ? -1 : 1;
-        const offset = (Math.random() * 60 + 10) * side;
-        bill.style.setProperty('--x-offset', offset + '%');
-        bill.style.left = (50 + offset / 3) + '%';
-        bill.style.animationDelay = (Math.random() * 0.6) + 's';
-        moneyRain.appendChild(bill);
-      }
-    }
     }
 
     // AUTH
@@ -1274,17 +1248,41 @@
         }
       });
 
+      // Calcul du max possible pour l'utilisateur
+      let maxPossible = 0;
+      allObjectives.forEach(obj => {
+        if (obj.milestone1) maxPossible += (obj.milestone1.prize / 35) * currentUser.hours;
+        if (obj.milestone2) maxPossible += (obj.milestone2.prize / 35) * currentUser.hours;
+        if (obj.milestone3) maxPossible += (obj.milestone3.prize / 35) * currentUser.hours;
+        if (obj.fixedBonus) maxPossible += (obj.fixedBonus / 35) * currentUser.hours;
+      });
+
+      // Mise à jour du montant affiché
       document.getElementById("myTotalGain").textContent = totalMyGain.toFixed(2) + "€";
+
+      // EFFET SQUID GAME - Billets + Remplissage
+      const percent = maxPossible > 0 ? Math.min(100, (totalMyGain / maxPossible) * 100) : 0;
+      const fill = document.getElementById("scoreFill");
       const rainContainer = document.getElementById("moneyRain");
+
+      // Remplissage du bas du cercle (tas de billets)
+      if(fill) fill.style.height = Math.max(20, Math.min(90, 20 + percent * 0.7)) + '%';
+
+      // Génération des billets qui tombent
       rainContainer.innerHTML = "";
       if(totalMyGain > 0) {
-         for(let i=0; i<30; i++) {
-            const bill = document.createElement("div"); bill.className = "bill"; bill.textContent = "💸";
-            bill.style.left = Math.random()*100 + "%";
-            bill.style.animation = `floatMoney ${2+Math.random()}s infinite ${Math.random()}s ease-in`;
-            bill.style.fontSize = (20 + Math.random()*20) + "px";
-            rainContainer.appendChild(bill);
-         }
+        const billsCount = Math.min(12, Math.max(3, Math.round(percent / 8)));
+        for (let i = 0; i < billsCount; i++) {
+          const bill = document.createElement('div');
+          bill.className = 'bill';
+          bill.textContent = '💶';
+          const side = Math.random() < 0.5 ? -1 : 1;
+          const offset = (Math.random() * 60 + 10) * side;
+          bill.style.setProperty('--x-offset', offset + '%');
+          bill.style.left = (50 + offset / 3) + '%';
+          bill.style.animationDelay = (Math.random() * 0.6) + 's';
+          rainContainer.appendChild(bill);
+        }
       }
       const d = new Date();
       document.getElementById("lastUpdate").textContent = "Mise à jour : " + d.toLocaleDateString('fr-FR');
