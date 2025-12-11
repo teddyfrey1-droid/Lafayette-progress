@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
@@ -92,23 +92,28 @@
 
     /* DARK MODE TOGGLE */
     .theme-toggle {
-        position: fixed; bottom: 20px; right: 20px; /* MOVE TO RIGHT */
+        position: fixed; bottom: 20px; right: 20px;
         z-index: 9999;
         background: var(--card-bg); border: 2px solid var(--border-color);
         width: 70px; height: 32px; border-radius: 50px;
+        display: flex; align-items: center; padding: 3px;
+        cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+    }
+    .theme-toggle-slider {
+        width: 24px; height: 24px; border-radius: 50%; 
+        background: var(--primary);
+        position: absolute; left: 4px; 
+        transition: all 0.3s ease;
         display: flex; align-items: center; justify-content: center;
-        cursor: pointer; padding: 3px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        transition: 0.3s;
+        font-size: 14px; 
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    body.dark-mode .theme-toggle-slider { 
+        left: calc(100% - 28px); 
+        background: #fbbf24; 
     }
     .theme-toggle:hover { transform: scale(1.05); }
-
-    .theme-toggle-slider {
-        width: 24px; height: 24px; border-radius: 50%; background: var(--primary);
-        position: absolute; left: 4px; transition: all 0.3s ease;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    }
-    body.dark-mode .theme-toggle-slider { left: calc(100% - 28px); background: #fbbf24; }
 
     /* FEEDBACK BUTTON */
     .feedback-btn {
@@ -166,7 +171,8 @@
     .last-update { font-size: 14px; color: var(--text-muted); background: rgba(255,255,255,0.5); padding: 8px 20px; border-radius: 30px; display: inline-block; font-weight: 600; border: 1px solid var(--border-color); text-transform: capitalize; }
     body.dark-mode .last-update { background: rgba(0,0,0,0.3); }
 
-    /* ANIMATION CERCLE - ROTATION 6 SECONDES */
+    
+    /* ========== ANIMATION CERCLE - 6 SECONDES ========== */
     @keyframes circleRotate {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
@@ -189,44 +195,25 @@
                         inset 0 0 50px rgba(239, 68, 68, 0.3);
         }
     }
-
-    /* --- CERCLE CENTRAL ROTATIF --- */
+/* --- NOUVEAU STYLE CERCLE CENTRAL --- */
     .global-score-container { 
         margin: 40px auto; 
-        width: 280px; height: 280px;
+        width: 280px; height: 280px; /* Un peu plus grand */
         border-radius: 50%; 
         display: flex; align-items: center; justify-content: center; flex-direction: column; 
-        position: relative; overflow: visible;
+        position: relative; overflow: visible; /* Important pour que les billets sortent */
         background: var(--card-bg);
+        /* Bordure double dégradée Or et Bleu */
         border: 6px solid transparent;
-        background: 
-            linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
-            conic-gradient(
-                from 0deg,
-                #b91c1c, #dc2626, #ef4444, #f87171,
-                #fb7185, #ec4899, #f472b6, #f9a8d4,
-                #d946ef, #e879f9, #c084fc, #a78bfa,
-                #8b5cf6, #7c3aed, #6366f1, #818cf8, #4f46e5,
-                #3b82f6, #60a5fa, #0ea5e9,
-                #06b6d4, #22d3ee,
-                #2563eb, #1d4ed8, #b91c1c
-            ) border-box;
-        animation: circleRotate 6s linear infinite, neonGlow 6s ease-in-out infinite;
+        background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
+                    linear-gradient(135deg, #f59e0b, #2563eb, #f59e0b) border-box;
+        /* Glow interne et externe */
+        box-shadow: 0 20px 60px rgba(37, 99, 235, 0.4), inset 0 0 30px rgba(245, 158, 11, 0.3);
     }
     body.dark-mode .global-score-container {
-         background: 
-            linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
-            conic-gradient(
-                from 0deg,
-                #7f1d1d, #991b1b, #dc2626, #ef4444,
-                #f43f5e, #db2777, #ec4899, #f472b6,
-                #c026d3, #d946ef, #a855f7, #8b5cf6,
-                #7c3aed, #6d28d9, #4f46e5, #6366f1, #3730a3,
-                #2563eb, #3b82f6, #0284c7,
-                #0891b2, #06b6d4,
-                #1e40af, #1e3a8a, #7f1d1d
-            ) border-box;
-         animation: circleRotate 6s linear infinite, neonGlow 6s ease-in-out infinite;
+         background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
+                    linear-gradient(135deg, #b45309, #1e40af, #b45309) border-box;
+         box-shadow: 0 20px 60px rgba(30, 64, 175, 0.5), inset 0 0 30px rgba(180, 83, 9, 0.3);
     }
     
     .global-score-value { font-size: 58px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
@@ -513,13 +500,30 @@
     .planning-title { text-align: center; justify-content: center; margin-left: auto; margin-right: auto; width: 100%; }
 
     @media (max-width: 600px) { .group-body.open { grid-template-columns: 1fr; } }
-  
-    @keyframes confettiFall { 0%{transform:translateY(-100vh) rotate(0deg);opacity:1;} 100%{transform:translateY(100vh) rotate(720deg);opacity:0;} }
-    .confetti { position:fixed; width:12px; height:12px; z-index:10000; pointer-events:none; border-radius:2px; }
-    @keyframes cardVictory { 0%,100%{transform:scale(1);} 25%{transform:scale(1.05) rotate(-2deg);} 50%{transform:scale(1.1) rotate(2deg);} 75%{transform:scale(1.05) rotate(-1deg);} }
-    .card-celebrating { animation:cardVictory 0.6s ease-out; }
-    .toast.celebration { background:linear-gradient(135deg,#10b981,#3b82f6,#8b5cf6); font-size:16px; padding:18px 30px; box-shadow:0 10px 40px rgba(59,130,246,0.4); }
-</style>
+
+    /* ========== CÉLÉBRATIONS ========== */
+    @keyframes confettiFall {
+        0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+        100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }
+    .confetti {
+        position: fixed;
+        width: 12px;
+        height: 12px;
+        z-index: 10000;
+        pointer-events: none;
+        border-radius: 2px;
+    }
+    @keyframes cardVictory {
+        0%, 100% { transform: scale(1); }
+        25% { transform: scale(1.05) rotate(-2deg); }
+        50% { transform: scale(1.1) rotate(2deg); }
+        75% { transform: scale(1.05) rotate(-1deg); }
+    }
+    .card-celebrating {
+        animation: cardVictory 0.6s ease-out;
+    }
+  </style>
 </head>
 <body>
 
@@ -1736,8 +1740,48 @@
     }
     function parse(s) { return parseFloat(String(s).replace(/[^0-9.]/g,''))||0; }
   
-    function triggerCelebration(msg='🎉 Objectif validé!'){const colors=['#ef4444','#f59e0b','#3b82f6','#8b5cf6','#ec4899','#06b6d4'];for(let i=0;i<60;i++)setTimeout(()=>{const c=document.createElement('div');c.className='confetti';c.style.left=Math.random()*100+'%';c.style.top='-50px';c.style.backgroundColor=colors[Math.floor(Math.random()*colors.length)];c.style.animation=`confettiFall ${2.5+Math.random()*2}s ease-out`;document.body.appendChild(c);setTimeout(()=>c.remove(),5000);},i*40);showToast(msg);}
-    window.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.card').forEach(card=>{card.addEventListener('click',function(){if(!this.classList.contains('card-celebrating')){this.classList.add('card-celebrating');triggerCelebration('🎉 Bravo! +50€ débloqué!');setTimeout(()=>this.classList.remove('card-celebrating'),600);}});});});
-</script>
+
+    // ========== CÉLÉBRATIONS ==========
+    function triggerCelebration(message) {
+        message = message || '🎉 Objectif validé!';
+        const colors = ['#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4'];
+
+        for(let i = 0; i < 60; i++) {
+            setTimeout(function() {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + '%';
+                confetti.style.top = '-50px';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animation = 'confettiFall ' + (2.5 + Math.random() * 2) + 's ease-out';
+                document.body.appendChild(confetti);
+
+                setTimeout(function() {
+                    confetti.remove();
+                }, 5000);
+            }, i * 40);
+        }
+
+        showToast(message);
+    }
+
+    // Activer célébration au clic sur cartes
+    window.addEventListener('DOMContentLoaded', function() {
+        const cards = document.querySelectorAll('.card');
+        cards.forEach(function(card) {
+            card.addEventListener('click', function() {
+                if(!this.classList.contains('card-celebrating')) {
+                    this.classList.add('card-celebrating');
+                    triggerCelebration('🎉 Bravo! +50€ débloqué!');
+
+                    setTimeout(function() {
+                        card.classList.remove('card-celebrating');
+                    }, 600);
+                }
+            });
+        });
+    });
+
+  </script>
 </body>
 </html>
