@@ -9,8 +9,6 @@ DOCTYPE html>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#2563eb">
   <meta name="mobile-web-app-capable" content="yes">
-
-  <!-- Icône PWA fusée -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%232563eb'/%3E%3Cstop offset='50%25' style='stop-color:%238b5cf6'/%3E%3Cstop offset='100%25' style='stop-color:%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23g)'/%3E%3Ctext x='50' y='70' font-family='Arial,sans-serif' font-size='55' fill='white' text-anchor='middle'%3E🚀%3C/text%3E%3C/svg%3E">
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%232563eb'/%3E%3Cstop offset='50%25' style='stop-color:%238b5cf6'/%3E%3Cstop offset='100%25' style='stop-color:%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23g)'/%3E%3Ctext x='50' y='70' font-family='Arial,sans-serif' font-size='55' fill='white' text-anchor='middle'%3E🚀%3C/text%3E%3C/svg%3E">
   
@@ -63,8 +61,7 @@ DOCTYPE html>
     
     /* ANIMATION BORDURE CARTE GAGNANTE */
     @keyframes borderRotate {
-      0% { background-position: 0% 0%; }
-      100% { background-position: 200% 0%; }
+      100% { background-position: 0 100%; }
     }
 
     /* ALERT TOP (NEWS) - 10 SECONDS */
@@ -96,12 +93,16 @@ DOCTYPE html>
 
     /* DARK MODE TOGGLE */
     .theme-toggle {
-        position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+        position: fixed; bottom: 20px; right: 20px; /* MOVE TO RIGHT */
+        z-index: 9999;
         background: var(--card-bg); border: 2px solid var(--border-color);
-        width: 70px; height: 32px; border-radius: 50px; cursor: pointer;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.2); transition: all 0.3s ease;
-        display: flex; align-items: center; padding: 3px;
+        width: 70px; height: 32px; border-radius: 50px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; padding: 3px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        transition: 0.3s;
     }
+    .theme-toggle:hover { transform: scale(1.05); }
+
     .theme-toggle-slider {
         width: 24px; height: 24px; border-radius: 50%; background: var(--primary);
         position: absolute; left: 4px; transition: all 0.3s ease;
@@ -109,45 +110,18 @@ DOCTYPE html>
         font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
     body.dark-mode .theme-toggle-slider { left: calc(100% - 28px); background: #fbbf24; }
-    .theme-toggle:hover { transform: scale(1.05); }
 
     /* FEEDBACK BUTTON */
     .feedback-btn {
         position: fixed; top: 50%; right: 0; transform: translateY(-50%);
-        background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
-        color: white; border: none; 
-        padding: 60px 5px;
-        border-radius: 8px 0 0 8px;
-        box-shadow: -4px 4px 15px rgba(37, 99, 235, 0.3);
-        cursor: pointer; z-index: 1000; font-weight: 900; font-size: 10px;
-        display: flex; flex-direction: column; align-items: center; gap: 14px;
-        transition: all 0.3s ease;
-        border-left: 2px solid rgba(255,255,255,0.3);
+        background: var(--accent); color: white; border: none;
+        padding: 15px 20px; border-radius: 30px 0 0 30px;
+        box-shadow: -4px 4px 15px rgba(245, 158, 11, 0.3);
+        cursor: pointer; z-index: 1000;
+        font-weight: 900; font-size: 14px;
+        display: flex; align-items: center; gap: 10px; transition: all 0.3s ease;
     }
-    .feedback-btn:hover {
-        padding-right: 9px;
-        background: linear-gradient(180deg, #2563eb 0%, #1e40af 100%);
-        transform: translateY(-50%) translateX(-4px);
-        box-shadow: -6px 4px 20px rgba(37, 99, 235, 0.4);
-    }
-    body.dark-mode .feedback-btn {
-        background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%);
-        border-left-color: rgba(147, 197, 253, 0.3);
-    }
-    body.dark-mode .feedback-btn:hover {
-        background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%);
-    }
-    .feedback-btn-icon {
-        writing-mode: horizontal-tb;
-        font-size: 30px;
-        margin-left: -2px;
-    }
-    .feedback-btn-text {
-        writing-mode: vertical-rl;
-        text-orientation: mixed;
-        letter-spacing: 1.5px;
-        margin-right: -2px;
-    }
+    .feedback-btn:hover { padding-right: 25px; background: #d97706; transform: translateY(-50%) scale(1.05); }
     
     /* MODALS */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2500; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(5px); }
@@ -193,31 +167,31 @@ DOCTYPE html>
     .last-update { font-size: 14px; color: var(--text-muted); background: rgba(255,255,255,0.5); padding: 8px 20px; border-radius: 30px; display: inline-block; font-weight: 600; border: 1px solid var(--border-color); text-transform: capitalize; }
     body.dark-mode .last-update { background: rgba(0,0,0,0.3); }
 
-    /* ANIMATION CERCLE - PAS DE hue-rotate pour éviter le vert */
-    @keyframes neonPulse {
+    /* ANIMATION CERCLE - ROTATION 6 SECONDES */
+    @keyframes circleRotate {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    @keyframes neonGlow {
         0%, 100% { 
             box-shadow: 0 0 40px rgba(239, 68, 68, 0.6),
                         0 0 70px rgba(139, 92, 246, 0.5),
                         inset 0 0 50px rgba(236, 72, 153, 0.3);
         }
-        25% { 
-            box-shadow: 0 0 40px rgba(236, 72, 153, 0.6),
-                        0 0 70px rgba(59, 130, 246, 0.5),
-                        inset 0 0 50px rgba(139, 92, 246, 0.3);
-        }
-        50% { 
+        33% { 
             box-shadow: 0 0 40px rgba(59, 130, 246, 0.6),
-                        0 0 70px rgba(6, 182, 212, 0.5),
+                        0 0 70px rgba(236, 72, 153, 0.5),
                         inset 0 0 50px rgba(59, 130, 246, 0.3);
         }
-        75% { 
+        66% { 
             box-shadow: 0 0 40px rgba(139, 92, 246, 0.6),
-                        0 0 70px rgba(236, 72, 153, 0.5),
+                        0 0 70px rgba(6, 182, 212, 0.5),
                         inset 0 0 50px rgba(239, 68, 68, 0.3);
         }
     }
 
-    /* CERCLE CENTRAL - ZÉRO VERT */
+    /* --- CERCLE CENTRAL ROTATIF --- */
     .global-score-container { 
         margin: 40px auto; 
         width: 280px; height: 280px;
@@ -230,66 +204,30 @@ DOCTYPE html>
             linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
             conic-gradient(
                 from 0deg,
-                #b91c1c,    /* Rouge foncé */
-                #dc2626,    /* Rouge */
-                #ef4444,    /* Rouge clair */
-                #f87171,    /* Rouge très clair */
-                #fb7185,    /* Rose-rouge */
-                #ec4899,    /* Rose */
-                #f472b6,    /* Rose clair */
-                #f9a8d4,    /* Rose très clair */
-                #d946ef,    /* Magenta */
-                #e879f9,    /* Magenta clair */
-                #c084fc,    /* Violet clair */
-                #a78bfa,    /* Violet */
-                #8b5cf6,    /* Violet foncé */
-                #7c3aed,    /* Violet très foncé */
-                #6366f1,    /* Indigo */
-                #818cf8,    /* Indigo clair */
-                #4f46e5,    /* Indigo foncé */
-                #3b82f6,    /* Bleu */
-                #60a5fa,    /* Bleu clair */
-                #0ea5e9,    /* Bleu ciel (pas vert) */
-                #06b6d4,    /* Cyan pur */
-                #22d3ee,    /* Cyan clair */
-                #2563eb,    /* Bleu royal */
-                #1d4ed8,    /* Bleu marine */
-                #b91c1c     /* Rouge foncé (retour) */
+                #b91c1c, #dc2626, #ef4444, #f87171,
+                #fb7185, #ec4899, #f472b6, #f9a8d4,
+                #d946ef, #e879f9, #c084fc, #a78bfa,
+                #8b5cf6, #7c3aed, #6366f1, #818cf8, #4f46e5,
+                #3b82f6, #60a5fa, #0ea5e9,
+                #06b6d4, #22d3ee,
+                #2563eb, #1d4ed8, #b91c1c
             ) border-box;
-        animation: neonPulse 5s ease-in-out infinite;
+        animation: circleRotate 6s linear infinite, neonGlow 6s ease-in-out infinite;
     }
     body.dark-mode .global-score-container {
          background: 
             linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
             conic-gradient(
                 from 0deg,
-                #7f1d1d,    /* Rouge ultra foncé */
-                #991b1b,    /* Rouge très foncé */
-                #dc2626,    /* Rouge foncé */
-                #ef4444,    /* Rouge */
-                #f43f5e,    /* Rose-rouge */
-                #db2777,    /* Rose foncé */
-                #ec4899,    /* Rose */
-                #f472b6,    /* Rose clair */
-                #c026d3,    /* Fuchsia */
-                #d946ef,    /* Magenta */
-                #a855f7,    /* Violet lumineux */
-                #8b5cf6,    /* Violet */
-                #7c3aed,    /* Violet foncé */
-                #6d28d9,    /* Violet très foncé */
-                #4f46e5,    /* Indigo foncé */
-                #6366f1,    /* Indigo */
-                #3730a3,    /* Indigo très foncé */
-                #2563eb,    /* Bleu foncé */
-                #3b82f6,    /* Bleu */
-                #0284c7,    /* Bleu sky (pas vert) */
-                #0891b2,    /* Cyan foncé */
-                #06b6d4,    /* Cyan */
-                #1e40af,    /* Bleu royal foncé */
-                #1e3a8a,    /* Bleu nuit */
-                #7f1d1d     /* Rouge ultra foncé (retour) */
+                #7f1d1d, #991b1b, #dc2626, #ef4444,
+                #f43f5e, #db2777, #ec4899, #f472b6,
+                #c026d3, #d946ef, #a855f7, #8b5cf6,
+                #7c3aed, #6d28d9, #4f46e5, #6366f1, #3730a3,
+                #2563eb, #3b82f6, #0284c7,
+                #0891b2, #06b6d4,
+                #1e40af, #1e3a8a, #7f1d1d
             ) border-box;
-         animation: neonPulse 5s ease-in-out infinite;
+         animation: circleRotate 6s linear infinite, neonGlow 6s ease-in-out infinite;
     }
     
     .global-score-value { font-size: 58px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
@@ -307,22 +245,31 @@ DOCTYPE html>
     body.dark-mode .card.is-locked { background: #0f172a; border-color: #334155; }
     .card.is-locked .obj-icon { filter: grayscale(1); opacity: 0.5; }
 
-    /* BORDURE CARTE GAGNANTE */
+    /* --- NOUVELLE ANIMATION BORDURE CARTE GAGNANTE --- */
     .card.is-winner {
-        border: none;
-        box-shadow: 0 15px 50px rgba(5, 150, 105, 0.25);
-        overflow: visible;
+        border: none; /* On enlève la bordure standard */
+        box-shadow: 0 15px 50px rgba(16, 185, 129, 0.2);
+        overflow: visible; /* Pour que la bordure animée dépasse */
     }
+    /* Pseudo-élément pour la bordure animée */
     .card.is-winner::before {
         content: "";
         position: absolute;
-        top: -3px; left: -3px; right: -3px; bottom: -3px;
+        top: -4px; left: -4px; right: -4px; bottom: -4px; /* Épaisseur de 4px */
         z-index: -1;
-        border-radius: calc(var(--radius) + 3px);
-        background: linear-gradient(90deg, #047857, #059669, #047857, #065f46, #047857);
-        background-size: 200% 100%;
-        animation: borderRotate 3s linear infinite;
+        border-radius: calc(var(--radius) + 4px);
+        /* Le dégradé rayé style "barber pole" */
+        background: repeating-linear-gradient(
+            45deg,
+            #10b981, /* Vert foncé */
+            #10b981 20px,
+            #86efac 20px, /* Vert clair */
+            #86efac 40px
+        );
+        background-size: 200% 200%;
+        animation: borderRotate 4s linear infinite; /* Animation continue */
     }
+    /* Pseudo-élément pour masquer l'intérieur de la bordure */
     .card.is-winner::after {
         content: "";
         position: absolute;
@@ -568,40 +515,11 @@ DOCTYPE html>
 
     @media (max-width: 600px) { .group-body.open { grid-template-columns: 1fr; } }
   
-    /* ========== CÉLÉBRATIONS (Idée #5) ========== */
-    @keyframes confettiFall {
-        0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
-        100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
-    }
-
-    .confetti {
-        position: fixed;
-        width: 12px;
-        height: 12px;
-        z-index: 10000;
-        pointer-events: none;
-        border-radius: 2px;
-    }
-
-    /* Animation pour les cartes quand objectif validé */
-    @keyframes cardVictory {
-        0%, 100% { transform: scale(1); }
-        25% { transform: scale(1.05) rotate(-2deg); }
-        50% { transform: scale(1.1) rotate(2deg); }
-        75% { transform: scale(1.05) rotate(-1deg); }
-    }
-
-    .card-celebrating {
-        animation: cardVictory 0.6s ease-out;
-    }
-
-    /* Toast amélioré pour célébrations */
-    .toast.celebration {
-        background: linear-gradient(135deg, #10b981, #3b82f6, #8b5cf6);
-        font-size: 16px;
-        padding: 18px 30px;
-        box-shadow: 0 10px 40px rgba(59, 130, 246, 0.4);
-    }
+    @keyframes confettiFall { 0%{transform:translateY(-100vh) rotate(0deg);opacity:1;} 100%{transform:translateY(100vh) rotate(720deg);opacity:0;} }
+    .confetti { position:fixed; width:12px; height:12px; z-index:10000; pointer-events:none; border-radius:2px; }
+    @keyframes cardVictory { 0%,100%{transform:scale(1);} 25%{transform:scale(1.05) rotate(-2deg);} 50%{transform:scale(1.1) rotate(2deg);} 75%{transform:scale(1.05) rotate(-1deg);} }
+    .card-celebrating { animation:cardVictory 0.6s ease-out; }
+    .toast.celebration { background:linear-gradient(135deg,#10b981,#3b82f6,#8b5cf6); font-size:16px; padding:18px 30px; box-shadow:0 10px 40px rgba(59,130,246,0.4); }
 </style>
 </head>
 <body>
@@ -618,7 +536,7 @@ DOCTYPE html>
       </div>
   </div>
 
-  <div class="feedback-btn" onclick="document.getElementById('feedbackModal').style.display='flex'" title="Proposer une idée"><span class="feedback-btn-icon">💡</span><span class="feedback-btn-text">Une idée ?</span></div>
+  <div class="feedback-btn" onclick="document.getElementById('feedbackModal').style.display='flex'">💡 Une idée ?</div>
 
   <div id="feedbackModal" class="modal-overlay">
       <div class="modal-box">
@@ -932,7 +850,7 @@ DOCTYPE html>
     ];
     let currentCalDate = new Date(2025, 11, 1);
 
-    // INITIALIZE THEME - MODE NUIT PAR DÉFAUT
+    // INITIALIZE THEME
     if(localStorage.getItem('heiko_dark_mode') === null) {
         localStorage.setItem('heiko_dark_mode', 'true');
     }
@@ -1819,79 +1737,8 @@ DOCTYPE html>
     }
     function parse(s) { return parseFloat(String(s).replace(/[^0-9.]/g,''))||0; }
   
-    // ========== CÉLÉBRATIONS AUTOMATIQUES (Idée #5) ==========
-
-    function triggerCelebration(message = '🎉 Objectif validé!') {
-        // 1. CONFETTIS
-        const colors = ['#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4'];
-        const confettiCount = 60;
-
-        for(let i = 0; i < confettiCount; i++) {
-            setTimeout(() => {
-                const confetti = document.createElement('div');
-                confetti.className = 'confetti';
-                confetti.style.left = Math.random() * 100 + '%';
-                confetti.style.top = '-50px';
-                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-                confetti.style.animation = `confettiFall ${2.5 + Math.random() * 2}s ease-out`;
-                confetti.style.animationDelay = '0s';
-                document.body.appendChild(confetti);
-
-                setTimeout(() => confetti.remove(), 5000);
-            }, i * 40); // Décalage pour effet cascade
-        }
-
-        // 2. TOAST SPÉCIAL CÉLÉBRATION
-        const toast = document.createElement('div');
-        toast.className = 'toast celebration';
-        toast.textContent = message;
-        toast.style.cssText = 'position:fixed;top:30px;left:50%;transform:translateX(-50%);z-index:10001;border-radius:50px;animation:slideDown 0.4s ease-out;';
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-            toast.style.animation = 'slideUp 0.4s ease-out';
-            setTimeout(() => toast.remove(), 400);
-        }, 3000);
-
-        // 3. SON (optionnel - décommenter si besoin)
-        // playVictorySound();
-    }
-
-    // Fonction pour jouer un son de victoire (optionnel)
-    function playVictorySound() {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-
-        oscillator.frequency.value = 523.25; // Do
-        oscillator.type = 'sine';
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.5);
-    }
-
-    // Déclencher célébration quand on clique sur une carte (démo)
-    window.addEventListener('DOMContentLoaded', function() {
-        // Ajouter l'événement sur toutes les cartes d'objectifs
-        document.querySelectorAll('.card').forEach(card => {
-            card.addEventListener('click', function() {
-                // Simuler la validation d'un objectif
-                if(!this.classList.contains('card-celebrating')) {
-                    this.classList.add('card-celebrating');
-                    triggerCelebration('🎉 Bravo! +50€ débloqué!');
-
-                    setTimeout(() => {
-                        this.classList.remove('card-celebrating');
-                    }, 600);
-                }
-            });
-        });
-    });
+    function triggerCelebration(msg='🎉 Objectif validé!'){const colors=['#ef4444','#f59e0b','#3b82f6','#8b5cf6','#ec4899','#06b6d4'];for(let i=0;i<60;i++)setTimeout(()=>{const c=document.createElement('div');c.className='confetti';c.style.left=Math.random()*100+'%';c.style.top='-50px';c.style.backgroundColor=colors[Math.floor(Math.random()*colors.length)];c.style.animation=`confettiFall ${2.5+Math.random()*2}s ease-out`;document.body.appendChild(c);setTimeout(()=>c.remove(),5000);},i*40);showToast(msg);}
+    window.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.card').forEach(card=>{card.addEventListener('click',function(){if(!this.classList.contains('card-celebrating')){this.classList.add('card-celebrating');triggerCelebration('🎉 Bravo! +50€ débloqué!');setTimeout(()=>this.classList.remove('card-celebrating'),600);}});});});
 </script>
 </body>
 </html>
