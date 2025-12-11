@@ -8,6 +8,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#2563eb">
   <meta name="mobile-web-app-capable" content="yes">
+
+  <!-- Icônes PWA avec dégradé Bleu/Violet/Rose -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%232563eb'/%3E%3Cstop offset='50%25' style='stop-color:%238b5cf6'/%3E%3Cstop offset='100%25' style='stop-color:%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23g)'/%3E%3Ctext x='50' y='72' font-family='Arial,sans-serif' font-size='60' font-weight='bold' fill='white' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%232563eb'/%3E%3Cstop offset='50%25' style='stop-color:%238b5cf6'/%3E%3Cstop offset='100%25' style='stop-color:%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23g)'/%3E%3Ctext x='50' y='72' font-family='Arial,sans-serif' font-size='60' font-weight='bold' fill='white' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E">
   
   <title>Heiko - Budget Master V61 (Animated Borders)</title>
   
@@ -179,12 +183,8 @@
 
     /* --- ANIMATION ROTATION CERCLE MULTICOLORE --- */
     @keyframes neonRotate {
-        0% { 
-            filter: hue-rotate(0deg) brightness(1.1);
-        }
-        100% { 
-            filter: hue-rotate(360deg) brightness(1.1);
-        }
+        0% { filter: hue-rotate(0deg) brightness(1.1); }
+        100% { filter: hue-rotate(360deg) brightness(1.1); }
     }
 
     /* --- NOUVEAU STYLE CERCLE CENTRAL --- */
@@ -200,24 +200,26 @@
             linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
             conic-gradient(
                 from 0deg, 
-                #ff6b6b,    /* Rouge vif */
-                #f59e0b,    /* Orange */
-                #fbbf24,    /* Jaune */
-                #84cc16,    /* Vert lime */
-                #10b981,    /* Vert émeraude */
-                #06b6d4,    /* Cyan */
+                #ef4444,    /* Rouge */
+                #f87171,    /* Rouge clair */
+                #fb923c,    /* Orange */
                 #3b82f6,    /* Bleu */
+                #60a5fa,    /* Bleu clair */
                 #6366f1,    /* Indigo */
+                #818cf8,    /* Indigo clair */
                 #8b5cf6,    /* Violet */
+                #a78bfa,    /* Violet clair */
+                #c084fc,    /* Violet plus clair */
                 #d946ef,    /* Magenta */
                 #ec4899,    /* Rose */
-                #ff6b6b     /* Rouge vif (retour) */
+                #f472b6,    /* Rose clair */
+                #ef4444     /* Rouge (retour) */
             ) border-box;
         box-shadow: 
-            0 0 30px rgba(59, 130, 246, 0.5),
-            0 0 60px rgba(139, 92, 246, 0.3),
-            inset 0 0 40px rgba(245, 158, 11, 0.2);
-        animation: neonRotate 3s linear infinite;
+            0 0 40px rgba(59, 130, 246, 0.6),
+            0 0 70px rgba(139, 92, 246, 0.4),
+            inset 0 0 50px rgba(236, 72, 153, 0.3);
+        animation: neonRotate 4s linear infinite;
     }
     body.dark-mode .global-score-container {
          background: 
@@ -225,23 +227,25 @@
             conic-gradient(
                 from 0deg, 
                 #dc2626,    /* Rouge foncé */
-                #ea580c,    /* Orange foncé */
-                #d97706,    /* Ambre */
-                #65a30d,    /* Lime foncé */
-                #059669,    /* Émeraude foncé */
-                #0891b2,    /* Cyan foncé */
+                #ef4444,    /* Rouge */
+                #f97316,    /* Orange foncé */
                 #2563eb,    /* Bleu foncé */
+                #3b82f6,    /* Bleu */
                 #4f46e5,    /* Indigo foncé */
+                #6366f1,    /* Indigo */
                 #7c3aed,    /* Violet foncé */
+                #8b5cf6,    /* Violet */
+                #a855f7,    /* Violet lumineux */
                 #c026d3,    /* Fuchsia */
                 #db2777,    /* Rose foncé */
+                #ec4899,    /* Rose */
                 #dc2626     /* Rouge foncé (retour) */
             ) border-box;
          box-shadow: 
-            0 0 40px rgba(37, 99, 235, 0.6),
-            0 0 70px rgba(124, 58, 237, 0.4),
-            inset 0 0 50px rgba(217, 119, 6, 0.3);
-         animation: neonRotate 3s linear infinite;
+            0 0 50px rgba(37, 99, 235, 0.7),
+            0 0 80px rgba(124, 58, 237, 0.5),
+            inset 0 0 60px rgba(219, 39, 119, 0.4);
+         animation: neonRotate 4s linear infinite;
     }
     
     .global-score-value { font-size: 58px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
