@@ -60,7 +60,7 @@
     @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
     @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); } 20%, 40%, 60%, 80% { transform: translateX(5px); } }
     
-    /* ANIMATION BORDURE CARTE GAGNANTE - VERSION SOBRE */
+    /* ANIMATION BORDURE CARTE GAGNANTE */
     @keyframes borderRotate {
       0% { background-position: 0% 0%; }
       100% { background-position: 200% 0%; }
@@ -110,22 +110,21 @@
     body.dark-mode .theme-toggle-slider { left: calc(100% - 28px); background: #fbbf24; }
     .theme-toggle:hover { transform: scale(1.05); }
 
-    /* FEEDBACK BUTTON - BARRE VERTICALE ALLONGÉE */
+    /* FEEDBACK BUTTON - ULTRA FIN ET ALLONGÉ */
     .feedback-btn {
         position: fixed; top: 50%; right: 0; transform: translateY(-50%);
         background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
         color: white; border: none; 
-        padding: 35px 8px;
-        border-radius: 12px 0 0 12px;
+        padding: 60px 5px; /* Encore plus allongé, encore plus fin */
+        border-radius: 8px 0 0 8px;
         box-shadow: -4px 4px 15px rgba(37, 99, 235, 0.3);
-        cursor: pointer; z-index: 1000; font-weight: 900; font-size: 12px;
-        display: flex; flex-direction: column; align-items: center; gap: 10px;
-        transition: all 0.3s ease; writing-mode: vertical-rl;
-        text-orientation: mixed; letter-spacing: 1.2px;
-        border-left: 3px solid rgba(255,255,255,0.3);
+        cursor: pointer; z-index: 1000; font-weight: 900; font-size: 10px;
+        display: flex; flex-direction: column; align-items: center; gap: 14px;
+        transition: all 0.3s ease;
+        border-left: 2px solid rgba(255,255,255,0.3);
     }
     .feedback-btn:hover {
-        padding-right: 12px;
+        padding-right: 9px;
         background: linear-gradient(180deg, #2563eb 0%, #1e40af 100%);
         transform: translateY(-50%) translateX(-4px);
         box-shadow: -6px 4px 20px rgba(37, 99, 235, 0.4);
@@ -136,6 +135,17 @@
     }
     body.dark-mode .feedback-btn:hover {
         background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%);
+    }
+    .feedback-btn-icon {
+        writing-mode: horizontal-tb;
+        font-size: 30px;
+        margin-left: -2px;
+    }
+    .feedback-btn-text {
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        letter-spacing: 1.5px;
+        margin-right: -2px;
     }
     
     /* MODALS */
@@ -182,13 +192,13 @@
     .last-update { font-size: 14px; color: var(--text-muted); background: rgba(255,255,255,0.5); padding: 8px 20px; border-radius: 30px; display: inline-block; font-weight: 600; border: 1px solid var(--border-color); text-transform: capitalize; }
     body.dark-mode .last-update { background: rgba(0,0,0,0.3); }
 
-    /* --- ANIMATION ROTATION CERCLE MULTICOLORE --- */
+    /* --- ANIMATION ROTATION CERCLE - ROUGE/ROSE/VIOLET/BLEU/TURQUOISE UNIQUEMENT --- */
     @keyframes neonRotate {
-        0% { filter: hue-rotate(0deg) brightness(1.1); }
-        100% { filter: hue-rotate(360deg) brightness(1.1); }
+        0% { filter: hue-rotate(0deg) brightness(1.2) saturate(1.3); }
+        100% { filter: hue-rotate(360deg) brightness(1.2) saturate(1.3); }
     }
 
-    /* --- NOUVEAU STYLE CERCLE CENTRAL --- */
+    /* --- CERCLE CENTRAL - ZÉRO VERT --- */
     .global-score-container { 
         margin: 40px auto; 
         width: 280px; height: 280px;
@@ -200,14 +210,35 @@
         background: 
             linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
             conic-gradient(
-                from 0deg, 
-                #dc2626, #ef4444, #f87171, #fb7185,
-                #ec4899, #f472b6, #f9a8d4,
-                #d946ef, #e879f9, #c084fc, #a78bfa,
-                #8b5cf6, #7c3aed, #6366f1, #818cf8, #4f46e5,
-                #3b82f6, #60a5fa, #38bdf8,
-                #22d3ee, #06b6d4, #0891b2,
-                #2563eb, #1d4ed8, #dc2626
+                from 0deg,
+                #b91c1c,    /* Rouge très foncé */
+                #dc2626,    /* Rouge foncé */
+                #ef4444,    /* Rouge */
+                #f87171,    /* Rouge clair */
+                #fb7185,    /* Rose-rouge */
+                #ec4899,    /* Rose */
+                #f472b6,    /* Rose clair */
+                #f9a8d4,    /* Rose très clair */
+                #d946ef,    /* Magenta */
+                #e879f9,    /* Magenta clair */
+                #c084fc,    /* Violet clair */
+                #a78bfa,    /* Violet */
+                #8b5cf6,    /* Violet foncé */
+                #7c3aed,    /* Violet très foncé */
+                #6366f1,    /* Indigo */
+                #818cf8,    /* Indigo clair */
+                #4f46e5,    /* Indigo foncé */
+                #3b82f6,    /* Bleu */
+                #60a5fa,    /* Bleu clair */
+                #38bdf8,    /* Bleu ciel */
+                #0ea5e9,    /* Bleu sky */
+                #06b6d4,    /* Cyan */
+                #22d3ee,    /* Cyan clair */
+                #67e8f9,    /* Cyan très clair */
+                #0891b2,    /* Turquoise foncé */
+                #2563eb,    /* Bleu royal */
+                #1e40af,    /* Bleu marine */
+                #b91c1c     /* Rouge très foncé (retour) */
             ) border-box;
         box-shadow: 
             0 0 40px rgba(59, 130, 246, 0.6),
@@ -219,14 +250,35 @@
          background: 
             linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
             conic-gradient(
-                from 0deg, 
-                #991b1b, #dc2626, #ef4444, #f43f5e,
-                #db2777, #ec4899, #f472b6,
-                #c026d3, #d946ef, #a855f7, #8b5cf6,
-                #7c3aed, #6d28d9, #4f46e5, #6366f1, #3730a3,
-                #2563eb, #3b82f6, #0ea5e9,
-                #06b6d4, #0891b2, #0e7490,
-                #1e40af, #1e3a8a, #991b1b
+                from 0deg,
+                #7f1d1d,    /* Rouge ultra foncé */
+                #991b1b,    /* Rouge très foncé */
+                #dc2626,    /* Rouge foncé */
+                #ef4444,    /* Rouge */
+                #f43f5e,    /* Rose-rouge */
+                #db2777,    /* Rose foncé */
+                #ec4899,    /* Rose */
+                #f472b6,    /* Rose clair */
+                #c026d3,    /* Fuchsia */
+                #d946ef,    /* Magenta */
+                #a855f7,    /* Violet lumineux */
+                #8b5cf6,    /* Violet */
+                #7c3aed,    /* Violet foncé */
+                #6d28d9,    /* Violet très foncé */
+                #4f46e5,    /* Indigo foncé */
+                #6366f1,    /* Indigo */
+                #3730a3,    /* Indigo très foncé */
+                #2563eb,    /* Bleu foncé */
+                #3b82f6,    /* Bleu */
+                #0ea5e9,    /* Bleu ciel */
+                #0284c7,    /* Sky foncé */
+                #0891b2,    /* Cyan foncé */
+                #06b6d4,    /* Cyan */
+                #22d3ee,    /* Cyan clair */
+                #0e7490,    /* Turquoise foncé */
+                #1e40af,    /* Bleu royal foncé */
+                #1e3a8a,    /* Bleu nuit */
+                #7f1d1d     /* Rouge ultra foncé (retour) */
             ) border-box;
          box-shadow: 
             0 0 50px rgba(37, 99, 235, 0.7),
@@ -250,7 +302,7 @@
     body.dark-mode .card.is-locked { background: #0f172a; border-color: #334155; }
     .card.is-locked .obj-icon { filter: grayscale(1); opacity: 0.5; }
 
-    /* --- BORDURE CARTE GAGNANTE - VERSION SOBRE --- */
+    /* --- BORDURE CARTE GAGNANTE --- */
     .card.is-winner {
         border: none;
         box-shadow: 0 15px 50px rgba(5, 150, 105, 0.25);
@@ -526,7 +578,7 @@
       </div>
   </div>
 
-  <div class="feedback-btn" onclick="document.getElementById('feedbackModal').style.display='flex'" title="Proposer une idée"><span style="font-size: 26px; writing-mode: horizontal-tb;">💡</span>Une idée ?</div>
+  <div class="feedback-btn" onclick="document.getElementById('feedbackModal').style.display='flex'" title="Proposer une idée"><span class="feedback-btn-icon">💡</span><span class="feedback-btn-text">Une idée ?</span></div>
 
   <div id="feedbackModal" class="modal-overlay">
       <div class="modal-box">
