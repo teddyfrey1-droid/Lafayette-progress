@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#2563eb">
   <meta name="mobile-web-app-capable" content="yes">
   
-  <title>Heiko - Budget Master V61.1 (Animated Borders)</title>
+  <title>Heiko - Budget Master V62 (Pro Design)</title>
   
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -28,6 +28,7 @@
       --primary: #2563eb; 
       --accent: #f59e0b;
       --success: #10b981; 
+      --success-dark: #047857;
       --danger: #ef4444;
       --radius: 28px;
       --font-stack: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -47,21 +48,26 @@
     body { font-family: var(--font-stack); background: var(--bg-gradient); color: var(--text-main); min-height: 100vh; padding: 20px; overflow-x: hidden; transition: background 0.3s ease, color 0.3s ease; }
 
     /* ANIMATIONS */
-    @keyframes floatMoney { 
-        0% { transform: translateY(80px) scale(0) rotate(0deg); opacity: 0; } 
-        20% { opacity: 1; transform: translateY(0px) scale(1) rotate(10deg); } 
-        100% { transform: translateY(-300px) scale(1.3) rotate(360deg); opacity: 0; } 
-    }
-    @keyframes moveStripes { 0% { background-position: 0 0; } 100% { background-position: 50px 0; } }
-    @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
-    @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); } 20%, 40%, 60%, 80% { transform: translateX(5px); } }
-    
-    /* ANIMATION BORDURE CARTE GAGNANTE */
-    @keyframes borderRotate {
-      100% { background-position: 0 100%; }
+    /* Fontaine de billets (Monte et retombe) */
+    @keyframes moneyFountain { 
+        0% { transform: translate(0, 50px) scale(0.5) rotate(0deg); opacity: 0; } 
+        20% { opacity: 1; }
+        50% { transform: translate(var(--rx), -150px) scale(1) rotate(180deg); } /* Monte haut */
+        100% { transform: translate(var(--rx2), 50px) scale(1) rotate(360deg); opacity: 0; } /* Retombe */
     }
 
-    /* ALERT TOP (NEWS) - 10 SECONDS */
+    @keyframes moveStripes { 0% { background-position: 0 0; } 100% { background-position: 50px 0; } }
+    
+    /* Animation Classy Pulse (Bordure Pro) */
+    @keyframes classyPulse {
+        0% { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.4); border-color: #059669; }
+        50% { box-shadow: 0 0 25px rgba(5, 150, 105, 0.2); border-color: #10b981; }
+        100% { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.4); border-color: #059669; }
+    }
+
+    @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); } 20%, 40%, 60%, 80% { transform: translateX(5px); } }
+
+    /* ALERT TOP */
     @keyframes slideDownUp {
         0% { transform: translate(-50%, -200%); opacity: 0; }
         5% { transform: translate(-50%, 20px); opacity: 1; }
@@ -88,17 +94,38 @@
     #toast { visibility: hidden; min-width: 300px; background-color: var(--success); color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 3000; left: 50%; top: 0; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; transform:translate(-50%, -100%); transition: all 0.3s; }
     #toast.show { visibility: visible; transform:translate(-50%, 20px); }
 
-    /* DARK MODE TOGGLE BTN - CHANGED POSITION & ICON */
-    .theme-toggle {
-        position: fixed; bottom: 20px; right: 20px; /* MOVE TO RIGHT */
-        z-index: 9999;
-        background: var(--card-bg); border: 2px solid var(--border-color);
-        width: 50px; height: 50px; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 24px; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        transition: 0.3s;
+    /* SWITCH MODE NUIT (Minimaliste Style) */
+    .theme-switch-container {
+        position: fixed; bottom: 20px; right: 20px; z-index: 9999;
     }
-    .theme-toggle:hover { transform: scale(1.1); }
+    .theme-switch {
+        width: 64px; height: 32px;
+        background-color: #cbd5e1;
+        border-radius: 32px;
+        position: relative;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        border: 2px solid #fff;
+    }
+    body.dark-mode .theme-switch { background-color: #334155; border-color:#475569; }
+    
+    .theme-knob {
+        width: 26px; height: 26px;
+        background-color: white;
+        border-radius: 50%;
+        position: absolute;
+        top: 1px; left: 2px;
+        transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    body.dark-mode .theme-knob {
+        transform: translateX(32px);
+        background-color: #1e293b;
+        color: white;
+    }
 
     /* FEEDBACK BUTTON */
     .feedback-btn {
@@ -156,19 +183,20 @@
     .last-update { font-size: 14px; color: var(--text-muted); background: rgba(255,255,255,0.5); padding: 8px 20px; border-radius: 30px; display: inline-block; font-weight: 600; border: 1px solid var(--border-color); text-transform: capitalize; }
     body.dark-mode .last-update { background: rgba(0,0,0,0.3); }
 
-    /* --- NOUVEAU STYLE CERCLE CENTRAL --- */
+    /* --- NOUVEAU STYLE CERCLE "MONEY PILE" --- */
     .global-score-container { 
         margin: 40px auto; 
-        width: 280px; height: 280px; /* Un peu plus grand */
+        width: 280px; height: 280px; 
         border-radius: 50%; 
         display: flex; align-items: center; justify-content: center; flex-direction: column; 
-        position: relative; overflow: visible; /* Important pour que les billets sortent */
+        position: relative; 
+        /* Overflow visible pour que les billets qui tombent sortent */
+        overflow: visible; 
         background: var(--card-bg);
-        /* Bordure double dégradée Or et Bleu */
+        /* Bordure Premium Or/Bleu */
         border: 6px solid transparent;
         background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
                     linear-gradient(135deg, #f59e0b, #2563eb, #f59e0b) border-box;
-        /* Glow interne et externe */
         box-shadow: 0 20px 60px rgba(37, 99, 235, 0.4), inset 0 0 30px rgba(245, 158, 11, 0.3);
     }
     body.dark-mode .global-score-container {
@@ -177,10 +205,33 @@
          box-shadow: 0 20px 60px rgba(30, 64, 175, 0.5), inset 0 0 30px rgba(180, 83, 9, 0.3);
     }
     
-    .global-score-value { font-size: 58px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
+    /* MASQUE POUR LE REMPLISSAGE LIQUIDE */
+    .score-fill-mask {
+        position: absolute; inset: 0; border-radius: 50%; overflow: hidden; z-index: 0;
+        /* Force le masque pour que le liquide reste DANS le rond */
+        mask-image: radial-gradient(white, black); 
+        -webkit-mask-image: -webkit-radial-gradient(white, black);
+    }
+    
+    /* LE TAS DE BILLETS (LIQUIDE) */
+    .score-fill-level {
+        position: absolute; bottom: 0; left: 0; right: 0;
+        height: 0%; /* Dynamic via JS */
+        background-color: #dcfce7;
+        /* Motif billets */
+        background-image: repeating-linear-gradient(45deg, #d1fae5 0, #d1fae5 10px, #a7f3d0 10px, #a7f3d0 20px);
+        transition: height 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        opacity: 0.5;
+        border-top: 2px solid #10b981;
+    }
+    body.dark-mode .score-fill-level { background-color: #064e3b; background-image: repeating-linear-gradient(45deg, #064e3b 0, #064e3b 10px, #065f46 10px, #065f46 20px); opacity:0.6; }
+
+    .global-score-value { font-size: 58px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; text-shadow: 0 2px 10px rgba(255,255,255,0.8); }
+    body.dark-mode .global-score-value { text-shadow: 0 2px 10px rgba(0,0,0,0.8); }
     .global-score-label { font-size: 13px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; margin-top: 8px; text-align: center; line-height: 1.4; letter-spacing: 1.5px; z-index: 2; position: relative; }
-    .money-rain { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: visible; }
-    .bill { position: absolute; font-size: 32px; opacity: 0; user-select:none; }
+    
+    .money-rain { position: absolute; inset: 0; pointer-events: none; z-index: 10; overflow: visible; width: 100%; height: 100%; }
+    .bill { position: absolute; font-size: 24px; opacity: 0; user-select:none; }
 
     .objectives-wrapper { display: flex; flex-direction: column; gap: 50px; }
     .category-title { font-size: 24px; font-weight: 900; text-transform: uppercase; color: var(--text-main); margin: 0 0 25px; display: flex; align-items: center; gap: 15px; letter-spacing: 1px; }
@@ -192,38 +243,11 @@
     body.dark-mode .card.is-locked { background: #0f172a; border-color: #334155; }
     .card.is-locked .obj-icon { filter: grayscale(1); opacity: 0.5; }
 
-    /* --- NOUVELLE ANIMATION BORDURE CARTE GAGNANTE --- */
+    /* --- CLASSY BORDER ANIMATION (OBJECTIFS VALIDÉS) --- */
     .card.is-winner {
-        border: none; /* On enlève la bordure standard */
-        box-shadow: 0 15px 50px rgba(16, 185, 129, 0.2);
-        overflow: visible; /* Pour que la bordure animée dépasse */
-    }
-    /* Pseudo-élément pour la bordure animée */
-    .card.is-winner::before {
-        content: "";
-        position: absolute;
-        top: -4px; left: -4px; right: -4px; bottom: -4px; /* Épaisseur de 4px */
-        z-index: -1;
-        border-radius: calc(var(--radius) + 4px);
-        /* Le dégradé rayé style "barber pole" */
-        background: repeating-linear-gradient(
-            45deg,
-            #10b981, /* Vert foncé */
-            #10b981 20px,
-            #86efac 20px, /* Vert clair */
-            #86efac 40px
-        );
-        background-size: 200% 200%;
-        animation: borderRotate 4s linear infinite; /* Animation continue */
-    }
-    /* Pseudo-élément pour masquer l'intérieur de la bordure */
-    .card.is-winner::after {
-        content: "";
-        position: absolute;
-        top: 0; left: 0; right: 0; bottom: 0;
-        z-index: -1;
-        background: var(--card-bg);
-        border-radius: var(--radius);
+        border: 2px solid #059669; /* Vert Émeraude Pro */
+        box-shadow: 0 0 15px rgba(5, 150, 105, 0.4);
+        animation: classyPulse 3s infinite ease-in-out; /* Pulsation lente et élégante */
     }
 
     .status-badge { position: absolute; top: 0; left: 0; right: 0; padding: 12px; text-align: center; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; border-radius: var(--radius) var(--radius) 0 0; }
@@ -242,10 +266,9 @@
     .data-box-label { font-size: 10px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px; }
     .data-box-value { font-size: 20px; font-weight: 900; color: var(--text-main); line-height: 1; }
 
-    /* BARRE DE PROGRESSION - RETOUR AU STYLE SIMPLE */
+    /* BARRE DE PROGRESSION */
     .progress-track { height: 30px; background: var(--border-color); border-radius: 99px; overflow: hidden; margin-bottom: 40px; position: relative; display: flex; }
     
-    /* Default Fill (and Winner Fill now) */
     .progress-fill { 
         height: 100%; 
         background-color: var(--primary);
@@ -255,7 +278,6 @@
         transition: width 1s ease; 
         position: relative; 
     }
-    /* Winner color override */
     .card.is-winner .progress-fill { background-color: var(--success); }
     
     .progress-overdrive { 
@@ -465,7 +487,10 @@
 </head>
 <body>
 
-  <button class="theme-toggle" onclick="toggleDarkMode()">🌙✨</button>
+  <div class="theme-switch-container">
+      <div class="theme-switch" onclick="toggleDarkMode()">
+          <div class="theme-knob">☀️</div> </div>
+  </div>
 
   <div id="topAlert">
       <div class="alert-icon">📣</div>
@@ -540,7 +565,11 @@
         <div class="last-update" id="lastUpdate">Chargement...</div>
         
         <div class="global-score-container" id="scoreCircle">
+          <div class="score-fill-mask">
+              <div class="score-fill-level" id="moneyFill"></div>
+          </div>
           <div class="money-rain" id="moneyRain"></div>
+          
           <div class="global-score-value" id="myTotalGain">0€</div>
           <div class="global-score-label">MES PRIMES<br>DÉBLOQUÉES</div>
         </div>
@@ -790,14 +819,25 @@
     let currentCalDate = new Date(2025, 11, 1);
 
     // INITIALIZE THEME
-    if(localStorage.getItem('heiko_dark_mode') === 'true') {
-        document.body.classList.add('dark-mode');
+    function initTheme() {
+        const isDark = localStorage.getItem('heiko_dark_mode') === 'true';
+        if(isDark) document.body.classList.add('dark-mode');
+        updateThemeIcon(isDark);
     }
-
+    
     function toggleDarkMode() {
         document.body.classList.toggle('dark-mode');
-        localStorage.setItem('heiko_dark_mode', document.body.classList.contains('dark-mode'));
+        const isDark = document.body.classList.contains('dark-mode');
+        localStorage.setItem('heiko_dark_mode', isDark);
+        updateThemeIcon(isDark);
     }
+    
+    function updateThemeIcon(isDark) {
+        const knob = document.querySelector('.theme-knob');
+        // ICONE: Soleil en mode jour, Lune en mode nuit
+        knob.innerHTML = isDark ? '🌙' : '☀️';
+    }
+    initTheme();
 
     // AUTH
     auth.onAuthStateChanged(user => {
@@ -1042,6 +1082,7 @@
         arr.forEach(u => {
             const d = new Date(u.date).toLocaleDateString();
             const div = document.createElement("div"); div.className = "update-card";
+            div.style.background = "white";
             div.innerHTML = `
                 <div class="update-header">
                     <span style="font-weight:800;font-size:12px;">${u.type.toUpperCase()} - ${d}</span>
@@ -1080,134 +1121,14 @@
         });
     }
 
-    // --- COCKPIT SIMULATOR LOGIC ---
-    let simObjs = {}; 
-
-    function renderSimulator() { buildSimulatorUI(); }
-    function buildSimulatorUI() {
-        const container = document.getElementById("simObjList");
-        container.innerHTML = "";
-        simObjs = JSON.parse(JSON.stringify(allObjs)); 
-        document.getElementById("simGlobalBudget").value = globalSettings.budget || 0;
-        let totalPotential35h = 0;
-        Object.keys(simObjs).forEach(k => {
-            const o = simObjs[k];
-            if(!o.published) return; 
-            let maxObjPrize = 0;
-            if(o.isFixed) {
-                maxObjPrize = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
-            } else {
-                if(o.paliers) o.paliers.forEach(p => maxObjPrize += parse(p.prize));
-            }
-            totalPotential35h += maxObjPrize;
-            let objTotalCost = 0;
-            let totalUserRatio = 0;
-            Object.values(allUsers).forEach(u => { totalUserRatio += (u.hours/BASE_HOURS); });
-            objTotalCost = maxObjPrize * totalUserRatio;
-            const div = document.createElement("div"); div.className = "cockpit-obj-row";
-            let slidersHtml = "";
-            if(o.isFixed) {
-                const prize = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
-                slidersHtml = `<div class="slider-row"><div class="slider-label-line"><span class="slider-label">Prime Fixe</span><span class="slider-val" id="val-${k}-0">${prize}€</span></div><input type="range" min="0" max="50" step="5" value="${prize}" oninput="updateObjVal('${k}', 0, this.value)"></div>`;
-            } else {
-                (o.paliers || []).forEach((p, i) => {
-                    const prize = parse(p.prize);
-                    let label = `Palier ${p.threshold}`;
-                    if(o.isNumeric) label += ""; else label += "%";
-                    slidersHtml += `<div class="slider-row"><div class="slider-label-line"><span class="slider-label">${label}</span><span class="slider-val" id="val-${k}-${i}">${prize}€</span></div><input type="range" min="0" max="30" step="5" value="${prize}" oninput="updateObjVal('${k}', ${i}, this.value)"></div>`;
-                });
-            }
-            div.innerHTML = `<div class="cockpit-obj-title"><span>${o.name}</span> <span class="cockpit-obj-cost" id="cost-${k}">Coût équipe : ${objTotalCost.toFixed(0)}€</span></div>${slidersHtml}`;
-            container.appendChild(div);
-        });
-        document.getElementById("simTotalPerUser").innerText = `${totalPotential35h.toFixed(0)}€`;
-        updateSim();
-    }
-    function updateObjVal(objId, tierIdx, val) {
-        document.getElementById(`val-${objId}-${tierIdx}`).innerText = val + "€";
-        if(simObjs[objId].paliers && simObjs[objId].paliers[tierIdx]) { simObjs[objId].paliers[tierIdx].prize = val; }
-        updateSim();
-    }
-    function updateSim() {
-       const budget = parseFloat(document.getElementById("simGlobalBudget").value) || 0;
-       let totalUserRatio = 0;
-       Object.values(allUsers).forEach(u => { totalUserRatio += (u.hours/BASE_HOURS); });
-       let maxLiability = 0;
-       let totalPotential35h = 0;
-       Object.keys(simObjs).forEach(k => {
-           const o = simObjs[k];
-           if(!o.published) return;
-           let maxP = 0;
-           if(o.isFixed) { maxP = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0; } 
-           else { if(o.paliers) o.paliers.forEach(p => maxP += parse(p.prize)); }
-           const objCost = maxP * totalUserRatio;
-           const costLabel = document.getElementById(`cost-${k}`);
-           if(costLabel) costLabel.innerText = `Coût équipe : ${objCost.toFixed(0)}€`;
-           maxLiability += objCost;
-           totalPotential35h += maxP;
-       });
-       const pct = (budget > 0) ? (maxLiability / budget) * 100 : 0;
-       const bar = document.getElementById("simGauge");
-       bar.style.width = Math.min(pct, 100) + "%";
-       if(maxLiability > budget) { bar.classList.add("danger"); document.getElementById("simUsed").style.color = "#ef4444"; } 
-       else { bar.classList.remove("danger"); document.getElementById("simUsed").style.color = "#3b82f6"; }
-       document.getElementById("simUsed").innerText = `${maxLiability.toFixed(0)}€ Engagés`;
-       document.getElementById("simLeft").innerText = `Reste : ${(budget - maxLiability).toFixed(0)}€`;
-       document.getElementById("simTotalPerUser").innerText = `${totalPotential35h.toFixed(0)}€`;
-    }
-    function publishSim() {
-        if(confirm("📡 Confirmer la publication des nouveaux montants ?")) {
-            const updates = {};
-            if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
-                const newBudget = parseFloat(document.getElementById("simGlobalBudget").value);
-                db.ref('settings/budget').set(newBudget);
-            }
-            Object.keys(simObjs).forEach(k => { updates['objectives/' + k + '/paliers'] = simObjs[k].paliers; });
-            db.ref().update(updates).then(() => { showToast("✅ Pilotage Appliqué !"); logAction("Pilotage", "Mise à jour globale budget & primes"); });
-        }
-    }
-
-    function renderNativeCalendar() {
-        const m = currentCalDate.getMonth();
-        const y = currentCalDate.getFullYear();
-        document.getElementById("calTitle").innerText = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(currentCalDate);
-        const firstDay = new Date(y, m, 1);
-        const lastDay = new Date(y, m + 1, 0);
-        const grid = document.getElementById("calGrid");
-        const legend = document.getElementById("calLegend");
-        grid.innerHTML = "";
-        legend.innerHTML = ""; 
-        let dayOfWeek = firstDay.getDay() - 1; if(dayOfWeek === -1) dayOfWeek = 6; 
-        for(let i=0; i<dayOfWeek; i++) { grid.appendChild(document.createElement("div")); }
-        for(let d=1; d<=lastDay.getDate(); d++) {
-            const cell = document.createElement("div"); cell.className = "cal-cell";
-            cell.innerHTML = `<span class="cal-date">${d}</span>`;
-            const cellDate = new Date(y, m, d);
-            calEvents.forEach(evt => {
-                const s = new Date(evt.start); const e = new Date(evt.end);
-                if(cellDate.setHours(0,0,0,0) >= s.setHours(0,0,0,0) && cellDate.setHours(0,0,0,0) <= e.setHours(0,0,0,0)) {
-                    cell.innerHTML += `<span class="cal-event-dot ${evt.c}">${evt.t}</span>`;
-                }
-            });
-            grid.appendChild(cell);
-        }
-        const uniqueEvents = [...new Map(calEvents.map(item => [item.t, item])).values()];
-        uniqueEvents.forEach(evt => {
-            const legItem = document.createElement("div");
-            legItem.className = "legend-item";
-            legItem.innerHTML = `<div class="legend-dot ${evt.c}"></div><span>${evt.t}</span>`;
-            legend.appendChild(legItem);
-        });
-    }
-    function prevMonth() { currentCalDate.setMonth(currentCalDate.getMonth()-1); renderNativeCalendar(); }
-    function nextMonth() { currentCalDate.setMonth(currentCalDate.getMonth()+1); renderNativeCalendar(); }
-
+    // --- RENDER DASHBOARD (UPDATED) ---
     function renderDashboard() {
       if(!currentUser) return;
       const container = document.getElementById("cardsContainer");
       container.innerHTML = "";
       const ratio = (currentUser.hours || 35) / BASE_HOURS;
       let totalMyGain = 0;
+      let totalPotentialGain = 0; // Pour le remplissage du cercle
       
       const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published);
       let primOk = true;
@@ -1225,12 +1146,19 @@
       }
 
       if(prims.length > 0) container.innerHTML += `<div class="category-title">🔥&nbsp;<span>Priorité Absolue</span></div>`;
-      prims.forEach(o => container.appendChild(createCard(o, false, ratio, true)));
+      prims.forEach(o => {
+          totalPotentialGain += getMaxPossibleGain(o) * ratio;
+          container.appendChild(createCard(o, false, ratio, true));
+      });
 
       const secs = Object.values(allObjs).filter(o => !o.isPrimary && o.published);
       if(secs.length > 0) container.innerHTML += `<div class="category-title secondary">💎&nbsp;<span>Bonus Déblocables</span></div>`;
-      secs.forEach(o => container.appendChild(createCard(o, !primOk, ratio, false)));
+      secs.forEach(o => {
+          totalPotentialGain += getMaxPossibleGain(o) * ratio;
+          container.appendChild(createCard(o, !primOk, ratio, false));
+      });
 
+      // CALCUL DES GAINS RÉELS
       Object.keys(allObjs).forEach(key => {
         const o = allObjs[key];
         if(!o.published) return;
@@ -1253,20 +1181,46 @@
         }
       });
 
+      // UPDATE CIRCLE UI
       document.getElementById("myTotalGain").textContent = totalMyGain.toFixed(2) + "€";
+      
+      // LOGIQUE REMPLISSAGE LIQUIDE DU CERCLE
+      let fillPercent = 0;
+      if(totalPotentialGain > 0) fillPercent = (totalMyGain / totalPotentialGain) * 100;
+      if(fillPercent > 100) fillPercent = 100; // Cap at 100%
+      document.getElementById("moneyFill").style.height = fillPercent + "%";
+
+      // LOGIQUE ANIMATION BILLETS (FONTAINE)
       const rainContainer = document.getElementById("moneyRain");
       rainContainer.innerHTML = "";
       if(totalMyGain > 0) {
          for(let i=0; i<30; i++) {
             const bill = document.createElement("div"); bill.className = "bill"; bill.textContent = "💸";
-            bill.style.left = Math.random()*100 + "%";
-            bill.style.animation = `floatMoney ${2+Math.random()}s infinite ${Math.random()}s ease-in`;
+            // Randomize trajectory for fountain effect
+            const randomX = (Math.random() - 0.5) * 200 + "px"; // Ecartement
+            const randomX2 = (Math.random() - 0.5) * 300 + "px"; // Retombée plus large
+            bill.style.setProperty('--rx', randomX);
+            bill.style.setProperty('--rx2', randomX2);
+            
+            bill.style.left = "50%"; // Start center
+            bill.style.bottom = "0px";
+            bill.style.animation = `moneyFountain ${2+Math.random()}s infinite ${Math.random()}s ease-in-out`;
             bill.style.fontSize = (20 + Math.random()*20) + "px";
             rainContainer.appendChild(bill);
          }
       }
       const d = new Date();
       document.getElementById("lastUpdate").textContent = "Mise à jour : " + d.toLocaleDateString('fr-FR');
+    }
+
+    function getMaxPossibleGain(obj) {
+        if(obj.isFixed && obj.paliers && obj.paliers[0]) return parse(obj.paliers[0].prize);
+        if(obj.paliers) {
+            let sum = 0;
+            obj.paliers.forEach(p => sum += parse(p.prize));
+            return sum;
+        }
+        return 0;
     }
 
     function createCard(obj, isLocked, userRatio, isPrimary) {
@@ -1283,7 +1237,9 @@
       }
 
       const el = document.createElement("div");
-      let cls = "card"; if(isLocked) cls += " is-locked"; if(isWin && !isLocked) cls += " is-winner";
+      let cls = "card"; 
+      if(isLocked) cls += " is-locked"; 
+      if(isWin && !isLocked) cls += " is-winner";
       el.className = cls;
 
       let badge = "";
