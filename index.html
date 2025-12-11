@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
@@ -57,9 +56,14 @@ html>
     @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
     @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); } 20%, 40%, 60%, 80% { transform: translateX(5px); } }
     
-    /* ANIMATION BORDURE CARTE GAGNANTE */
+    /* ANIMATION BORDURE CARTE GAGNANTE - VERSION SOBRE */
     @keyframes borderRotate {
-      100% { background-position: 0 100%; }
+      0% { 
+        background-position: 0% 0%;
+      }
+      100% { 
+        background-position: 200% 0%;
+      }
     }
 
     /* ALERT TOP (NEWS) - 10 SECONDS */
@@ -183,6 +187,63 @@ html>
     .last-update { font-size: 14px; color: var(--text-muted); background: rgba(255,255,255,0.5); padding: 8px 20px; border-radius: 30px; display: inline-block; font-weight: 600; border: 1px solid var(--border-color); text-transform: capitalize; }
     body.dark-mode .last-update { background: rgba(0,0,0,0.3); }
 
+    /* --- ANIMATION NÉON ROTATION CERCLE --- */
+    @keyframes neonRotate {
+        0% { 
+            background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
+                        linear-gradient(0deg, #f59e0b, #2563eb, #10b981, #8b5cf6, #f59e0b) border-box;
+            box-shadow: 0 20px 60px rgba(37, 99, 235, 0.4), inset 0 0 30px rgba(245, 158, 11, 0.3);
+        }
+        25% { 
+            background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
+                        linear-gradient(90deg, #f59e0b, #2563eb, #10b981, #8b5cf6, #f59e0b) border-box;
+            box-shadow: 0 20px 60px rgba(16, 185, 129, 0.4), inset 0 0 30px rgba(37, 99, 235, 0.3);
+        }
+        50% { 
+            background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
+                        linear-gradient(180deg, #f59e0b, #2563eb, #10b981, #8b5cf6, #f59e0b) border-box;
+            box-shadow: 0 20px 60px rgba(139, 92, 246, 0.4), inset 0 0 30px rgba(16, 185, 129, 0.3);
+        }
+        75% { 
+            background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
+                        linear-gradient(270deg, #f59e0b, #2563eb, #10b981, #8b5cf6, #f59e0b) border-box;
+            box-shadow: 0 20px 60px rgba(245, 158, 11, 0.4), inset 0 0 30px rgba(139, 92, 246, 0.3);
+        }
+        100% { 
+            background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
+                        linear-gradient(360deg, #f59e0b, #2563eb, #10b981, #8b5cf6, #f59e0b) border-box;
+            box-shadow: 0 20px 60px rgba(37, 99, 235, 0.4), inset 0 0 30px rgba(245, 158, 11, 0.3);
+        }
+    }
+
+    @keyframes neonRotateDark {
+        0% { 
+            background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
+                        linear-gradient(0deg, #d97706, #1e40af, #059669, #7c3aed, #d97706) border-box;
+            box-shadow: 0 20px 60px rgba(30, 64, 175, 0.6), inset 0 0 40px rgba(217, 119, 6, 0.4);
+        }
+        25% { 
+            background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
+                        linear-gradient(90deg, #d97706, #1e40af, #059669, #7c3aed, #d97706) border-box;
+            box-shadow: 0 20px 60px rgba(5, 150, 105, 0.6), inset 0 0 40px rgba(30, 64, 175, 0.4);
+        }
+        50% { 
+            background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
+                        linear-gradient(180deg, #d97706, #1e40af, #059669, #7c3aed, #d97706) border-box;
+            box-shadow: 0 20px 60px rgba(124, 58, 237, 0.6), inset 0 0 40px rgba(5, 150, 105, 0.4);
+        }
+        75% { 
+            background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
+                        linear-gradient(270deg, #d97706, #1e40af, #059669, #7c3aed, #d97706) border-box;
+            box-shadow: 0 20px 60px rgba(217, 119, 6, 0.6), inset 0 0 40px rgba(124, 58, 237, 0.4);
+        }
+        100% { 
+            background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
+                        linear-gradient(360deg, #d97706, #1e40af, #059669, #7c3aed, #d97706) border-box;
+            box-shadow: 0 20px 60px rgba(30, 64, 175, 0.6), inset 0 0 40px rgba(217, 119, 6, 0.4);
+        }
+    }
+
     /* --- NOUVEAU STYLE CERCLE CENTRAL --- */
     .global-score-container { 
         margin: 40px auto; 
@@ -191,17 +252,19 @@ html>
         display: flex; align-items: center; justify-content: center; flex-direction: column; 
         position: relative; overflow: visible; /* Important pour que les billets sortent */
         background: var(--card-bg);
-        /* Bordure double dégradée Or et Bleu */
+        /* Bordure double dégradée Or et Bleu avec animation */
         border: 6px solid transparent;
         background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
-                    linear-gradient(135deg, #f59e0b, #2563eb, #f59e0b) border-box;
+                    linear-gradient(135deg, #f59e0b, #2563eb, #10b981, #8b5cf6, #f59e0b) border-box;
         /* Glow interne et externe */
         box-shadow: 0 20px 60px rgba(37, 99, 235, 0.4), inset 0 0 30px rgba(245, 158, 11, 0.3);
+        animation: neonRotate 8s ease-in-out infinite;
     }
     body.dark-mode .global-score-container {
          background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
-                    linear-gradient(135deg, #b45309, #1e40af, #b45309) border-box;
-         box-shadow: 0 20px 60px rgba(30, 64, 175, 0.5), inset 0 0 30px rgba(180, 83, 9, 0.3);
+                    linear-gradient(135deg, #d97706, #1e40af, #059669, #7c3aed, #d97706) border-box;
+         box-shadow: 0 20px 60px rgba(30, 64, 175, 0.6), inset 0 0 40px rgba(217, 119, 6, 0.4);
+         animation: neonRotateDark 8s ease-in-out infinite;
     }
     
     .global-score-value { font-size: 58px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
@@ -219,29 +282,30 @@ html>
     body.dark-mode .card.is-locked { background: #0f172a; border-color: #334155; }
     .card.is-locked .obj-icon { filter: grayscale(1); opacity: 0.5; }
 
-    /* --- NOUVELLE ANIMATION BORDURE CARTE GAGNANTE --- */
+    /* --- BORDURE CARTE GAGNANTE - VERSION SOBRE ET ÉLÉGANTE --- */
     .card.is-winner {
-        border: none; /* On enlève la bordure standard */
-        box-shadow: 0 15px 50px rgba(16, 185, 129, 0.2);
-        overflow: visible; /* Pour que la bordure animée dépasse */
+        border: none;
+        box-shadow: 0 15px 50px rgba(5, 150, 105, 0.25);
+        overflow: visible;
     }
     /* Pseudo-élément pour la bordure animée */
     .card.is-winner::before {
         content: "";
         position: absolute;
-        top: -4px; left: -4px; right: -4px; bottom: -4px; /* Épaisseur de 4px */
+        top: -3px; left: -3px; right: -3px; bottom: -3px; /* Bordure plus fine */
         z-index: -1;
-        border-radius: calc(var(--radius) + 4px);
-        /* Le dégradé rayé style "barber pole" */
-        background: repeating-linear-gradient(
-            45deg,
-            #10b981, /* Vert foncé */
-            #10b981 20px,
-            #86efac 20px, /* Vert clair */
-            #86efac 40px
+        border-radius: calc(var(--radius) + 3px);
+        /* Dégradé linéaire sobre avec 3 nuances de vert foncé */
+        background: linear-gradient(
+            90deg,
+            #047857, /* Vert foncé 1 */
+            #059669, /* Vert moyen */
+            #047857, /* Vert foncé 1 */
+            #065f46, /* Vert très foncé */
+            #047857  /* Retour au début */
         );
-        background-size: 200% 200%;
-        animation: borderRotate 4s linear infinite; /* Animation continue */
+        background-size: 200% 100%;
+        animation: borderRotate 3s linear infinite; /* Rotation continue */
     }
     /* Pseudo-élément pour masquer l'intérieur de la bordure */
     .card.is-winner::after {
@@ -493,7 +557,7 @@ html>
 <body>
 
   <div class="theme-toggle" onclick="toggleDarkMode()">
-    <div class="theme-toggle-slider"><span class="toggle-icon">🌙</span></div>
+    <div class="theme-toggle-slider"><span class="toggle-icon">☀️</span></div>
   </div>
 
   <div id="topAlert">
@@ -818,7 +882,10 @@ html>
     ];
     let currentCalDate = new Date(2025, 11, 1);
 
-    // INITIALIZE THEME
+    // INITIALIZE THEME - TOUJOURS EN MODE NUIT PAR DÉFAUT
+    if(localStorage.getItem('heiko_dark_mode') === null) {
+        localStorage.setItem('heiko_dark_mode', 'true');
+    }
     if(localStorage.getItem('heiko_dark_mode') === 'true') {
         document.body.classList.add('dark-mode');
     }
