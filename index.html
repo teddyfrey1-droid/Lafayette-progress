@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
@@ -9,7 +10,7 @@
   <meta name="theme-color" content="#2563eb">
   <meta name="mobile-web-app-capable" content="yes">
 
-  <!-- Icônes PWA avec fusée 🚀 -->
+  <!-- Icône PWA fusée -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%232563eb'/%3E%3Cstop offset='50%25' style='stop-color:%238b5cf6'/%3E%3Cstop offset='100%25' style='stop-color:%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23g)'/%3E%3Ctext x='50' y='70' font-family='Arial,sans-serif' font-size='55' fill='white' text-anchor='middle'%3E🚀%3C/text%3E%3C/svg%3E">
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%232563eb'/%3E%3Cstop offset='50%25' style='stop-color:%238b5cf6'/%3E%3Cstop offset='100%25' style='stop-color:%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23g)'/%3E%3Ctext x='50' y='70' font-family='Arial,sans-serif' font-size='55' fill='white' text-anchor='middle'%3E🚀%3C/text%3E%3C/svg%3E">
   
@@ -93,7 +94,7 @@
     #toast { visibility: hidden; min-width: 300px; background-color: var(--success); color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 3000; left: 50%; top: 0; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; transform:translate(-50%, -100%); transition: all 0.3s; }
     #toast.show { visibility: visible; transform:translate(-50%, 20px); }
 
-    /* DARK MODE TOGGLE - BARRE ARRONDIE AVEC CURSEUR FIXE */
+    /* DARK MODE TOGGLE */
     .theme-toggle {
         position: fixed; bottom: 20px; right: 20px; z-index: 9999;
         background: var(--card-bg); border: 2px solid var(--border-color);
@@ -110,12 +111,12 @@
     body.dark-mode .theme-toggle-slider { left: calc(100% - 28px); background: #fbbf24; }
     .theme-toggle:hover { transform: scale(1.05); }
 
-    /* FEEDBACK BUTTON - ULTRA FIN ET ALLONGÉ */
+    /* FEEDBACK BUTTON */
     .feedback-btn {
         position: fixed; top: 50%; right: 0; transform: translateY(-50%);
         background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
         color: white; border: none; 
-        padding: 60px 5px; /* Encore plus allongé, encore plus fin */
+        padding: 60px 5px;
         border-radius: 8px 0 0 8px;
         box-shadow: -4px 4px 15px rgba(37, 99, 235, 0.3);
         cursor: pointer; z-index: 1000; font-weight: 900; font-size: 10px;
@@ -192,13 +193,31 @@
     .last-update { font-size: 14px; color: var(--text-muted); background: rgba(255,255,255,0.5); padding: 8px 20px; border-radius: 30px; display: inline-block; font-weight: 600; border: 1px solid var(--border-color); text-transform: capitalize; }
     body.dark-mode .last-update { background: rgba(0,0,0,0.3); }
 
-    /* --- ANIMATION ROTATION CERCLE - ROUGE/ROSE/VIOLET/BLEU/TURQUOISE UNIQUEMENT --- */
-    @keyframes neonRotate {
-        0% { filter: hue-rotate(0deg) brightness(1.2) saturate(1.3); }
-        100% { filter: hue-rotate(360deg) brightness(1.2) saturate(1.3); }
+    /* ANIMATION CERCLE - PAS DE hue-rotate pour éviter le vert */
+    @keyframes neonPulse {
+        0%, 100% { 
+            box-shadow: 0 0 40px rgba(239, 68, 68, 0.6),
+                        0 0 70px rgba(139, 92, 246, 0.5),
+                        inset 0 0 50px rgba(236, 72, 153, 0.3);
+        }
+        25% { 
+            box-shadow: 0 0 40px rgba(236, 72, 153, 0.6),
+                        0 0 70px rgba(59, 130, 246, 0.5),
+                        inset 0 0 50px rgba(139, 92, 246, 0.3);
+        }
+        50% { 
+            box-shadow: 0 0 40px rgba(59, 130, 246, 0.6),
+                        0 0 70px rgba(6, 182, 212, 0.5),
+                        inset 0 0 50px rgba(59, 130, 246, 0.3);
+        }
+        75% { 
+            box-shadow: 0 0 40px rgba(139, 92, 246, 0.6),
+                        0 0 70px rgba(236, 72, 153, 0.5),
+                        inset 0 0 50px rgba(239, 68, 68, 0.3);
+        }
     }
 
-    /* --- CERCLE CENTRAL - ZÉRO VERT --- */
+    /* CERCLE CENTRAL - ZÉRO VERT */
     .global-score-container { 
         margin: 40px auto; 
         width: 280px; height: 280px;
@@ -211,10 +230,10 @@
             linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
             conic-gradient(
                 from 0deg,
-                #b91c1c,    /* Rouge très foncé */
-                #dc2626,    /* Rouge foncé */
-                #ef4444,    /* Rouge */
-                #f87171,    /* Rouge clair */
+                #b91c1c,    /* Rouge foncé */
+                #dc2626,    /* Rouge */
+                #ef4444,    /* Rouge clair */
+                #f87171,    /* Rouge très clair */
                 #fb7185,    /* Rose-rouge */
                 #ec4899,    /* Rose */
                 #f472b6,    /* Rose clair */
@@ -230,21 +249,14 @@
                 #4f46e5,    /* Indigo foncé */
                 #3b82f6,    /* Bleu */
                 #60a5fa,    /* Bleu clair */
-                #38bdf8,    /* Bleu ciel */
-                #0ea5e9,    /* Bleu sky */
-                #06b6d4,    /* Cyan */
+                #0ea5e9,    /* Bleu ciel (pas vert) */
+                #06b6d4,    /* Cyan pur */
                 #22d3ee,    /* Cyan clair */
-                #67e8f9,    /* Cyan très clair */
-                #0891b2,    /* Turquoise foncé */
                 #2563eb,    /* Bleu royal */
-                #1e40af,    /* Bleu marine */
-                #b91c1c     /* Rouge très foncé (retour) */
+                #1d4ed8,    /* Bleu marine */
+                #b91c1c     /* Rouge foncé (retour) */
             ) border-box;
-        box-shadow: 
-            0 0 40px rgba(59, 130, 246, 0.6),
-            0 0 70px rgba(139, 92, 246, 0.4),
-            inset 0 0 50px rgba(236, 72, 153, 0.3);
-        animation: neonRotate 5s linear infinite;
+        animation: neonPulse 5s ease-in-out infinite;
     }
     body.dark-mode .global-score-container {
          background: 
@@ -270,21 +282,14 @@
                 #3730a3,    /* Indigo très foncé */
                 #2563eb,    /* Bleu foncé */
                 #3b82f6,    /* Bleu */
-                #0ea5e9,    /* Bleu ciel */
-                #0284c7,    /* Sky foncé */
+                #0284c7,    /* Bleu sky (pas vert) */
                 #0891b2,    /* Cyan foncé */
                 #06b6d4,    /* Cyan */
-                #22d3ee,    /* Cyan clair */
-                #0e7490,    /* Turquoise foncé */
                 #1e40af,    /* Bleu royal foncé */
                 #1e3a8a,    /* Bleu nuit */
                 #7f1d1d     /* Rouge ultra foncé (retour) */
             ) border-box;
-         box-shadow: 
-            0 0 50px rgba(37, 99, 235, 0.7),
-            0 0 80px rgba(124, 58, 237, 0.5),
-            inset 0 0 60px rgba(219, 39, 119, 0.4);
-         animation: neonRotate 5s linear infinite;
+         animation: neonPulse 5s ease-in-out infinite;
     }
     
     .global-score-value { font-size: 58px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
@@ -302,7 +307,7 @@
     body.dark-mode .card.is-locked { background: #0f172a; border-color: #334155; }
     .card.is-locked .obj-icon { filter: grayscale(1); opacity: 0.5; }
 
-    /* --- BORDURE CARTE GAGNANTE --- */
+    /* BORDURE CARTE GAGNANTE */
     .card.is-winner {
         border: none;
         box-shadow: 0 15px 50px rgba(5, 150, 105, 0.25);
@@ -562,7 +567,42 @@
     .planning-title { text-align: center; justify-content: center; margin-left: auto; margin-right: auto; width: 100%; }
 
     @media (max-width: 600px) { .group-body.open { grid-template-columns: 1fr; } }
-  </style>
+  
+    /* ========== CÉLÉBRATIONS (Idée #5) ========== */
+    @keyframes confettiFall {
+        0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+        100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }
+
+    .confetti {
+        position: fixed;
+        width: 12px;
+        height: 12px;
+        z-index: 10000;
+        pointer-events: none;
+        border-radius: 2px;
+    }
+
+    /* Animation pour les cartes quand objectif validé */
+    @keyframes cardVictory {
+        0%, 100% { transform: scale(1); }
+        25% { transform: scale(1.05) rotate(-2deg); }
+        50% { transform: scale(1.1) rotate(2deg); }
+        75% { transform: scale(1.05) rotate(-1deg); }
+    }
+
+    .card-celebrating {
+        animation: cardVictory 0.6s ease-out;
+    }
+
+    /* Toast amélioré pour célébrations */
+    .toast.celebration {
+        background: linear-gradient(135deg, #10b981, #3b82f6, #8b5cf6);
+        font-size: 16px;
+        padding: 18px 30px;
+        box-shadow: 0 10px 40px rgba(59, 130, 246, 0.4);
+    }
+</style>
 </head>
 <body>
 
@@ -892,7 +932,7 @@
     ];
     let currentCalDate = new Date(2025, 11, 1);
 
-    // INITIALIZE THEME - TOUJOURS EN MODE NUIT PAR DÉFAUT
+    // INITIALIZE THEME - MODE NUIT PAR DÉFAUT
     if(localStorage.getItem('heiko_dark_mode') === null) {
         localStorage.setItem('heiko_dark_mode', 'true');
     }
@@ -1778,6 +1818,80 @@
       if(!tv) return 0; return (cv/tv)*100;
     }
     function parse(s) { return parseFloat(String(s).replace(/[^0-9.]/g,''))||0; }
-  </script>
+  
+    // ========== CÉLÉBRATIONS AUTOMATIQUES (Idée #5) ==========
+
+    function triggerCelebration(message = '🎉 Objectif validé!') {
+        // 1. CONFETTIS
+        const colors = ['#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4'];
+        const confettiCount = 60;
+
+        for(let i = 0; i < confettiCount; i++) {
+            setTimeout(() => {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + '%';
+                confetti.style.top = '-50px';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animation = `confettiFall ${2.5 + Math.random() * 2}s ease-out`;
+                confetti.style.animationDelay = '0s';
+                document.body.appendChild(confetti);
+
+                setTimeout(() => confetti.remove(), 5000);
+            }, i * 40); // Décalage pour effet cascade
+        }
+
+        // 2. TOAST SPÉCIAL CÉLÉBRATION
+        const toast = document.createElement('div');
+        toast.className = 'toast celebration';
+        toast.textContent = message;
+        toast.style.cssText = 'position:fixed;top:30px;left:50%;transform:translateX(-50%);z-index:10001;border-radius:50px;animation:slideDown 0.4s ease-out;';
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.animation = 'slideUp 0.4s ease-out';
+            setTimeout(() => toast.remove(), 400);
+        }, 3000);
+
+        // 3. SON (optionnel - décommenter si besoin)
+        // playVictorySound();
+    }
+
+    // Fonction pour jouer un son de victoire (optionnel)
+    function playVictorySound() {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.frequency.value = 523.25; // Do
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.5);
+    }
+
+    // Déclencher célébration quand on clique sur une carte (démo)
+    window.addEventListener('DOMContentLoaded', function() {
+        // Ajouter l'événement sur toutes les cartes d'objectifs
+        document.querySelectorAll('.card').forEach(card => {
+            card.addEventListener('click', function() {
+                // Simuler la validation d'un objectif
+                if(!this.classList.contains('card-celebrating')) {
+                    this.classList.add('card-celebrating');
+                    triggerCelebration('🎉 Bravo! +50€ débloqué!');
+
+                    setTimeout(() => {
+                        this.classList.remove('card-celebrating');
+                    }, 600);
+                }
+            });
+        });
+    });
+</script>
 </body>
 </html>
