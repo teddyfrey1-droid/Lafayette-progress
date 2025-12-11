@@ -9,9 +9,9 @@
   <meta name="theme-color" content="#2563eb">
   <meta name="mobile-web-app-capable" content="yes">
 
-  <!-- Icônes PWA avec dégradé Bleu/Violet/Rose -->
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%232563eb'/%3E%3Cstop offset='50%25' style='stop-color:%238b5cf6'/%3E%3Cstop offset='100%25' style='stop-color:%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23g)'/%3E%3Ctext x='50' y='72' font-family='Arial,sans-serif' font-size='60' font-weight='bold' fill='white' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E">
-  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%232563eb'/%3E%3Cstop offset='50%25' style='stop-color:%238b5cf6'/%3E%3Cstop offset='100%25' style='stop-color:%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23g)'/%3E%3Ctext x='50' y='72' font-family='Arial,sans-serif' font-size='60' font-weight='bold' fill='white' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E">
+  <!-- Icônes PWA avec fusée 🚀 -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%232563eb'/%3E%3Cstop offset='50%25' style='stop-color:%238b5cf6'/%3E%3Cstop offset='100%25' style='stop-color:%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23g)'/%3E%3Ctext x='50' y='70' font-family='Arial,sans-serif' font-size='55' fill='white' text-anchor='middle'%3E🚀%3C/text%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%232563eb'/%3E%3Cstop offset='50%25' style='stop-color:%238b5cf6'/%3E%3Cstop offset='100%25' style='stop-color:%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23g)'/%3E%3Ctext x='50' y='70' font-family='Arial,sans-serif' font-size='55' fill='white' text-anchor='middle'%3E🚀%3C/text%3E%3C/svg%3E">
   
   <title>Heiko - Budget Master V61 (Animated Borders)</title>
   
@@ -110,21 +110,22 @@
     body.dark-mode .theme-toggle-slider { left: calc(100% - 28px); background: #fbbf24; }
     .theme-toggle:hover { transform: scale(1.05); }
 
-    /* FEEDBACK BUTTON - BARRE VERTICALE */
+    /* FEEDBACK BUTTON - BARRE VERTICALE ALLONGÉE */
     .feedback-btn {
         position: fixed; top: 50%; right: 0; transform: translateY(-50%);
         background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
-        color: white; border: none; padding: 20px 12px;
+        color: white; border: none; 
+        padding: 35px 8px;
         border-radius: 12px 0 0 12px;
         box-shadow: -4px 4px 15px rgba(37, 99, 235, 0.3);
-        cursor: pointer; z-index: 1000; font-weight: 900; font-size: 13px;
-        display: flex; flex-direction: column; align-items: center; gap: 8px;
+        cursor: pointer; z-index: 1000; font-weight: 900; font-size: 12px;
+        display: flex; flex-direction: column; align-items: center; gap: 10px;
         transition: all 0.3s ease; writing-mode: vertical-rl;
-        text-orientation: mixed; letter-spacing: 1px;
+        text-orientation: mixed; letter-spacing: 1.2px;
         border-left: 3px solid rgba(255,255,255,0.3);
     }
     .feedback-btn:hover {
-        padding-right: 16px;
+        padding-right: 12px;
         background: linear-gradient(180deg, #2563eb 0%, #1e40af 100%);
         transform: translateY(-50%) translateX(-4px);
         box-shadow: -6px 4px 20px rgba(37, 99, 235, 0.4);
@@ -200,52 +201,38 @@
             linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
             conic-gradient(
                 from 0deg, 
-                #ef4444,    /* Rouge */
-                #f87171,    /* Rouge clair */
-                #fb923c,    /* Orange */
-                #3b82f6,    /* Bleu */
-                #60a5fa,    /* Bleu clair */
-                #6366f1,    /* Indigo */
-                #818cf8,    /* Indigo clair */
-                #8b5cf6,    /* Violet */
-                #a78bfa,    /* Violet clair */
-                #c084fc,    /* Violet plus clair */
-                #d946ef,    /* Magenta */
-                #ec4899,    /* Rose */
-                #f472b6,    /* Rose clair */
-                #ef4444     /* Rouge (retour) */
+                #dc2626, #ef4444, #f87171, #fb7185,
+                #ec4899, #f472b6, #f9a8d4,
+                #d946ef, #e879f9, #c084fc, #a78bfa,
+                #8b5cf6, #7c3aed, #6366f1, #818cf8, #4f46e5,
+                #3b82f6, #60a5fa, #38bdf8,
+                #22d3ee, #06b6d4, #0891b2,
+                #2563eb, #1d4ed8, #dc2626
             ) border-box;
         box-shadow: 
             0 0 40px rgba(59, 130, 246, 0.6),
             0 0 70px rgba(139, 92, 246, 0.4),
             inset 0 0 50px rgba(236, 72, 153, 0.3);
-        animation: neonRotate 4s linear infinite;
+        animation: neonRotate 5s linear infinite;
     }
     body.dark-mode .global-score-container {
          background: 
             linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
             conic-gradient(
                 from 0deg, 
-                #dc2626,    /* Rouge foncé */
-                #ef4444,    /* Rouge */
-                #f97316,    /* Orange foncé */
-                #2563eb,    /* Bleu foncé */
-                #3b82f6,    /* Bleu */
-                #4f46e5,    /* Indigo foncé */
-                #6366f1,    /* Indigo */
-                #7c3aed,    /* Violet foncé */
-                #8b5cf6,    /* Violet */
-                #a855f7,    /* Violet lumineux */
-                #c026d3,    /* Fuchsia */
-                #db2777,    /* Rose foncé */
-                #ec4899,    /* Rose */
-                #dc2626     /* Rouge foncé (retour) */
+                #991b1b, #dc2626, #ef4444, #f43f5e,
+                #db2777, #ec4899, #f472b6,
+                #c026d3, #d946ef, #a855f7, #8b5cf6,
+                #7c3aed, #6d28d9, #4f46e5, #6366f1, #3730a3,
+                #2563eb, #3b82f6, #0ea5e9,
+                #06b6d4, #0891b2, #0e7490,
+                #1e40af, #1e3a8a, #991b1b
             ) border-box;
          box-shadow: 
             0 0 50px rgba(37, 99, 235, 0.7),
             0 0 80px rgba(124, 58, 237, 0.5),
             inset 0 0 60px rgba(219, 39, 119, 0.4);
-         animation: neonRotate 4s linear infinite;
+         animation: neonRotate 5s linear infinite;
     }
     
     .global-score-value { font-size: 58px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
@@ -539,7 +526,7 @@
       </div>
   </div>
 
-  <div class="feedback-btn" onclick="document.getElementById('feedbackModal').style.display='flex'" title="Proposer une idée"><span style="font-size: 20px; writing-mode: horizontal-tb;">💡</span>Une idée ?</div>
+  <div class="feedback-btn" onclick="document.getElementById('feedbackModal').style.display='flex'" title="Proposer une idée"><span style="font-size: 26px; writing-mode: horizontal-tb;">💡</span>Une idée ?</div>
 
   <div id="feedbackModal" class="modal-overlay">
       <div class="modal-box">
