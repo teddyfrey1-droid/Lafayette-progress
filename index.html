@@ -91,66 +91,32 @@
 
     /* DARK MODE TOGGLE - BARRE ARRONDIE AVEC CURSEUR FIXE */
     .theme-toggle {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        z-index: 9999;
-        background: var(--card-bg);
-        border: 2px solid var(--border-color);
-        width: 70px;
-        height: 32px;
-        border-radius: 50px;
-        cursor: pointer;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        transition: all 0.3s ease;
-        display: flex;
-        align-items: center;
-        padding: 3px;
+        position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+        background: var(--card-bg); border: 2px solid var(--border-color);
+        width: 70px; height: 32px; border-radius: 50px; cursor: pointer;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2); transition: all 0.3s ease;
+        display: flex; align-items: center; padding: 3px;
     }
     .theme-toggle-slider {
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-        background: var(--primary);
-        position: absolute;
-        left: 4px;
-        transition: all 0.3s ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 14px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        width: 24px; height: 24px; border-radius: 50%; background: var(--primary);
+        position: absolute; left: 4px; transition: all 0.3s ease;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
-    body.dark-mode .theme-toggle-slider {
-        left: calc(100% - 28px);
-        background: #fbbf24;
-    }
+    body.dark-mode .theme-toggle-slider { left: calc(100% - 28px); background: #fbbf24; }
     .theme-toggle:hover { transform: scale(1.05); }
 
     /* FEEDBACK BUTTON - BARRE VERTICALE */
     .feedback-btn {
-        position: fixed;
-        top: 50%;
-        right: 0;
-        transform: translateY(-50%);
+        position: fixed; top: 50%; right: 0; transform: translateY(-50%);
         background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
-        color: white;
-        border: none;
-        padding: 20px 12px;
+        color: white; border: none; padding: 20px 12px;
         border-radius: 12px 0 0 12px;
         box-shadow: -4px 4px 15px rgba(37, 99, 235, 0.3);
-        cursor: pointer;
-        z-index: 1000;
-        font-weight: 900;
-        font-size: 13px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 8px;
-        transition: all 0.3s ease;
-        writing-mode: vertical-rl;
-        text-orientation: mixed;
-        letter-spacing: 1px;
+        cursor: pointer; z-index: 1000; font-weight: 900; font-size: 13px;
+        display: flex; flex-direction: column; align-items: center; gap: 8px;
+        transition: all 0.3s ease; writing-mode: vertical-rl;
+        text-orientation: mixed; letter-spacing: 1px;
         border-left: 3px solid rgba(255,255,255,0.3);
     }
     .feedback-btn:hover {
@@ -211,56 +177,13 @@
     .last-update { font-size: 14px; color: var(--text-muted); background: rgba(255,255,255,0.5); padding: 8px 20px; border-radius: 30px; display: inline-block; font-weight: 600; border: 1px solid var(--border-color); text-transform: capitalize; }
     body.dark-mode .last-update { background: rgba(0,0,0,0.3); }
 
-    /* --- ANIMATION NÉON ROTATION CERCLE FLUIDE --- */
+    /* --- ANIMATION ROTATION CERCLE MULTICOLORE --- */
     @keyframes neonRotate {
-        from { 
-            background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
-                        conic-gradient(from 0deg, #f59e0b, #2563eb, #10b981, #8b5cf6, #f59e0b) border-box;
+        0% { 
+            filter: hue-rotate(0deg) brightness(1.1);
         }
-        to { 
-            background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
-                        conic-gradient(from 360deg, #f59e0b, #2563eb, #10b981, #8b5cf6, #f59e0b) border-box;
-        }
-    }
-
-    @keyframes neonRotateDark {
-        from { 
-            background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
-                        conic-gradient(from 0deg, #d97706, #1e40af, #059669, #7c3aed, #d97706) border-box;
-        }
-        to { 
-            background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
-                        conic-gradient(from 360deg, #d97706, #1e40af, #059669, #7c3aed, #d97706) border-box;
-        }
-    }
-
-    @keyframes neonGlow {
-        0%, 100% { 
-            box-shadow: 0 20px 60px rgba(37, 99, 235, 0.4), inset 0 0 30px rgba(245, 158, 11, 0.3);
-        }
-        25% { 
-            box-shadow: 0 20px 60px rgba(16, 185, 129, 0.4), inset 0 0 30px rgba(37, 99, 235, 0.3);
-        }
-        50% { 
-            box-shadow: 0 20px 60px rgba(139, 92, 246, 0.4), inset 0 0 30px rgba(16, 185, 129, 0.3);
-        }
-        75% { 
-            box-shadow: 0 20px 60px rgba(245, 158, 11, 0.4), inset 0 0 30px rgba(139, 92, 246, 0.3);
-        }
-    }
-
-    @keyframes neonGlowDark {
-        0%, 100% { 
-            box-shadow: 0 20px 60px rgba(30, 64, 175, 0.6), inset 0 0 40px rgba(217, 119, 6, 0.4);
-        }
-        25% { 
-            box-shadow: 0 20px 60px rgba(5, 150, 105, 0.6), inset 0 0 40px rgba(30, 64, 175, 0.4);
-        }
-        50% { 
-            box-shadow: 0 20px 60px rgba(124, 58, 237, 0.6), inset 0 0 40px rgba(5, 150, 105, 0.4);
-        }
-        75% { 
-            box-shadow: 0 20px 60px rgba(217, 119, 6, 0.6), inset 0 0 40px rgba(124, 58, 237, 0.4);
+        100% { 
+            filter: hue-rotate(360deg) brightness(1.1);
         }
     }
 
@@ -273,16 +196,52 @@
         position: relative; overflow: visible;
         background: var(--card-bg);
         border: 6px solid transparent;
-        background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
-                    conic-gradient(from 0deg, #f59e0b, #2563eb, #10b981, #8b5cf6, #f59e0b) border-box;
-        box-shadow: 0 20px 60px rgba(37, 99, 235, 0.4), inset 0 0 30px rgba(245, 158, 11, 0.3);
-        animation: neonRotate 4s linear infinite, neonGlow 8s ease-in-out infinite;
+        background: 
+            linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
+            conic-gradient(
+                from 0deg, 
+                #ff6b6b,    /* Rouge vif */
+                #f59e0b,    /* Orange */
+                #fbbf24,    /* Jaune */
+                #84cc16,    /* Vert lime */
+                #10b981,    /* Vert émeraude */
+                #06b6d4,    /* Cyan */
+                #3b82f6,    /* Bleu */
+                #6366f1,    /* Indigo */
+                #8b5cf6,    /* Violet */
+                #d946ef,    /* Magenta */
+                #ec4899,    /* Rose */
+                #ff6b6b     /* Rouge vif (retour) */
+            ) border-box;
+        box-shadow: 
+            0 0 30px rgba(59, 130, 246, 0.5),
+            0 0 60px rgba(139, 92, 246, 0.3),
+            inset 0 0 40px rgba(245, 158, 11, 0.2);
+        animation: neonRotate 3s linear infinite;
     }
     body.dark-mode .global-score-container {
-         background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
-                    conic-gradient(from 0deg, #d97706, #1e40af, #059669, #7c3aed, #d97706) border-box;
-         box-shadow: 0 20px 60px rgba(30, 64, 175, 0.6), inset 0 0 40px rgba(217, 119, 6, 0.4);
-         animation: neonRotateDark 4s linear infinite, neonGlowDark 8s ease-in-out infinite;
+         background: 
+            linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
+            conic-gradient(
+                from 0deg, 
+                #dc2626,    /* Rouge foncé */
+                #ea580c,    /* Orange foncé */
+                #d97706,    /* Ambre */
+                #65a30d,    /* Lime foncé */
+                #059669,    /* Émeraude foncé */
+                #0891b2,    /* Cyan foncé */
+                #2563eb,    /* Bleu foncé */
+                #4f46e5,    /* Indigo foncé */
+                #7c3aed,    /* Violet foncé */
+                #c026d3,    /* Fuchsia */
+                #db2777,    /* Rose foncé */
+                #dc2626     /* Rouge foncé (retour) */
+            ) border-box;
+         box-shadow: 
+            0 0 40px rgba(37, 99, 235, 0.6),
+            0 0 70px rgba(124, 58, 237, 0.4),
+            inset 0 0 50px rgba(217, 119, 6, 0.3);
+         animation: neonRotate 3s linear infinite;
     }
     
     .global-score-value { font-size: 58px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
