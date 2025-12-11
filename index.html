@@ -48,137 +48,53 @@
 
     /* ANIMATIONS */
     @keyframes dropBill {
-      0% { transform: translateY(-120%) translateX(var(--x-offset)) rotate(-10deg) scale(0.7); opacity: 0; }
-      15% { opacity: 1; }
-      60% { transform: translateY(20%) translateX(calc(var(--x-offset) * 0.3)) rotate(5deg) scale(1); opacity: 1; }
-      100% { transform: translateY(120%) translateX(calc(var(--x-offset) * 0.2)) rotate(8deg) scale(1); opacity: 0; }
-    }
-    @keyframes moveStripes { 0% { background-position: 0 0; } 100% { background-position: 50px 0; } }
-    @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
-    @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); } 20%, 40%, 60%, 80% { transform: translateX(5px); } }
-    
-    /* ANIMATION BORDURE CARTE GAGNANTE */
-    @keyframes borderRotate {
-      100% { background-position: 0 100%; }
+      0% { transform: translateY(-150%) translateX(var(--x-offset)) rotate(-15deg); opacity: 0; }
+      10% { opacity: 1; }
+      50% { transform: translateY(10%) translateX(calc(var(--x-offset) * 0.4)) rotate(5deg); opacity: 1; }
+      100% { transform: translateY(150%) translateX(calc(var(--x-offset) * 0.2)) rotate(12deg); opacity: 0; }
     }
 
-    /* ALERT TOP (NEWS) - 10 SECONDS */
-    @keyframes slideDownUp {
-        0% { transform: translate(-50%, -200%); opacity: 0; }
-        5% { transform: translate(-50%, 20px); opacity: 1; }
-        95% { transform: translate(-50%, 20px); opacity: 1; }
-        100% { transform: translate(-50%, -200%); opacity: 0; }
-    }
-
-    #topAlert {
-        position: fixed; top: 0; left: 50%; transform: translate(-50%, -200%);
-        background: var(--card-bg); z-index: 4000;
-        padding: 20px 30px; border-radius: 20px;
-        box-shadow: 0 15px 50px rgba(0,0,0,0.3);
-        display: flex; align-items: center; gap: 20px;
-        border: 2px solid var(--primary);
-        min-width: 340px;
-        max-width: 90%;
-    }
-    #topAlert.trigger { animation: slideDownUp 10s forwards ease-in-out; }
-    .alert-icon { font-size: 30px; }
-    .alert-title { font-weight: 900; color: var(--text-main); font-size: 16px; text-transform: uppercase; margin-bottom:4px; }
-    .alert-desc { font-size: 13px; color: var(--text-muted); font-weight:600; }
-
-    /* TOAST */
-    #toast { visibility: hidden; min-width: 300px; background-color: var(--success); color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 3000; left: 50%; top: 0; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; transform:translate(-50%, -100%); transition: all 0.3s; }
-    #toast.show { visibility: visible; transform:translate(-50%, 20px); }
-
-    /* NOUVEAU TOGGLE MODE NUIT - BARRE HORIZONTALE */
-    .theme-toggle {
-        position: fixed; bottom: 20px; right: 20px; z-index: 9999; width: 90px; height: 38px; border-radius: 999px; background: var(--card-bg); border: 2px solid var(--border-color); display: flex; align-items: center; padding: 3px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); cursor: pointer; transition: background 0.25s ease, border-color 0.25s ease; font-size: 11px; font-weight: 800; color: var(--text-muted);
-    }
-    .theme-toggle-inner { position: relative; display: flex; align-items: center; width: 100%; height: 100%; justify-content: space-between; padding: 0 8px; }
-    .theme-toggle-label { z-index: 2; transition: opacity 0.25s; }
-    .theme-toggle-thumb { position: absolute; top: 3px; bottom: 3px; width: 44px; border-radius: 999px; background: #0f172a; display: flex; align-items: center; justify-content: center; color: #facc15; font-size: 15px; font-weight: 900; transform: translateX(0); transition: transform 0.25s ease, background 0.25s ease, color 0.25s ease; }
-    body.dark-mode .theme-toggle-thumb { transform: translateX(40px); background: #e5f2ff; color: #0f172a; }
-
-    /* FEEDBACK BUTTON */
-    .feedback-btn {
-        position: fixed; top: 50%; right: 0; transform: translateY(-50%);
-        background: var(--accent); color: white; border: none;
-        padding: 15px 20px; border-radius: 30px 0 0 30px;
-        box-shadow: -4px 4px 15px rgba(245, 158, 11, 0.3);
-        cursor: pointer; z-index: 1000;
-        font-weight: 900; font-size: 14px;
-        display: flex; align-items: center; gap: 10px; transition: all 0.3s ease;
-    }
-    .feedback-btn:hover { padding-right: 25px; background: #d97706; transform: translateY(-50%) scale(1.05); }
-    
-    /* MODALS */
-    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2500; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(5px); }
-    .modal-box { background: var(--card-bg); padding: 25px; border-radius: 20px; width: 100%; max-width: 500px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-height: 80vh; overflow-y: auto; border: 1px solid var(--border-color); }
-    .modal-title { font-size: 18px; font-weight: 900; margin-bottom: 15px; color: var(--text-main); display:flex; justify-content:space-between; align-items:center; }
-    textarea.fb-input { width: 100%; height: 120px; padding: 12px; border: 2px solid var(--border-color); background: var(--input-bg); color: var(--text-main); border-radius: 12px; resize: none; font-family: inherit; font-size: 14px; margin-bottom: 15px; outline: none; }
-    textarea.fb-input:focus { border-color: var(--primary); }
-
-    /* UPDATES STYLE */
-    .update-card { background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; margin-bottom: 10px; }
-    .update-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
-    .update-tag { font-size: 10px; padding: 3px 8px; border-radius: 6px; font-weight: 800; text-transform: uppercase; }
-    .tag-new { background: #dcfce7; color: #166534; }
-    .tag-fix { background: #fee2e2; color: #991b1b; }
-    .tag-impr { background: #dbeafe; color: #1e40af; }
-    .update-date { font-size: 11px; color: var(--text-muted); font-weight: 700; }
-    .update-body { font-size: 13px; color: var(--text-main); line-height: 1.5; white-space: pre-line; }
-    .update-title { font-weight: 800; font-size: 14px; color: var(--text-main); display: block; margin-bottom: 4px; }
-
-    /* LOGIN */
-    #loginOverlay { position: fixed; inset: 0; background: var(--bg-gradient); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 20px; }
-    .login-box { background: var(--card-bg); padding: 40px; border-radius: var(--radius); box-shadow: 0 20px 60px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; border: 1px solid var(--border-color); }
-    .login-title { font-size: 24px; font-weight: 900; color: var(--text-main); margin-bottom: 20px; }
-    
-    .input-group { position: relative; margin-bottom: 10px; }
-    input, select { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border-color); font-size: 13px; background: var(--input-bg); color: var(--text-main); outline: none; transition: 0.3s; }
-    input.error { border-color: var(--danger); animation: shake 0.3s; background-color: rgba(239, 68, 68, 0.05); }
-    .toggle-password { position: absolute; right: 12px; top: 12px; cursor: pointer; opacity: 0.5; font-size: 16px; }
-    .toggle-password:hover { opacity: 1; }
-
-    #appContent { display: none; }
-    .top-bar { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; position: relative; z-index: 50; flex-wrap: wrap; gap:10px; }
-    .user-welcome { font-size: 20px; font-weight: 900; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
-    .user-badge { background: #dbeafe; color: var(--primary); padding: 6px 14px; border-radius: 30px; font-size: 13px; text-transform: uppercase; font-weight: 900; letter-spacing: 0.5px; }
-    body.dark-mode .user-badge { background: #1e40af; color: #dbeafe; }
-
-    .container { max-width: 1200px; margin: 0 auto; padding-bottom: 120px; }
-    
-    header { text-align: center; margin-bottom: 60px; position: relative; z-index: 10; } 
-    .header-pill { display: inline-flex; align-items: center; gap: 8px; background: #eff6ff; padding: 8px 18px; border-radius: 50px; font-size: 12px; font-weight: 900; color: var(--primary); margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
-    body.dark-mode .header-pill { background: #1e3a8a; color: #93c5fd; }
-    h1 { font-size: 48px; font-weight: 900; color: var(--text-main); margin: 0 0 15px; letter-spacing: -1.5px; text-transform: uppercase; line-height: 1; }
-    .last-update { font-size: 14px; color: var(--text-muted); background: rgba(255,255,255,0.5); padding: 8px 20px; border-radius: 30px; display: inline-block; font-weight: 600; border: 1px solid var(--border-color); text-transform: capitalize; }
-    body.dark-mode .last-update { background: rgba(0,0,0,0.3); }
-
-    /* --- NOUVEAU STYLE CERCLE CENTRAL --- */
+    /* ===== CERCLE CENTRAL STYLE SQUID GAME ===== */
     .global-score-container { 
-        margin: 40px auto; 
-        width: 280px; height: 280px; /* Un peu plus grand */
-        border-radius: 50%; 
+        margin: 40px auto; width: 280px; height: 280px; border-radius: 50%; 
         display: flex; align-items: center; justify-content: center; flex-direction: column; 
-        position: relative; overflow: visible; /* Important pour que les billets sortent */
-        background: var(--card-bg);
-        /* Bordure double dégradée Or et Bleu */
-        border: 6px solid transparent;
-        background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
-                    linear-gradient(135deg, #f59e0b, #2563eb, #f59e0b) border-box;
-        /* Glow interne et externe */
-        box-shadow: 0 20px 60px rgba(37, 99, 235, 0.4), inset 0 0 30px rgba(245, 158, 11, 0.3);
+        position: relative; overflow: hidden;
+        background: radial-gradient(circle at 30% 20%, rgba(5,150,105,0.15), transparent 60%), var(--card-bg); 
+        border: 3px solid #059669; 
+        box-shadow: 0 18px 45px rgba(5, 150, 105, 0.3), inset 0 0 25px rgba(5, 150, 105, 0.2);
     }
-    body.dark-mode .global-score-container {
-         background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
-                    linear-gradient(135deg, #b45309, #1e40af, #b45309) border-box;
-         box-shadow: 0 20px 60px rgba(30, 64, 175, 0.5), inset 0 0 30px rgba(180, 83, 9, 0.3);
+    body.dark-mode .global-score-container { 
+        border-color: #10b981; 
+        box-shadow: 0 18px 45px rgba(16, 185, 129, 0.4), inset 0 0 25px rgba(16, 185, 129, 0.25); 
     }
-    
-    .global-score-value { font-size: 58px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
-    .global-score-label { font-size: 13px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; margin-top: 8px; text-align: center; line-height: 1.4; letter-spacing: 1.5px; z-index: 2; position: relative; }
-    .money-rain { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: visible; }
-    .bill { position: absolute; font-size: 32px; opacity: 0; user-select:none; }
+
+    .score-fill { 
+        position: absolute; left: 0; right: 0; bottom: 0; height: 0%; 
+        background: linear-gradient(to top, #047857, rgba(5,150,105,0.3)); 
+        z-index: 1; clip-path: ellipse(80% 60% at 50% 100%); 
+        transition: height 0.8s ease-out; 
+    }
+
+    .money-rain { 
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+        pointer-events: none; z-index: 3; overflow: hidden;
+    }
+
+    .bill { 
+        position: absolute; font-size: 28px; opacity: 0; user-select: none;
+        top: -50px; z-index: 3; animation: dropBill 2s ease-in forwards;
+    }
+
+    .global-score-value { 
+        font-size: 52px; font-weight: 900; color: #059669; line-height: 1; 
+        z-index: 10; position: relative; text-align: center;
+    }
+
+    .global-score-label { 
+        font-size: 13px; font-weight: 900; color: var(--text-muted); 
+        text-transform: uppercase; margin-top: 8px; text-align: center; 
+        line-height: 1.4; letter-spacing: 1.5px; z-index: 10; position: relative;
+    }
 
     .objectives-wrapper { display: flex; flex-direction: column; gap: 50px; }
     .category-title { font-size: 24px; font-weight: 900; text-transform: uppercase; color: var(--text-main); margin: 0 0 25px; display: flex; align-items: center; gap: 15px; letter-spacing: 1px; }
@@ -191,11 +107,19 @@
     .card.is-locked .obj-icon { filter: grayscale(1); opacity: 0.5; }
 
     /* BORDURE CARTE GAGNANTE - VERT PROFESSIONNEL */
-    .card.is-winner { border: none; box-shadow: 0 15px 50px rgba(5, 150, 105, 0.25); overflow: visible; }
-    .card.is-winner::before {
-        content: ""; position: absolute; top: -4px; left: -4px; right: -4px; bottom: -4px; z-index: -1; border-radius: calc(var(--radius) + 4px); background: repeating-linear-gradient(45deg, #059669, #059669 20px, #10b981 20px, #10b981 40px); background-size: 200% 200%; animation: borderRotate 4s linear infinite;
+    .card.is-winner { 
+        border: none; box-shadow: 0 15px 50px rgba(5, 150, 105, 0.25); overflow: visible; 
     }
-    .card.is-winner::after { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: -1; background: var(--card-bg); border-radius: var(--radius); }
+    .card.is-winner::before {
+        content: ""; position: absolute; top: -4px; left: -4px; right: -4px; bottom: -4px; 
+        z-index: -1; border-radius: calc(var(--radius) + 4px); 
+        background: repeating-linear-gradient(45deg, #059669, #059669 20px, #10b981 20px, #10b981 40px); 
+        background-size: 200% 200%; animation: borderRotate 4s linear infinite;
+    }
+    .card.is-winner::after { 
+        content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; 
+        z-index: -1; background: var(--card-bg); border-radius: var(--radius); 
+    }
 
     .status-badge { position: absolute; top: 0; left: 0; right: 0; padding: 12px; text-align: center; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; border-radius: var(--radius) var(--radius) 0 0; }
     .badge-locked { background: #fff7ed; color: #c2410c; border-bottom: 2px solid #ffedd5; }
@@ -780,16 +704,15 @@
       const thumb = document.getElementById('themeThumb');
       const labelDay = document.getElementById('labelDay');
       const labelNight = document.getElementById('labelNight');
-
       if (isDark) {
-        thumb.textContent = '☀️';
-        labelDay.style.opacity = '0.4';
-        labelNight.style.opacity = '1';
+        if(thumb) thumb.textContent = '☀️';
+        if(labelDay) labelDay.style.opacity = '0.4';
+        if(labelNight) labelNight.style.opacity = '1';
         localStorage.setItem('theme', 'dark');
       } else {
-        thumb.textContent = '🌙';
-        labelDay.style.opacity = '1';
-        labelNight.style.opacity = '0.4';
+        if(thumb) thumb.textContent = '🌙';
+        if(labelDay) labelDay.style.opacity = '1';
+        if(labelNight) labelNight.style.opacity = '0.4';
         localStorage.setItem('theme', 'light');
       }
     }
@@ -1248,7 +1171,7 @@
         }
       });
 
-      // Calcul du max possible pour l'utilisateur (toutes primes confondues)
+      // Calcul du max possible pour l'utilisateur
       let maxPossible = 0;
       Object.keys(allObjs).forEach(key => {
         const o = allObjs[key];
@@ -1262,7 +1185,7 @@
         }
       });
 
-      // Mise à jour du montant affiché
+      // Mise à jour du montant
       document.getElementById("myTotalGain").textContent = totalMyGain.toFixed(2) + "€";
 
       // EFFET SQUID GAME - Billets + Remplissage
@@ -1270,22 +1193,29 @@
       const fill = document.getElementById("scoreFill");
       const rainContainer = document.getElementById("moneyRain");
 
-      // Remplissage du bas du cercle (tas de billets)
+      // Remplissage du bas du cercle
       if(fill) fill.style.height = Math.max(20, Math.min(90, 20 + percent * 0.7)) + '%';
 
       // Génération des billets qui tombent
       rainContainer.innerHTML = "";
       if(totalMyGain > 0) {
-        const billsCount = Math.min(12, Math.max(3, Math.round(percent / 8)));
+        const billsCount = Math.min(15, Math.max(5, Math.round(percent / 7)));
         for (let i = 0; i < billsCount; i++) {
           const bill = document.createElement('div');
           bill.className = 'bill';
           bill.textContent = '💶';
+
+          // Position et trajectoire aléatoires
           const side = Math.random() < 0.5 ? -1 : 1;
-          const offset = (Math.random() * 60 + 10) * side;
-          bill.style.setProperty('--x-offset', offset + '%');
-          bill.style.left = (50 + offset / 3) + '%';
-          bill.style.animationDelay = (Math.random() * 0.6) + 's';
+          const xOffset = (Math.random() * 70 + 15) * side;
+          bill.style.setProperty('--x-offset', xOffset + '%');
+          bill.style.left = (50 + xOffset / 4) + '%';
+
+          // Délai aléatoire pour créer l'effet de pluie continue
+          const delay = Math.random() * 1.5;
+          bill.style.animationDelay = delay + 's';
+          bill.style.animationDuration = (1.5 + Math.random() * 0.5) + 's';
+
           rainContainer.appendChild(bill);
         }
       }
