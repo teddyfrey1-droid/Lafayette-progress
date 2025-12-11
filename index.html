@@ -1,4 +1,5 @@
-!DOCTYPE html>
+<!DOCTYPE html>
+html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
@@ -88,17 +89,42 @@
     #toast { visibility: hidden; min-width: 300px; background-color: var(--success); color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 3000; left: 50%; top: 0; font-weight: 800; font-size: 14px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; gap: 10px; transform:translate(-50%, -100%); transition: all 0.3s; }
     #toast.show { visibility: visible; transform:translate(-50%, 20px); }
 
-    /* DARK MODE TOGGLE BTN - CHANGED POSITION & ICON */
+    /* DARK MODE TOGGLE - BARRE ARRONDIE AVEC CURSEUR */
     .theme-toggle {
-        position: fixed; bottom: 20px; right: 20px; /* MOVE TO RIGHT */
+        position: fixed; bottom: 20px; right: 20px;
         z-index: 9999;
-        background: var(--card-bg); border: 2px solid var(--border-color);
-        width: 50px; height: 50px; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 24px; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        transition: 0.3s;
+        background: var(--card-bg);
+        border: 2px solid var(--border-color);
+        width: 70px;
+        height: 32px;
+        border-radius: 50px;
+        cursor: pointer;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+        position: relative;
+        display: flex;
+        align-items: center;
+        padding: 3px;
     }
-    .theme-toggle:hover { transform: scale(1.1); }
+    .theme-toggle-slider {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--primary);
+        position: absolute;
+        left: 4px;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    body.dark-mode .theme-toggle-slider {
+        left: calc(100% - 28px);
+        background: #fbbf24;
+    }
+    .theme-toggle:hover { transform: scale(1.05); }
 
     /* FEEDBACK BUTTON */
     .feedback-btn {
@@ -465,7 +491,9 @@
 </head>
 <body>
 
-  <button class="theme-toggle" onclick="toggleDarkMode()">🌙✨</button>
+  <div class="theme-toggle" onclick="toggleDarkMode()">
+    <div class="theme-toggle-slider"><span class="toggle-icon">🌙</span></div>
+  </div>
 
   <div id="topAlert">
       <div class="alert-icon">📣</div>
@@ -793,10 +821,19 @@
     if(localStorage.getItem('heiko_dark_mode') === 'true') {
         document.body.classList.add('dark-mode');
     }
+    // Initialiser l'icône au chargement
+    window.addEventListener('DOMContentLoaded', function() {
+        const icon = document.querySelector('.toggle-icon');
+        if(icon) icon.textContent = document.body.classList.contains('dark-mode') ? '☀️' : '🌙';
+    });
 
     function toggleDarkMode() {
         document.body.classList.toggle('dark-mode');
-        localStorage.setItem('heiko_dark_mode', document.body.classList.contains('dark-mode'));
+        const isDark = document.body.classList.contains('dark-mode');
+        localStorage.setItem('heiko_dark_mode', isDark);
+        // Mettre à jour l'icône
+        const icon = document.querySelector('.toggle-icon');
+        if(icon) icon.textContent = isDark ? '☀️' : '🌙';
     }
 
     // AUTH
