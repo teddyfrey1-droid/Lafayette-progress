@@ -1,51 +1,83 @@
 /* ============================================
    DATA MANAGEMENT - Heiko Dashboard
+   - Real-time listeners
+   - Safe writes for feedback & activity logs
    ============================================ */
 
-// Charger toutes les données depuis Firebase
 function loadAllData() {
-  console.log("🔄 Chargement des données...");
-  
-  // Charger les utilisateurs
-  db.ref('users').on('value', function(snapshot) {
+  console.log('🔄 Chargement des données...');
+
+  // Users
+  db.ref('users').on('value', (snapshot) => {
     globalData.users = snapshot.val() || {};
-    console.log("✅ Utilisateurs chargés:", Object.keys(globalData.users).length);
     updateDashboard();
   });
-  
-  // Charger les objectifs
-  db.ref('objectives').on('value', function(snapshot) {
+
+  // Objectives config
+  db.ref('objectives').on('value', (snapshot) => {
     globalData.objectives = snapshot.val() || {};
-    console.log("✅ Objectifs chargés:", Object.keys(globalData.objectives).length);
     updateDashboard();
   });
-  
-  // Charger le planning
-  db.ref('planning').on('value', function(snapshot) {
+
+  // Planning/calendar
+  db.ref('planning').on('value', (snapshot) => {
     globalData.planning = snapshot.val() || {};
-    console.log("✅ Planning chargé");
-    renderCalendar();
+    if (typeof renderCalendar === 'function') renderCalendar();
   });
-  
-  // Charger les updates publiques
-  db.ref('publicUpdates').on('value', function(snapshot) {
+
+  // Public updates
+  db.ref('publicUpdates').on('value', (snapshot) => {
     globalData.publicUpdates = snapshot.val() || {};
-    console.log("✅ Updates chargées");
-    renderPublicUpdates();
-    showTopAlert();
+    if (typeof renderPublicUpdates === 'function') renderPublicUpdates();
+    if (typeof showTopAlert === 'function') showTopAlert();
   });
-  
-  // Logger l'activité utilisateur
+
+  // First activity log
   logActivity('Connexion');
 }
 
-// Sauvegarder un objectif
-function saveObjective(objId, data) {
-  return db.ref('objectives/' + objId).set(data)
-    .then(function() {
-      showToast("✅ Objectif sauvegardé");
-      console.log("Objectif sauvegardé:", objId);
+function logActivity(action, extra = {}) {
+  try {
+    if (!currentUser) return;
+    const payload = {
+      uid: currentUser.uid,
+      email: currentUser.email || null,
+      action: action || 'Action',
+      ts: Date.now(),
+      ...extra
+    };
+    db.ref(`activityLogs/${currentUser.uid}`).push(payload).catch(() => {});
+  } catch (e) {
+    // silent
+  }
+}
+
+function sendFeedback() {
+  const input = document.getElementById('fbContent');
+  const content = (input?.value || '').trim();
+  if (!content) {
+    showToast?.('⚠️ Écris un message');
+    return;
+  }
+
+  const payload = {
+    uid: currentUser?.uid || null,
+    email: currentUser?.email || null,
+    content,
+    ts: Date.now()
+  };
+
+  db.ref('feedback').push(payload)
+    .then(() => {
+      input.value = '';
+      document.getElementById('feedbackModal').style.display = 'none';
+      showToast?.('✅ Merci !');
+      logActivity('Feedback envoyé');
     })
-    .catch(function(error) {
-      showToast("❌ Erreur sauvegarde");
-      console.
+    .catch((err) => {
+      console.error(err);
+      showToast?.('❌ Erreur');
+    });
+}
+
+console.log('✅ Module Data chargé');

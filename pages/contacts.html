@@ -1,54 +1,39 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#2563eb">
-  <title>Heiko - Contacts</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Contacts - Dashboard Lafayette</title>
   <link rel="stylesheet" href="../css/variables.css">
   <link rel="stylesheet" href="../css/reset.css">
-  <link rel="stylesheet" href="../css/animations.css">
   <link rel="stylesheet" href="../css/components.css">
-  <link rel="stylesheet" href="../css/admin.css">
-  <link rel="stylesheet" href="../css/calendar.css">
   <link rel="stylesheet" href="../css/enhancements.css">
 </head>
 <body>
-  <div class="theme-toggle" onclick="toggleDarkMode()">
-    <div class="theme-toggle-slider"><span class="toggle-icon">☀️</span></div>
-  </div>
+  <div class="container" style="padding-top:24px;">
+    <a class="btn" style="width:auto; padding:10px 16px;" href="../index.html">← Retour dashboard</a>
+    <header style="margin-top:16px;">
+      <div class="header-pill">📇</div>
+      <h1>Contacts utiles</h1>
+      <div class="last-update">Mets ici les contacts clés (réseau, fournisseurs, maintenance, etc.)</div>
+    </header>
 
-  <button id="appMenuBtn" class="app-menu-btn" type="button" aria-label="Menu" aria-haspopup="true" aria-expanded="false">☰</button>
-  <div id="appMenu" class="app-menu" aria-hidden="true">
-    <a href="../index.html" class="app-menu-item">📊 Dashboard</a>
-    <a href="contacts.html" class="app-menu-item">👥 Contacts</a>
-    <a href="sites-utiles.html" class="app-menu-item">🔗 Sites utiles</a>
-  </div>
+    <div class="card" style="margin-top:16px;">
+      <h2 style="margin:0 0 8px 0;">Réseau / Support</h2>
+      <ul style="margin:0; padding-left:18px;">
+        <li>Nom – Rôle – Téléphone – Email</li>
+        <li>Nom – Rôle – Téléphone – Email</li>
+      </ul>
+    </div>
 
-  <div class="container" style="max-width:900px; margin:0 auto; padding:24px 16px 90px;">
-    <div class="card" style="padding:18px;">
-      <div class="category-title" style="margin:0 0 10px;">👥 Contacts</div>
-      <p style="color:var(--text-muted); margin:0 0 14px;">Ajoute ici les contacts utiles (manager, maintenance, fournisseurs, etc.).</p>
-
-      <div class="objective-card" style="padding:14px; margin-bottom:12px;">
-        <div style="font-weight:900;">Manager</div>
-        <div style="color:var(--text-muted); margin-top:6px;">Nom : —</div>
-        <div style="color:var(--text-muted);">Téléphone : —</div>
-      </div>
-
-      <div class="objective-card" style="padding:14px;">
-        <div style="font-weight:900;">Maintenance</div>
-        <div style="color:var(--text-muted); margin-top:6px;">Société : —</div>
-        <div style="color:var(--text-muted);">Téléphone : —</div>
-      </div>
-
-      <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
-        <a class="btn" href="../index.html" style="text-decoration:none; display:inline-flex; align-items:center;">⬅️ Retour</a>
-      </div>
+    <div class="card" style="margin-top:12px;">
+      <h2 style="margin:0 0 8px 0;">Urgences</h2>
+      <ul style="margin:0; padding-left:18px;">
+        <li>Serrurier</li>
+        <li>Électricien</li>
+        <li>Plombier</li>
+      </ul>
     </div>
   </div>
-
-  <script src="../js/utils.js"></script>
-  <script src="../js/menu.js"></script>
 </body>
 </html>
