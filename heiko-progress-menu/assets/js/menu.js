@@ -1,1 +1,0 @@
-(()=>{const t=document.getElementById("menu-toggle"),m=document.getElementById("side-menu"),o=document.getElementById("menu-overlay");if(!t||!m||!o)return;const c=()=>{m.classList.add("open");o.classList.add("active")},r=()=>{m.classList.remove("open");o.classList.remove("active")};t.addEventListener("click",c);o.addEventListener("click",r)})();
