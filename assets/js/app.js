@@ -22,6 +22,24 @@
     const BASE_HOURS = 35;
     const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
 
+    // MENU (tous utilisateurs)
+    function toggleMainMenu(open) {
+        const drawer = document.getElementById("mainMenuDrawer");
+        const overlay = document.getElementById("mainMenuOverlay");
+        if(!drawer || !overlay) return;
+
+        const shouldOpen = (open === true);
+        drawer.classList.toggle("open", shouldOpen);
+        overlay.classList.toggle("open", shouldOpen);
+        drawer.setAttribute("aria-hidden", shouldOpen ? "false" : "true");
+    }
+
+    // Ferme le menu avec ESC
+    document.addEventListener("keydown", function(e) {
+        if(e.key === "Escape") toggleMainMenu(false);
+    });
+
+
     // CALENDAR DATA
     const calEvents = [
         { t: "HEIKO x STURIA", start: "2025-12-01", end: "2026-01-31", c: "evt-heiko" },
@@ -509,16 +527,9 @@
 
       document.getElementById("myTotalGain").textContent = totalMyGain.toFixed(2) + "€";
       const rainContainer = document.getElementById("moneyRain");
-      rainContainer.innerHTML = "";
-      if(totalMyGain > 0) {
-         for(let i=0; i<30; i++) {
-            const bill = document.createElement("div"); bill.className = "bill"; bill.textContent = "💸";
-            bill.style.left = Math.random()*100 + "%";
-            bill.style.animation = `floatMoney ${2+Math.random()}s infinite ${Math.random()}s ease-in`;
-            bill.style.fontSize = (20 + Math.random()*20) + "px";
-            rainContainer.appendChild(bill);
-         }
-      }
+      if(rainContainer) rainContainer.innerHTML = "";
+      // Effet "billets" désactivé.
+
       const d = new Date();
       document.getElementById("lastUpdate").textContent = "Mise à jour : " + d.toLocaleDateString('fr-FR');
     }
