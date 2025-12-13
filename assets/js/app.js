@@ -22,24 +22,6 @@
     const BASE_HOURS = 35;
     const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
 
-    // MENU (tous utilisateurs)
-    function toggleMainMenu(open) {
-        const drawer = document.getElementById("mainMenuDrawer");
-        const overlay = document.getElementById("mainMenuOverlay");
-        if(!drawer || !overlay) return;
-
-        const shouldOpen = (open === true);
-        drawer.classList.toggle("open", shouldOpen);
-        overlay.classList.toggle("open", shouldOpen);
-        drawer.setAttribute("aria-hidden", shouldOpen ? "false" : "true");
-    }
-
-    // Ferme le menu avec ESC
-    document.addEventListener("keydown", function(e) {
-        if(e.key === "Escape") toggleMainMenu(false);
-    });
-
-
     // CALENDAR DATA
     const calEvents = [
         { t: "HEIKO x STURIA", start: "2025-12-01", end: "2026-01-31", c: "evt-heiko" },
@@ -71,7 +53,31 @@
         if(icon) icon.textContent = isDark ? '☀️' : '🌙';
     }
 
-    // AUTH
+    
+    // GLOBAL MENU (all users)
+    function toggleGlobalMenu(force) {
+        const menu = document.getElementById("globalMenu");
+        const backdrop = document.getElementById("globalMenuBackdrop");
+        if(!menu || !backdrop) return;
+
+        const isOpen = menu.classList.contains("open");
+        const shouldOpen = (typeof force === "boolean") ? force : !isOpen;
+
+        if(shouldOpen) {
+            menu.classList.add("open");
+            backdrop.classList.add("open");
+            document.body.style.overflow = "hidden";
+        } else {
+            menu.classList.remove("open");
+            backdrop.classList.remove("open");
+            document.body.style.overflow = "";
+        }
+    }
+    document.addEventListener("keydown", (e) => {
+        if(e.key === "Escape") toggleGlobalMenu(false);
+    });
+
+// AUTH
     auth.onAuthStateChanged(user => {
       if (user) {
         document.getElementById("loginOverlay").style.display = "none";
@@ -525,14 +531,35 @@
         }
       });
 
-      document.getElementById("myTotalGain").textContent = totalMyGain.toFixed(2) + "€";
+      const d = new Date();
+      const gainText = totalMyGain.toFixed(2) + "€";
+      const myGainEl = document.getElementById("myTotalGain");
+      if(myGainEl) myGainEl.textContent = gainText;
+
+      // Money rain disabled (kept for backward compatibility)
       const rainContainer = document.getElementById("moneyRain");
       if(rainContainer) rainContainer.innerHTML = "";
-      // Effet "billets" désactivé.
 
-      const d = new Date();
-      document.getElementById("lastUpdate").textContent = "Mise à jour : " + d.toLocaleDateString('fr-FR');
-    }
+      const lastUpdateEl = document.getElementById("lastUpdate");
+      if(lastUpdateEl) lastUpdateEl.textContent = "Mise à jour : " + d.toLocaleDateString('fr-FR');
+
+      // KPI cards
+      const kMy = document.getElementById("kpiMyGain");
+      if(kMy) kMy.textContent = gainText;
+
+      const publishedCount = Object.values(allObjs || {}).filter(o => o && o.published).length;
+      const kAct = document.getElementById("kpiActiveObjs");
+      if(kAct) kAct.textContent = publishedCount;
+
+      const bonusCount = Object.values(allObjs || {}).filter(o => o && !o.isPrimary && o.published).length;
+      const kBonus = document.getElementById("kpiBonusState");
+      const kBonusSub = document.getElementById("kpiBonusSub");
+      if(kBonus) kBonus.textContent = primOk ? "Ouverts" : "Verrouillés";
+      if(kBonusSub) kBonusSub.textContent = primOk ? (bonusCount + " bonus") : "Priorités requises";
+
+      const kUp = document.getElementById("kpiUpdated");
+      if(kUp) kUp.textContent = d.toLocaleDateString('fr-FR');
+}
 
     function createCard(obj, isLocked, userRatio, isPrimary) {
       const pct = getPct(obj.current, obj.target, obj.isInverse);

@@ -20,6 +20,12 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <link rel="stylesheet" href="assets/css/styles.css">
+
+  <!-- Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
 </head>
 <body>
 
@@ -43,7 +49,7 @@
           <p style="font-size:13px; color:var(--text-muted); margin-bottom:15px;">Une suggestion pour améliorer l'outil ou l'équipe ? Dites-le nous !</p>
           <textarea id="fbContent" class="fb-input" placeholder="Votre message..."></textarea>
           <div style="display:flex; gap:10px;">
-<button class="btn" onclick="sendFeedback()">Envoyer</button>
+              <button class="btn" onclick="sendFeedback()">Envoyer</button>
               <button class="btn" style="background:var(--border-color); color:var(--text-muted);" onclick="document.getElementById('feedbackModal').style.display='none'">Fermer</button>
           </div>
       </div>
@@ -90,23 +96,27 @@
       <div style="display:flex; gap:10px;">
         <button id="btnAdmin" class="btn" style="width:auto; padding:8px 16px; font-size:11px; display:none;">⚙️ Admin</button>
         <button onclick="logout()" class="btn" style="width:auto; padding:8px 16px; font-size:11px; background:var(--card-bg); color:#ef4444; border:1px solid #fca5a5;">Déconnexion</button>
-        <button class="menu-btn" onclick="toggleMainMenu(true)" aria-label="Menu">☰</button>
+              <button class="icon-btn" id="globalMenuBtn" onclick="toggleGlobalMenu()">☰</button>
       </div>
-    </div>
-    <!-- Menu principal (tous utilisateurs) -->
-    <div id="mainMenuOverlay" class="menu-overlay" onclick="toggleMainMenu(false)"></div>
-    <div id="mainMenuDrawer" class="menu-drawer" aria-hidden="true">
-      <div class="menu-drawer-header">
-        <div class="menu-drawer-title">Menu</div>
-        <button class="menu-close" onclick="toggleMainMenu(false)" aria-label="Fermer">×</button>
-      </div>
-      <a class="menu-link" href="#dashboard" onclick="toggleMainMenu(false)">📊 Dashboard</a>
-      <a class="menu-link" href="#contacts" onclick="toggleMainMenu(false)">📇 Contacts</a>
-      <a class="menu-link" href="#sites-utiles" onclick="toggleMainMenu(false)">🔗 Sites utiles</a>
-      <div class="menu-note">Vous pourrez ajouter d'autres rubriques ici plus tard.</div>
     </div>
 
 
+    <!-- Global menu (all users) -->
+    <div class="global-menu-backdrop" id="globalMenuBackdrop" onclick="toggleGlobalMenu(false)"></div>
+    <aside class="global-menu" id="globalMenu" aria-label="Menu">
+      <div class="global-menu-head">
+        <div class="global-menu-title">Menu</div>
+        <button class="icon-btn" type="button" onclick="toggleGlobalMenu(false)" aria-label="Fermer">×</button>
+      </div>
+      <nav class="global-menu-links">
+        <a class="global-menu-link" href="#dashboard" onclick="toggleGlobalMenu(false)">Dashboard</a>
+        <a class="global-menu-link" href="#contacts" onclick="toggleGlobalMenu(false)">Contacts</a>
+        <a class="global-menu-link" href="#sites-utiles" onclick="toggleGlobalMenu(false)">Sites utiles</a>
+      </nav>
+      <div class="global-menu-foot">
+        <div class="global-menu-foot-note">Astuce : tu peux enrichir ces sections plus tard sans toucher au reste du site.</div>
+      </div>
+    </aside>
 
     <div class="container">
       <header id="dashboard">
@@ -121,6 +131,30 @@
         </div>
       </header>
       
+
+      <section class="kpi-strip" id="kpiStrip" aria-label="Indicateurs clés">
+        <div class="kpi-card">
+          <div class="kpi-label">Mes primes</div>
+          <div class="kpi-value" id="kpiMyGain">0€</div>
+          <div class="kpi-sub">Débloquées</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Objectifs actifs</div>
+          <div class="kpi-value" id="kpiActiveObjs">0</div>
+          <div class="kpi-sub">Publiés</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Bonus</div>
+          <div class="kpi-value" id="kpiBonusState">—</div>
+          <div class="kpi-sub" id="kpiBonusSub">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Mise à jour</div>
+          <div class="kpi-value" id="kpiUpdated">—</div>
+          <div class="kpi-sub">Aujourd’hui</div>
+        </div>
+      </section>
+
       <div class="objectives-wrapper" id="cardsContainer">
         <div style="text-align:center; color:#9ca3af; margin-top:50px;">Chargement des données...</div>
       </div>
@@ -139,40 +173,37 @@
           <div class="cal-grid" id="calGrid"></div>
           <div class="cal-legend" id="calLegend"></div>
       </div>
-
-      <div class="category-title" id="contacts" style="margin-top:60px;">Contacts 📇</div>
-      <div class="card info-card">
-        <div style="font-weight:900; font-size:16px; margin-bottom:10px;">Contacts</div>
-        <div style="font-size:13px; color:var(--text-muted); line-height:1.5;">
-          Ajoutez ici les contacts utiles (équipe, fournisseurs, urgences, etc.).<br>
-          <span style="font-weight:700;">Astuce :</span> vous pourrez modifier cette section plus tard sans toucher au reste du site.
-        </div>
-        <ul class="info-list">
-          <li><span class="info-label">À compléter</span> <span class="info-value">—</span></li>
-          <li><span class="info-label">À compléter</span> <span class="info-value">—</span></li>
-          <li><span class="info-label">À compléter</span> <span class="info-value">—</span></li>
-        </ul>
-      </div>
-
-      <div class="category-title" id="sites-utiles" style="margin-top:60px;">Sites utiles 🔗</div>
-      <div class="card info-card">
-        <div style="font-weight:900; font-size:16px; margin-bottom:10px;">Liens</div>
-        <div style="font-size:13px; color:var(--text-muted); line-height:1.5;">
-          Ajoutez ici les liens que vous utilisez souvent (Google Drive, planning, outils RH, etc.).
-        </div>
-        <div class="links-grid">
-          <a class="link-tile" href="#" onclick="return false;">+ Ajouter un lien</a>
-          <a class="link-tile" href="#" onclick="return false;">+ Ajouter un lien</a>
-          <a class="link-tile" href="#" onclick="return false;">+ Ajouter un lien</a>
-        </div>
-      </div>
-
     </div>
   </div>
 
-      
 
-<div class="admin-panel" id="adminPanel">
+      <div class="section-block" id="contacts">
+        <div class="section-title">Contacts</div>
+        <div class="section-card">
+          <div class="section-muted">Tu peux mettre ici des numéros utiles (maintenance, réseau, franchise, prestataires…).</div>
+          <ul class="simple-list">
+            <li><strong>Maintenance</strong> — à compléter</li>
+            <li><strong>Support</strong> — à compléter</li>
+            <li><strong>Urgences</strong> — à compléter</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="section-block" id="sites-utiles">
+        <div class="section-title">Sites utiles</div>
+        <div class="section-card">
+          <div class="section-muted">Raccourcis rapides (Deliveroo, UberEats, banque, planning, docs…).</div>
+          <div class="links-grid">
+            <a class="link-tile" href="https://deliveroo.com/" target="_blank" rel="noopener">Deliveroo</a>
+            <a class="link-tile" href="https://www.ubereats.com/" target="_blank" rel="noopener">Uber Eats</a>
+            <a class="link-tile" href="https://firebase.google.com/" target="_blank" rel="noopener">Firebase</a>
+            <a class="link-tile" href="https://github.com/" target="_blank" rel="noopener">GitHub</a>
+          </div>
+          <div class="section-muted" style="margin-top:10px;">Tu peux remplacer ces liens par les tiens.</div>
+        </div>
+      </div>
+
+  <div class="admin-panel" id="adminPanel">
     <button class="close-admin" onclick="toggleAdmin(false)">×</button>
     <h2 style="margin-bottom:20px;">Panneau Manager</h2>
     
