@@ -289,7 +289,7 @@
     
     .global-score-value { font-size: 58px; font-weight: 900; color: var(--success); line-height: 1; z-index: 2; position: relative; }
     .global-score-label { font-size: 13px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; margin-top: 8px; text-align: center; line-height: 1.4; letter-spacing: 1.5px; z-index: 2; position: relative; }
-    .money-rain { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: visible; }
+    .money-rain { display: none !important; }
     .bill { position: absolute; font-size: 32px; opacity: 0; user-select:none; }
 
     .objectives-wrapper { display: flex; flex-direction: column; gap: 50px; }
@@ -643,7 +643,7 @@
         <div class="last-update" id="lastUpdate">Chargement...</div>
         
         <div class="global-score-container" id="scoreCircle">
-          <div class="money-rain" id="moneyRain"></div>
+          <!-- Removed legacy flying bills / money rain effect -->
           <div class="global-score-value" id="myTotalGain">0€</div>
           <div class="global-score-label">MES PRIMES<br>DÉBLOQUÉES</div>
         </div>
