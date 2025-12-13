@@ -19,10 +19,33 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
-  <link rel="stylesheet" href="assets/css/styles.css">
-<link rel="stylesheet" href="assets/css/menu.css">
+    <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="stylesheet" href="assets/css/menu.css">
+
 </head>
 <body>
+
+  <!-- ☰ Menu (ajouté, isolé) -->
+  <button id="menu-toggle" aria-expanded="false" type="button" aria-label="Menu">☰</button>
+
+  <nav id="side-menu" aria-label="Navigation principale">
+    <div class="menu-header">
+      <span class="menu-title">Menu</span>
+      <button id="menu-close" type="button" aria-label="Fermer">✕</button>
+    </div>
+    <ul>
+      <li><a href="#dashboard" data-view="dashboard">Dashboard</a></li>
+      <li><a href="#contacts" data-view="contacts">Contacts</a></li>
+      <li><a href="#sites-utiles" data-view="sites-utiles">Sites utiles</a></li>
+    </ul>
+  </nav>
+
+  <div id="menu-overlay" aria-hidden="true"></div>
+
+  <div id="view-dashboard" class="spa-view active" data-view="dashboard">
+
+
+
 
   <div class="theme-toggle" onclick="toggleDarkMode()">
     <div class="theme-toggle-slider"><span class="toggle-icon">☀️</span></div>
@@ -314,6 +337,712 @@
     <button class="btn" onclick="document.getElementById('editObjPanel').classList.remove('active')" style="background:white; color:#666; border:1px solid #ccc; margin-top:10px;">Annuler</button>
   </div>
 
-  <script src="assets/js/app.js"></script>
-<button id="menu-toggle" aria-label="Menu">☰</button><nav id="side-menu"><ul><li><a href="#dashboard">Dashboard</a></li><li><a href="#contacts">Contacts</a></li><li><a href="#sites-utiles">Sites utiles</a></li></ul></nav><div id="menu-overlay"></div><script src="assets/js/menu.js"></script></body>
-</html>
+  
+  </div>
+
+  <div id="view-contacts" class="spa-view" data-view="contacts" hidden>
+    <div class="spa-page">
+      <h2>Contacts</h2>
+      <p>Ajoute ici tes contacts (ex: franchisé, fournisseurs, maintenance, etc.).</p>
+    </div>
+  </div>
+
+  <div id="view-sites-utiles" class="spa-view" data-view="sites-utiles" hidden>
+    <div class="spa-page">
+      <h2>Sites utiles</h2>
+      <ul class="useful-links">
+        <li><a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer">Firebase Console</a></li>
+        <li><a href="https://render.com/" target="_blank" rel="noopener noreferrer">Render</a></li>
+        <li><a href="https://github.com/" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+      </ul>
+    </div>
+  </div>
+
+<script>
+    // CONFIG
+    const firebaseConfig = {
+      apiKey: "AIzaSyAGaitqmFwExvJ9ZUpkdUdCKAqqDOP2cdQ",
+      authDomain: "objectif-restaurant.firebaseapp.com",
+      databaseURL: "https://objectif-restaurant-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "objectif-restaurant",
+      storageBucket: "objectif-restaurant.firebasestorage.app",
+      messagingSenderId: "910113283000",
+      appId: "1:910113283000:web:0951fd9dca01aa6e46cd4d"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    let currentUser = null;
+    let allUsers = {};
+    let allObjs = {};
+    let allLogs = {};
+    let allFeedbacks = {};
+    let allUpdates = {};
+    let globalSettings = { budget: 0 };
+    const BASE_HOURS = 35;
+    const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
+
+    // CALENDAR DATA
+    const calEvents = [
+        { t: "HEIKO x STURIA", start: "2025-12-01", end: "2026-01-31", c: "evt-heiko" },
+        { t: "Flyers Sturia", start: "2025-12-01", end: "2025-12-31", c: "evt-sturia" },
+        { t: "7off7 Deliveroo", start: "2025-12-01", end: "2025-12-07", c: "evt-deliv" },
+        { t: "BOGOF Deliveroo", start: "2025-12-08", end: "2025-12-14", c: "evt-deliv" },
+        { t: "BOGOF UberEats", start: "2025-12-15", end: "2025-12-21", c: "evt-uber" },
+        { t: "Street Marketing", start: "2026-01-01", end: "2026-01-31", c: "evt-street" }
+    ];
+    let currentCalDate = new Date(2025, 11, 1);
+
+    // INITIALIZE THEME - TOUJOURS EN MODE NUIT PAR DÉFAUT
+    if(localStorage.getItem('heiko_dark_mode') === null) {
+        localStorage.setItem('heiko_dark_mode', 'true');
+    }
+    if(localStorage.getItem('heiko_dark_mode') === 'true') {
+        document.body.classList.add('dark-mode');
+    }
+    window.addEventListener('DOMContentLoaded', function() {
+        const icon = document.querySelector('.toggle-icon');
+        if(icon) icon.textContent = document.body.classList.contains('dark-mode') ? '☀️' : '🌙';
+    });
+
+    function toggleDarkMode() {
+        document.body.classList.toggle('dark-mode');
+        const isDark = document.body.classList.contains('dark-mode');
+        localStorage.setItem('heiko_dark_mode', isDark);
+        const icon = document.querySelector('.toggle-icon');
+        if(icon) icon.textContent = isDark ? '☀️' : '🌙';
+    }
+
+    // AUTH
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        document.getElementById("loginOverlay").style.display = "none";
+        document.getElementById("appContent").style.display = "block";
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('mode') === 'resetPassword') { /* Handled */ }
+
+        db.ref('users/' + user.uid).on('value', snap => {
+          const val = snap.val();
+          if(!val) {
+             const def = { name: "Utilisateur", hours:35, role:'staff', email: user.email, status: 'pending' };
+             db.ref('users/'+user.uid).set(def);
+             currentUser = def;
+          } else { 
+             currentUser = val; 
+             if(currentUser.status !== 'active') {
+                 db.ref('users/'+user.uid).update({ status: 'active', lastLogin: Date.now() });
+             }
+          }
+          currentUser.uid = user.uid; currentUser.email = user.email;
+          const newLogRef = db.ref("logs").push();
+          newLogRef.set({ user: currentUser.name, action: "Connexion", type: "session", startTime: Date.now(), lastSeen: Date.now() });
+          setInterval(() => { newLogRef.update({ lastSeen: Date.now() }); }, 60000);
+          updateUI();
+        });
+        loadData();
+        renderNativeCalendar();
+      } else {
+        document.getElementById("loginOverlay").style.display = "flex";
+        document.getElementById("appContent").style.display = "none";
+      }
+    });
+
+    document.getElementById("btnLogin").onclick = () => {
+      const email = document.getElementById("loginEmail").value.trim();
+      const pass = document.getElementById("loginPass").value;
+      auth.signInWithEmailAndPassword(email, pass).catch(e => {
+          // LOGIN ERROR FEEDBACK
+          document.getElementById("loginPass").classList.add("error");
+          document.getElementById("loginEmail").classList.add("error");
+          setTimeout(() => {
+             document.getElementById("loginPass").classList.remove("error");
+             document.getElementById("loginEmail").classList.remove("error");
+          }, 1000); // Remove animation but keep red border logic if preferred, here just animate
+          alert("❌ Mot de passe incorrect !");
+      });
+    };
+
+    function clearLoginError() {
+        document.getElementById("loginPass").classList.remove("error");
+        document.getElementById("loginEmail").classList.remove("error");
+    }
+
+    function togglePass() {
+        const x = document.getElementById("loginPass");
+        x.type = (x.type === "password") ? "text" : "password";
+    }
+
+    function logout() { auth.signOut(); location.reload(); }
+    window.resetPassword = () => {
+      let email = document.getElementById("loginEmail").value.trim();
+      if (!email) email = prompt("Email pour réinitialisation :");
+      if(email) auth.sendPasswordResetEmail(email).then(() => alert("Email envoyé !")).catch(e => alert(e.message));
+    };
+
+    function logAction(action, detail) {
+        db.ref("logs").push({ user: currentUser ? currentUser.name : "Inconnu", action: action, detail: detail || "", type: "action", time: Date.now() });
+    }
+    function showToast(message) {
+        const toast = document.getElementById("toast"); toast.textContent = message; toast.className = "show";
+        setTimeout(() => { toast.className = "hide"; }, 3000);
+    }
+
+    function loadData() {
+      db.ref('objectives').on('value', s => { 
+          allObjs = s.val() || {}; 
+          try {
+             renderDashboard(); 
+             if(currentUser && (currentUser.role === 'admin' || currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase())) {
+                 renderAdminObjs(); renderSimulator();
+             }
+          } catch(e) { console.error(e); }
+      });
+      db.ref('users').on('value', s => { allUsers = s.val() || {}; if(currentUser && (currentUser.role==='admin' || currentUser.email === SUPER_ADMIN_EMAIL)) { renderAdminUsers(); renderSimulator(); } });
+      db.ref('settings').on('value', s => { globalSettings = s.val() || { budget: 0 }; if(currentUser && (currentUser.role==='admin' || currentUser.email === SUPER_ADMIN_EMAIL)) { renderSimulator(); } });
+      db.ref('logs').limitToLast(2000).on('value', s => { allLogs = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); });
+      db.ref('feedbacks').on('value', s => { allFeedbacks = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderFeedbacks(allFeedbacks); });
+      
+      // LOAD UPDATES & CHECK ALERT
+      db.ref('updates').on('value', s => { 
+          allUpdates = s.val() || {}; 
+          renderUpdatesPublic();
+          checkNewUpdates(allUpdates);
+          if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderUpdatesAdmin();
+      });
+    }
+
+    // CHECK FOR NEW UPDATES TO SHOW ALERT
+    function checkNewUpdates(updates) {
+        const arr = Object.values(updates).sort((a,b) => b.date - a.date);
+        if(arr.length === 0) return;
+        const latest = arr[0];
+        const latestId = latest.title + "_" + latest.date;
+        const lastSeen = localStorage.getItem('heiko_last_update_seen');
+        
+        if(latestId !== lastSeen) {
+            // Trigger Alert
+            const alertBox = document.getElementById("topAlert");
+            document.getElementById("topAlertText").textContent = latest.title;
+            alertBox.classList.remove("trigger");
+            void alertBox.offsetWidth; // Force reflow
+            alertBox.classList.add("trigger");
+            
+            // Save as seen
+            localStorage.setItem('heiko_last_update_seen', latestId);
+        }
+    }
+
+    function updateUI() {
+      if(!currentUser) return;
+      document.getElementById("userName").textContent = currentUser.name;
+      document.getElementById("userHours").textContent = (currentUser.hours || 35) + "h";
+      
+      const isSuperUser = (currentUser.email && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
+      const isAdmin = (currentUser.role === 'admin' || isSuperUser);
+
+      document.getElementById("btnAdmin").style.display = isAdmin ? 'block' : 'none';
+      
+      // SHOW TAB BUTTONS ONLY FOR SUPER ADMIN
+      document.getElementById("btnTabLogs").style.display = isSuperUser ? 'block' : 'none';
+      document.getElementById("btnTabFeedbacks").style.display = isSuperUser ? 'block' : 'none';
+
+      const globalBudgetInput = document.getElementById("simGlobalBudget");
+      const saveBudgetBtn = document.getElementById("btnSaveGlobalBudget");
+      
+      if(isSuperUser) {
+          globalBudgetInput.disabled = false;
+          saveBudgetBtn.style.display = 'inline-block';
+      } else {
+          globalBudgetInput.disabled = true;
+          saveBudgetBtn.style.display = 'none';
+      }
+      
+      if(isAdmin) {
+          renderAdminObjs();
+          renderSimulator();
+      }
+
+      renderDashboard();
+    }
+
+    // --- UPDATES LOGIC (CREATE, EDIT, DELETE) ---
+    function saveUpdate() {
+        const id = document.getElementById("uptId").value; // Empty if creation, filled if edit
+        const t = document.getElementById("uptTitle").value.trim();
+        const d = document.getElementById("uptDesc").value.trim();
+        const type = document.getElementById("uptType").value;
+
+        if(!t || !d) return alert("Remplir titre et description");
+
+        if(id) {
+            // MODE MODIFICATION
+            db.ref('updates/' + id).update({ title:t, desc:d, type:type }).then(() => {
+                showToast("✅ Mise à jour modifiée !");
+                cancelUpdateEdit();
+            });
+        } else {
+            // MODE CREATION
+            db.ref('updates').push({ title:t, desc:d, type:type, date:Date.now() }).then(() => {
+                showToast("📢 Publié !");
+                cancelUpdateEdit();
+            });
+        }
+    }
+
+    function editUpdate(id) {
+        const u = allUpdates[id];
+        if(!u) return;
+        document.getElementById("uptId").value = id;
+        document.getElementById("uptTitle").value = u.title;
+        document.getElementById("uptDesc").value = u.desc;
+        document.getElementById("uptType").value = u.type;
+        
+        document.getElementById("btnSaveUpdate").textContent = "💾 Enregistrer Modification";
+        document.getElementById("btnSaveUpdate").style.background = "#f59e0b"; // Orange for edit
+        document.getElementById("btnCancelUpdate").style.display = "inline-block";
+        document.querySelector('.admin-section').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function cancelUpdateEdit() {
+        document.getElementById("uptId").value = "";
+        document.getElementById("uptTitle").value = "";
+        document.getElementById("uptDesc").value = "";
+        
+        document.getElementById("btnSaveUpdate").textContent = "Publier l'info";
+        document.getElementById("btnSaveUpdate").style.background = "var(--primary)";
+        document.getElementById("btnCancelUpdate").style.display = "none";
+    }
+
+    function deleteUpdate(id) {
+        if(confirm("Supprimer cette info ?")) {
+            db.ref('updates/'+id).remove();
+            if(document.getElementById("uptId").value === id) cancelUpdateEdit();
+        }
+    }
+
+    function renderUpdatesPublic() {
+        const c = document.getElementById("publicUpdatesList"); c.innerHTML = "";
+        const arr = Object.values(allUpdates).sort((a,b) => b.date - a.date);
+        if(arr.length === 0) { c.innerHTML = "<div style='text-align:center;color:#999;font-style:italic;'>Aucune nouveauté pour le moment.</div>"; return; }
+        
+        arr.forEach(u => {
+            const d = new Date(u.date).toLocaleDateString();
+            let tag = "";
+            if(u.type==='new') tag = `<span class="update-tag tag-new">✨ Nouveauté</span>`;
+            if(u.type==='impr') tag = `<span class="update-tag tag-impr">🛠️ Amélioration</span>`;
+            if(u.type==='fix') tag = `<span class="update-tag tag-fix">🐛 Correction</span>`;
+            
+            const div = document.createElement("div"); div.className = "update-card";
+            div.innerHTML = `
+                <div class="update-header">
+                    ${tag}
+                    <span class="update-date">${d}</span>
+                </div>
+                <span class="update-title">${u.title}</span>
+                <div class="update-body">${u.desc}</div>
+            `;
+            c.appendChild(div);
+        });
+    }
+
+    function renderUpdatesAdmin() {
+        const c = document.getElementById("adminUpdatesList"); c.innerHTML = "";
+        const arr = [];
+        Object.keys(allUpdates).forEach(k => arr.push({id:k, ...allUpdates[k]}));
+        arr.sort((a,b) => b.date - a.date);
+
+        if(arr.length === 0) { c.innerHTML = "<div style='color:#ccc; font-style:italic;'>Aucune publication.</div>"; return; }
+        
+        arr.forEach(u => {
+            const d = new Date(u.date).toLocaleDateString();
+            const div = document.createElement("div"); div.className = "update-card";
+            div.innerHTML = `
+                <div class="update-header">
+                    <span style="font-weight:800;font-size:12px;">${u.type.toUpperCase()} - ${d}</span>
+                    <div style="display:flex; gap:10px;">
+                        <button onclick="editUpdate('${u.id}')" style="background:none;border:none;cursor:pointer;font-size:14px;">✏️</button>
+                        <button onclick="deleteUpdate('${u.id}')" style="background:none;border:none;cursor:pointer;font-size:14px;">🗑️</button>
+                    </div>
+                </div>
+                <div style="font-weight:bold;">${u.title}</div>
+                <div style="font-size:12px; color:var(--text-muted);">${u.desc.substring(0,50)}...</div>
+            `;
+            c.appendChild(div);
+        });
+    }
+
+    // --- FEEDBACK LOGIC ---
+    function sendFeedback() {
+        const txt = document.getElementById("fbContent").value.trim();
+        if(!txt) return;
+        db.ref('feedbacks').push({ user: currentUser.name, msg: txt, time: Date.now() }).then(() => {
+            showToast("Message envoyé ! Merci 💡");
+            document.getElementById("fbContent").value = "";
+            document.getElementById("feedbackModal").style.display = 'none';
+        });
+    }
+
+    function renderFeedbacks(feeds) {
+        const container = document.getElementById("feedbacksContainer"); container.innerHTML = "";
+        const arr = Object.values(feeds).sort((a,b) => b.time - a.time);
+        if(arr.length === 0) container.innerHTML = "<div style='color:#999;font-style:italic;'>Aucun avis.</div>";
+        arr.forEach(f => {
+            const d = new Date(f.time);
+            const div = document.createElement("div"); div.className = "log-user-group";
+            div.innerHTML = `<div class="group-header" style="cursor:default;"><div class="group-info">💬 ${f.user}</div><div class="last-seen">${d.toLocaleString()}</div></div><div style="padding:15px; font-size:13px; line-height:1.4; color:var(--text-main);">${f.msg}</div>`;
+            container.appendChild(div);
+        });
+    }
+
+    // --- COCKPIT SIMULATOR LOGIC ---
+    let simObjs = {}; 
+
+    function renderSimulator() { buildSimulatorUI(); }
+    function buildSimulatorUI() {
+        const container = document.getElementById("simObjList");
+        container.innerHTML = "";
+        simObjs = JSON.parse(JSON.stringify(allObjs)); 
+        document.getElementById("simGlobalBudget").value = globalSettings.budget || 0;
+        let totalPotential35h = 0;
+        Object.keys(simObjs).forEach(k => {
+            const o = simObjs[k];
+            if(!o.published) return; 
+            let maxObjPrize = 0;
+            if(o.isFixed) {
+                maxObjPrize = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
+            } else {
+                if(o.paliers) o.paliers.forEach(p => maxObjPrize += parse(p.prize));
+            }
+            totalPotential35h += maxObjPrize;
+            let objTotalCost = 0;
+            let totalUserRatio = 0;
+            Object.values(allUsers).forEach(u => { totalUserRatio += (u.hours/BASE_HOURS); });
+            objTotalCost = maxObjPrize * totalUserRatio;
+            const div = document.createElement("div"); div.className = "cockpit-obj-row";
+            let slidersHtml = "";
+            if(o.isFixed) {
+                const prize = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
+                slidersHtml = `<div class="slider-row"><div class="slider-label-line"><span class="slider-label">Prime Fixe</span><span class="slider-val" id="val-${k}-0">${prize}€</span></div><input type="range" min="0" max="50" step="5" value="${prize}" oninput="updateObjVal('${k}', 0, this.value)"></div>`;
+            } else {
+                (o.paliers || []).forEach((p, i) => {
+                    const prize = parse(p.prize);
+                    let label = `Palier ${p.threshold}`;
+                    if(o.isNumeric) label += ""; else label += "%";
+                    slidersHtml += `<div class="slider-row"><div class="slider-label-line"><span class="slider-label">${label}</span><span class="slider-val" id="val-${k}-${i}">${prize}€</span></div><input type="range" min="0" max="30" step="5" value="${prize}" oninput="updateObjVal('${k}', ${i}, this.value)"></div>`;
+                });
+            }
+            div.innerHTML = `<div class="cockpit-obj-title"><span>${o.name}</span> <span class="cockpit-obj-cost" id="cost-${k}">Coût équipe : ${objTotalCost.toFixed(0)}€</span></div>${slidersHtml}`;
+            container.appendChild(div);
+        });
+        document.getElementById("simTotalPerUser").innerText = `${totalPotential35h.toFixed(0)}€`;
+        updateSim();
+    }
+    function updateObjVal(objId, tierIdx, val) {
+        document.getElementById(`val-${objId}-${tierIdx}`).innerText = val + "€";
+        if(simObjs[objId].paliers && simObjs[objId].paliers[tierIdx]) { simObjs[objId].paliers[tierIdx].prize = val; }
+        updateSim();
+    }
+    function updateSim() {
+       const budget = parseFloat(document.getElementById("simGlobalBudget").value) || 0;
+       let totalUserRatio = 0;
+       Object.values(allUsers).forEach(u => { totalUserRatio += (u.hours/BASE_HOURS); });
+       let maxLiability = 0;
+       let totalPotential35h = 0;
+       Object.keys(simObjs).forEach(k => {
+           const o = simObjs[k];
+           if(!o.published) return;
+           let maxP = 0;
+           if(o.isFixed) { maxP = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0; } 
+           else { if(o.paliers) o.paliers.forEach(p => maxP += parse(p.prize)); }
+           const objCost = maxP * totalUserRatio;
+           const costLabel = document.getElementById(`cost-${k}`);
+           if(costLabel) costLabel.innerText = `Coût équipe : ${objCost.toFixed(0)}€`;
+           maxLiability += objCost;
+           totalPotential35h += maxP;
+       });
+       const pct = (budget > 0) ? (maxLiability / budget) * 100 : 0;
+       const bar = document.getElementById("simGauge");
+       bar.style.width = Math.min(pct, 100) + "%";
+       if(maxLiability > budget) { bar.classList.add("danger"); document.getElementById("simUsed").style.color = "#ef4444"; } 
+       else { bar.classList.remove("danger"); document.getElementById("simUsed").style.color = "#3b82f6"; }
+       document.getElementById("simUsed").innerText = `${maxLiability.toFixed(0)}€ Engagés`;
+       document.getElementById("simLeft").innerText = `Reste : ${(budget - maxLiability).toFixed(0)}€`;
+       document.getElementById("simTotalPerUser").innerText = `${totalPotential35h.toFixed(0)}€`;
+    }
+    function publishSim() {
+        if(confirm("📡 Confirmer la publication des nouveaux montants ?")) {
+            const updates = {};
+            if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+                const newBudget = parseFloat(document.getElementById("simGlobalBudget").value);
+                db.ref('settings/budget').set(newBudget);
+            }
+            Object.keys(simObjs).forEach(k => { updates['objectives/' + k + '/paliers'] = simObjs[k].paliers; });
+            db.ref().update(updates).then(() => { showToast("✅ Pilotage Appliqué !"); logAction("Pilotage", "Mise à jour globale budget & primes"); });
+        }
+    }
+
+    function renderNativeCalendar() {
+        const m = currentCalDate.getMonth();
+        const y = currentCalDate.getFullYear();
+        document.getElementById("calTitle").innerText = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(currentCalDate);
+        const firstDay = new Date(y, m, 1);
+        const lastDay = new Date(y, m + 1, 0);
+        const grid = document.getElementById("calGrid");
+        const legend = document.getElementById("calLegend");
+        grid.innerHTML = "";
+        legend.innerHTML = ""; 
+        let dayOfWeek = firstDay.getDay() - 1; if(dayOfWeek === -1) dayOfWeek = 6; 
+        for(let i=0; i<dayOfWeek; i++) { grid.appendChild(document.createElement("div")); }
+        for(let d=1; d<=lastDay.getDate(); d++) {
+            const cell = document.createElement("div"); cell.className = "cal-cell";
+            cell.innerHTML = `<span class="cal-date">${d}</span>`;
+            const cellDate = new Date(y, m, d);
+            calEvents.forEach(evt => {
+                const s = new Date(evt.start); const e = new Date(evt.end);
+                if(cellDate.setHours(0,0,0,0) >= s.setHours(0,0,0,0) && cellDate.setHours(0,0,0,0) <= e.setHours(0,0,0,0)) {
+                    cell.innerHTML += `<span class="cal-event-dot ${evt.c}">${evt.t}</span>`;
+                }
+            });
+            grid.appendChild(cell);
+        }
+        const uniqueEvents = [...new Map(calEvents.map(item => [item.t, item])).values()];
+        uniqueEvents.forEach(evt => {
+            const legItem = document.createElement("div");
+            legItem.className = "legend-item";
+            legItem.innerHTML = `<div class="legend-dot ${evt.c}"></div><span>${evt.t}</span>`;
+            legend.appendChild(legItem);
+        });
+    }
+    function prevMonth() { currentCalDate.setMonth(currentCalDate.getMonth()-1); renderNativeCalendar(); }
+    function nextMonth() { currentCalDate.setMonth(currentCalDate.getMonth()+1); renderNativeCalendar(); }
+
+    function renderDashboard() {
+      if(!currentUser) return;
+      const container = document.getElementById("cardsContainer");
+      container.innerHTML = "";
+      const ratio = (currentUser.hours || 35) / BASE_HOURS;
+      let totalMyGain = 0;
+      
+      const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published);
+      let primOk = true;
+      if(prims.length > 0) {
+        primOk = prims.every(o => {
+           let threshold = 100;
+           if(o.isFixed) threshold = 100;
+           else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold;
+           if(o.isNumeric) return parseFloat(o.current) >= threshold;
+           else {
+               const pct = getPct(o.current, o.target, o.isInverse);
+               return pct >= threshold;
+           }
+        });
+      }
+
+      if(prims.length > 0) container.innerHTML += `<div class="category-title">🔥&nbsp;<span>Priorité Absolue</span></div>`;
+      prims.forEach(o => container.appendChild(createCard(o, false, ratio, true)));
+
+      const secs = Object.values(allObjs).filter(o => !o.isPrimary && o.published);
+      if(secs.length > 0) container.innerHTML += `<div class="category-title secondary">💎&nbsp;<span>Bonus Déblocables</span></div>`;
+      secs.forEach(o => container.appendChild(createCard(o, !primOk, ratio, false)));
+
+      Object.keys(allObjs).forEach(key => {
+        const o = allObjs[key];
+        if(!o.published) return;
+        const pct = getPct(o.current, o.target, o.isInverse);
+        const isLocked = !o.isPrimary && !primOk;
+        if(!isLocked) {
+             if(o.isFixed) {
+                 let win = false;
+                 if(o.isNumeric) win = parseFloat(o.current) >= o.target;
+                 else win = pct >= 100;
+                 if(win && o.paliers && o.paliers[0]) totalMyGain += (parse(o.paliers[0].prize) * ratio);
+             } else {
+                 if(o.paliers) o.paliers.forEach(p => { 
+                     let unlocked = false;
+                     if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold;
+                     else unlocked = pct >= p.threshold;
+                     if(unlocked) totalMyGain += (parse(p.prize) * ratio); 
+                 });
+             }
+        }
+      });
+
+      document.getElementById("myTotalGain").textContent = totalMyGain.toFixed(2) + "€";
+      const rainContainer = document.getElementById("moneyRain");
+      rainContainer.innerHTML = "";
+      if(totalMyGain > 0) {
+         for(let i=0; i<30; i++) {
+            const bill = document.createElement("div"); bill.className = "bill"; bill.textContent = "💸";
+            bill.style.left = Math.random()*100 + "%";
+            bill.style.animation = `floatMoney ${2+Math.random()}s infinite ${Math.random()}s ease-in`;
+            bill.style.fontSize = (20 + Math.random()*20) + "px";
+            rainContainer.appendChild(bill);
+         }
+      }
+      const d = new Date();
+      document.getElementById("lastUpdate").textContent = "Mise à jour : " + d.toLocaleDateString('fr-FR');
+    }
+
+    function createCard(obj, isLocked, userRatio, isPrimary) {
+      const pct = getPct(obj.current, obj.target, obj.isInverse);
+      let isWin = false;
+      if(obj.isFixed) {
+          if(obj.isNumeric) isWin = parseFloat(obj.current) >= obj.target;
+          else isWin = pct >= 100;
+      } else {
+          if(obj.paliers && obj.paliers[0]) {
+              if(obj.isNumeric) isWin = parseFloat(obj.current) >= obj.paliers[0].threshold;
+              else isWin = pct >= obj.paliers[0].threshold;
+          }
+      }
+
+      const el = document.createElement("div");
+      let cls = "card"; if(isLocked) cls += " is-locked"; if(isWin && !isLocked) cls += " is-winner";
+      el.className = cls;
+
+      let badge = "";
+      if(isLocked) badge = `<div class="status-badge badge-locked">🔒 DÉBLOQUER L'OBJECTIF PRINCIPAL</div>`;
+      else if(isWin) badge = `<div class="status-badge badge-winner">🎉 OBJECTIF VALIDÉ</div>`;
+      else if(!isPrimary) badge = `<div class="status-badge badge-ready">💎 BONUS POTENTIEL</div>`;
+
+      let earnedBadge = "";
+      let myGain = 0;
+      if(obj.isFixed) { 
+          let win = false;
+          if(obj.isNumeric) win = parseFloat(obj.current) >= obj.target;
+          else win = pct >= 100;
+          if(win && obj.paliers && obj.paliers[0]) myGain = parse(obj.paliers[0].prize); 
+      } else { 
+          if(obj.paliers) obj.paliers.forEach(p => { 
+             let unlocked = false;
+             if(obj.isNumeric) unlocked = parseFloat(obj.current) >= p.threshold;
+             else unlocked = pct >= p.threshold;
+             if(unlocked) myGain += parse(p.prize); 
+          }); 
+      }
+
+      if(!isLocked && myGain > 0) earnedBadge = `<div class="earned-badge-container"><div class="earned-badge">💶 Prime gagnée : ${(myGain*userRatio).toFixed(2)}€</div></div>`;
+
+      let middleHtml = "";
+      if(obj.isFixed) {
+          const prizeAmount = (obj.paliers && obj.paliers[0]) ? parse(obj.paliers[0].prize) : 0;
+          middleHtml = `<div class="fixed-bonus-block ${isWin && !isLocked ? 'unlocked' : ''}"><div style="font-size:12px; text-transform:uppercase;">PRIME UNIQUE</div><div style="font-size:24px; font-weight:900;">${(prizeAmount * userRatio).toFixed(2)}€</div><div style="font-size:11px; margin-top:5px;">${isWin && !isLocked ? '✅ ACQUISE' : '🔒 À DÉBLOQUER'}</div></div>`;
+      } else {
+          middleHtml = `<div class="milestones">`;
+          const emojis = ['🥳','🚀','🔥'];
+          (obj.paliers||[]).forEach((p, i) => {
+               let u = false;
+               if(obj.isNumeric) u = parseFloat(obj.current) >= p.threshold;
+               else u = pct >= p.threshold;
+               const valStep = parse(p.prize);
+               const displayVal = (valStep * userRatio).toFixed(2);
+               let labelTh = p.threshold + "%";
+               if(obj.isNumeric) labelTh = p.threshold; 
+               middleHtml += `<div class="ms-item ${u?'unlocked':''}"><div class="ms-threshold">${labelTh}</div><div class="ms-circle">${u?emojis[i%3]:(i+1)}</div><div class="ms-prize">+${displayVal}€</div></div>`;
+          });
+          middleHtml += `</div>`;
+      }
+
+      let targetVal = obj.hideTarget ? '<span style="font-size:20px;">🔒</span>' : obj.target + (obj.isInverse ? '%' : '');
+      let currentVal = obj.hideCurrent ? '<span style="font-size:20px;">🔒</span>' : obj.current + (obj.isInverse ? '%' : '');
+      if(obj.isNumeric) { targetVal = obj.target; currentVal = obj.current; }
+      let percentDisplay = pct.toFixed(1) + '%';
+      if(obj.isNumeric) { percentDisplay = `${Math.floor(obj.current)} / ${obj.target}`; } 
+      else if(obj.isInverse && pct >= 100) { percentDisplay = 'SUCCÈS'; }
+
+      const w1 = Math.min(pct, 100);
+      const w2 = pct > 100 ? Math.min(pct - 100, 100) : 0;
+
+      el.innerHTML = `
+        ${badge}
+        <div class="card-top">
+          <div class="obj-info-group">
+             <div class="obj-icon">${isPrimary?'⚡':'💎'}</div>
+             <div style="flex:1">
+               <h3 style="font-weight:800; font-size:20px; margin-bottom:2px;">${obj.name}</h3>
+               <div style="font-size:12px; color:var(--text-muted); font-weight:700;">${isPrimary ? 'OBJECTIF OBLIGATOIRE' : 'BONUS SECONDAIRE'} ${obj.isInverse ? '📉 (Inversé)' : ''}</div>
+             </div>
+          </div>
+        </div>
+        <div class="data-boxes-row"><div class="data-box"><span class="data-box-label">ACTUEL</span><span class="data-box-value">${currentVal}</span></div><div class="data-box"><span class="data-box-label">CIBLE ${obj.isInverse ? '(MAX)' : ''}</span><span class="data-box-value">${targetVal}</span></div></div>
+        <div class="progress-track"><div class="percent-float">${percentDisplay}</div><div class="progress-fill ${isWin?'green-mode':''}" style="width:${w1}%"></div><div class="progress-overdrive" style="width:${w2}%"></div></div>
+        ${middleHtml}${earnedBadge}`;
+      return el;
+    }
+
+    function toggleAdmin(show) { document.getElementById("adminPanel").classList.toggle("active", show); if(show) { renderAdminUsers(); renderSimulator(); } }
+    document.getElementById("btnAdmin").onclick = () => toggleAdmin(true);
+    function switchTab(t) {
+       document.querySelectorAll('.btn-tab').forEach(b => b.classList.remove('active'));
+       if(t === 'team') document.getElementById('btnTabTeam').classList.add('active');
+       if(t === 'objs') document.getElementById('btnTabObjs').classList.add('active');
+       if(t === 'logs') document.getElementById('btnTabLogs').classList.add('active');
+       if(t === 'feedbacks') document.getElementById('btnTabFeedbacks').classList.add('active');
+       
+       document.getElementById('tab-team').style.display = t==='team'?'block':'none';
+       document.getElementById('tab-objs').style.display = t==='objs'?'block':'none';
+       document.getElementById('tab-logs').style.display = t==='logs'?'block':'none';
+       document.getElementById('tab-feedbacks').style.display = t==='feedbacks'?'block':'none';
+    }
+    function toggleCreateInputs() { document.getElementById("createTiersBlock").style.display = document.getElementById("noFixed").checked ? 'none' : 'block'; }
+    function toggleEditInputs() { document.getElementById("editTiersBlock").style.display = document.getElementById("eoFixed").checked ? 'none' : 'block'; }
+
+    function addObj() {
+       const name = document.getElementById("noName").value.trim();
+       const target = document.getElementById("noTarget").value.trim();
+       if(name.length < 2) { alert("⚠️ Le NOM est obligatoire."); return; }
+       if(target.length < 1) { alert("⚠️ La CIBLE est obligatoire."); return; }
+       const isFixed = document.getElementById("noFixed").checked;
+       const isNumeric = document.getElementById("noNumeric").checked;
+       let paliers = [];
+       if(isFixed) { paliers = [{ threshold: 100, prize: "0" }]; } 
+       else { paliers = [{threshold: parseFloat(document.getElementById("c_p1t").value)||50, prize: "0"}, {threshold: parseFloat(document.getElementById("c_p2t").value)||100, prize: "0"}, {threshold: parseFloat(document.getElementById("c_p3t").value)||120, prize: "0"}]; }
+       const id = "obj-" + Date.now();
+       db.ref("objectives/"+id).set({ 
+           name: name, 
+           target: target, 
+           current: 0, 
+           published: true, 
+           isPrimary: document.getElementById("noPrimary").checked, 
+           isInverse: document.getElementById("noInverse").checked, 
+           isFixed: isFixed, 
+           isNumeric: isNumeric,
+           paliers: paliers 
+       }).then(() => { showToast("✅ Objectif Ajouté !"); });
+       logAction("Création Objectif", name);
+    }
+
+    function renderAdminObjs() {
+      const pl = document.getElementById("pubList"); pl.innerHTML = "";
+      const ol = document.getElementById("objList"); ol.innerHTML = "";
+      Object.keys(allObjs).forEach(k => {
+        const o = allObjs[k];
+        const d1 = document.createElement("div"); d1.className="pub-item";
+        d1.innerHTML = `<span class="pub-name">${o.name}</span><label class="switch"><input type="checkbox" ${o.published?'checked':''} onchange="togglePub('${k}', this.checked)"><span class="slider"></span></label>`;
+        pl.appendChild(d1);
+        const d2 = document.createElement("div"); d2.className="user-item";
+        d2.id = "row-" + k; 
+        d2.innerHTML = `<span>${o.name} ${o.isInverse?'📉':''} ${o.isFixed?'🎁':''}</span><div style="display:flex; gap:10px;"><button onclick="openEditObj('${k}')" class="action-btn">✏️</button> <button onclick="deleteObj('${k}')" class="action-btn delete">🗑️</button></div>`;
+        ol.appendChild(d2);
+      });
+    }
+
+    function openEditObj(id) {
+      const o = allObjs[id];
+      document.getElementById("editObjPanel").classList.add("active");
+      document.getElementById("eoId").value = id;
+      document.getElementById("eoName").value = o.name;
+      document.getElementById("eoCurrent").value = o.current;
+      document.getElementById("eoTarget").value = o.target;
+      document.getElementById("eoPrimary").checked = o.isPrimary;
+      document.getElementById("eoInverse").checked = o.isInverse || false;
+      document.getElementById("eoFixed").checked = o.isFixed || false;
+      document.getElementById("eoNumeric").checked = o.isNumeric || false;
+      toggleEditInputs(); 
+      if(o.paliers && o.paliers.length > 0) {
+        if(o.isFixed) { document.getElementById("eoFixedPrize").value = o.paliers[0].prize; } 
+        else {
+            if(o.paliers[0]) { document.getElementById("p1t").value = o.paliers[0].threshold; document.getElementById("p1p").value = o.paliers[0].prize; }
+            if(o.paliers[1]) { document.getElementById("p2t").value = o.paliers[1].threshold; document.getElementById("p2p").value = o.paliers[1].pri  <script src="assets/js/app.js" defer></script>
+  <script src="assets/js/menu.js" defer></script>
