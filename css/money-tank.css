@@ -1,0 +1,58 @@
+/* ============================================
+   MONEY TANK (Squid Game) styles
+   ============================================ */
+
+.global-score-container {
+  position: relative;
+  overflow: hidden; /* ensures bills stay inside circle */
+}
+
+.money-tank {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Put text above */
+.global-score-value,
+.global-score-label {
+  position: relative;
+  z-index: 2;
+}
+
+.tank-bill {
+  position: absolute;
+  width: 34px;
+  height: 18px;
+  border-radius: 4px;
+  opacity: 0.95;
+  background: linear-gradient(135deg, rgba(16,185,129,0.95), rgba(34,197,94,0.7));
+  box-shadow: 0 8px 18px rgba(0,0,0,0.18);
+  will-change: transform, top, left, bottom;
+  animation: tankDrop 420ms ease-out forwards;
+}
+
+.tank-bill::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 3px;
+  border: 1px solid rgba(255,255,255,0.22);
+}
+
+@keyframes tankDrop {
+  from {
+    transform: translateY(0) scale(0.98) rotate(var(--rot, 0deg));
+    opacity: 0.0;
+  }
+  to {
+    left: var(--final-left);
+    top: auto;
+    bottom: var(--final-bottom);
+    transform: translateY(0) scale(1) rotate(var(--rot, 0deg));
+    opacity: 0.95;
+  }
+}
