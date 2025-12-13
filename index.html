@@ -109,9 +109,9 @@
         <button class="icon-btn" type="button" onclick="toggleGlobalMenu(false)" aria-label="Fermer">×</button>
       </div>
       <nav class="global-menu-links">
-        <a class="global-menu-link" href="#dashboard" onclick="toggleGlobalMenu(false)">Dashboard</a>
-        <a class="global-menu-link" href="#contacts" onclick="toggleGlobalMenu(false)">Contacts</a>
-        <a class="global-menu-link" href="#sites-utiles" onclick="toggleGlobalMenu(false)">Sites utiles</a>
+        <a class="global-menu-link" href="#dashboard" onclick="toggleGlobalMenu(false)">📊 Dashboard</a>
+        <a class="global-menu-link" href="#contacts" onclick="toggleGlobalMenu(false)">📇 Contacts</a>
+        <a class="global-menu-link" href="#sites-utiles" onclick="toggleGlobalMenu(false)">🔗 Sites utiles</a>
       </nav>
       <div class="global-menu-foot">
         <div class="global-menu-foot-note">Astuce : tu peux enrichir ces sections plus tard sans toucher au reste du site.</div>
@@ -154,6 +154,11 @@
           <div class="kpi-sub">Aujourd’hui</div>
         </div>
       </section>
+
+      <div class="focus-pill" id="focusPill" aria-label="Focus du jour">
+        <span class="focus-emoji" id="focusEmoji">🔥</span>
+        <span class="focus-text" id="focusText">Chargement...</span>
+      </div>
 
       <div class="objectives-wrapper" id="cardsContainer">
         <div style="text-align:center; color:#9ca3af; margin-top:50px;">Chargement des données...</div>

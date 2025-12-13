@@ -559,6 +559,60 @@
 
       const kUp = document.getElementById("kpiUpdated");
       if(kUp) kUp.textContent = d.toLocaleDateString('fr-FR');
+
+      // UI: small bump on main circle (motivating, without money rain)
+      const sc = document.getElementById("scoreCircle");
+      if(sc){
+        sc.classList.remove("bump");
+        void sc.offsetWidth; // restart animation
+        sc.classList.add("bump");
+        setTimeout(() => sc.classList.remove("bump"), 240);
+      }
+
+      // UI: "Focus du jour" line (simple + motivating)
+      const focusTextEl = document.getElementById("focusText");
+      const focusEmojiEl = document.getElementById("focusEmoji");
+      if(focusTextEl && focusEmojiEl){
+        const publishedObjs = Object.values(allObjs || {}).filter(o => o && o.published);
+        let winCount = 0;
+        publishedObjs.forEach(o => {
+          const pct2 = getPct(o.current, o.target, o.isInverse);
+          let win = false;
+          if(o.isFixed){
+            if(o.isNumeric) win = parseFloat(o.current) >= o.target;
+            else win = pct2 >= 100;
+          } else if(o.paliers && o.paliers[0]){
+            const thr = o.paliers[0].threshold;
+            if(o.isNumeric) win = parseFloat(o.current) >= thr;
+            else win = pct2 >= thr;
+          }
+          if(win) winCount++;
+        });
+
+        const n = publishedObjs.length;
+        const dayKey = new Date().toISOString().slice(0,10); // stable per day
+        let msgs = [];
+
+        if(n === 0){
+          msgs = [{ e: "📝", t: "Publie les objectifs du jour pour lancer la journée." }];
+        } else if(!primOk){
+          msgs = [{ e: "⚡", t: "Priorités d’abord : débloque le principal pour ouvrir les bonus." }];
+        } else if(winCount === n){
+          msgs = [{ e: "🎉", t: "Tout est validé : garde ce rythme, c’est parfait." }];
+        } else {
+          msgs = [
+            { e: "🎯", t: "Objectif du jour : +1 palier validé." },
+            { e: "🚀", t: `Prochain palier : ${n - winCount} objectif(s) à valider.` },
+            { e: "💶", t: "Chaque palier compte : vise le +1 aujourd’hui." }
+          ];
+        }
+
+        let idx = 0;
+        for(let i=0; i<dayKey.length; i++) idx = (idx + dayKey.charCodeAt(i)) % msgs.length;
+        const m = msgs[idx] || msgs[0];
+        focusEmojiEl.textContent = m.e;
+        focusTextEl.textContent = m.t;
+      }
 }
 
     function createCard(obj, isLocked, userRatio, isPrimary) {
