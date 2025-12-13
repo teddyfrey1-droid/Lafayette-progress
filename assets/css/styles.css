@@ -9,7 +9,7 @@
       
       --primary: #2563eb; 
       --accent: #f59e0b;
-      --success: #10b981; 
+      --success: #16a34a; 
       --danger: #ef4444;
       --radius: 28px;
       --font-stack: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -354,7 +354,7 @@
 
     .status-badge { position: absolute; top: 0; left: 0; right: 0; padding: 12px; text-align: center; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; border-radius: var(--radius) var(--radius) 0 0; }
     .badge-locked { background: #fff7ed; color: #c2410c; border-bottom: 2px solid #ffedd5; }
-    .badge-winner { background: #dcfce7; color: #166534; border-bottom: 2px solid #bbf7d0; }
+    .badge-winner { background: rgba(22,163,74,.14); color: #14532d; border-bottom: 2px solid rgba(22,163,74,.35); }
     .badge-ready { background: rgba(37,99,235,.10); color: #1e40af; border-bottom: 2px solid rgba(37,99,235,.15); }
 
     .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; margin-top: 25px; gap: 15px; }
@@ -511,7 +511,7 @@
     body.dark-mode .fixed-bonus-block { background: #0f172a; border-color: #334155; }
     .fixed-bonus-block.unlocked { background: #dcfce7; border: 2px solid #22c55e; color: #15803d; animation: pulse-green 2s infinite; }
     .earned-badge-container { margin-top: 30px; display: flex; justify-content: center; }
-    .earned-badge { background: #dcfce7; color: #166534; padding: 12px 24px; border-radius: 16px; font-weight: 900; font-size: 18px; border: 2px solid #86efac; display: inline-flex; align-items: center; gap: 10px; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.15); animation: pulse-green 2s infinite; }
+    .earned-badge { background: rgba(22,163,74,.14); color: #14532d; padding: 12px 18px; border-radius: 999px; font-weight: 900; font-size: 14px; display:flex; align-items:center; gap: 10px; border: 1px solid rgba(22,163,74,.28); box-shadow: 0 10px 26px rgba(0,0,0,0.10); }
 
     /* --- NATIVE CALENDAR --- */
     .native-cal-container { margin-top: 60px; background: var(--card-bg); border-radius: 20px; padding: 20px; box-shadow: 0 15px 40px -5px rgba(0,0,0,0.06); border: 1px solid var(--border-color); }
@@ -983,4 +983,72 @@ body.dark-mode .focus-pill{ background: rgba(255,255,255,0.04); }
   line-height: 1;
   color: #111827;
 }
+
+
+
+/* --- CERCLE CENTRAL: visibilité garantie en mode jour --- */
+body:not(.dark-mode) .global-score-container{
+  background: linear-gradient(180deg, #0b1220 0%, #111827 100%);
+  border: 2px solid rgba(15,23,42,.18);
+  box-shadow: 0 18px 55px rgba(0,0,0,.28);
+}
+body:not(.dark-mode) .global-score-container .global-score-value,
+body:not(.dark-mode) .global-score-container .global-score-label,
+body:not(.dark-mode) .global-score-container .global-score-sub,
+body:not(.dark-mode) .global-score-container .global-score-next,
+body:not(.dark-mode) .global-score-container .global-score-pill,
+body:not(.dark-mode) .global-score-container .global-score-days,
+body:not(.dark-mode) .global-score-container .global-score-micro{
+  color: #ffffff;
+}
+
+
+
+/* --- PILOTAGE BUDGET & PRIMES: objectif compact (ligne) + ouverture --- */
+.cockpit-obj-row{
+  padding: 0 !important;
+  overflow: hidden;
+}
+.cockpit-obj-head{
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: transparent;
+  border: none;
+  padding: 18px 18px;
+  cursor: pointer;
+  text-align: left;
+}
+.cockpit-obj-head:active{ transform: scale(0.997); }
+
+.cockpit-obj-title{
+  width: 100%;
+  display:flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.cockpit-obj-title .cost{
+  font-size: 12px;
+  font-weight: 900;
+  color: #1e40af;
+  background: rgba(37,99,235,.10);
+  border: 1px solid rgba(37,99,235,.18);
+  padding: 6px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.cockpit-chevron{
+  font-size: 18px;
+  color: var(--text-muted);
+  margin-left: 12px;
+  transition: transform .18s ease;
+}
+.cockpit-obj-body{
+  display: none;
+  padding: 0 18px 18px 18px;
+}
+.cockpit-obj-row.open .cockpit-obj-body{ display:block; }
+.cockpit-obj-row.open .cockpit-chevron{ transform: rotate(180deg); }
 

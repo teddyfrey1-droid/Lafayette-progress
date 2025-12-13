@@ -395,7 +395,18 @@
                     slidersHtml += `<div class="slider-row"><div class="slider-label-line"><span class="slider-label">${label}</span><span class="slider-val" id="val-${k}-${i}">${prize}€</span></div><input type="range" min="0" max="30" step="5" value="${prize}" oninput="updateObjVal('${k}', ${i}, this.value)"></div>`;
                 });
             }
-            div.innerHTML = `<div class="cockpit-obj-title"><span>${o.name}</span> <span class="cockpit-obj-cost" id="cost-${k}">Coût équipe : ${objTotalCost.toFixed(0)}€</span></div>${slidersHtml}`;
+            div.innerHTML = `
+              <button class="cockpit-obj-head" type="button" onclick="toggleCockpitObj(this)">
+                <div class="cockpit-obj-title">
+                  <span>${o.name}</span>
+                  <span class="cost">Coût équipe : ${objTotalCost.toFixed(0)}€</span>
+                </div>
+                <span class="cockpit-chevron">▾</span>
+              </button>
+              <div class="cockpit-obj-body">
+                ${slidersHtml}
+              </div>
+            `; 
             container.appendChild(div);
         });
         document.getElementById("simTotalPerUser").innerText = `${totalPotential35h.toFixed(0)}€`;
@@ -406,7 +417,16 @@
         if(simObjs[objId].paliers && simObjs[objId].paliers[tierIdx]) { simObjs[objId].paliers[tierIdx].prize = val; }
         updateSim();
     }
-    function updateSim() {
+    
+    function toggleCockpitObj(btn){
+      try{
+        const row = btn.closest('.cockpit-obj-row');
+        if(!row) return;
+        row.classList.toggle('open');
+      }catch(e){}
+    }
+
+function updateSim() {
        const budget = parseFloat(document.getElementById("simGlobalBudget").value) || 0;
        let totalUserRatio = 0;
        Object.values(allUsers).forEach(u => { totalUserRatio += (u.hours/BASE_HOURS); });
