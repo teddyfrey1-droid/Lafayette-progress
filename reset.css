@@ -1,0 +1,43 @@
+/* ============================================
+   RESET & BASE STYLES - Heiko Dashboard
+   ============================================ */
+
+* { 
+  box-sizing: border-box; 
+  margin: 0; 
+  padding: 0; 
+  -webkit-tap-highlight-color: transparent; 
+}
+
+body { 
+  font-family: var(--font-stack); 
+  background: var(--bg-gradient); 
+  color: var(--text-main); 
+  min-height: 100vh; 
+  padding: 20px; 
+  overflow-x: hidden; 
+  transition: background 0.3s ease, color 0.3s ease; 
+}
+
+input, select, textarea { 
+  width: 100%; 
+  padding: 12px; 
+  border-radius: 10px; 
+  border: 1px solid var(--border-color); 
+  font-size: 13px; 
+  background: var(--input-bg); 
+  color: var(--text-main); 
+  outline: none; 
+  transition: 0.3s;
+  font-family: inherit;
+}
+
+input:focus, select:focus, textarea:focus { 
+  border-color: var(--primary); 
+}
+
+input.error { 
+  border-color: var(--danger); 
+  animation: shake 0.3s; 
+  background-color: rgba(239, 68, 68, 0.05); 
+}

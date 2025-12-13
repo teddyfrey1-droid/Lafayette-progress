@@ -18,7 +18,6 @@
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/admin.css">
   <link rel="stylesheet" href="css/calendar.css">
-  <!-- UI polish + Money Tank (Squid Game) overrides (loaded last on purpose) -->
   <link rel="stylesheet" href="css/enhancements.css">
   
   <!-- Firebase -->
@@ -111,9 +110,20 @@
 
       <!-- Global Score -->
       <div class="global-score-container">
-        <div class="money-rain"></div>
         <div class="global-score-value">0%</div>
         <div class="global-score-label">Score Global</div>
+      </div>
+
+      <!-- Motivation strip (dynamic) -->
+      <div class="motivation-strip" id="motivationStrip" aria-live="polite">
+        <div class="motivation-title" id="motivationTitle">Objectif du jour</div>
+        <div class="motivation-sub" id="motivationSub">Chargement…</div>
+      </div>
+
+      <!-- Motivation strip (auto-updated) -->
+      <div class="motivation-strip" id="motivationStrip" aria-live="polite">
+        <div class="motivation-main" id="motivationMain">Objectif du jour : rester focus 🔥</div>
+        <div class="motivation-sub" id="motivationSub">...</div>
       </div>
 
       <!-- Primary Objectives -->
@@ -173,8 +183,8 @@
   <script src="js/admin.js"></script>
   <script src="js/calendar.js"></script>
   <script src="js/simulator.js"></script>
-  <!-- Squid Game: bills fall into the circle and fill it based on score -->
   <script src="js/money_tank.js"></script>
+  <script src="js/motivation.js"></script>
 
 </body>
 </html>

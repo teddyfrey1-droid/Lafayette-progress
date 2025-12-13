@@ -1,0 +1,30 @@
+/* ============================================
+   VARIABLES & THEMES - Heiko Dashboard
+   ============================================ */
+
+:root {
+  --bg-gradient: linear-gradient(135deg, #fffaf4 0%, #f3f4f6 100%);
+  --card-bg: #ffffff;
+  --text-main: #1f2937; 
+  --text-muted: #6b7280;
+  --border-color: #e2e8f0;
+  --input-bg: #ffffff;
+  
+  --primary: #2563eb; 
+  --accent: #f59e0b;
+  --success: #10b981; 
+  --danger: #ef4444;
+  --radius: 28px;
+  --font-stack: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* DARK MODE VARIABLES */
+body.dark-mode {
+  --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  --card-bg: #1e293b;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+  --input-bg: #0f172a;
+}
+
