@@ -43,6 +43,9 @@ function calculatePercent(current, target) {
 
 // Dark mode toggle
 function toggleDarkMode() {
+  // Smooth transition without "flash": enable transitions briefly
+  document.body.classList.add('theme-transition');
+
   document.body.classList.toggle('dark-mode');
   const isDark = document.body.classList.contains('dark-mode');
   
@@ -52,6 +55,9 @@ function toggleDarkMode() {
   // Changer l'icône
   const icon = document.querySelector('.toggle-icon');
   icon.textContent = isDark ? '🌙' : '☀️';
+
+  // Remove transition class after the animation window
+  setTimeout(() => document.body.classList.remove('theme-transition'), 320);
   
   logActivity('Thème changé', isDark ? 'dark' : 'light');
 }
