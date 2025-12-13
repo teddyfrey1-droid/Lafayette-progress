@@ -17,6 +17,27 @@
   // Guard if menu elements don't exist
   if (!toggleBtn || !sideMenu || !overlay) return;
 
+  // Hide the menu until the user is authenticated. Once the auth state changes,
+  // show or hide the menu toggle and related elements accordingly.
+  if (typeof firebase !== 'undefined' && firebase.auth) {
+    firebase.auth().onAuthStateChanged(user => {
+      if (toggleBtn) {
+        toggleBtn.style.display = user ? 'block' : 'none';
+      }
+      if (sideMenu) {
+        sideMenu.style.display = user ? '' : 'none';
+      }
+      if (overlay) {
+        overlay.style.display = user ? '' : 'none';
+      }
+    });
+  } else {
+    // If Firebase auth isn't available, hide the menu in case of anonymous state
+    if (toggleBtn) toggleBtn.style.display = 'none';
+    if (sideMenu) sideMenu.style.display = 'none';
+    if (overlay) overlay.style.display = 'none';
+  }
+
   function openMenu() {
     sideMenu.classList.add('open');
     overlay.classList.add('active');
