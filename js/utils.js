@@ -78,6 +78,8 @@ function generateId() {
 
 // Escape HTML pour éviter XSS
 function escapeHtml(text) {
+  if (text === null || text === undefined) return '';
+  text = String(text);
   const map = {
     '&': '&amp;',
     '<': '&lt;',
