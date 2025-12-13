@@ -1,0 +1,127 @@
+/*
+  Enhancements layer
+  - Pure CSS overrides loaded last
+  - Keeps the existing business logic intact
+  - Focus: readability, premium look, smoother theme switch
+*/
+
+:root {
+  --elev-1: 0 6px 20px rgba(0,0,0,0.12);
+  --elev-2: 0 10px 32px rgba(0,0,0,0.16);
+  --radius-xl: 22px;
+  --radius-lg: 16px;
+}
+
+/* Slightly smoother overall feel */
+body {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Cards: more premium depth without being "toy" */
+.card,
+.objective-card,
+.modal-box,
+.native-cal-container {
+  border-radius: var(--radius-xl);
+  box-shadow: var(--elev-1);
+}
+
+/* Buttons: clearer hover, better focus */
+.btn {
+  border-radius: 14px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  transition: transform 140ms ease, filter 140ms ease, box-shadow 140ms ease;
+}
+.btn:hover { transform: translateY(-1px); filter: brightness(1.02); }
+.btn:active { transform: translateY(0px); }
+.btn:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.35); outline-offset: 2px; }
+
+/* ================================================================
+   Top-right menu
+   ================================================================ */
+.app-menu-btn{
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 120;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-main);
+  box-shadow: var(--elev-1);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  line-height: 1;
+  transition: transform 140ms ease, filter 140ms ease;
+}
+.app-menu-btn:hover{ transform: translateY(-1px); filter: brightness(1.03); }
+
+.app-menu{
+  position: fixed;
+  top: 64px;
+  right: 14px;
+  z-index: 119;
+  min-width: 220px;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  box-shadow: var(--elev-2);
+  display: none;
+}
+.app-menu.open{ display: block; }
+.app-menu-item{
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 12px;
+  color: var(--text-main);
+  text-decoration: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 800;
+}
+.app-menu-item:hover{ background: rgba(0,0,0,0.06); }
+body.dark .app-menu-item:hover{ background: rgba(255,255,255,0.07); }
+.app-menu-sep{ height: 1px; background: var(--border-color); margin: 6px 0; }
+
+.app-menu-btn-item{ font-family: inherit; }
+
+/* Headings: stronger hierarchy */
+h1 { letter-spacing: -0.4px; }
+.category-title { letter-spacing: -0.2px; }
+
+/* Motivation strip */
+.motivation-strip {
+  margin: 14px auto 22px;
+  padding: 14px 16px;
+  max-width: 520px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--elev-1);
+}
+.motivation-title { font-weight: 900; font-size: 14px; color: var(--text-muted); }
+.motivation-main { font-weight: 950; font-size: 16px; margin-top: 6px; color: var(--text-main); }
+.motivation-sub { font-size: 13px; margin-top: 4px; color: var(--text-muted); }
+
+/* Theme switch smoothing: apply during body class .theme-transition (added by existing toggle if present)
+   If your toggle doesn't add this class, it still looks fine; this is a safe enhancement.
+*/
+body.theme-transition * {
+  transition: background-color 240ms ease, color 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

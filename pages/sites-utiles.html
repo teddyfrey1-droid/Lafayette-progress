@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#2563eb">
+  <title>Heiko - Sites utiles</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/reset.css">
+  <link rel="stylesheet" href="../css/animations.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/admin.css">
+  <link rel="stylesheet" href="../css/calendar.css">
+  <link rel="stylesheet" href="../css/enhancements.css">
+</head>
+<body>
+  <div class="theme-toggle" onclick="toggleDarkMode()">
+    <div class="theme-toggle-slider"><span class="toggle-icon">☀️</span></div>
+  </div>
+
+  <button id="appMenuBtn" class="app-menu-btn" type="button" aria-label="Menu" aria-haspopup="true" aria-expanded="false">☰</button>
+  <div id="appMenu" class="app-menu" aria-hidden="true">
+    <a href="../index.html" class="app-menu-item">📊 Dashboard</a>
+    <a href="contacts.html" class="app-menu-item">👥 Contacts</a>
+    <a href="sites-utiles.html" class="app-menu-item">🔗 Sites utiles</a>
+  </div>
+
+  <div class="container" style="max-width:900px; margin:0 auto; padding:24px 16px 90px;">
+    <div class="card" style="padding:18px;">
+      <div class="category-title" style="margin:0 0 10px;">🔗 Sites utiles</div>
+      <p style="color:var(--text-muted); margin:0 0 14px;">Regroupe ici les liens utiles (planning, caisse, deliveroo/uber, drive, etc.).</p>
+
+      <div class="objective-card" style="padding:14px; margin-bottom:12px;">
+        <div style="font-weight:900;">Google Drive</div>
+        <a href="#" style="color:var(--primary-color); text-decoration:none;">Ajouter un lien</a>
+      </div>
+
+      <div class="objective-card" style="padding:14px; margin-bottom:12px;">
+        <div style="font-weight:900;">Deliveroo</div>
+        <a href="#" style="color:var(--primary-color); text-decoration:none;">Ajouter un lien</a>
+      </div>
+
+      <div class="objective-card" style="padding:14px;">
+        <div style="font-weight:900;">Uber Eats</div>
+        <a href="#" style="color:var(--primary-color); text-decoration:none;">Ajouter un lien</a>
+      </div>
+
+      <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
+        <a class="btn" href="../index.html" style="text-decoration:none; display:inline-flex; align-items:center;">⬅️ Retour</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/utils.js"></script>
+  <script src="../js/menu.js"></script>
+</body>
+</html>
