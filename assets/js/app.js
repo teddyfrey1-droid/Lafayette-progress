@@ -509,12 +509,9 @@
 
       document.getElementById("myTotalGain").textContent = totalMyGain.toFixed(2) + "€";
       const rainContainer = document.getElementById("moneyRain");
-      rainContainer.innerHTML = "";
-      if(totalMyGain > 0) {
-         for(let i=0; i<30; i++) {
-            const bill = document.createElement("div"); bill.className = "bill"; bill.textContent = "💸";
-            bill.style.left = Math.random()*100 + "%";
-            bill.style.animation = `floatMoney ${2+Math.random()}s infinite ${Math.random()}s ease-in`;
+      // Bills animation disabled (removed on request)
+      if(rainContainer) rainContainer.innerHTML = "";
+s infinite ${Math.random()}s ease-in`;
             bill.style.fontSize = (20 + Math.random()*20) + "px";
             rainContainer.appendChild(bill);
          }
