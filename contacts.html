@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Contacts - Lafayette Dashboard</title>
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <link rel="stylesheet" href="css/calendar.css">
+  <style>
+    .page-card{background:var(--card-bg); border:1px solid rgba(0,0,0,0.06); border-radius:18px; padding:18px; box-shadow:0 18px 40px rgba(0,0,0,0.08);} 
+    body.dark-mode .page-card{border-color: rgba(148,163,184,0.18);} 
+    .grid{display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:12px;}
+    .contact-line{display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid rgba(0,0,0,0.06);} 
+    body.dark-mode .contact-line{border-color: rgba(148,163,184,0.12);} 
+    .contact-line:last-child{border-bottom:none;}
+    .muted{color:var(--text-muted); font-weight:700;}
+  </style>
+</head>
+<body>
+  <div class="container" style="padding-top:20px;">
+    <div class="top-bar">
+      <div class="user-welcome">📇 <strong>Contacts</strong></div>
+      <div class="topbar-actions">
+        <div class="menu-wrapper">
+          <button class="icon-btn" id="menuBtn" aria-label="Menu" aria-haspopup="true" aria-expanded="false">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M4 7H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M4 12H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M4 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <div class="menu-dropdown" id="menuDropdown" role="menu" aria-label="Menu">
+            <a href="Index.html" role="menuitem">Dashboard</a>
+            <a href="contacts.html" role="menuitem">Contacts</a>
+            <a href="sites-utiles.html" role="menuitem">Sites utiles</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <header style="margin-bottom:16px;">
+      <div class="header-pill">📍 Heiko Lafayette</div>
+      <h1 style="margin-top:8px;">Contacts utiles</h1>
+      <div class="last-update">Astuce: tu peux épingler cette page sur ton écran d’accueil.</div>
+    </header>
+
+    <div class="grid">
+      <div class="page-card">
+        <h3 style="margin-bottom:10px;">Management</h3>
+        <div class="contact-line"><span>Responsable</span><span class="muted">À compléter</span></div>
+        <div class="contact-line"><span>Adjoint</span><span class="muted">À compléter</span></div>
+      </div>
+      <div class="page-card">
+        <h3 style="margin-bottom:10px;">Support / Tech</h3>
+        <div class="contact-line"><span>Zelty / Caisse</span><span class="muted">À compléter</span></div>
+        <div class="contact-line"><span>Livraisons</span><span class="muted">À compléter</span></div>
+      </div>
+      <div class="page-card">
+        <h3 style="margin-bottom:10px;">Urgences</h3>
+        <div class="contact-line"><span>Maintenance</span><span class="muted">À compléter</span></div>
+        <div class="contact-line"><span>Sécurité</span><span class="muted">À compléter</span></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // keep theme if stored
+    try { if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode'); } catch(e) {}
+  </script>
+  <script src="js/nav.js"></script>
+</body>
+</html>
