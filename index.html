@@ -18,6 +18,8 @@
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/admin.css">
   <link rel="stylesheet" href="css/calendar.css">
+  <link rel="stylesheet" href="css/enhancements.css">
+  <link rel="stylesheet" href="css/money-tank.css">
   
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -25,6 +27,23 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
+
+  <!-- Firebase setup overlay (shown if config missing) -->
+  <div id="firebaseSetupOverlay" class="modal-overlay" style="display:none;">
+    <div class="modal-box" style="max-width:560px;">
+      <div class="modal-title">⚙️ Configuration Firebase</div>
+      <p id="firebaseSetupHint" style="font-size:13px; color:var(--text-muted); margin-bottom:10px;"></p>
+      <textarea id="firebaseConfigTextarea" class="fb-input" style="min-height:150px;" placeholder='Colle ici le JSON firebaseConfig (ex: {"apiKey":"...", ...})'></textarea>
+      <div id="firebaseSetupError" style="color:#ef4444; font-size:13px; margin-top:8px;"></div>
+      <div style="display:flex; gap:10px; margin-top:12px;">
+        <button class="btn" onclick="saveFirebaseConfigFromUi()">Sauvegarder & Recharger</button>
+        <button class="btn" style="background:var(--border-color); color:var(--text-muted);" onclick="document.getElementById('firebaseSetupOverlay').style.display='none'">Fermer</button>
+      </div>
+      <div style="margin-top:10px; font-size:12px; color:var(--text-muted);">
+        Astuce : si tu veux la réinitialiser → console : <code>localStorage.removeItem('heiko_firebase_config')</code>
+      </div>
+    </div>
+  </div>
 
   <!-- Theme Toggle -->
   <div class="theme-toggle" onclick="toggleDarkMode()">
@@ -108,9 +127,12 @@
               </svg>
             </button>
             <div class="menu-dropdown" id="menuDropdown" role="menu" aria-label="Menu">
-              <a href="Index.html" role="menuitem">Dashboard</a>
+              <a href="index.html" role="menuitem">Dashboard</a>
               <a href="contacts.html" role="menuitem">Contacts</a>
               <a href="sites-utiles.html" role="menuitem">Sites utiles</a>
+              <a href="#" id="menuAdmin" role="menuitem" style="display:none;" onclick="openAdminPanel(); return false;">Admin</a>
+              <a href="#" id="menuLogout" role="menuitem" style="display:none;">Se déconnecter</a>
+              <a href="#" role="menuitem" onclick="document.getElementById('firebaseSetupOverlay').style.display='flex'; return false;">Configurer Firebase</a>
             </div>
           </div>
         </div>
@@ -127,6 +149,15 @@
       <div class="global-score-container">
         <div class="global-score-value">0%</div>
         <div class="global-score-label">Score Global</div>
+      </div>
+
+      <!-- Motivation strip (optional, UI-only) -->
+      <div id="motivationStrip" class="motivation-strip">
+        <div class="motivation-left">
+          <div id="motivationTitle" class="motivation-title">Objectif du jour</div>
+          <div id="motivationMain" class="motivation-main">...</div>
+          <div id="motivationSub" class="motivation-sub">...</div>
+        </div>
       </div>
 
       <!-- Primary Objectives -->
@@ -186,7 +217,11 @@
   <script src="js/admin.js"></script>
   <script src="js/calendar.js"></script>
   <script src="js/simulator.js"></script>
+  <script src="js/motivation.js"></script>
+  <script src="js/money_tank.js"></script>
   <script src="js/nav.js"></script>
+  <script src="js/motivation.js"></script>
+  <script src="js/money_tank.js"></script>
 
 </body>
 </html>
