@@ -41,9 +41,3 @@ input.error {
   animation: shake 0.3s; 
   background-color: rgba(239, 68, 68, 0.05); 
 }
-
-
-/* Smooth theme switch */
-body.theme-transition, body.theme-transition *{
-  transition: background-color 220ms ease, color 220ms ease, border-color 220ms ease, box-shadow 220ms ease, filter 220ms ease;
-}

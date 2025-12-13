@@ -171,7 +171,6 @@
   <script src="js/admin.js"></script>
   <script src="js/calendar.js"></script>
   <script src="js/simulator.js"></script>
-<script src="js/money_tank.js"></script>
 
 </body>
 </html>

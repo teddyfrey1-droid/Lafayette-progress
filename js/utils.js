@@ -43,13 +43,6 @@ function calculatePercent(current, target) {
 
 // Dark mode toggle
 function toggleDarkMode() {
-  // Smooth theme switch (avoid flashes)
-  document.body.classList.add('theme-transition');
-  window.clearTimeout(window.__themeTransitionTimer);
-  window.__themeTransitionTimer = window.setTimeout(() => {
-    document.body.classList.remove('theme-transition');
-  }, 350);
-
   document.body.classList.toggle('dark-mode');
   const isDark = document.body.classList.contains('dark-mode');
   

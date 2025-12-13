@@ -1,203 +1,110 @@
-(() => {
-  "use strict";
+// Money Tank effect inside the global score circle
+// This script creates falling bills that accumulate inside the circle and fill it
+// proportionally to the displayed score. It also hides the original money-rain effect.
 
-  function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+document.addEventListener('DOMContentLoaded', function () {
+    const container = document.querySelector('.global-score-container');
+    const valueEl = document.querySelector('.global-score-value');
+    if (!container || !valueEl) return;
 
-  function parsePercent(text) {
-    if (!text) return 0;
-    const m = String(text).match(/(\d+(?:[\.,]\d+)?)/);
-    if (!m) return 0;
-    return clamp(parseFloat(m[1].replace(",", ".")), 0, 100);
-  }
-
-  function createCanvasIn(container) {
-    let canvas = container.querySelector("canvas.money-tank-canvas");
-    if (!canvas) {
-      canvas = document.createElement("canvas");
-      canvas.className = "money-tank-canvas";
-      canvas.setAttribute("aria-hidden", "true");
-      container.appendChild(canvas);
-    }
-    const ctx = canvas.getContext("2d", { alpha: true });
-    return { canvas, ctx };
-  }
-
-  function setup() {
-    const scoreEl = document.querySelector(".global-score-value");
-    const rainEl = document.querySelector(".global-score-container .money-rain");
-    if (!scoreEl || !rainEl) return;
-
-    const { canvas, ctx } = createCanvasIn(rainEl);
-
-    let W = 0, H = 0, dpr = 1;
-
-    function resize() {
-      const rect = rainEl.getBoundingClientRect();
-      dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-      W = Math.max(1, Math.floor(rect.width));
-      H = Math.max(1, Math.floor(rect.height));
-      canvas.width = Math.floor(W * dpr);
-      canvas.height = Math.floor(H * dpr);
-      canvas.style.width = W + "px";
-      canvas.style.height = H + "px";
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Ensure the container is positioned relative so absolute elements align correctly
+    if (getComputedStyle(container).position === 'static') {
+        container.style.position = 'relative';
     }
 
-    const bills = [];
-    const MAX_BILLS = 220; // cap for performance
-    let targetFill = parsePercent(scoreEl.textContent) / 100;
-    let fill = targetFill;
-
-    function spawnBills(count) {
-      for (let i = 0; i < count; i++) {
-        if (bills.length >= MAX_BILLS) break;
-        bills.push({
-          x: Math.random() * W,
-          y: -20 - Math.random() * 60,
-          w: 18 + Math.random() * 10,
-          h: 10 + Math.random() * 6,
-          rot: (Math.random() - 0.5) * 0.9,
-          vr: (Math.random() - 0.5) * 0.02,
-          vy: 1.5 + Math.random() * 2.5,
-          vx: (Math.random() - 0.5) * 0.7,
-          a: 1,
-          state: "fall"
-        });
-      }
+    // Hide any existing money rain effect
+    const rainEl = container.querySelector('.money-rain');
+    if (rainEl) {
+        rainEl.style.display = 'none';
     }
 
-    function drawBill(b) {
-      ctx.save();
-      ctx.translate(b.x, b.y);
-      ctx.rotate(b.rot);
-      ctx.globalAlpha = b.a;
-
-      // bill body
-      const r = 2.5;
-      ctx.beginPath();
-      const x = -b.w/2, y = -b.h/2, w = b.w, h = b.h;
-      ctx.moveTo(x + r, y);
-      ctx.arcTo(x + w, y, x + w, y + h, r);
-      ctx.arcTo(x + w, y + h, x, y + h, r);
-      ctx.arcTo(x, y + h, x, y, r);
-      ctx.arcTo(x, y, x + w, y, r);
-      ctx.closePath();
-
-      const grad = ctx.createLinearGradient(0, -b.h/2, 0, b.h/2);
-      grad.addColorStop(0, "rgba(34,197,94,0.95)");
-      grad.addColorStop(1, "rgba(22,163,74,0.95)");
-      ctx.fillStyle = grad;
-      ctx.fill();
-
-      // inner border
-      ctx.strokeStyle = "rgba(255,255,255,0.25)";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      // center stripe
-      ctx.strokeStyle = "rgba(0,0,0,0.15)";
-      ctx.beginPath();
-      ctx.moveTo(-b.w*0.25, 0);
-      ctx.lineTo(b.w*0.25, 0);
-      ctx.stroke();
-
-      // small circle
-      ctx.fillStyle = "rgba(255,255,255,0.22)";
-      ctx.beginPath();
-      ctx.arc(0, 0, Math.min(b.w, b.h) * 0.18, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.restore();
+    // Create the tank container if it doesn't exist
+    let tank = container.querySelector('.money-tank');
+    if (!tank) {
+        tank = document.createElement('div');
+        tank.className = 'money-tank';
+        container.appendChild(tank);
     }
 
-    function tick() {
-      // smooth fill level
-      fill += (targetFill - fill) * 0.06;
-
-      // decide how many to spawn: more when fill is increasing
-      const delta = targetFill - fill;
-      const base = 1; // always a tiny rain
-      const extra = delta > 0 ? Math.ceil(delta * 40) : 0;
-      spawnBills(base + extra);
-
-      // background fade (subtle)
-      ctx.clearRect(0, 0, W, H);
-
-      // compute filled region
-      const fillH = clamp(fill, 0, 1) * H;
-      const topY = H - fillH;
-
-      // subtle "glass" vignette
-      const glass = ctx.createRadialGradient(W*0.5, H*0.35, Math.min(W,H)*0.1, W*0.5, H*0.35, Math.max(W,H)*0.7);
-      glass.addColorStop(0, "rgba(255,255,255,0.08)");
-      glass.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = glass;
-      ctx.fillRect(0, 0, W, H);
-
-      // bills update
-      for (let i = bills.length - 1; i >= 0; i--) {
-        const b = bills[i];
-
-        if (b.state === "fall") {
-          b.vy += 0.02; // gravity
-          b.y += b.vy;
-          b.x += b.vx;
-          b.rot += b.vr;
-
-          // wrap x
-          if (b.x < -30) b.x = W + 30;
-          if (b.x > W + 30) b.x = -30;
-
-          const landingY = topY + (H - topY) * (0.15 + Math.random() * 0.8);
-          if (b.y >= landingY) {
-            b.y = landingY;
-            b.state = "rest";
-            b.vy = 0;
-            b.vx *= 0.2;
-            b.vr *= 0.2;
-          }
-        } else {
-          // if fill decreased and bill is now above allowed region, fade it out
-          if (b.y < topY) {
-            b.a -= 0.03;
-            if (b.a <= 0) {
-              bills.splice(i, 1);
-              continue;
+    // Inject styles once into the document head. These styles control the tank and bills.
+    if (!document.querySelector('#money-tank-styles')) {
+        const style = document.createElement('style');
+        style.id = 'money-tank-styles';
+        style.textContent = `
+            /* Hide the default rain effect in the global score */
+            .global-score-container .money-rain { display: none !important; }
+            /* Tank takes up the full circle area */
+            .global-score-container .money-tank {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                border-radius: 50%;
+                pointer-events: none;
             }
-          }
-        }
-
-        // remove very old offscreen
-        if (b.y > H + 80) {
-          bills.splice(i, 1);
-          continue;
-        }
-      }
-
-      // draw bills behind text
-      for (const b of bills) drawBill(b);
-
-      requestAnimationFrame(tick);
+            /* Each bill starts above the tank and falls to its final position */
+            .global-score-container .tank-bill {
+                position: absolute;
+                bottom: 0;
+                opacity: 0;
+                transform: translateY(-120%);
+                animation: moneyTankDrop 1s ease-out forwards;
+            }
+            @keyframes moneyTankDrop {
+                from { transform: translateY(-120%); opacity: 1; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
     }
 
-    // Observe score changes without touching existing logic
-    const observer = new MutationObserver(() => {
-      targetFill = parsePercent(scoreEl.textContent) / 100;
-    });
-    observer.observe(scoreEl, { childList: true, characterData: true, subtree: true });
-
-    // resize observers
-    resize();
-    const ro = new ResizeObserver(resize);
-    ro.observe(rainEl);
-    window.addEventListener("resize", resize, { passive: true });
-
-    requestAnimationFrame(tick);
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", setup);
-  } else {
-    setup();
-  }
-})();
+    // Maximum number of bills that can be shown at 100%/100€ (adjust as needed)
+    const MAX_BILLS = 40;
+    /**
+     * Parse the numeric value out of the score text.
+     * If a percent sign is present, treat it as a percentage (0‑100).
+     * Otherwise, treat the value as euros and map to a percentage
+     * based on a default maximum (100) to avoid overfilling.
+     */
+    function parseRatio(text) {
+        const cleaned = text.replace(/[^\d,\.\%]/g, '');
+        const num = parseFloat(cleaned.replace(',', '.')) || 0;
+        if (cleaned.includes('%')) {
+            return Math.min(num / 100, 1);
+        }
+        // Default maximum for euros; can be updated if the real max is known
+        const MAX_EURO = 100;
+        return Math.min(num / MAX_EURO, 1);
+    }
+    /**
+     * Render the falling bills based on the current score.
+     */
+    function renderBills() {
+        const ratio = parseRatio(valueEl.textContent.trim());
+        const count = Math.floor(MAX_BILLS * ratio);
+        // Remove existing bills
+        tank.innerHTML = '';
+        for (let i = 0; i < count; i++) {
+            const bill = document.createElement('div');
+            bill.className = 'tank-bill';
+            bill.textContent = '💸';
+            // Random horizontal position within the circle
+            bill.style.left = Math.random() * 90 + '%';
+            // Random animation delay so bills don't all fall at once
+            bill.style.animationDelay = (Math.random() * 1.0) + 's';
+            // Random size variation
+            bill.style.fontSize = (14 + Math.random() * 10) + 'px';
+            // Assign a bottom offset to stack bills gradually; up to 70% height
+            const bottomOffset = (i / (count || 1)) * 70; // 0 to 70%
+            bill.style.bottom = bottomOffset + '%';
+            tank.appendChild(bill);
+        }
+    }
+    // Initial render
+    renderBills();
+    // Observe changes to the score value
+    const observer = new MutationObserver(renderBills);
+    observer.observe(valueEl, { childList: true, characterData: true, subtree: true });
+});
