@@ -176,88 +176,103 @@
         100% { filter: hue-rotate(360deg) brightness(1.2) saturate(1.3); }
     }
 
-    /* --- CERCLE CENTRAL - ZÉRO VERT --- */
-    .global-score-container {
-  margin: 44px auto 18px;
-  width: 320px;
-  height: 320px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  position: relative;
-  overflow: hidden;
-
-  background: linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
-  border: 8px solid rgba(37, 99, 235, 0.92);
-  box-shadow: 0 24px 70px rgba(2, 6, 23, 0.35);
-}
-
-    body.dark-mode .global-score-container {
-         background: 
-            linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
-            conic-gradient(
-                from 0deg,
-                #7f1d1d,    /* Rouge ultra foncé */
-                #991b1b,    /* Rouge très foncé */
-                #dc2626,    /* Rouge foncé */
-                #ef4444,    /* Rouge */
-                #f43f5e,    /* Rose-rouge */
-                #db2777,    /* Rose foncé */
-                #ec4899,    /* Rose */
-                #f472b6,    /* Rose clair */
-                #c026d3,    /* Fuchsia */
-                #d946ef,    /* Magenta */
-                #a855f7,    /* Violet lumineux */
-                #8b5cf6,    /* Violet */
-                #7c3aed,    /* Violet foncé */
-                #6d28d9,    /* Violet très foncé */
-                #4f46e5,    /* Indigo foncé */
-                #6366f1,    /* Indigo */
-                #3730a3,    /* Indigo très foncé */
-                #2563eb,    /* Bleu foncé */
-                #3b82f6,    /* Bleu */
-                #0ea5e9,    /* Bleu ciel */
-                #0284c7,    /* Sky foncé */
-                #0891b2,    /* Cyan foncé */
-                #06b6d4,    /* Cyan */
-                #22d3ee,    /* Cyan clair */
-                #0e7490,    /* Turquoise foncé */
-                #1e40af,    /* Bleu royal foncé */
-                #1e3a8a,    /* Bleu nuit */
-                #7f1d1d     /* Rouge ultra foncé (retour) */
-            ) border-box;
-         box-shadow: 
-            0 0 50px rgba(37, 99, 235, 0.7),
-            0 0 80px rgba(124, 58, 237, 0.5),
-            inset 0 0 60px rgba(219, 39, 119, 0.4);
-         animation: neonRotate 5s linear infinite;
+    /* --- CERCLE CENTRAL - VERSION PRO SIMPLE --- */
+    .global-score-container{
+      margin: 38px auto;
+      width: 280px; height: 280px;
+      border-radius: 50%;
+      display:flex; align-items:center; justify-content:center; flex-direction:column;
+      position: relative;
+      overflow: visible;
+      /* fond premium sombre */
+      background: linear-gradient(180deg, #0b1220 0%, #111827 100%);
+      /* anneau discret, sans animation */
+      border: 2px solid rgba(255,255,255,.10);
+      box-shadow: 0 18px 55px rgba(0,0,0,.35);
     }
-    
-    .global-score-value {
-  font-size: 66px;
-  font-weight: 900;
-  color: #ffffff;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  z-index: 2;
-  position: relative;
-}
 
-    .global-score-label {
-  margin-top: 10px;
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.70);
-  line-height: 1.35;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  z-index: 2;
-  position: relative;
-}
+    /* petit anneau “accent” subtil */
+    .global-score-container::before{
+      content:"";
+      position:absolute; inset:-6px;
+      border-radius:50%;
+      background: conic-gradient(from 230deg,
+        rgba(37,99,235,.55),
+        rgba(245,158,11,.40),
+        rgba(16,185,129,.45),
+        rgba(37,99,235,.55)
+      );
+      filter: blur(0.2px);
+      z-index:-1;
+      opacity:.55;
+    }
 
-    .money-rain { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: visible; }
+    .global-score-value{
+      font-size: 64px;
+      font-weight: 900;
+      color:#ffffff;
+      letter-spacing:-.02em;
+      text-shadow: 0 8px 22px rgba(0,0,0,.55);
+      line-height: 1;
+      padding: 6px 14px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.06);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,.10);
+    }
+
+    .global-score-label{
+      margin-top: 12px;
+      font-size: 12px;
+      font-weight: 800;
+      color: rgba(255,255,255,.72);
+      letter-spacing:.18em;
+      text-align:center;
+      text-transform: uppercase;
+      line-height: 1.25;
+    }
+
+    .global-score-sub{
+      margin-top: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      color: rgba(255,255,255,.85);
+    }
+
+    .global-score-next{
+      margin-top: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(255,255,255,.60);
+      text-align:center;
+      max-width: 220px;
+      line-height: 1.25;
+    }
+
+    .global-score-days{
+      margin-top: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: rgba(255,255,255,.85);
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+    }
+
+    /* pulse unique quand palier franchi */
+    .global-score-container.milestone{
+      animation: milestonePulse .6s ease-out 1;
+      box-shadow: 0 18px 55px rgba(0,0,0,.35), 0 0 0 8px rgba(16,185,129,.12);
+    }
+    @keyframes milestonePulse{
+      0%{ transform: scale(1); }
+      45%{ transform: scale(1.03); }
+      100%{ transform: scale(1); }
+    }
+
+.money-rain { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: visible; }
     .bill { position: absolute; font-size: 32px; opacity: 0; user-select:none; }
 
     .objectives-wrapper { display: flex; flex-direction: column; gap: 50px; }
@@ -272,8 +287,8 @@
 
     /* --- BORDURE CARTE GAGNANTE --- */
     .card.is-winner {
-        border: none;
-        box-shadow: 0 15px 50px rgba(5, 150, 105, 0.25);
+        border: 1px solid rgba(16,185,129,.25);
+        box-shadow: 0 18px 50px rgba(16,185,129,.14);
         overflow: visible;
     }
     .card.is-winner::before {
@@ -282,9 +297,9 @@
         top: -3px; left: -3px; right: -3px; bottom: -3px;
         z-index: -1;
         border-radius: calc(var(--radius) + 3px);
-        background: linear-gradient(90deg, #047857, #059669, #047857, #065f46, #047857);
+        background: linear-gradient(90deg, rgba(16,185,129,.35), rgba(16,185,129,.18), rgba(16,185,129,.35));
         background-size: 200% 100%;
-        animation: borderRotate 3s linear infinite;
+        animation: borderRotate 6s linear infinite;
     }
     .card.is-winner::after {
         content: "";
@@ -298,7 +313,7 @@
     .status-badge { position: absolute; top: 0; left: 0; right: 0; padding: 12px; text-align: center; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; border-radius: var(--radius) var(--radius) 0 0; }
     .badge-locked { background: #fff7ed; color: #c2410c; border-bottom: 2px solid #ffedd5; }
     .badge-winner { background: #dcfce7; color: #166534; border-bottom: 2px solid #bbf7d0; }
-    .badge-ready { background: var(--accent); color: white; animation: pulse-green 2s infinite; }
+    .badge-ready { background: rgba(37,99,235,.10); color: #1e40af; border-bottom: 2px solid rgba(37,99,235,.15); }
 
     .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; margin-top: 25px; gap: 15px; }
     .obj-info-group { display: flex; align-items: center; flex: 1; }
@@ -774,110 +789,56 @@ body.dark-mode .focus-pill{ background: rgba(255,255,255,0.04); }
 .focus-text{ font-size: 13px; font-weight: 800; color: var(--text-main); }
 
 
-
-/* ===========================
-   PRO PREMIUM (écran clé)
-   =========================== */
-
-/* Animation uniquement quand un palier est franchi (halo vert discret) */
-.global-score-container.pulse-success{
-  animation: circlePulse 0.6s ease-out 1;
-  border-color: rgba(16, 185, 129, 0.85);
+/* --- CAROUSEL OBJECTIFS SECONDAIRES --- */
+.secondary-carousel{
+  margin-top: 16px;
+  position: relative;
 }
 
-@keyframes circlePulse{
-  0%   { box-shadow: 0 24px 70px rgba(2, 6, 23, 0.35), 0 0 0 0 rgba(16, 185, 129, 0.00); }
-  40%  { box-shadow: 0 24px 70px rgba(2, 6, 23, 0.35), 0 0 0 12px rgba(16, 185, 129, 0.18), 0 0 55px rgba(16, 185, 129, 0.28); }
-  100% { box-shadow: 0 24px 70px rgba(2, 6, 23, 0.35), 0 0 0 0 rgba(16, 185, 129, 0.00); }
+.secondary-carousel .carousel-track{
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 10px 6px 18px 6px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
 }
 
-/* Billets supprimés */
-.money-rain, .bill { display:none !important; }
+.secondary-carousel .carousel-track::-webkit-scrollbar{ height: 6px; }
+.secondary-carousel .carousel-track::-webkit-scrollbar-thumb{ background: rgba(17,24,39,.18); border-radius: 999px; }
 
-/* Détails sous le cercle */
-.score-sub{
-  width: min(520px, 92vw);
-  margin: 0 auto 6px;
-  text-align: center;
-}
-.score-today,
-.score-next{
-  font-size: 14px;
-  font-weight: 500;
-  color: rgba(17, 24, 39, 0.58);
-}
-.score-next{ margin-top: 6px; }
-.score-micro{
-  margin-top: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(17, 24, 39, 0.72);
-}
-body.dark-mode .score-today,
-body.dark-mode .score-next{
-  color: rgba(226, 232, 240, 0.68);
-}
-body.dark-mode .score-micro{
-  color: rgba(226, 232, 240, 0.80);
+.secondary-carousel .carousel-item{
+  flex: 0 0 86%;
+  scroll-snap-align: start;
 }
 
-/* Objectif prioritaire (hiérarchie claire) */
-.card.is-primary{
-  background: #eff6ff;
-  border: 2px solid rgba(37, 99, 235, 0.18);
-  box-shadow: 0 18px 55px rgba(37, 99, 235, 0.10);
-}
-body.dark-mode .card.is-primary{
-  background: #0b1a33;
-  border-color: rgba(37, 99, 235, 0.35);
-}
-.card.is-primary .obj-icon{
-  width: 72px;
-  height: 72px;
-  font-size: 36px;
+@media (min-width: 900px){
+  .secondary-carousel .carousel-item{ flex-basis: 48%; }
 }
 
-/* Barre de progression: plus pro (pas d’animation permanente) */
-.progress-fill,
-.progress-overdrive{
-  background-image: none !important;
-  animation: none !important;
-  transition: width 0.8s ease;
-}
-.progress-overdrive{
-  background-color: rgba(37, 99, 235, 0.35) !important; /* pas de rouge pour "over 100%" */
-}
-.progress-track{
-  height: 28px;
-  margin-bottom: 26px;
-}
-
-/* Ligne de contexte (effort lisible) */
-.progress-hint{
-  margin-top: -12px;
-  margin-bottom: 18px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-.card.is-primary .progress-hint{
-  color: rgba(30, 64, 175, 0.95);
-}
-body.dark-mode .card.is-primary .progress-hint{
-  color: rgba(191, 219, 254, 0.92);
+.carousel-btn{
+  position:absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 42px; height: 42px;
+  border-radius: 999px;
+  border: 1px solid rgba(17,24,39,.14);
+  background: rgba(255,255,255,.92);
+  box-shadow: 0 10px 26px rgba(0,0,0,.18);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer;
+  z-index: 5;
+  user-select:none;
 }
 
-/* Carte gagnée: stop animation et rendu premium */
-.card.is-winner{
-  box-shadow: 0 15px 45px rgba(16, 185, 129, 0.16) !important;
-}
-.card.is-winner::before,
-.card.is-winner::after{
-  display:none !important;
+.carousel-btn:active{ transform: translateY(-50%) scale(.98); }
+
+.carousel-btn.prev{ left: -6px; }
+.carousel-btn.next{ right: -6px; }
+
+.carousel-btn span{
+  font-size: 18px;
+  line-height: 1;
+  color: #111827;
 }
 
-/* Badge "ready": stop pulse permanent */
-.badge-ready{
-  animation: none !important;
-  background: rgba(37, 99, 235, 0.92) !important;
-}

@@ -480,7 +480,182 @@
     function prevMonth() { currentCalDate.setMonth(currentCalDate.getMonth()-1); renderNativeCalendar(); }
     function nextMonth() { currentCalDate.setMonth(currentCalDate.getMonth()+1); renderNativeCalendar(); }
 
-    function renderDashboard() {
+    
+    // --- UI helpers (safe: no impact on Firebase/data) ---
+    function formatEuro(v){
+      const n = Number(v||0);
+      return (isFinite(n)? n.toFixed(2): "0.00") + "€";
+    }
+
+    function updateGainToday(totalMyGain){
+      if(!currentUser) return;
+      const el = document.getElementById("gainToday");
+      if(!el) return;
+
+      const uid = currentUser.uid || currentUser.id || "me";
+      const key = "gainDayStart_" + uid;
+      const today = (new Date()).toLocaleDateString("fr-FR");
+
+      let state = null;
+      try { state = JSON.parse(localStorage.getItem(key) || "null"); } catch(e){ state = null; }
+
+      // reset at day change
+      if(!state || state.day !== today){
+        state = { day: today, start: Number(totalMyGain||0) };
+        try { localStorage.setItem(key, JSON.stringify(state)); } catch(e){}
+      }
+
+      const delta = Number(totalMyGain||0) - Number(state.start||0);
+      const sign = delta >= 0 ? "+" : "";
+      el.textContent = `${sign}${delta.toFixed(2)}€ aujourd’hui`;
+    }
+
+    
+function updateDaysLeft(){
+      const el = document.getElementById("daysLeft");
+      if(!el) return;
+      const now = new Date();
+      const lastDay = new Date(now.getFullYear(), now.getMonth()+1, 0);
+      const daysLeft = Math.max(0, lastDay.getDate() - now.getDate());
+      el.textContent = daysLeft === 0 ? "Dernier jour du mois" : `${daysLeft} jour${daysLeft>1?'s':''} restant${daysLeft>1?'s':''} ce mois`;
+}
+
+function computeNextMilestone(userRatio, primOk){
+      const el = document.getElementById("nextMilestone");
+      if(!el) return;
+
+      // Find the closest *locked* palier among unlocked objectives
+      let best = null; // {gap, unit, name, prize}
+      let unlockedCount = 0;
+      let totalPaliers = 0;
+
+      Object.keys(allObjs||{}).forEach(k=>{
+        const o = allObjs[k];
+        if(!o || !o.published) return;
+
+        const isLocked = !o.isPrimary && !primOk;
+        if(isLocked) return;
+
+        const pct = getPct(o.current, o.target, o.isInverse);
+
+        (o.paliers||[]).forEach(p=>{
+          totalPaliers += 1;
+          const th = Number(p.threshold);
+          const prize = parse(p.prize) * userRatio;
+
+          let unlocked = false;
+          if(o.isNumeric) unlocked = Number(o.current) >= th;
+          else unlocked = pct >= th;
+
+          if(unlocked){
+            unlockedCount += 1;
+            return;
+          }
+
+          // gap to unlock
+          let gap = 0;
+          let unit = "";
+          if(o.isNumeric){
+            gap = th - Number(o.current);
+            unit = "";
+          } else {
+            gap = th - pct;
+            unit = "%";
+          }
+          if(!(gap > 0)) return;
+
+          // score by relative gap (avoid favoring big-number KPIs)
+          const denom = (o.isNumeric ? Math.max(1, Math.abs(th)) : 100);
+          const score = gap / denom;
+
+          const cand = {
+            score,
+            gap,
+            unit,
+            name: (o.name || "Objectif").toString(),
+            prize
+          };
+          if(!best || cand.score < best.score) best = cand;
+        });
+      });
+
+      // render
+      if(totalPaliers > 0 && unlockedCount >= totalPaliers){
+        el.textContent = "Tous les paliers sont débloqués 🎉";
+      } else if(best){
+        const gapTxt = best.unit === "%" ? `${best.gap.toFixed(1)}%` : `${Math.ceil(best.gap)}`;
+        el.textContent = `Encore ${gapTxt} sur “${best.name}” pour +${best.prize.toFixed(2)}€`;
+      } else {
+        el.textContent = "Prochain palier : à portée de main 💪";
+      }
+
+      // milestone pulse only when unlockedCount increases
+      if(!currentUser) return;
+      const uid = currentUser.uid || currentUser.id || "me";
+      const key = "unlockedCount_" + uid;
+      let prev = 0;
+      try { prev = Number(localStorage.getItem(key) || "0"); } catch(e){ prev = 0; }
+      if(unlockedCount > prev){
+        const sc = document.getElementById("scoreCircle");
+        if(sc){
+          sc.classList.remove("milestone");
+          void sc.offsetWidth;
+          sc.classList.add("milestone");
+          setTimeout(()=>sc.classList.remove("milestone"), 650);
+        }
+      }
+      try { localStorage.setItem(key, String(unlockedCount)); } catch(e){}
+    }
+
+
+function createSecondaryCarousel(objs, primOk, ratio){
+      const wrap = document.createElement("div");
+      wrap.className = "secondary-carousel";
+
+      const btnPrev = document.createElement("button");
+      btnPrev.className = "carousel-btn prev";
+      btnPrev.type = "button";
+      btnPrev.setAttribute("aria-label", "Objectifs précédents");
+      btnPrev.innerHTML = "<span>‹</span>";
+
+      const btnNext = document.createElement("button");
+      btnNext.className = "carousel-btn next";
+      btnNext.type = "button";
+      btnNext.setAttribute("aria-label", "Objectifs suivants");
+      btnNext.innerHTML = "<span>›</span>";
+
+      const track = document.createElement("div");
+      track.className = "carousel-track";
+
+      objs.forEach(o => {
+        const item = document.createElement("div");
+        item.className = "carousel-item";
+        item.appendChild(createCard(o, !primOk, ratio, false));
+        track.appendChild(item);
+      });
+
+      const step = () => Math.max(220, Math.round(track.clientWidth * 0.88));
+
+      btnPrev.addEventListener("click", () => {
+        track.scrollBy({ left: -step(), behavior: "smooth" });
+      });
+      btnNext.addEventListener("click", () => {
+        track.scrollBy({ left: step(), behavior: "smooth" });
+      });
+
+      // Masquer les flèches si 0/1 élément
+      if(objs.length <= 1){
+        btnPrev.style.display = "none";
+        btnNext.style.display = "none";
+      }
+
+      wrap.appendChild(btnPrev);
+      wrap.appendChild(btnNext);
+      wrap.appendChild(track);
+      return wrap;
+}
+
+function renderDashboard() {
       if(!currentUser) return;
       const container = document.getElementById("cardsContainer");
       container.innerHTML = "";
@@ -507,7 +682,7 @@
 
       const secs = Object.values(allObjs).filter(o => !o.isPrimary && o.published);
       if(secs.length > 0) container.innerHTML += `<div class="category-title secondary">💎&nbsp;<span>Bonus Déblocables</span></div>`;
-      secs.forEach(o => container.appendChild(createCard(o, !primOk, ratio, false)));
+      container.appendChild(createSecondaryCarousel(secs, primOk, ratio));
 
       Object.keys(allObjs).forEach(key => {
         const o = allObjs[key];
@@ -536,6 +711,12 @@
       const myGainEl = document.getElementById("myTotalGain");
       if(myGainEl) myGainEl.textContent = gainText;
 
+      // UI: résumé (aujourd’hui + prochain palier)
+      updateGainToday(totalMyGain);
+      computeNextMilestone(ratio, primOk);
+      updateDaysLeft();
+
+
       // Money rain disabled (kept for backward compatibility)
       const rainContainer = document.getElementById("moneyRain");
       if(rainContainer) rainContainer.innerHTML = "";
@@ -560,137 +741,16 @@
       const kUp = document.getElementById("kpiUpdated");
       if(kUp) kUp.textContent = d.toLocaleDateString('fr-FR');
 
-      
-      // UI: détails sous le cercle (clair + motivant, sans changer les chiffres)
+      // UI: small bump on main circle (motivating, without money rain)
       const sc = document.getElementById("scoreCircle");
-
-      const fmtEuro = (x) => {
-        const r = Math.round(x);
-        if(Math.abs(x - r) < 0.01) return String(r);
-        return x.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      };
-
-      // +X€ aujourd'hui : basé sur un "point de départ" stocké par jour (localStorage)
-      const dayKey2 = new Date().toISOString().slice(0,10);
-      const baseKey = "gainBase_" + (currentUser ? currentUser.uid : "anon") + "_" + dayKey2;
-      const baseRaw = localStorage.getItem(baseKey);
-      const base = (baseRaw === null || isNaN(parseFloat(baseRaw))) ? totalMyGain : parseFloat(baseRaw);
-      if(baseRaw === null) localStorage.setItem(baseKey, String(totalMyGain));
-      const todayGain = totalMyGain - base;
-
-      const todayEl = document.getElementById("todayGain");
-      if(todayEl){
-        const sign = todayGain >= 0 ? "+" : "-";
-        todayEl.textContent = sign + fmtEuro(Math.abs(todayGain)) + "€ aujourd’hui";
-      }
-
-      // Prochain palier : on affiche le gain (€) du palier le plus proche à atteindre
-      const getNextPalier = () => {
-        const published = Object.values(allObjs || {}).filter(o => o && o.published);
-        const candidates = published.filter(o => primOk ? true : !!o.isPrimary);
-        let best = null;
-
-        candidates.forEach(o => {
-          const p = getPct(o.current, o.target, o.isInverse);
-          const cv = o.isNumeric ? (parseFloat(o.current) || 0) : p;
-
-          if(o.isFixed){
-            const won = o.isNumeric ? (cv >= (parseFloat(o.target) || 0)) : (p >= 100);
-            if(won) return;
-            const prize = parse(o.prize) * ratio;
-            const rem = o.isNumeric ? Math.max(0, (parseFloat(o.target) || 0) - cv) : Math.max(0, 100 - p);
-            const denom = o.isNumeric ? Math.max(1, Math.abs(parseFloat(o.target) || 1)) : 100;
-            const score = rem / denom;
-            if(!best || score < best.score) best = { score, prize, rem, name: o.name, isNumeric: !!o.isNumeric };
-            return;
-          }
-
-          if(o.paliers && o.paliers.length){
-            const sorted = o.paliers.slice().sort((a,b)=>parseFloat(a.threshold)-parseFloat(b.threshold));
-            let next = null;
-            for(let i=0;i<sorted.length;i++){
-              const thr = parseFloat(sorted[i].threshold);
-              if(cv < thr - 1e-9){ next = sorted[i]; break; }
-            }
-            if(!next) return;
-
-            const thr = parseFloat(next.threshold);
-            const prize = parse(next.prize) * ratio;
-            const rem = Math.max(0, thr - cv);
-            const denom = o.isNumeric ? Math.max(1, Math.abs(thr || 1)) : 100;
-            const score = rem / denom;
-            if(!best || score < best.score) best = { score, prize, rem, name: o.name, isNumeric: !!o.isNumeric };
-          }
-        });
-
-        return best;
-      };
-
-      const next = getNextPalier();
-      const nextEl = document.getElementById("nextPalierGain");
-      const microEl = document.getElementById("scoreMicro");
-
-      if(nextEl){
-        if(next && isFinite(next.prize) && next.prize > 0){
-          nextEl.textContent = "Encore " + fmtEuro(next.prize) + "€ pour le prochain palier";
-        } else {
-          nextEl.textContent = "Encore —€ pour le prochain palier";
-        }
-      }
-
-      if(microEl){
-        if(next){
-          const remTxt = next.isNumeric ? (Math.ceil(next.rem) + "") : (Math.ceil(next.rem) + "%");
-          microEl.textContent = "Dernier effort : " + remTxt + " sur " + next.name + ".";
-        } else if(!primOk){
-          microEl.textContent = "Priorité d’abord : valide l’objectif principal pour débloquer les bonus.";
-        } else {
-          microEl.textContent = "Tout est en place : publie / mets à jour les objectifs pour avancer.";
-        }
-      }
-
-      // Animation uniquement si un palier vient d'être franchi (pas de bump permanent)
       if(sc){
-        // calcule le nombre total de paliers/obj débloqués pour l'utilisateur
-        const published = Object.values(allObjs || {}).filter(o => o && o.published);
-        const candidates = published.filter(o => primOk ? true : !!o.isPrimary);
-        let unlockedCount = 0;
-
-        candidates.forEach(o => {
-          const p = getPct(o.current, o.target, o.isInverse);
-          const cv = o.isNumeric ? (parseFloat(o.current) || 0) : p;
-
-          if(o.isFixed){
-            const won = o.isNumeric ? (cv >= (parseFloat(o.target) || 0)) : (p >= 100);
-            if(won) unlockedCount += 1;
-          } else if(o.paliers && o.paliers.length){
-            const sorted = o.paliers.slice().sort((a,b)=>parseFloat(a.threshold)-parseFloat(b.threshold));
-            sorted.forEach(pp => {
-              const thr = parseFloat(pp.threshold);
-              if(cv >= thr - 1e-9) unlockedCount += 1;
-            });
-          }
-        });
-
-        const unlockKey = "unlockCount_" + (currentUser ? currentUser.uid : "anon");
-        const prevRaw = localStorage.getItem(unlockKey);
-        const hadPrev = prevRaw !== null;
-        const prev = hadPrev ? (parseInt(prevRaw, 10) || 0) : unlockedCount;
-
-        if(!hadPrev){
-          localStorage.setItem(unlockKey, String(unlockedCount));
-        } else {
-          if(unlockedCount > prev){
-            sc.classList.remove("pulse-success");
-            void sc.offsetWidth; // restart
-            sc.classList.add("pulse-success");
-            setTimeout(() => sc.classList.remove("pulse-success"), 650);
-          }
-          localStorage.setItem(unlockKey, String(unlockedCount));
-        }
+        sc.classList.remove("bump");
+        void sc.offsetWidth; // restart animation
+        sc.classList.add("bump");
+        setTimeout(() => sc.classList.remove("bump"), 240);
       }
 
-// UI: "Focus du jour" line (simple + motivating)
+      // UI: "Focus du jour" line (simple + motivating)
       const focusTextEl = document.getElementById("focusText");
       const focusEmojiEl = document.getElementById("focusEmoji");
       if(focusTextEl && focusEmojiEl){
@@ -750,7 +810,7 @@
       }
 
       const el = document.createElement("div");
-      let cls = "card"; if(isLocked) cls += " is-locked"; if(isWin && !isLocked) cls += " is-winner"; if(isPrimary) cls += " is-primary";
+      let cls = "card"; if(isLocked) cls += " is-locked"; if(isWin && !isLocked) cls += " is-winner";
       el.className = cls;
 
       let badge = "";
@@ -806,43 +866,6 @@
       const w1 = Math.min(pct, 100);
       const w2 = pct > 100 ? Math.min(pct - 100, 100) : 0;
 
-      // Ligne de contexte (1 phrase max) : effort restant lisible
-      let contextLine = "";
-      if(isLocked){
-        contextLine = "Bonus verrouillé tant que la priorité n'est pas validée";
-      } else if(obj.isFixed){
-        const won = obj.isNumeric ? (parseFloat(obj.current) >= parseFloat(obj.target)) : (pct >= 100);
-        if(won){
-          contextLine = "Objectif atteint";
-        } else {
-          const prize = parse(obj.prize) * userRatio;
-          if(obj.isNumeric){
-            const rem = Math.max(0, (parseFloat(obj.target) || 0) - (parseFloat(obj.current) || 0));
-            contextLine = `Encore ${Math.ceil(rem)} pour +${Math.round(prize)}€`;
-          } else {
-            const remPct = Math.max(0, 100 - pct);
-            contextLine = `Encore ${Math.ceil(remPct)}% pour +${Math.round(prize)}€`;
-          }
-        }
-      } else if(obj.paliers && obj.paliers.length){
-        const sorted = obj.paliers.slice().sort((a,b)=>parseFloat(a.threshold)-parseFloat(b.threshold));
-        const cv = obj.isNumeric ? (parseFloat(obj.current) || 0) : pct;
-        let next = null;
-        for(let i=0;i<sorted.length;i++){
-          const thr = parseFloat(sorted[i].threshold);
-          if(cv < thr - 1e-9){ next = sorted[i]; break; }
-        }
-        if(next){
-          const thr = parseFloat(next.threshold);
-          const prize = parse(next.prize) * userRatio;
-          const rem = Math.max(0, thr - cv);
-          contextLine = obj.isNumeric ? `Encore ${Math.ceil(rem)} pour +${Math.round(prize)}€`
-                                      : `Encore ${Math.ceil(rem)}% pour +${Math.round(prize)}€`;
-        } else {
-          contextLine = "Tous les paliers atteints";
-        }
-      }
-
       el.innerHTML = `
         ${badge}
         <div class="card-top">
@@ -856,7 +879,6 @@
         </div>
         <div class="data-boxes-row"><div class="data-box"><span class="data-box-label">ACTUEL</span><span class="data-box-value">${currentVal}</span></div><div class="data-box"><span class="data-box-label">CIBLE ${obj.isInverse ? '(MAX)' : ''}</span><span class="data-box-value">${targetVal}</span></div></div>
         <div class="progress-track"><div class="percent-float">${percentDisplay}</div><div class="progress-fill ${isWin?'green-mode':''}" style="width:${w1}%"></div><div class="progress-overdrive" style="width:${w2}%"></div></div>
-        <div class="progress-hint">${contextLine}</div>
         ${middleHtml}${earnedBadge}`;
       return el;
     }
