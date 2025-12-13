@@ -109,9 +109,8 @@
         <button class="icon-btn" type="button" onclick="toggleGlobalMenu(false)" aria-label="Fermer">×</button>
       </div>
       <nav class="global-menu-links">
-        <a class="global-menu-link" href="#dashboard" onclick="toggleGlobalMenu(false)">📊 Dashboard</a>
-        <a class="global-menu-link" href="#contacts" onclick="toggleGlobalMenu(false)">📇 Contacts</a>
-        <a class="global-menu-link" href="#sites-utiles" onclick="toggleGlobalMenu(false)">🔗 Sites utiles</a>
+        <a class="global-menu-link" href="index.html#dashboard" onclick="toggleGlobalMenu(false)">📊 Dashboard</a>
+        <a class="global-menu-link" href="contacts.html" onclick="toggleGlobalMenu(false)">📇 Contacts &amp; Sites</a>
       </nav>
       <div class="global-menu-foot">
         <div class="global-menu-foot-note">Astuce : tu peux enrichir ces sections plus tard sans toucher au reste du site.</div>
@@ -130,7 +129,11 @@
           <div class="global-score-label">MES PRIMES<br>DÉBLOQUÉES</div>
           <div class="global-score-sub" id="gainToday">+0€ aujourd’hui</div>
           <div class="global-score-next" id="nextMilestone">Chargement…</div>
-          <div class="global-score-days" id="daysLeft">—</div>
+          <div class="global-score-pills">
+            <div class="global-score-pill" id="pendingGain">⏳ 0€ en attente</div>
+            <div class="global-score-days" id="daysLeft">—</div>
+          </div>
+          <div class="global-score-micro" id="microMotiv">—</div>
         </div>
       </header>
       
@@ -185,29 +188,13 @@
   </div>
 
 
-      <div class="section-block" id="contacts">
-        <div class="section-title">Contacts</div>
-        <div class="section-card">
-          <div class="section-muted">Tu peux mettre ici des numéros utiles (maintenance, réseau, franchise, prestataires…).</div>
-          <ul class="simple-list">
-            <li><strong>Maintenance</strong> — à compléter</li>
-            <li><strong>Support</strong> — à compléter</li>
-            <li><strong>Urgences</strong> — à compléter</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="section-block" id="sites-utiles">
-        <div class="section-title">Sites utiles</div>
-        <div class="section-card">
-          <div class="section-muted">Raccourcis rapides (Deliveroo, UberEats, banque, planning, docs…).</div>
-          <div class="links-grid">
-            <a class="link-tile" href="https://deliveroo.com/" target="_blank" rel="noopener">Deliveroo</a>
-            <a class="link-tile" href="https://www.ubereats.com/" target="_blank" rel="noopener">Uber Eats</a>
-            <a class="link-tile" href="https://firebase.google.com/" target="_blank" rel="noopener">Firebase</a>
-            <a class="link-tile" href="https://github.com/" target="_blank" rel="noopener">GitHub</a>
+      <div class="section-block" id="quick-directory">
+        <div class="section-title">Contacts &amp; Sites utiles</div>
+        <div class="section-card" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <div>
+            <div class="section-muted">Une page dédiée (rapide) pour tout retrouver. Admin &amp; Super Admin peuvent ajouter/modifier/supprimer.</div>
           </div>
-          <div class="section-muted" style="margin-top:10px;">Tu peux remplacer ces liens par les tiens.</div>
+          <a class="btn" href="contacts.html" style="width:auto; padding:12px 16px;">Ouvrir</a>
         </div>
       </div>
 

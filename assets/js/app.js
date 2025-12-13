@@ -661,6 +661,7 @@ function renderDashboard() {
       container.innerHTML = "";
       const ratio = (currentUser.hours || 35) / BASE_HOURS;
       let totalMyGain = 0;
+      let totalPotential = 0;
       
       const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published);
       let primOk = true;
@@ -689,6 +690,15 @@ function renderDashboard() {
         if(!o.published) return;
         const pct = getPct(o.current, o.target, o.isInverse);
         const isLocked = !o.isPrimary && !primOk;
+
+        // potential (incl. locked) for "en attente"
+        if(o.isFixed) {
+          const prize = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
+          totalPotential += prize * ratio;
+        } else {
+          (o.paliers||[]).forEach(p => { totalPotential += parse(p.prize) * ratio; });
+        }
+
         if(!isLocked) {
              if(o.isFixed) {
                  let win = false;
@@ -715,6 +725,27 @@ function renderDashboard() {
       updateGainToday(totalMyGain);
       computeNextMilestone(ratio, primOk);
       updateDaysLeft();
+
+      // UI: primes en attente (potentiel - acquis)
+      const pending = Math.max(0, totalPotential - totalMyGain);
+      const pendingEl = document.getElementById('pendingGain');
+      if(pendingEl) pendingEl.textContent = `⏳ ${pending.toFixed(2)}€ en attente`;
+
+      // UI: micro feedback (sobre, motivant)
+      const microEl = document.getElementById('microMotiv');
+      if(microEl){
+        let msg = "";
+        if(!prims.length){
+          msg = "📝 Publie les objectifs pour activer les primes.";
+        } else if(!primOk){
+          msg = "⚡ Priorités d’abord : les bonus s’ouvrent après validation.";
+        } else if(pending < 0.01){
+          msg = "✅ Tout est débloqué pour ce mois. Maintiens le niveau.";
+        } else {
+          msg = "🎯 Prochain palier : focus sur le +1 aujourd’hui.";
+        }
+        microEl.textContent = msg;
+      }
 
 
       // Money rain disabled (kept for backward compatibility)
@@ -810,7 +841,10 @@ function renderDashboard() {
       }
 
       const el = document.createElement("div");
-      let cls = "card"; if(isLocked) cls += " is-locked"; if(isWin && !isLocked) cls += " is-winner";
+      let cls = "card";
+      if(isPrimary) cls += " primary-card";
+      if(isLocked) cls += " is-locked";
+      if(isWin && !isLocked) cls += " is-winner";
       el.className = cls;
 
       let badge = "";
