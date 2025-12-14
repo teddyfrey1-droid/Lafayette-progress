@@ -25,6 +25,14 @@
     // Persisté en Firebase (settings/guardrailMaxPctOfCA) et modifiable Super Admin.
     const DEFAULT_GUARDRAIL_MAX_PCT_OF_CA = 20;
 
+// --- Archives mensuelles (équipe) & suivi manuel (objectifs) ---
+let _archiveUserId = null;
+let _archiveUserName = null;
+let _archiveUserComputedBonus = 0;
+
+let _objProgId = null;
+let _objProgUnsub = null;
+
     function getGuardrailMaxPctOfCA(){
       const v = (globalSettings && globalSettings.guardrailMaxPctOfCA != null)
         ? parseFloat(globalSettings.guardrailMaxPctOfCA)
@@ -1358,6 +1366,7 @@ const el = document.createElement("div");
           <div class="user-actions">
             <label class="switch" title="Activer / désactiver"><input type="checkbox" ${o.published?'checked':''} onchange="togglePub('${k}', this.checked)"><span class="slider"></span></label>
             <div class="btn-group">
+              <button onclick="openObjectiveProgress('${k}')" class="action-btn" title="Suivi (graph)">📈</button>
               <button onclick="openEditObj('${k}')" class="action-btn" title="Modifier">✏️</button>
               <button onclick="deleteObj('${k}')" class="action-btn delete" title="Supprimer">🗑️</button>
             </div>
@@ -1531,6 +1540,7 @@ const el = document.createElement("div");
                 <div class="user-actions">
                     <div class="user-gain">${userBonus.toFixed(2)}€</div>
                     <div class="btn-group">
+                      <button onclick="openTeamArchive('${k}')" class="action-btn" title="Archive mensuelle">📄</button>
                       <button onclick="resendInvite('${u.email}')" class="action-btn" title="Renvoyer Invitation">📩</button>
                       <button onclick="editUser('${k}')" class="action-btn" title="Modifier">✏️</button>
                       <button onclick="deleteUser('${k}')" class="action-btn delete" title="Supprimer">🗑️</button>
@@ -1539,6 +1549,324 @@ const el = document.createElement("div");
             d.appendChild(div); 
         }); 
         const totalRow = document.createElement("div"); totalRow.className = "total-row"; totalRow.innerHTML = `<span>TOTAL</span><span>${totalToPay.toFixed(2)} €</span>`; d.appendChild(totalRow); 
+    }
+
+    // --- Archive mensuelle par équipier (Admin/Super Admin) ---
+    function openTeamArchive(uid){
+      if(!isAdminUser()) return;
+      const u = allUsers[uid];
+      if(!u) return;
+      _archiveUserId = uid;
+      _archiveUserName = u.name || (u.email||'');
+
+      // bonus calculé à date (reprend le calcul de la liste)
+      try{
+        const userRatio = (u.hours || 35) / BASE_HOURS;
+        let userBonus = 0;
+
+        const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published);
+        let primOk = true;
+        if(prims.length > 0) {
+          primOk = prims.every(o => {
+            let threshold = 100;
+            if(o.isFixed) threshold = 100;
+            else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold;
+            if(o.isNumeric) return parseFloat(o.current) >= threshold;
+            const pct = getPct(o.current, o.target, o.isInverse);
+            return pct >= threshold;
+          });
+        }
+
+        Object.values(allObjs).forEach(o => {
+          if(!o.published) return;
+          const pct = getPct(o.current, o.target, o.isInverse);
+          const isLocked = !o.isPrimary && !primOk;
+          let g = 0;
+          if(o.isFixed) {
+            let win = false;
+            if(o.isNumeric) win = parseFloat(o.current) >= o.target;
+            else win = pct >= 100;
+            if(win && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize);
+          } else {
+            (o.paliers||[]).forEach(p => {
+              let unlocked = false;
+              if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold;
+              else unlocked = pct >= p.threshold;
+              if(unlocked) g += parse(p.prize);
+            });
+          }
+          if(!isLocked) userBonus += (g * userRatio);
+        });
+        _archiveUserComputedBonus = userBonus;
+      }catch(e){ _archiveUserComputedBonus = 0; }
+
+      const nameEl = document.getElementById('teamArchiveName');
+      if(nameEl) nameEl.textContent = _archiveUserName;
+      const modal = document.getElementById('teamArchiveModal');
+      if(modal) modal.style.display = 'flex';
+
+      renderTeamArchiveList();
+    }
+
+    function closeTeamArchive(){
+      const modal = document.getElementById('teamArchiveModal');
+      if(modal) modal.style.display = 'none';
+      _archiveUserId = null; _archiveUserName = null; _archiveUserComputedBonus = 0;
+    }
+
+    function _monthKey(d){
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      return `${y}-${m}`;
+    }
+
+    function archiveCurrentMonthForUser(){
+      if(!isAdminUser() || !_archiveUserId) return;
+      const key = _monthKey(new Date());
+      const ref = db.ref(`teamArchive/${_archiveUserId}/${key}`);
+      const payload = {
+        month: key,
+        amount: parseFloat((_archiveUserComputedBonus||0).toFixed(2)),
+        validatedAt: Date.now(),
+        sentAt: null,
+        note: ''
+      };
+      ref.update(payload).then(() => {
+        showToast('✅ Mois archivé');
+        logAction('Archive', `${_archiveUserName} — ${key} = ${payload.amount}€`);
+      }).catch(()=>{});
+    }
+
+    function addManualArchiveRow(){
+      if(!isAdminUser() || !_archiveUserId) return;
+      const key = prompt('Mois à ajouter (format AAAA-MM) :', _monthKey(new Date()));
+      if(!key || !/^\d{4}-\d{2}$/.test(key)) return;
+      const amount = parseFloat(prompt('Montant (€) :', '0')||'0') || 0;
+      db.ref(`teamArchive/${_archiveUserId}/${key}`).update({
+        month: key,
+        amount: parseFloat(amount.toFixed(2)),
+        validatedAt: Date.now(),
+        sentAt: null,
+        note: ''
+      }).then(() => showToast('✅ Ajouté'));
+    }
+
+    function renderTeamArchiveList(){
+      if(!_archiveUserId) return;
+      const list = document.getElementById('teamArchiveList');
+      if(!list) return;
+      list.innerHTML = '<div style="text-align:center; color:#999;">Chargement...</div>';
+
+      db.ref(`teamArchive/${_archiveUserId}`).once('value').then(snap => {
+        const data = snap.val() || {};
+        const keys = Object.keys(data).sort((a,b) => (b||'').localeCompare(a||''));
+        if(keys.length === 0){
+          list.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-weight:800;">Aucune archive.</div>';
+          return;
+        }
+        list.innerHTML = '';
+        keys.forEach(k => {
+          const r = data[k] || {};
+          const amount = (r.amount != null) ? Number(r.amount) : 0;
+          const sent = !!r.sentAt;
+          const row = document.createElement('div');
+          row.className = 'user-item';
+          row.innerHTML = `
+            <div class="user-info">
+              <div class="user-header" style="gap:10px;">
+                <span class="user-name">${k}</span>
+                <span class="pub-state ${sent?'on':'off'}" style="text-transform:none;">${sent?'Envoyé':'Non envoyé'}</span>
+              </div>
+              <div class="user-meta" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <span style="font-weight:900;">Montant :</span>
+                <input type="number" step="0.01" value="${amount.toFixed(2)}" style="max-width:140px;" onchange="updateArchiveAmount('${k}', this.value)">
+                <input type="text" placeholder="Note (optionnel)" value="${(r.note||'').replace(/"/g,'&quot;')}" style="flex:1; min-width:180px;" onchange="updateArchiveNote('${k}', this.value)">
+              </div>
+            </div>
+            <div class="user-actions">
+              <div class="btn-group">
+                <button class="action-btn" title="Marquer envoyé" onclick="toggleArchiveSent('${k}', ${sent})">${sent?'↩️':'📩'}</button>
+                <button class="action-btn delete" title="Supprimer" onclick="deleteArchiveRow('${k}')">🗑️</button>
+              </div>
+            </div>
+          `;
+          list.appendChild(row);
+        });
+      });
+    }
+
+    function updateArchiveAmount(monthKey, val){
+      if(!_archiveUserId || !isAdminUser()) return;
+      const n = parseFloat(val);
+      if(!isFinite(n)) return;
+      db.ref(`teamArchive/${_archiveUserId}/${monthKey}`).update({ amount: parseFloat(n.toFixed(2)) });
+    }
+    function updateArchiveNote(monthKey, val){
+      if(!_archiveUserId || !isAdminUser()) return;
+      db.ref(`teamArchive/${_archiveUserId}/${monthKey}`).update({ note: String(val||'') });
+    }
+    function toggleArchiveSent(monthKey, currentlySent){
+      if(!_archiveUserId || !isAdminUser()) return;
+      db.ref(`teamArchive/${_archiveUserId}/${monthKey}`).update({ sentAt: currentlySent ? null : Date.now() }).then(() => {
+        renderTeamArchiveList();
+      });
+    }
+    function deleteArchiveRow(monthKey){
+      if(!_archiveUserId || !isAdminUser()) return;
+      if(!confirm('Supprimer cette archive ?')) return;
+      db.ref(`teamArchive/${_archiveUserId}/${monthKey}`).remove().then(() => renderTeamArchiveList());
+    }
+
+    // --- Suivi manuel + graph par objectif (Admin/Super Admin) ---
+    function openObjectiveProgress(objId){
+      if(!isAdminUser()) return;
+      const o = allObjs[objId];
+      if(!o) return;
+      _objProgId = objId;
+      const n = document.getElementById('objProgName');
+      if(n) n.textContent = o.name || objId;
+      const modal = document.getElementById('objectiveProgressModal');
+      if(modal) modal.style.display = 'flex';
+      // default date
+      const dEl = document.getElementById('objProgDate');
+      if(dEl){
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth()+1).padStart(2,'0');
+        const d = String(now.getDate()).padStart(2,'0');
+        dEl.value = `${y}-${m}-${d}`;
+      }
+      _refreshObjectiveProgress();
+    }
+
+    function closeObjectiveProgress(){
+      const modal = document.getElementById('objectiveProgressModal');
+      if(modal) modal.style.display = 'none';
+      _objProgId = null;
+      if(_objProgUnsub){ try{ _objProgUnsub.off(); }catch(e){} }
+      _objProgUnsub = null;
+    }
+
+    function _refreshObjectiveProgress(){
+      if(!_objProgId) return;
+      const list = document.getElementById('objProgList');
+      if(list) list.innerHTML = '<div style="text-align:center; color:#999;">Chargement...</div>';
+      const ref = db.ref(`objectiveProgressManual/${_objProgId}`);
+      // detach previous
+      if(_objProgUnsub){ try{ _objProgUnsub.off(); }catch(e){} }
+      _objProgUnsub = ref;
+      ref.on('value', snap => {
+        const data = snap.val() || {};
+        const rows = Object.keys(data).map(k => ({ id:k, ...(data[k]||{}) }))
+          .filter(r => r.date && r.value != null)
+          .sort((a,b) => String(a.date).localeCompare(String(b.date)));
+        _drawObjectiveProgress(rows);
+        if(!list) return;
+        if(rows.length === 0){
+          list.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-weight:800;">Aucune donnée.</div>';
+          return;
+        }
+        list.innerHTML = '';
+        rows.slice().reverse().forEach(r => {
+          const div = document.createElement('div');
+          div.className = 'user-item';
+          div.innerHTML = `
+            <div class="user-info">
+              <div class="user-header" style="gap:10px;">
+                <span class="user-name">${r.date}</span>
+                <span class="pub-state on" style="text-transform:none;">${Number(r.value).toFixed(1)}%</span>
+              </div>
+              <div class="user-meta">Saisie manuelle</div>
+            </div>
+            <div class="user-actions">
+              <div class="btn-group">
+                <button class="action-btn delete" title="Supprimer" onclick="deleteObjectiveProgressPoint('${r.id}')">🗑️</button>
+              </div>
+            </div>
+          `;
+          list.appendChild(div);
+        });
+      });
+    }
+
+    function addObjectiveProgressPoint(){
+      if(!_objProgId || !isAdminUser()) return;
+      const dEl = document.getElementById('objProgDate');
+      const vEl = document.getElementById('objProgValue');
+      const date = dEl ? String(dEl.value||'').trim() : '';
+      const value = vEl ? parseFloat(String(vEl.value||'')) : NaN;
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) { alert('Date invalide.'); return; }
+      if(!isFinite(value)) { alert('Progression invalide.'); return; }
+      db.ref(`objectiveProgressManual/${_objProgId}`).push({ date, value, createdAt: Date.now() })
+        .then(() => { showToast('✅ Ajouté'); if(vEl) vEl.value=''; })
+        .catch(()=>{});
+    }
+
+    function deleteObjectiveProgressPoint(pointId){
+      if(!_objProgId || !isAdminUser()) return;
+      if(!confirm('Supprimer ce point ?')) return;
+      db.ref(`objectiveProgressManual/${_objProgId}/${pointId}`).remove().then(() => showToast('🗑️ Supprimé'));
+    }
+
+    function _drawObjectiveProgress(rows){
+      const canvas = document.getElementById('objProgCanvas');
+      if(!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width; const h = canvas.height;
+      ctx.clearRect(0,0,w,h);
+
+      // background (respecte thème)
+      const isDark = document.body.classList.contains('dark-mode');
+      ctx.fillStyle = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
+      ctx.fillRect(0,0,w,h);
+
+      // axes
+      const pad = 28;
+      ctx.strokeStyle = isDark ? 'rgba(148,163,184,0.25)' : 'rgba(17,24,39,0.18)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pad, pad);
+      ctx.lineTo(pad, h-pad);
+      ctx.lineTo(w-pad, h-pad);
+      ctx.stroke();
+
+      if(!rows || rows.length < 1) return;
+
+      // x range by date
+      const xs = rows.map(r => new Date(r.date).getTime()).filter(t => isFinite(t));
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const spanX = Math.max(1, maxX - minX);
+
+      // y range fixed 0..100
+      const minY = 0;
+      const maxY = 100;
+      const spanY = maxY - minY;
+
+      const pts = rows.map(r => {
+        const tx = new Date(r.date).getTime();
+        const vx = (tx - minX) / spanX;
+        const vy = (Number(r.value) - minY) / spanY;
+        const x = pad + vx * (w - 2*pad);
+        const y = (h - pad) - vy * (h - 2*pad);
+        return { x, y };
+      });
+
+      // line
+      ctx.strokeStyle = isDark ? 'rgba(59,130,246,0.85)' : 'rgba(37,99,235,0.90)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+
+      // points
+      ctx.fillStyle = isDark ? 'rgba(255,255,255,0.92)' : 'rgba(17,24,39,0.88)';
+      pts.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3.5, 0, Math.PI*2);
+        ctx.fill();
+      });
     }
 
     function editUser(uid) { const u = allUsers[uid]; document.getElementById("editUserPanel").classList.add("active"); document.getElementById("euId").value = uid; document.getElementById("euName").value = u.name; document.getElementById("euHours").value = u.hours; document.getElementById("euAdmin").checked = (u.role === 'admin'); }

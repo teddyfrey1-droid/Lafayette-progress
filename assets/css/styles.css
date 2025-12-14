@@ -314,6 +314,28 @@
     .month-countdown .mc-label{ color: rgba(255,255,255,.72); font-weight: 700; }
     .month-countdown .mc-time b{ color: rgba(255,255,255,1); font-weight: 900; }
 
+/* MODE JOUR : compteur + phase 1 lisibles sur fond clair (style pro, type "timer") */
+body:not(.dark-mode) .month-countdown,
+body:not(.dark-mode) .trajectory-indicator,
+body:not(.dark-mode) .daily-micro{
+  background: rgba(15,23,42,.88);
+  border: 1px solid rgba(148,163,184,.35);
+  box-shadow: 0 16px 40px rgba(0,0,0,.16);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+body:not(.dark-mode) .trajectory-indicator,
+body:not(.dark-mode) .daily-micro{
+  width: min(520px, 92vw);
+  margin-left: auto;
+  margin-right: auto;
+  padding: 10px 14px;
+  border-radius: 999px;
+}
+body:not(.dark-mode) .trajectory-indicator{ margin-top: -10px; margin-bottom: 8px; }
+body:not(.dark-mode) .daily-micro{ margin-top: 0; margin-bottom: 12px; }
+body:not(.dark-mode) .month-countdown{ background: rgba(15,23,42,.92); }
+
     /* Phase 1 (sous le cercle) */
     .trajectory-indicator{
       margin: -8px auto 6px;
@@ -419,6 +441,12 @@
     .status-badge { position: absolute; top: 0; left: 0; right: 0; padding: 12px; text-align: center; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; border-radius: var(--radius) var(--radius) 0 0; }
     .badge-locked { background: #fff7ed; color: #c2410c; border-bottom: 2px solid #ffedd5; }
     .badge-winner { background: rgba(22,163,74,.16); color: #14532d; border-bottom: 2px solid rgba(22,163,74,.38); }
+/* MODE JOUR : rendre "OBJECTIF VALIDÉ" plus sobre (gris foncé pro) */
+body:not(.dark-mode) .badge-winner{
+  background: rgba(17,24,39,.06);
+  color: #374151;
+  border-bottom-color: rgba(107,114,128,.42);
+}
     /* meilleure lisibilité en mode nuit, sans effet "arcade" */
     body.dark-mode .badge-winner { background: rgba(16,185,129,.22); color: #ecfdf5; border-bottom-color: rgba(16,185,129,.42); }
     .badge-ready { background: rgba(37,99,235,.10); color: #1e40af; border-bottom: 2px solid rgba(37,99,235,.15); }
@@ -1092,6 +1120,12 @@ body:not(.dark-mode) .global-score-container .global-score-value{
   box-shadow: 0 10px 26px rgba(0,0,0,.35);
 }
 
+/* Cadre "en attente" : bord gris plus lisible (surtout en mode jour) */
+body:not(.dark-mode) .global-score-container .global-score-pill{
+  border-color: rgba(148,163,184,.45);
+  background: rgba(255,255,255,.08);
+}
+
 /* Compteur sous le cercle : même lisibilité en mode jour */
 body:not(.dark-mode) .month-countdown{
   color: #ffffff;
@@ -1137,6 +1171,14 @@ body:not(.dark-mode) .month-countdown .mc-label{ color: rgba(255,255,255,.72); }
   padding: 6px 10px;
   border-radius: 999px;
   white-space: nowrap;
+}
+
+/* MODE NUIT : "Coût équipe" plus contrasté */
+body.dark-mode .cockpit-obj-title .cost{
+  color: #e0f2fe;
+  background: rgba(59,130,246,.22);
+  border-color: rgba(147,197,253,.38);
+  box-shadow: 0 10px 26px rgba(0,0,0,.28);
 }
 .cockpit-chevron{
   font-size: 18px;

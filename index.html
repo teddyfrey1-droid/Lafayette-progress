@@ -68,6 +68,53 @@
       </div>
   </div>
 
+  <!-- Archive mensuelle (Super Admin/Admin) : trace dans le temps par équipier -->
+  <div id="teamArchiveModal" class="modal-overlay">
+    <div class="modal-box" style="max-width:640px;">
+      <div class="modal-title">
+        <span>📄 Archive mensuelle — <span id="teamArchiveName">—</span></span>
+        <button style="border:none; background:none; font-size:20px; cursor:pointer; color:var(--text-main);" onclick="closeTeamArchive()">×</button>
+      </div>
+      <div style="font-size:12px; color:var(--text-muted); font-weight:700; margin-bottom:10px;">
+        Valide une ligne en fin de mois (30/31) pour garder une trace, puis marque “Envoyé” si tu lui as partagé.
+      </div>
+      <div id="teamArchiveList" style="display:flex; flex-direction:column; gap:10px;"></div>
+      <div style="height:12px;"></div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn" id="btnArchiveThisMonth" onclick="archiveCurrentMonthForUser()">✅ Archiver le mois en cours</button>
+        <button class="btn" style="background:var(--border-color); color:var(--text-main);" onclick="addManualArchiveRow()">➕ Ajouter un mois</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Suivi manuel (graph) par objectif -->
+  <div id="objectiveProgressModal" class="modal-overlay">
+    <div class="modal-box" style="max-width:760px;">
+      <div class="modal-title">
+        <span>📈 Suivi — <span id="objProgName">—</span></span>
+        <button style="border:none; background:none; font-size:20px; cursor:pointer; color:var(--text-main);" onclick="closeObjectiveProgress()">×</button>
+      </div>
+      <div style="font-size:12px; color:var(--text-muted); font-weight:700; margin-bottom:12px;">
+        Saisie manuelle : ajoute des points (date + %) pour visualiser la progression dans le temps.
+      </div>
+      <canvas id="objProgCanvas" width="720" height="220" style="width:100%; border:1px solid var(--border-color); border-radius:14px; background:rgba(0,0,0,0.02);"></canvas>
+      <div style="height:12px;"></div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+        <div style="flex:1; min-width:160px;">
+          <div style="font-size:11px; font-weight:900; color:var(--text-muted); margin-bottom:6px;">DATE</div>
+          <input type="date" id="objProgDate" />
+        </div>
+        <div style="flex:1; min-width:160px;">
+          <div style="font-size:11px; font-weight:900; color:var(--text-muted); margin-bottom:6px;">PROGRESSION (%)</div>
+          <input type="number" id="objProgValue" placeholder="ex: 22" step="0.1" />
+        </div>
+        <button class="btn" style="width:auto; padding:12px 16px;" onclick="addObjectiveProgressPoint()">➕ Ajouter</button>
+      </div>
+      <div style="height:14px;"></div>
+      <div id="objProgList" style="display:flex; flex-direction:column; gap:10px;"></div>
+    </div>
+  </div>
+
   <div id="toast">✅ Action effectuée avec succès !</div>
 
   <div id="loginOverlay">
