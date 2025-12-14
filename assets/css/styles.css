@@ -293,6 +293,27 @@
       max-width: 240px;
     }
 
+    /* Compteur fin de mois (sous le cercle) */
+    .month-countdown{
+      width: min(420px, 92vw);
+      margin: 12px auto 0;
+      padding: 10px 14px;
+      border-radius: 999px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .03em;
+      font-variant-numeric: tabular-nums;
+      color: rgba(255,255,255,.90);
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.08);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0,0,0,.20);
+    }
+    .month-countdown .mc-label{ color: rgba(255,255,255,.72); font-weight: 700; }
+    .month-countdown .mc-time b{ color: rgba(255,255,255,1); font-weight: 900; }
+
     /* pulse unique quand palier franchi */
     .global-score-container.milestone{
       animation: milestonePulse .6s ease-out 1;
@@ -1027,6 +1048,15 @@ body:not(.dark-mode) .global-score-container .global-score-value{
   border: 1px solid rgba(255,255,255,.18);
   box-shadow: 0 10px 26px rgba(0,0,0,.35);
 }
+
+/* Compteur sous le cercle : même lisibilité en mode jour */
+body:not(.dark-mode) .month-countdown{
+  color: #ffffff;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.08);
+  box-shadow: 0 10px 30px rgba(0,0,0,.20);
+}
+body:not(.dark-mode) .month-countdown .mc-label{ color: rgba(255,255,255,.72); }
 
 
 
