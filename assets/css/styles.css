@@ -314,6 +314,49 @@
     .month-countdown .mc-label{ color: rgba(255,255,255,.72); font-weight: 700; }
     .month-countdown .mc-time b{ color: rgba(255,255,255,1); font-weight: 900; }
 
+    /* Phase 1 (sous le cercle) */
+    .trajectory-indicator{
+      margin: -8px auto 6px;
+      max-width: 520px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .02em;
+      color: rgba(255,255,255,.92);
+      text-shadow: 0 10px 28px rgba(0,0,0,.35);
+    }
+    .trajectory-indicator .ti-sub{ font-weight: 700; color: rgba(255,255,255,.70); }
+
+    .daily-micro{
+      margin: 0 auto 14px;
+      max-width: 560px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 750;
+      color: rgba(255,255,255,.78);
+    }
+
+    /* En mode jour on garde le rendu sombre (comme le cercle) => lisible */
+    body:not(.dark-mode) .trajectory-indicator{
+      color: rgba(255,255,255,.92);
+      text-shadow: 0 10px 28px rgba(0,0,0,.35);
+    }
+    body:not(.dark-mode) .daily-micro{ color: rgba(255,255,255,.78); }
+
+    /* Texte “gain potentiel restant” sous chaque objectif */
+    .remaining-potential{
+      margin-top: 10px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 850;
+      letter-spacing: .02em;
+      color: rgba(17,24,39,.78);
+    }
+    .remaining-potential b{ font-weight: 900; }
+    body.dark-mode .remaining-potential{
+      color: rgba(255,255,255,.78);
+    }
+
     /* pulse unique quand palier franchi */
     .global-score-container.milestone{
       animation: milestonePulse .6s ease-out 1;

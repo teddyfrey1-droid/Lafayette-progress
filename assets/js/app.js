@@ -202,6 +202,85 @@
     function logAction(action, detail) {
         db.ref("logs").push({ user: currentUser ? currentUser.name : "Inconnu", action: action, detail: detail || "", type: "action", time: Date.now() });
     }
+
+    // --- Phase 1 helpers: trajectoire + micro feedback journalier ---
+    function getMonthlyCAObjective(){
+      const arr = Object.values(allObjs || {}).filter(o => o && o.published);
+      // Prefer an objective explicitly about CA
+      let cand = arr.find(o => o && o.isNumeric && (String(o.name||"").toLowerCase().includes("ca") || String(o.name||"").toLowerCase().includes("chiffre") ));
+      if(!cand) cand = arr.find(o => o && o.isPrimary && o.isNumeric);
+      return cand || null;
+    }
+
+    function renderTrajectoryIndicator(){
+      const el = document.getElementById('trajectoryIndicator');
+      if(!el) return;
+      const caObj = getMonthlyCAObjective();
+      const cur = caObj ? parseFloat(caObj.current) : NaN;
+      const target = caObj ? parseFloat(caObj.target) : NaN;
+      if(!isFinite(cur) || !isFinite(target) || target <= 0){
+        el.style.display = 'none';
+        return;
+      }
+
+      const now = new Date();
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+      const day = now.getDate();
+      const pctElapsed = day / Math.max(1, daysInMonth);
+      const theo = target * pctElapsed;
+      if(!(theo > 0)) { el.style.display = 'none'; return; }
+      const deltaPct = ((cur - theo) / theo) * 100;
+      const abs = Math.abs(deltaPct).toFixed(1);
+
+      let emoji = '🟠';
+      let label = `À l’heure : ${deltaPct >= 0 ? '+' : '-'}${abs}%`;
+      let color = 'rgba(245,158,11,1)';
+      if(deltaPct >= 2){
+        emoji = '🟢';
+        label = `En avance de +${abs}%`;
+        color = 'rgba(16,185,129,1)';
+      } else if(deltaPct <= -2){
+        emoji = '🔴';
+        label = `À rattraper : -${abs}%`;
+        color = 'rgba(239,68,68,1)';
+      }
+
+      el.innerHTML = `${emoji} ${label} <span class="ti-sub">· trajectoire</span>`;
+      el.style.display = 'block';
+      // Dark glass background in day & night -> colored text stays readable
+      el.style.color = color;
+    }
+
+    function computeDailyMicroMessage(primOk, pending){
+      // Always 1 sentence, professional tone
+      const published = Object.values(allObjs || {}).filter(o => o && o.published);
+      const visible = published.filter(o => o && (o.isPrimary || primOk));
+      const n = visible.length;
+
+      if(n === 0) return "Publie les objectifs pour démarrer la journée.";
+      if(!primOk) return "Objectif obligatoire : priorité du jour.";
+      if(pending < 0.01) return "Tout est débloqué : maintiens ce rythme.";
+      return "Objectif du jour : valider un palier de plus.";
+    }
+
+    function renderDailyMicro(primOk, pending){
+      const el = document.getElementById('dailyMicro');
+      if(!el) return;
+      if(!currentUser || !currentUser.uid){ el.style.display='none'; return; }
+      const uid = currentUser.uid;
+      const dayKey = new Date().toISOString().slice(0,10);
+      const lsKey = `dailyMicro_${uid}_${dayKey}`;
+      let msg = null;
+      try{ msg = localStorage.getItem(lsKey); }catch(e){ msg = null; }
+      if(!msg){
+        msg = computeDailyMicroMessage(primOk, pending);
+        try{ localStorage.setItem(lsKey, msg); }catch(e){}
+        // Persist once/day in Firebase (optional but useful across devices)
+        db.ref(`dailyMicro/${uid}/${dayKey}`).set({ msg, time: Date.now() }).catch(() => {});
+      }
+      el.textContent = msg || "";
+      el.style.display = msg ? 'block' : 'none';
+    }
     // HAPTICS (mobile): subtle, only on key moments
     function haptic(kind){
       try{
@@ -1001,6 +1080,10 @@ function renderDashboard() {
       const pendingEl = document.getElementById('pendingGain');
       if(pendingEl) pendingEl.textContent = `⏳ ${pending.toFixed(2)}€ en attente`;
 
+      // Phase 1: Trajectoire + micro feedback journalier (sous le cercle)
+      renderTrajectoryIndicator();
+      renderDailyMicro(primOk, pending);
+
       // UI: micro feedback (sobre, motivant)
       const microEl = document.getElementById('microMotiv');
       if(microEl){
@@ -1155,6 +1238,18 @@ const el = document.createElement("div");
 
       if(!isLocked && myGain > 0) earnedBadge = `<div class="earned-badge-container"><div class="earned-badge">💶 Prime gagnée : ${(myGain*userRatio).toFixed(2)}€</div></div>`;
 
+      // Phase 1: gain potentiel restant (somme des paliers non débloqués)
+      let totalPotentialObj = 0;
+      if(obj.isFixed){
+        totalPotentialObj = (obj.paliers && obj.paliers[0]) ? parse(obj.paliers[0].prize) : 0;
+      } else {
+        (obj.paliers||[]).forEach(p => { totalPotentialObj += parse(p.prize); });
+      }
+      const remainingPotential = Math.max(0, (totalPotentialObj - myGain) * userRatio);
+      const remainingHtml = (!isLocked && remainingPotential > 0.009)
+        ? `<div class="remaining-potential">Encore <b>+${remainingPotential.toFixed(2)}€</b> possibles</div>`
+        : "";
+
       let middleHtml = "";
       if(obj.isFixed) {
           const prizeAmount = (obj.paliers && obj.paliers[0]) ? parse(obj.paliers[0].prize) : 0;
@@ -1198,6 +1293,7 @@ const el = document.createElement("div");
         </div>
         <div class="data-boxes-row"><div class="data-box"><span class="data-box-label">ACTUEL</span><span class="data-box-value">${currentVal}</span></div><div class="data-box"><span class="data-box-label">CIBLE ${obj.isInverse ? '(MAX)' : ''}</span><span class="data-box-value">${targetVal}</span></div></div>
         <div class="progress-track"><div class="percent-float">${percentDisplay}</div><div class="progress-fill ${isWin?'green-mode':''}" style="width:${w1}%"></div><div class="progress-overdrive" style="width:${w2}%"></div></div>
+        ${remainingHtml}
         ${middleHtml}${earnedBadge}`;
       return el;
     }
