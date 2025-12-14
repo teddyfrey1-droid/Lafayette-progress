@@ -514,6 +514,20 @@ let _objProgUnsub = null;
       const list = document.getElementById("historyList");
       if(!panel || !list) return;
 
+const fmtMonth = (key) => {
+  const k = String(key || '').trim();
+  const mt = /^(\d{4})-(\d{2})$/.exec(k);
+  if(!mt) return k;
+  const y = Number(mt[1]);
+  const mo = Number(mt[2]) - 1;
+  const d = new Date(y, mo, 1);
+  let s = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  // Capitaliser la première lettre (ex: "Décembre 2025")
+  s = s ? (s.charAt(0).toUpperCase() + s.slice(1)) : k;
+  return s;
+};
+
+
       db.ref(`history/users/${currentUser.uid}`).limitToLast(6).on('value', s=>{
         const v = s.val() || {};
         const rows = Object.values(v).sort((a,b)=> (b.month||"").localeCompare(a.month||""));
@@ -523,7 +537,7 @@ let _objProgUnsub = null;
         }
         panel.style.display = "";
         list.innerHTML = rows.slice(0,3).map(r=>{
-          const m = (r.month || "").replace("-", " / ");
+          const m = fmtMonth(r.month);
           const primes = (Number(r.primes||0)).toFixed(0);
           const pct = (Number(r.validatedPct||0)).toFixed(0);
           return `
@@ -1971,6 +1985,33 @@ const el = document.createElement("div");
 
     // --- Suivi (graph) par objectif (Admin/Super Admin) ---
     let _objProgMode = 'pct'; // 'pct' ou 'num'
+    let _objProgHit = [];
+
+    function _bindObjProgCanvas(){
+      const canvas = document.getElementById('objProgCanvas');
+      if(!canvas || canvas._bound) return;
+      canvas._bound = true;
+      canvas.style.cursor = 'pointer';
+      canvas.addEventListener('click', (ev) => {
+        if(!_objProgHit || !_objProgHit.length) return;
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / Math.max(1, rect.width);
+        const scaleY = canvas.height / Math.max(1, rect.height);
+        const x = (ev.clientX - rect.left) * scaleX;
+        const y = (ev.clientY - rect.top) * scaleY;
+        let best = null;
+        let bestD = 1e9;
+        for(const p of _objProgHit){
+          const dx = x - p.x;
+          const dy = y - p.y;
+          const d = Math.sqrt(dx*dx + dy*dy);
+          if(d < bestD){ bestD = d; best = p; }
+        }
+        if(best && bestD <= 12){
+          showToast(best.label);
+        }
+      });
+    }
 
     function _getObjProgMode(o){
       if(!o) return 'pct';
@@ -2012,6 +2053,7 @@ const el = document.createElement("div");
         const d = String(now.getDate()).padStart(2,'0');
         dEl.value = `${y}-${m}-${d}`;
       }
+      _bindObjProgCanvas();
       _refreshObjectiveProgress();
     }
 
@@ -2185,6 +2227,25 @@ const el = document.createElement("div");
         return { x, y };
       });
 
+      // Hit points (click) : affiche date + valeur/%
+      _objProgHit = pts.map((p, i) => {
+        const r = rows[i];
+        const date = (r && r.date) ? r.date : '';
+        let label = date;
+        if(mode === 'num'){
+          const v = (r && isFinite(r._y)) ? Number(r._y) : NaN;
+          const pct = (r && isFinite(r._pct)) ? Number(r._pct) : NaN;
+          if(isFinite(v) && isFinite(pct)) label = `${date} — ${v.toLocaleString('fr-FR')} (${pct.toFixed(1)}%)`;
+          else if(isFinite(v)) label = `${date} — ${v.toLocaleString('fr-FR')}`;
+          else if(isFinite(pct)) label = `${date} — ${pct.toFixed(1)}%`;
+        } else {
+          const pct = (r && isFinite(r._pct)) ? Number(r._pct) : NaN;
+          if(isFinite(pct)) label = `${date} — ${pct.toFixed(1)}%`;
+        }
+        return { x: p.x, y: p.y, label };
+      });
+
+
       ctx.strokeStyle = isDark ? 'rgba(59,130,246,0.85)' : 'rgba(37,99,235,0.90)';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -2195,8 +2256,11 @@ const el = document.createElement("div");
       ctx.fillStyle = isDark ? 'rgba(255,255,255,0.92)' : 'rgba(17,24,39,0.88)';
       pts.forEach(p => {
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 3.5, 0, Math.PI*2);
+        ctx.arc(p.x, p.y, 6, 0, Math.PI*2);
         ctx.fill();
+        ctx.strokeStyle = isDark ? 'rgba(59,130,246,0.55)' : 'rgba(37,99,235,0.45)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
       });
     }
 

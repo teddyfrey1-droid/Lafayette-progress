@@ -46,20 +46,6 @@
       </div>
   </div>
 
-  <div class="feedback-btn" onclick="document.getElementById('feedbackModal').style.display='flex'" title="Proposer une idée"><span class="feedback-btn-icon">💡</span><span class="feedback-btn-text">Une idée ?</span></div>
-
-  <div id="feedbackModal" class="modal-overlay">
-      <div class="modal-box">
-          <div class="modal-title">💡 Boîte à idées</div>
-          <p style="font-size:13px; color:var(--text-muted); margin-bottom:15px;">Une suggestion pour améliorer l'outil ou l'équipe ? Dites-le nous !</p>
-          <textarea id="fbContent" class="fb-input" placeholder="Votre message..."></textarea>
-          <div style="display:flex; gap:10px;">
-              <button class="btn" onclick="sendFeedback()">Envoyer</button>
-              <button class="btn" style="background:var(--border-color); color:var(--text-muted);" onclick="document.getElementById('feedbackModal').style.display='none'">Fermer</button>
-          </div>
-      </div>
-  </div>
-
   <div id="updatesModal" class="modal-overlay">
       <div class="modal-box">
           <div class="modal-title">
@@ -145,7 +131,7 @@
         <span class="user-badge" id="userHours">--h</span>
         <button onclick="document.getElementById('updatesModal').style.display='flex'" style="border:none; background:#eff6ff; color:#3b82f6; border-radius:20px; padding:5px 12px; font-size:11px; font-weight:800; cursor:pointer; margin-left:5px;">📢 Nouveautés</button>
       </div>
-      <div style="display:flex; gap:10px;">
+      <div class="top-actions">
         <button id="btnAdmin" class="btn" style="width:auto; padding:8px 16px; font-size:11px; display:none;">⚙️ Admin</button>
         <button onclick="logout()" class="btn" style="width:auto; padding:8px 16px; font-size:11px; background:var(--card-bg); color:#ef4444; border:1px solid #fca5a5;">Déconnexion</button>
               <button class="icon-btn" id="globalMenuBtn" onclick="toggleGlobalMenu()">☰</button>
