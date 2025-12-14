@@ -135,7 +135,8 @@ let _objProgUnsub = null;
             menu.classList.remove("open");
             backdrop.classList.remove("open");
             document.body.style.overflow = "";
-            try{ toggleMenuDirectory(false); }catch(e){}
+            try{ toggleMenuSites(false); }catch(e){}
+            try{ toggleMenuContacts(false); }catch(e){}
         }
     }
     document.addEventListener("keydown", (e) => {
@@ -156,77 +157,89 @@ let _objProgUnsub = null;
     }
     window.toggleSitesMini = toggleSitesMini;
 
-    // --- Global menu : Contacts & Sites (aperçu sans quitter le dashboard) ---
-    let __menuDirOpen = false;
-    function toggleMenuDirectory(force){
-      const sub = document.getElementById('menuDirSub');
-      const chev = document.getElementById('menuDirChev');
-      if(!sub) return;
-      const next = (typeof force === 'boolean') ? force : !__menuDirOpen;
-      __menuDirOpen = next;
-      sub.style.display = next ? 'block' : 'none';
-      if(chev) chev.textContent = next ? '▾' : '▸';
-      if(next){
-        try{ renderMenuDirectoryPreview(); }catch(e){}
+    // --- Global menu : 2 catégories séparées (Sites utiles puis Contacts) ---
+    let __menuSitesOpen = false;
+    let __menuContactsOpen = false;
+
+    function _setMenuAccordion(which, open){
+      const isSites = which === 'sites';
+      const sub = document.getElementById(isSites ? 'menuSitesSub' : 'menuContactsSub');
+      const chev = document.getElementById(isSites ? 'menuSitesChev' : 'menuContactsChev');
+      if(sub) sub.style.display = open ? 'block' : 'none';
+      if(chev) chev.textContent = open ? '▾' : '▸';
+    }
+
+    function toggleMenuSites(force){
+      const next = (typeof force === 'boolean') ? force : !__menuSitesOpen;
+      __menuSitesOpen = next;
+      if(next){ __menuContactsOpen = false; _setMenuAccordion('contacts', false); }
+      _setMenuAccordion('sites', next);
+      if(next){ try{ renderMenuSitesPreview(); }catch(e){} }
+    }
+    window.toggleMenuSites = toggleMenuSites;
+
+    function toggleMenuContacts(force){
+      const next = (typeof force === 'boolean') ? force : !__menuContactsOpen;
+      __menuContactsOpen = next;
+      if(next){ __menuSitesOpen = false; _setMenuAccordion('sites', false); }
+      _setMenuAccordion('contacts', next);
+      if(next){ try{ renderMenuContactsPreview(); }catch(e){} }
+    }
+    window.toggleMenuContacts = toggleMenuContacts;
+
+    function renderMenuContactsPreview(){
+      const cRoot = document.getElementById('menuContactsPreview');
+      if(!cRoot) return;
+      const data = window.__contactsData || {};
+      const items = Object.entries(data).map(([k,v]) => ({ key:k, ...(v||{}) }))
+        .filter(it => it && (it.label || it.value));
+      items.sort((a,b) => (a.label||'').localeCompare(b.label||''));
+      cRoot.innerHTML = '';
+      items.slice(0, 8).forEach(it => {
+        const value = (it.value || '').toString().trim();
+        const isPhone = /^[+0-9][0-9 .-]{6,}$/.test(value);
+        const href = isPhone ? `tel:${value.replace(/\s+/g,'')}` : '';
+        const a = document.createElement('a');
+        a.className = 'menu-preview-chip';
+        a.href = href || 'contacts.html#contacts';
+        a.innerHTML = `
+          <div class="menu-preview-title">${escapeHtml(it.label || 'Contact')}</div>
+          <div class="menu-preview-sub">${escapeHtml(value || '—')}</div>
+        `;
+        cRoot.appendChild(a);
+      });
+      if(items.length === 0){
+        cRoot.innerHTML = '<div class="menu-preview-empty">Aucun contact.</div>';
       }
     }
-    window.toggleMenuDirectory = toggleMenuDirectory;
 
-    function renderMenuDirectoryPreview(){
-      // Contacts
-      const cRoot = document.getElementById('menuContactsPreview');
-      if(cRoot){
-        const data = window.__contactsData || {};
-        const items = Object.entries(data).map(([k,v]) => ({ key:k, ...(v||{}) }))
-          .filter(it => it && (it.label || it.value));
-        items.sort((a,b) => (a.label||'').localeCompare(b.label||''));
-        cRoot.innerHTML = '';
-        items.slice(0, 6).forEach(it => {
-          const value = (it.value || '').toString().trim();
-          const isPhone = /^[+0-9][0-9 .-]{6,}$/.test(value);
-          const href = isPhone ? `tel:${value.replace(/\s+/g,'')}` : '';
-          const a = document.createElement('a');
-          a.className = 'menu-preview-chip';
-          a.href = href || 'contacts.html';
-          a.innerHTML = `
-            <div class="menu-preview-title">${escapeHtml(it.label || 'Contact')}</div>
-            <div class="menu-preview-sub">${escapeHtml(value || '—')}</div>
-          `;
-          cRoot.appendChild(a);
-        });
-        if(items.length === 0){
-          cRoot.innerHTML = '<div class="menu-preview-empty">Aucun contact.</div>';
-        }
-      }
-
-      // Sites
+    function renderMenuSitesPreview(){
       const sRoot = document.getElementById('menuSitesPreview');
-      if(sRoot){
-        const data = window.__sitesData || {};
-        const items = Object.entries(data).map(([k,v]) => ({ key:k, ...(v||{}) }))
-          .filter(it => it && (it.url || it.label));
-        items.sort((a,b) => (a.category||'').localeCompare(b.category||'') || (a.label||'').localeCompare(b.label||''));
-        sRoot.innerHTML = '';
-        items.slice(0, 8).forEach(it => {
-          const safe = sanitizeUrl(it.url);
-          const a = document.createElement('a');
-          a.className = 'menu-preview-chip';
-          a.href = safe || 'contacts.html';
-          if(safe){ a.target = '_blank'; a.rel = 'noopener'; }
-          a.innerHTML = `
-            <div class="menu-preview-row">
-              <div class="menu-preview-icon">${siteLogoHtml(it)}</div>
-              <div style="min-width:0;">
-                <div class="menu-preview-title">${escapeHtml(it.label || 'Lien')}</div>
-                <div class="menu-preview-sub">${escapeHtml((it.category||'').trim() || (it.url||'—'))}</div>
-              </div>
+      if(!sRoot) return;
+      const data = window.__sitesData || {};
+      const items = Object.entries(data).map(([k,v]) => ({ key:k, ...(v||{}) }))
+        .filter(it => it && (it.url || it.label));
+      items.sort((a,b) => (a.category||'').localeCompare(b.category||'') || (a.label||'').localeCompare(b.label||''));
+      sRoot.innerHTML = '';
+      items.slice(0, 10).forEach(it => {
+        const safe = sanitizeUrl(it.url);
+        const a = document.createElement('a');
+        a.className = 'menu-preview-chip';
+        a.href = safe || 'contacts.html#sites';
+        if(safe){ a.target = '_blank'; a.rel = 'noopener'; }
+        a.innerHTML = `
+          <div class="menu-preview-row">
+            <div class="menu-preview-icon">${siteLogoHtml(it)}</div>
+            <div style="min-width:0;">
+              <div class="menu-preview-title">${escapeHtml(it.label || 'Lien')}</div>
+              <div class="menu-preview-sub">${escapeHtml((it.category||'').trim() || '—')}</div>
             </div>
-          `;
-          sRoot.appendChild(a);
-        });
-        if(items.length === 0){
-          sRoot.innerHTML = '<div class="menu-preview-empty">Aucun lien.</div>';
-        }
+          </div>
+        `;
+        sRoot.appendChild(a);
+      });
+      if(items.length === 0){
+        sRoot.innerHTML = '<div class="menu-preview-empty">Aucun lien.</div>';
       }
     }
 
@@ -427,7 +440,7 @@ let _objProgUnsub = null;
       const n = visible.length;
 
       if(n === 0) return "Publie les objectifs pour démarrer la journée.";
-      if(!primOk) return "Objectif obligatoire : priorité du jour.";
+      if(!primOk) return "TEMPS RESTANT";
       if(pending < 0.01) return "Tout est débloqué : maintiens ce rythme.";
       return "Objectif du jour : valider un palier de plus.";
     }
@@ -1655,13 +1668,19 @@ const el = document.createElement("div");
             const dayKey = `${y}-${m}-${d}`;
             const curNum = parseFloat(String(newCurrentRaw).replace(',', '.'));
             const tarNum = parseFloat(String(newTargetRaw).replace(',', '.'));
-            if(isFinite(curNum) && isFinite(tarNum) && tarNum !== 0){
-              const pct = getPct(curNum, tarNum, newIsInverse);
-              db.ref(`objectiveProgress/${id}/${dayKey}`).set({
-                value: pct,
+            if(isFinite(curNum)){
+              const payload = {
                 updatedAt: Date.now(),
-                by: (currentUser && currentUser.name) ? currentUser.name : 'Admin'
-              });
+                by: (currentUser && currentUser.name) ? currentUser.name : 'Admin',
+                current: curNum
+              };
+              if(isFinite(tarNum)) payload.target = tarNum;
+              if(isFinite(tarNum)){
+                const pct = getPct(curNum, tarNum, newIsInverse);
+                payload.pct = pct;
+                payload.value = pct; // compat (anciens points)
+              }
+              db.ref(`objectiveProgress/${id}/${dayKey}`).set(payload);
             }
           }catch(e){}
       });
@@ -1950,17 +1969,41 @@ const el = document.createElement("div");
       db.ref(`teamArchive/${_archiveUserId}/${monthKey}`).remove().then(() => renderTeamArchiveList());
     }
 
-    // --- Suivi manuel + graph par objectif (Admin/Super Admin) ---
+    // --- Suivi (graph) par objectif (Admin/Super Admin) ---
+    let _objProgMode = 'pct'; // 'pct' ou 'num'
+
+    function _getObjProgMode(o){
+      if(!o) return 'pct';
+      if(o.hideCurrent || o.hideTarget) return 'pct';
+      if(o.isNumeric) return 'num';
+      return 'pct';
+    }
+
     function openObjectiveProgress(objId){
       if(!isAdminUser()) return;
       const o = allObjs[objId];
       if(!o) return;
       _objProgId = objId;
+      _objProgMode = _getObjProgMode(o);
+
       const n = document.getElementById('objProgName');
       if(n) n.textContent = o.name || objId;
+
+      const label = document.getElementById('objProgValueLabel');
+      const vEl = document.getElementById('objProgValue');
+      if(label){
+        label.textContent = (_objProgMode === 'num') ? 'VALEUR (NOMBRE)' : 'PROGRESSION (%)';
+      }
+      if(vEl){
+        vEl.value = '';
+        vEl.placeholder = (_objProgMode === 'num') ? 'ex: 12' : 'ex: 22';
+        vEl.step = (_objProgMode === 'num') ? '1' : '0.1';
+      }
+
       const modal = document.getElementById('objectiveProgressModal');
       if(modal) modal.style.display = 'flex';
-      // default date
+
+      // default date = aujourd'hui
       const dEl = document.getElementById('objProgDate');
       if(dEl){
         const now = new Date();
@@ -1980,23 +2023,49 @@ const el = document.createElement("div");
       _objProgUnsub = null;
     }
 
+    function _computeObjProgRows(data){
+      const o = allObjs[_objProgId];
+      const mode = _objProgMode;
+      const rowsRaw = Object.keys(data||{})
+        .filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k))
+        .map(k => ({ id:k, date:k, ...(data[k]||{}) }))
+        .sort((a,b) => String(a.date).localeCompare(String(b.date)));
+
+      const out = [];
+      rowsRaw.forEach(r => {
+        const cur = (r.current != null) ? parseFloat(r.current) : NaN;
+        const tar = (r.target != null) ? parseFloat(r.target) : (o && o.target != null ? parseFloat(o.target) : NaN);
+        const pct = (r.pct != null) ? parseFloat(r.pct)
+          : (r.value != null) ? parseFloat(r.value)
+          : (isFinite(cur) && isFinite(tar)) ? getPct(cur, tar, !!(o && o.isInverse))
+          : NaN;
+
+        if(mode === 'num'){
+          let y = cur;
+          if(!isFinite(y)){
+            // fallback (si ancien enregistrement en %): approx = pct% * target
+            if(isFinite(pct) && isFinite(tar) && !(o && o.isInverse)) y = (pct/100) * tar;
+          }
+          if(isFinite(y)) out.push({ ...r, _y: y, _pct: isFinite(pct) ? pct : (isFinite(tar) ? getPct(y, tar, !!(o && o.isInverse)) : NaN) });
+        } else {
+          if(isFinite(pct)) out.push({ ...r, _y: pct, _pct: pct });
+        }
+      });
+      return out;
+    }
+
     function _refreshObjectiveProgress(){
       if(!_objProgId) return;
       const list = document.getElementById('objProgList');
       if(list) list.innerHTML = '<div style="text-align:center; color:#999;">Chargement...</div>';
       const ref = db.ref(`objectiveProgress/${_objProgId}`);
-      // detach previous
       if(_objProgUnsub){ try{ _objProgUnsub.off(); }catch(e){} }
       _objProgUnsub = ref;
       ref.on('value', snap => {
         const data = snap.val() || {};
-        // data: { 'YYYY-MM-DD': {value, updatedAt, by}, ... }
-        const rows = Object.keys(data)
-          .filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k))
-          .map(k => ({ id:k, date:k, ...(data[k]||{}) }))
-          .filter(r => r.value != null)
-          .sort((a,b) => String(a.date).localeCompare(String(b.date)));
-        _drawObjectiveProgress(rows);
+        const rows = _computeObjProgRows(data);
+        _drawObjectiveProgress(rows, _objProgMode);
+
         if(!list) return;
         if(rows.length === 0){
           list.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-weight:800;">Aucune donnée.</div>';
@@ -2006,11 +2075,14 @@ const el = document.createElement("div");
         rows.slice().reverse().forEach(r => {
           const div = document.createElement('div');
           div.className = 'user-item';
+          const badge = (_objProgMode === 'num')
+            ? `${Number(r._y).toLocaleString('fr-FR')} <span style="opacity:.75; font-weight:900;">(${Number(r._pct).toFixed(1)}%)</span>`
+            : `${Number(r._pct).toFixed(1)}%`;
           div.innerHTML = `
             <div class="user-info">
               <div class="user-header" style="gap:10px;">
                 <span class="user-name">${r.date}</span>
-                <span class="pub-state on" style="text-transform:none;">${Number(r.value).toFixed(1)}%</span>
+                <span class="pub-state on" style="text-transform:none;">${badge}</span>
               </div>
               <div class="user-meta">Mise à jour (auto / admin)</div>
             </div>
@@ -2027,13 +2099,34 @@ const el = document.createElement("div");
 
     function addObjectiveProgressPoint(){
       if(!_objProgId || !isAdminUser()) return;
+      const o = allObjs[_objProgId];
       const dEl = document.getElementById('objProgDate');
       const vEl = document.getElementById('objProgValue');
       const date = dEl ? String(dEl.value||'').trim() : '';
-      const value = vEl ? parseFloat(String(vEl.value||'')) : NaN;
+      const raw = vEl ? parseFloat(String(vEl.value||'')) : NaN;
       if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) { alert('Date invalide.'); return; }
-      if(!isFinite(value)) { alert('Progression invalide.'); return; }
-      db.ref(`objectiveProgress/${_objProgId}/${date}`).set({ value, updatedAt: Date.now(), by: (currentUser && currentUser.name) ? currentUser.name : 'Admin' })
+      if(!isFinite(raw)) { alert('Valeur invalide.'); return; }
+
+      const payload = {
+        updatedAt: Date.now(),
+        by: (currentUser && currentUser.name) ? currentUser.name : 'Admin'
+      };
+
+      if(_objProgMode === 'num'){
+        payload.current = raw;
+        const tar = (o && o.target != null) ? parseFloat(o.target) : NaN;
+        if(isFinite(tar)) payload.target = tar;
+        if(isFinite(tar)){
+          const pct = getPct(raw, tar, !!(o && o.isInverse));
+          payload.pct = pct;
+          payload.value = pct; // compat
+        }
+      } else {
+        payload.pct = raw;
+        payload.value = raw;
+      }
+
+      db.ref(`objectiveProgress/${_objProgId}/${date}`).set(payload)
         .then(() => { showToast('✅ Ajouté'); if(vEl) vEl.value=''; })
         .catch(()=>{});
     }
@@ -2044,19 +2137,17 @@ const el = document.createElement("div");
       db.ref(`objectiveProgress/${_objProgId}/${pointId}`).remove().then(() => showToast('🗑️ Supprimé'));
     }
 
-    function _drawObjectiveProgress(rows){
+    function _drawObjectiveProgress(rows, mode){
       const canvas = document.getElementById('objProgCanvas');
       if(!canvas) return;
       const ctx = canvas.getContext('2d');
       const w = canvas.width; const h = canvas.height;
       ctx.clearRect(0,0,w,h);
 
-      // background (respecte thème)
       const isDark = document.body.classList.contains('dark-mode');
       ctx.fillStyle = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
       ctx.fillRect(0,0,w,h);
 
-      // axes
       const pad = 28;
       ctx.strokeStyle = isDark ? 'rgba(148,163,184,0.25)' : 'rgba(17,24,39,0.18)';
       ctx.lineWidth = 1;
@@ -2068,27 +2159,32 @@ const el = document.createElement("div");
 
       if(!rows || rows.length < 1) return;
 
-      // x range by date
       const xs = rows.map(r => new Date(r.date).getTime()).filter(t => isFinite(t));
+      if(xs.length === 0) return;
       const minX = Math.min(...xs);
       const maxX = Math.max(...xs);
       const spanX = Math.max(1, maxX - minX);
 
-      // y range fixed 0..100
-      const minY = 0;
-      const maxY = 100;
-      const spanY = maxY - minY;
+      let minY = 0;
+      let maxY = 100;
+      if(mode === 'num'){
+        const ys = rows.map(r => Number(r._y)).filter(v => isFinite(v));
+        if(ys.length){
+          minY = 0;
+          maxY = Math.max(1, Math.max(...ys) * 1.10);
+        }
+      }
+      const spanY = Math.max(1e-9, maxY - minY);
 
       const pts = rows.map(r => {
         const tx = new Date(r.date).getTime();
         const vx = (tx - minX) / spanX;
-        const vy = (Number(r.value) - minY) / spanY;
+        const vy = (Number(r._y) - minY) / spanY;
         const x = pad + vx * (w - 2*pad);
         const y = (h - pad) - vy * (h - 2*pad);
         return { x, y };
       });
 
-      // line
       ctx.strokeStyle = isDark ? 'rgba(59,130,246,0.85)' : 'rgba(37,99,235,0.90)';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -2096,7 +2192,6 @@ const el = document.createElement("div");
       for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y);
       ctx.stroke();
 
-      // points
       ctx.fillStyle = isDark ? 'rgba(255,255,255,0.92)' : 'rgba(17,24,39,0.88)';
       pts.forEach(p => {
         ctx.beginPath();

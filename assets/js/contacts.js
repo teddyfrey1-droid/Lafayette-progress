@@ -22,7 +22,7 @@ const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
 
 let currentUser = null;
 let canEdit = false;
-let currentTab = "contacts";
+let currentTab = "sites";
 let editingType = null; // 'contact' | 'site'
 let editingKey = null;
 
@@ -228,7 +228,8 @@ function renderSites(){
   const root = document.getElementById('sitesGrid');
   if(!root) return;
   const items = Object.entries(sitesData || {}).map(([k,v]) => ({ key:k, ...(v||{}) }));
-  items.sort((a,b) => (a.label||"").localeCompare(b.label||""));
+  // Tri : catégorie puis libellé
+  items.sort((a,b) => (String(a.category||'').trim()).localeCompare(String(b.category||'').trim()) || (a.label||"").localeCompare(b.label||""));
   root.innerHTML = "";
 
   if(items.length === 0){
@@ -236,37 +237,61 @@ function renderSites(){
     return;
   }
 
+  // Groupes par catégorie (en gras)
+  const groups = new Map();
   items.forEach(it => {
-    const tile = document.createElement('div');
-    tile.className = 'dir-tile';
-    const url = (it.url || "").toString();
-    const safeUrl = sanitizeUrl(url);
-    const logo = (it.imageData || it.imageUrl || '').toString().trim();
-    const icon = (it.icon || '🔗').toString().trim() || '🔗';
-    tile.innerHTML = `
-      <a class="dir-tile-link" href="${safeUrl || '#'}" ${safeUrl ? 'target="_blank" rel="noopener"' : ''}>
-        <div style="display:flex; gap:10px; align-items:center;">
-          <div class="dir-tile-icon" aria-hidden="true">
-            ${logo ? `<img src="${escapeAttr(logo)}" alt="">` : escapeHtml(icon)}
-          </div>
-          <div style="flex:1; min-width:0;">
-            <div class="dir-tile-title" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(it.label || 'Lien')}</span>
-              ${it.category ? `<span class="dir-badge">${escapeHtml(it.category)}</span>` : ''}
+    const cat = String(it.category||'').trim();
+    const key = cat || 'Autres';
+    if(!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(it);
+  });
+  const cats = Array.from(groups.keys()).sort((a,b) => {
+    if(a === 'Autres') return 1;
+    if(b === 'Autres') return -1;
+    return a.localeCompare(b);
+  });
+
+  cats.forEach(cat => {
+    const wrap = document.createElement('div');
+    wrap.className = 'dir-group';
+    wrap.innerHTML = `<div class="dir-group-title">${escapeHtml(cat)}</div>`;
+    const grid = document.createElement('div');
+    grid.className = 'dir-grid';
+
+    (groups.get(cat) || []).forEach(it => {
+      const tile = document.createElement('div');
+      tile.className = 'dir-tile' + (canEdit ? ' has-actions' : '');
+      const url = (it.url || "").toString();
+      const safeUrl = sanitizeUrl(url);
+      const logo = (it.imageData || it.imageUrl || '').toString().trim();
+      const icon = (it.icon || '🔗').toString().trim() || '🔗';
+      // IMPORTANT : on cache l'URL dans la tuile (on clique sur la carte pour ouvrir)
+      tile.innerHTML = `
+        <a class="dir-tile-link" href="${safeUrl || '#'}" ${safeUrl ? 'target="_blank" rel="noopener"' : ''}>
+          <div style="display:flex; gap:10px; align-items:flex-start;">
+            <div class="dir-tile-icon" aria-hidden="true">
+              ${logo ? `<img src="${escapeAttr(logo)}" alt="">` : escapeHtml(icon)}
             </div>
-            <div class="dir-tile-sub">${escapeHtml(url || '—')}</div>
-            ${it.description ? `<div class="dir-tile-desc">${escapeHtml(it.description)}</div>` : ''}
+            <div style="flex:1; min-width:0;">
+              <div class="dir-tile-title" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${escapeHtml(it.label || 'Lien')}
+              </div>
+              ${it.description ? `<div class="dir-tile-desc">${escapeHtml(it.description)}</div>` : `<div class="dir-tile-desc" style="opacity:.65;">—</div>`}
+            </div>
           </div>
-        </div>
-      </a>
-      ${canEdit ? `
-        <div class="dir-tile-actions">
-          <button class="icon-btn" title="Modifier" onclick="openDirModal('site','${it.key}')">✏️</button>
-          <button class="icon-btn danger" title="Supprimer" onclick="deleteDirItem('site','${it.key}')">🗑️</button>
-        </div>
-      ` : ''}
-    `;
-    root.appendChild(tile);
+        </a>
+        ${canEdit ? `
+          <div class="dir-tile-actions">
+            <button class="icon-btn" title="Modifier" onclick="openDirModal('site','${it.key}')">✏️</button>
+            <button class="icon-btn danger" title="Supprimer" onclick="deleteDirItem('site','${it.key}')">🗑️</button>
+          </div>
+        ` : ''}
+      `;
+      grid.appendChild(tile);
+    });
+
+    wrap.appendChild(grid);
+    root.appendChild(wrap);
   });
 }
 
@@ -439,8 +464,12 @@ async function toSmallDataURL(file, maxW, maxH, quality){
   catch(e){ return c.toDataURL('image/jpeg', q); }
 }
 
-// Default tab
-switchDirectoryTab('contacts');
+// Default tab (hash : #sites / #contacts)
+(() => {
+  const h = (window.location.hash || '').replace('#','').trim().toLowerCase();
+  if(h === 'contacts' || h === 'sites') switchDirectoryTab(h);
+  else switchDirectoryTab('sites');
+})();
 
   // PWA: force check update (évite les versions figées)
   if('serviceWorker' in navigator){

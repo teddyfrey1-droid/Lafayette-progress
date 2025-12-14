@@ -91,15 +91,15 @@
     </div>
   </div>
 
-  <!-- Suivi manuel (graph) par objectif -->
+  <!-- Suivi (graph) par objectif -->
   <div id="objectiveProgressModal" class="modal-overlay">
     <div class="modal-box" style="max-width:760px;">
       <div class="modal-title">
         <span>📈 Suivi — <span id="objProgName">—</span></span>
         <button style="border:none; background:none; font-size:20px; cursor:pointer; color:var(--text-main);" onclick="closeObjectiveProgress()">×</button>
       </div>
-      <div style="font-size:12px; color:var(--text-muted); font-weight:700; margin-bottom:12px;">
-        Saisie manuelle : ajoute des points (date + %) pour visualiser la progression dans le temps.
+      <div id="objProgHint" style="font-size:12px; color:var(--text-muted); font-weight:700; margin-bottom:12px;">
+        Auto : un point se crée quand la valeur d’un objectif est modifiée. Tu peux aussi ajouter un point si besoin.
       </div>
       <canvas id="objProgCanvas" width="720" height="220" style="width:100%; border:1px solid var(--border-color); border-radius:14px; background:rgba(0,0,0,0.02);"></canvas>
       <div style="height:12px;"></div>
@@ -109,7 +109,7 @@
           <input type="date" id="objProgDate" />
         </div>
         <div style="flex:1; min-width:160px;">
-          <div style="font-size:11px; font-weight:900; color:var(--text-muted); margin-bottom:6px;">PROGRESSION (%)</div>
+          <div id="objProgValueLabel" style="font-size:11px; font-weight:900; color:var(--text-muted); margin-bottom:6px;">PROGRESSION (%)</div>
           <input type="number" id="objProgValue" placeholder="ex: 22" step="0.1" />
         </div>
         <button class="btn" style="width:auto; padding:12px 16px;" onclick="addObjectiveProgressPoint()">➕ Ajouter</button>
@@ -162,22 +162,29 @@
       </div>
       <nav class="global-menu-links">
         <a class="global-menu-link" href="index.html#dashboard" onclick="toggleGlobalMenu(false)">📊 Dashboard</a>
-        <button class="global-menu-link global-menu-accordion" type="button" onclick="toggleMenuDirectory()">
-          <span>📇 Contacts &amp; Sites</span>
-          <span id="menuDirChev" style="opacity:.8; font-weight:900;">▸</span>
+        <!-- 2 catégories séparées : Sites utiles puis Contacts (1 seule ouverte à la fois) -->
+        <button class="global-menu-link global-menu-accordion" type="button" onclick="toggleMenuSites()">
+          <span>🔗 Sites utiles</span>
+          <span id="menuSitesChev" style="opacity:.8; font-weight:900;">▸</span>
         </button>
-        <div class="global-menu-sub" id="menuDirSub" style="display:none;">
+        <div class="global-menu-sub" id="menuSitesSub" style="display:none;">
           <div class="menu-sub-head">
-            <div class="menu-sub-title">📞 Contacts</div>
-            <a class="menu-sub-link" href="contacts.html" onclick="toggleGlobalMenu(false)">Voir tout</a>
-          </div>
-          <div class="menu-preview-grid" id="menuContactsPreview"></div>
-
-          <div class="menu-sub-head" style="margin-top:12px;">
             <div class="menu-sub-title">🔗 Sites utiles</div>
-            <a class="menu-sub-link" href="contacts.html" onclick="toggleGlobalMenu(false)">Voir tout</a>
+            <a class="menu-sub-link" href="contacts.html#sites" onclick="toggleGlobalMenu(false)">Voir tout</a>
           </div>
           <div class="menu-preview-grid" id="menuSitesPreview"></div>
+        </div>
+
+        <button class="global-menu-link global-menu-accordion" type="button" onclick="toggleMenuContacts()">
+          <span>📞 Contacts</span>
+          <span id="menuContactsChev" style="opacity:.8; font-weight:900;">▸</span>
+        </button>
+        <div class="global-menu-sub" id="menuContactsSub" style="display:none;">
+          <div class="menu-sub-head">
+            <div class="menu-sub-title">📞 Contacts</div>
+            <a class="menu-sub-link" href="contacts.html#contacts" onclick="toggleGlobalMenu(false)">Voir tout</a>
+          </div>
+          <div class="menu-preview-grid" id="menuContactsPreview"></div>
         </div>
       </nav>
       <div class="global-menu-foot">
