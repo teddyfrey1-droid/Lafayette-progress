@@ -1374,7 +1374,7 @@ const el = document.createElement("div");
       }
       const remainingPotential = Math.max(0, (totalPotentialObj - myGain) * userRatio);
       const remainingHtml = (!isLocked && remainingPotential > 0.009)
-        ? `<span class="remaining-potential">Encore <b>+${remainingPotential.toFixed(2)}€</b></span>`
+        ? `<span class="remaining-potential">Reste <b>${remainingPotential.toFixed(2)}€</b> à débloquer</span>`
         : "";
 
       let middleHtml = "";
@@ -1531,6 +1531,11 @@ const el = document.createElement("div");
     function saveObj() {
       const id = document.getElementById("eoId").value;
       const isFixed = document.getElementById("eoFixed").checked;
+      const newName = document.getElementById("eoName").value;
+      const newCurrentRaw = document.getElementById("eoCurrent").value;
+      const newTargetRaw = document.getElementById("eoTarget").value;
+      const newIsInverse = document.getElementById("eoInverse").checked;
+      const newIsNumeric = document.getElementById("eoNumeric").checked;
       let paliers = [];
       const oldP = allObjs[id].paliers || [];
       if(isFixed) { paliers = [{ threshold: 100, prize: oldP[0]?oldP[0].prize:"0" }]; } 
@@ -1542,18 +1547,40 @@ const el = document.createElement("div");
           ]; 
       }
       db.ref("objectives/"+id).update({ 
-          name: document.getElementById("eoName").value, 
-          current: document.getElementById("eoCurrent").value, 
-          target: document.getElementById("eoTarget").value, 
+          name: newName, 
+          current: newCurrentRaw, 
+          target: newTargetRaw, 
           isPrimary: document.getElementById("eoPrimary").checked, 
-          isInverse: document.getElementById("eoInverse").checked, 
+          isInverse: newIsInverse, 
           isFixed: isFixed, 
-          isNumeric: document.getElementById("eoNumeric").checked,
+          isNumeric: newIsNumeric,
           hideTarget: document.getElementById("eoHideTarget").checked, 
           hideCurrent: document.getElementById("eoHideCurrent").checked, 
           paliers: paliers 
-      }).then(() => { showToast("✅ Objectif Modifié !"); document.getElementById("editObjPanel").classList.remove("active"); });
-      logAction("Modification", "Objectif : " + document.getElementById("eoName").value);
+      }).then(() => {
+          showToast("✅ Objectif Modifié !");
+          document.getElementById("editObjPanel").classList.remove("active");
+
+          // Phase demandée : graph auto -> on enregistre un point du jour quand la valeur (current) est saisie/éditée
+          try{
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth()+1).padStart(2,'0');
+            const d = String(now.getDate()).padStart(2,'0');
+            const dayKey = `${y}-${m}-${d}`;
+            const curNum = parseFloat(String(newCurrentRaw).replace(',', '.'));
+            const tarNum = parseFloat(String(newTargetRaw).replace(',', '.'));
+            if(isFinite(curNum) && isFinite(tarNum) && tarNum !== 0){
+              const pct = getPct(curNum, tarNum, newIsInverse);
+              db.ref(`objectiveProgress/${id}/${dayKey}`).set({
+                value: pct,
+                updatedAt: Date.now(),
+                by: (currentUser && currentUser.name) ? currentUser.name : 'Admin'
+              });
+            }
+          }catch(e){}
+      });
+      logAction("Modification", "Objectif : " + newName);
     }
 
     function deleteObj(id) { if(confirm("🗑️ Supprimer ?")) { db.ref("objectives/"+id).remove().then(() => showToast("🗑️ Supprimé")); logAction("Suppression", `Objectif ${id}`); } }
@@ -1872,14 +1899,17 @@ const el = document.createElement("div");
       if(!_objProgId) return;
       const list = document.getElementById('objProgList');
       if(list) list.innerHTML = '<div style="text-align:center; color:#999;">Chargement...</div>';
-      const ref = db.ref(`objectiveProgressManual/${_objProgId}`);
+      const ref = db.ref(`objectiveProgress/${_objProgId}`);
       // detach previous
       if(_objProgUnsub){ try{ _objProgUnsub.off(); }catch(e){} }
       _objProgUnsub = ref;
       ref.on('value', snap => {
         const data = snap.val() || {};
-        const rows = Object.keys(data).map(k => ({ id:k, ...(data[k]||{}) }))
-          .filter(r => r.date && r.value != null)
+        // data: { 'YYYY-MM-DD': {value, updatedAt, by}, ... }
+        const rows = Object.keys(data)
+          .filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k))
+          .map(k => ({ id:k, date:k, ...(data[k]||{}) }))
+          .filter(r => r.value != null)
           .sort((a,b) => String(a.date).localeCompare(String(b.date)));
         _drawObjectiveProgress(rows);
         if(!list) return;
@@ -1897,7 +1927,7 @@ const el = document.createElement("div");
                 <span class="user-name">${r.date}</span>
                 <span class="pub-state on" style="text-transform:none;">${Number(r.value).toFixed(1)}%</span>
               </div>
-              <div class="user-meta">Saisie manuelle</div>
+              <div class="user-meta">Mise à jour (auto / admin)</div>
             </div>
             <div class="user-actions">
               <div class="btn-group">
@@ -1918,7 +1948,7 @@ const el = document.createElement("div");
       const value = vEl ? parseFloat(String(vEl.value||'')) : NaN;
       if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) { alert('Date invalide.'); return; }
       if(!isFinite(value)) { alert('Progression invalide.'); return; }
-      db.ref(`objectiveProgressManual/${_objProgId}`).push({ date, value, createdAt: Date.now() })
+      db.ref(`objectiveProgress/${_objProgId}/${date}`).set({ value, updatedAt: Date.now(), by: (currentUser && currentUser.name) ? currentUser.name : 'Admin' })
         .then(() => { showToast('✅ Ajouté'); if(vEl) vEl.value=''; })
         .catch(()=>{});
     }
@@ -1926,7 +1956,7 @@ const el = document.createElement("div");
     function deleteObjectiveProgressPoint(pointId){
       if(!_objProgId || !isAdminUser()) return;
       if(!confirm('Supprimer ce point ?')) return;
-      db.ref(`objectiveProgressManual/${_objProgId}/${pointId}`).remove().then(() => showToast('🗑️ Supprimé'));
+      db.ref(`objectiveProgress/${_objProgId}/${pointId}`).remove().then(() => showToast('🗑️ Supprimé'));
     }
 
     function _drawObjectiveProgress(rows){

@@ -383,9 +383,9 @@ body:not(.dark-mode) .daily-micro{ margin-top: 0; margin-bottom: 12px; }
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 6px 10px;
+      padding: 7px 12px;
       border-radius: 999px;
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 900;
       letter-spacing: .02em;
       line-height: 1;
@@ -466,9 +466,10 @@ body:not(.dark-mode) .daily-micro{ margin-top: 0; margin-bottom: 12px; }
     .badge-winner { background: rgba(22,163,74,.16); color: #14532d; border-bottom: 2px solid rgba(22,163,74,.38); }
 /* MODE JOUR : rendre "OBJECTIF VALIDÉ" plus sobre (gris foncé pro) */
 body:not(.dark-mode) .badge-winner{
-  background: rgba(17,24,39,.06);
-  color: #374151;
-  border-bottom-color: rgba(107,114,128,.42);
+  /* fond vert pro (pas flashy) */
+  background: rgba(21,128,61,.14);
+  color: #065f46;
+  border-bottom-color: rgba(21,128,61,.30);
 }
     /* meilleure lisibilité en mode nuit, sans effet "arcade" */
     body.dark-mode .badge-winner { background: rgba(16,185,129,.22); color: #ecfdf5; border-bottom-color: rgba(16,185,129,.42); }
@@ -911,6 +912,11 @@ header h1{
 .global-score-container::before{
   opacity: .55; /* garde l’anneau subtil */
 }
+
+/* MODE NUIT : anneau plus voyant */
+body.dark-mode .global-score-container::before{
+  opacity: .78;
+}
 .global-score-container *{ animation: none !important; }
 .global-score-value{ font-size: 62px !important; }
 .global-score-label{ font-size: 12px !important; letter-spacing: 0.10em !important; }
@@ -1268,14 +1274,26 @@ body:not(.dark-mode) .global-score-container .global-score-pill{
   color: rgba(255,255,255,.94);
 }
 
-/* Compteur sous le cercle : même lisibilité en mode jour */
-body:not(.dark-mode) .month-countdown{
-  color: #ffffff;
-  border: 1px solid rgba(255,255,255,.14);
-  background: rgba(255,255,255,.08);
-  box-shadow: 0 10px 30px rgba(0,0,0,.20);
+/* Cadre "en attente" : un peu plus grand (jour + nuit) */
+#pendingGain{
+  padding: 8px 14px;
+  font-size: 13px;
 }
-body:not(.dark-mode) .month-countdown .mc-label{ color: rgba(255,255,255,.72); }
+
+/* Compteur sous le cercle : même lisibilité en mode jour */
+/* Compteur sous le cercle : lisible en mode jour */
+body:not(.dark-mode) .month-countdown{
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+body:not(.dark-mode) .month-countdown .mc-box{
+  background: rgba(15,23,42,.82);
+  border-color: rgba(255,255,255,.16);
+  box-shadow: 0 10px 30px rgba(2,6,23,.18);
+}
+body:not(.dark-mode) .month-countdown .mc-num{ color: rgba(255,255,255,.96); }
+body:not(.dark-mode) .month-countdown .mc-unit{ color: rgba(255,255,255,.72); }
 
 
 
