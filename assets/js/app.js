@@ -141,6 +141,92 @@ let _objProgUnsub = null;
         if(e.key === "Escape") toggleGlobalMenu(false);
     });
 
+    // --- Dashboard: aperçu Sites utiles (mini) ---
+    let __sitesMiniOpen = false;
+    function toggleSitesMini(force){
+      const panel = document.getElementById('sitesMiniPanel');
+      const btn = document.getElementById('sitesMiniToggle');
+      if(!panel) return;
+      const next = (typeof force === 'boolean') ? force : !__sitesMiniOpen;
+      __sitesMiniOpen = next;
+      panel.style.display = next ? 'block' : 'none';
+      if(btn){ btn.textContent = next ? '▴' : '▾'; }
+      if(next){ try{ renderSitesPreview(true); }catch(e){} }
+    }
+    window.toggleSitesMini = toggleSitesMini;
+
+    function escapeHtml(str){
+      return (str || '').toString().replace(/[&<>\"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
+    }
+    function sanitizeUrl(url){
+      const u = (url || '').trim();
+      if(!u) return '';
+      if(/^https?:\/\//i.test(u)) return u;
+      return '';
+    }
+
+    function siteLogoHtml(it){
+      const img = (it.imageData || it.imageUrl || '').toString().trim();
+      if(img){
+        return `<img src="${escapeHtml(img)}" alt="">`;
+      }
+      const icon = (it.icon || '🔗').toString().trim() || '🔗';
+      return escapeHtml(icon);
+    }
+
+    function renderSitesPreview(forceMini){
+      const data = window.__sitesData || {};
+      const items = Object.entries(data).map(([k,v]) => ({ key:k, ...(v||{}) }))
+        .filter(it => it && (it.url || it.label));
+      items.sort((a,b) => (a.category||'').localeCompare(b.category||'') || (a.label||'').localeCompare(b.label||''));
+
+      const miniRow = document.getElementById('sitesMiniRow');
+      const bottomRow = document.getElementById('sitesBottomRow');
+      if(miniRow) miniRow.innerHTML = '';
+      if(bottomRow) bottomRow.innerHTML = '';
+
+      const top = items.slice(0, 12);
+      const bottom = items.slice(0, 6);
+
+      if(miniRow && (__sitesMiniOpen || forceMini)){
+        top.forEach(it => {
+          const safe = sanitizeUrl(it.url);
+          const a = document.createElement('a');
+          a.className = 'site-chip';
+          a.href = safe || 'contacts.html';
+          if(safe){ a.target = '_blank'; a.rel = 'noopener'; }
+          a.innerHTML = `
+            <div class="site-chip-icon">${siteLogoHtml(it)}</div>
+            <div class="site-chip-main">
+              <div class="site-chip-name">${escapeHtml(it.label || 'Lien')}</div>
+              <div class="site-chip-meta">${escapeHtml((it.category||'').trim() || '—')}</div>
+              ${it.description ? `<div class="site-chip-desc">${escapeHtml(it.description)}</div>` : ''}
+            </div>
+          `;
+          miniRow.appendChild(a);
+        });
+      }
+
+      if(bottomRow){
+        bottom.forEach(it => {
+          const safe = sanitizeUrl(it.url);
+          const a = document.createElement('a');
+          a.className = 'site-card-mini';
+          a.href = safe || 'contacts.html';
+          if(safe){ a.target = '_blank'; a.rel = 'noopener'; }
+          a.innerHTML = `
+            <div class="site-chip-icon">${siteLogoHtml(it)}</div>
+            <div class="site-chip-main">
+              <div class="site-chip-name">${escapeHtml(it.label || 'Lien')}</div>
+              <div class="site-chip-meta">${escapeHtml((it.category||'').trim() || (it.url||'—'))}</div>
+            </div>
+          `;
+          bottomRow.appendChild(a);
+        });
+      }
+    }
+
+
 // AUTH
     auth.onAuthStateChanged(user => {
       if (user) {
@@ -396,6 +482,12 @@ function showToast(message) {
           globalSettings.guardrailMaxPctOfCA = DEFAULT_GUARDRAIL_MAX_PCT_OF_CA;
         }
         if(isSuperAdmin()) { renderSimulator(); }
+      });
+
+      // Aperçu "Sites utiles" sur le dashboard
+      db.ref('directory/sites').on('value', s => {
+        window.__sitesData = s.val() || {};
+        try{ renderSitesPreview(); }catch(e){ console.error(e); }
       });
       db.ref('logs').limitToLast(2000).on('value', s => { allLogs = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); });
       db.ref('feedbacks').on('value', s => { allFeedbacks = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderFeedbacks(allFeedbacks); });
@@ -848,8 +940,13 @@ function updateMonthCountdown(){
 
   const pad2 = (n) => String(n).padStart(2, "0");
 
-  // Ex: "⏳ Fin du mois dans 02j 14h 03m 12s"
-  el.innerHTML = `<span class="mc-label">⏳ Fin du mois dans</span> <span class="mc-time"><b>${pad2(days)}</b>j <b>${pad2(hours)}</b>h <b>${pad2(mins)}</b>m <b>${pad2(secs)}</b>s</span>`;
+  // Style “carrés” (jours/heures/minutes/secondes)
+  el.innerHTML = `
+    <div class="mc-box" aria-label="Jours"><div class="mc-num">${pad2(days)}</div><div class="mc-unit">jours</div></div>
+    <div class="mc-box" aria-label="Heures"><div class="mc-num">${pad2(hours)}</div><div class="mc-unit">heures</div></div>
+    <div class="mc-box" aria-label="Minutes"><div class="mc-num">${pad2(mins)}</div><div class="mc-unit">minutes</div></div>
+    <div class="mc-box" aria-label="Secondes"><div class="mc-num">${pad2(secs)}</div><div class="mc-unit">secondes</div></div>
+  `;
 
   // Démarre un timer unique (si pas déjà actif)
   if(!__monthCountdownTimer){
@@ -969,6 +1066,22 @@ function createSecondaryCarousel(objs, primOk, ratio){
         window.__carouselNudged = true;
         track.classList.add("nudge");
         setTimeout(()=>track.classList.remove("nudge"), 2600);
+      }
+
+      // petite "impulsion" régulière sur la carte la plus à droite
+      if(!window.__carouselPeekTimer){
+        window.__carouselPeekTimer = setInterval(() => {
+          try{
+            if(!track || !track.lastElementChild) return;
+            const canScroll = track.scrollWidth > (track.clientWidth + 24);
+            if(!canScroll) return;
+            const notAtEnd = track.scrollLeft < (track.scrollWidth - track.clientWidth - 24);
+            if(!notAtEnd) return;
+            const last = track.lastElementChild;
+            last.classList.add('peek');
+            setTimeout(() => last.classList.remove('peek'), 1800);
+          }catch(e){}
+        }, 8000);
       }
 
       objs.forEach(o => {
@@ -1261,7 +1374,7 @@ const el = document.createElement("div");
       }
       const remainingPotential = Math.max(0, (totalPotentialObj - myGain) * userRatio);
       const remainingHtml = (!isLocked && remainingPotential > 0.009)
-        ? `<div class="remaining-potential">Encore <b>+${remainingPotential.toFixed(2)}€</b> possibles</div>`
+        ? `<span class="remaining-potential">Encore <b>+${remainingPotential.toFixed(2)}€</b></span>`
         : "";
 
       let middleHtml = "";
@@ -1300,14 +1413,16 @@ const el = document.createElement("div");
           <div class="obj-info-group">
              <div class="obj-icon">${isPrimary?'⚡':'💎'}</div>
              <div style="flex:1">
-               <h3 style="font-weight:800; font-size:20px; margin-bottom:2px;">${obj.name}</h3>
+               <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                 <h3 style="font-weight:800; font-size:20px; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${obj.name}</h3>
+                 ${remainingHtml}
+               </div>
                <div style="font-size:12px; color:var(--text-muted); font-weight:700;">${isPrimary ? 'OBJECTIF OBLIGATOIRE' : 'BONUS SECONDAIRE'} ${obj.isInverse ? '📉 (Inversé)' : ''}</div>
              </div>
           </div>
         </div>
         <div class="data-boxes-row"><div class="data-box"><span class="data-box-label">ACTUEL</span><span class="data-box-value">${currentVal}</span></div><div class="data-box"><span class="data-box-label">CIBLE ${obj.isInverse ? '(MAX)' : ''}</span><span class="data-box-value">${targetVal}</span></div></div>
         <div class="progress-track"><div class="percent-float">${percentDisplay}</div><div class="progress-fill ${isWin?'green-mode':''}" style="width:${w1}%"></div><div class="progress-overdrive" style="width:${w2}%"></div></div>
-        ${remainingHtml}
         ${middleHtml}${earnedBadge}`;
       return el;
     }

@@ -256,13 +256,28 @@
 
 
       <div class="section-block" id="quick-directory">
-        <div class="section-title">Contacts &amp; Sites utiles</div>
+        <div class="section-title" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <span>Contacts &amp; Sites utiles</span>
+          <button class="icon-btn" id="sitesMiniToggle" type="button" aria-label="Aperçu des sites" onclick="toggleSitesMini()">▾</button>
+        </div>
         <div class="section-card" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
           <div>
-            <div class="section-muted">Page dédiée pour tout retrouver.</div>
+            <div class="section-muted">Page dédiée (rapide) pour tout retrouver.</div>
           </div>
           <a class="btn" href="contacts.html" style="width:auto; padding:12px 16px;">Ouvrir</a>
         </div>
+
+        <!-- Aperçu rapide (dashboard) : clic sur la flèche ▾ -->
+        <div id="sitesMiniPanel" class="sites-mini-panel" style="display:none;">
+          <div class="sites-mini-head">
+            <div class="sites-mini-title">🔗 Sites utiles</div>
+            <a class="sites-mini-all" href="contacts.html" aria-label="Voir tous les sites">Voir tout</a>
+          </div>
+          <div id="sitesMiniRow" class="sites-mini-row" aria-label="Aperçu sites utiles"></div>
+        </div>
+
+        <!-- Raccourcis en bas (cartes) -->
+        <div id="sitesBottomRow" class="sites-bottom-row" aria-label="Raccourcis sites"></div>
       </div>
 
   <div class="admin-panel" id="adminPanel">

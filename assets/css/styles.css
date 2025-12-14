@@ -293,47 +293,47 @@
       max-width: 240px;
     }
 
-    /* Compteur fin de mois (sous le cercle) */
+    /* Compteur fin de mois (sous le cercle) — style "carrés" */
     .month-countdown{
-      width: min(420px, 92vw);
-      margin: 12px auto 0;
-      padding: 10px 14px;
-      border-radius: 999px;
-      text-align: center;
-      font-size: 12px;
-      font-weight: 800;
-      letter-spacing: .03em;
+      width: min(560px, 94vw);
+      margin: 14px auto 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      background: transparent;
+      border: none;
+      box-shadow: none;
       font-variant-numeric: tabular-nums;
-      color: rgba(255,255,255,.90);
+    }
+    .month-countdown .mc-box{
+      width: 78px;
+      padding: 12px 10px;
+      border-radius: 16px;
+      text-align: center;
       border: 1px solid rgba(255,255,255,.14);
       background: rgba(255,255,255,.08);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
-      box-shadow: 0 10px 30px rgba(0,0,0,.20);
+      box-shadow: 0 10px 28px rgba(0,0,0,.18);
     }
-    .month-countdown .mc-label{ color: rgba(255,255,255,.72); font-weight: 700; }
-    .month-countdown .mc-time b{ color: rgba(255,255,255,1); font-weight: 900; }
+    .month-countdown .mc-num{
+      font-size: 22px;
+      font-weight: 950;
+      letter-spacing: .02em;
+      color: rgba(255,255,255,.95);
+      line-height: 1;
+    }
+    .month-countdown .mc-unit{
+      margin-top: 6px;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.70);
+    }
 
-/* MODE JOUR : style "timer" clair (lisible sur fond clair) */
-body:not(.dark-mode) .month-countdown,
-body:not(.dark-mode) .trajectory-indicator,
-body:not(.dark-mode) .daily-micro{
-  background: rgba(226,232,240,.92);
-  border: 1px solid rgba(148,163,184,.55);
-  box-shadow: 0 16px 40px rgba(15,23,42,.12);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: rgba(15,23,42,.92);
-}
-body:not(.dark-mode) .trajectory-indicator{
-  color: rgba(15,23,42,.92);
-  text-shadow: none;
-}
-body:not(.dark-mode) .daily-micro{
-  color: rgba(15,23,42,.78);
-}
-body:not(.dark-mode) .month-countdown .mc-label{ color: rgba(15,23,42,.65); }
-body:not(.dark-mode) .month-countdown .mc-time b{ color: rgba(15,23,42,.95); }
+/* MODE JOUR : on garde le rendu sombre (lisible sur fond clair) */
 body:not(.dark-mode) .trajectory-indicator,
 body:not(.dark-mode) .daily-micro{
   width: min(520px, 92vw);
@@ -341,10 +341,13 @@ body:not(.dark-mode) .daily-micro{
   margin-right: auto;
   padding: 10px 14px;
   border-radius: 999px;
+  background: rgba(15,23,42,.82);
+  border: 1px solid rgba(255,255,255,.14);
+  box-shadow: 0 10px 28px rgba(2,6,23,.18);
 }
 body:not(.dark-mode) .trajectory-indicator{ margin-top: -10px; margin-bottom: 8px; }
 body:not(.dark-mode) .daily-micro{ margin-top: 0; margin-bottom: 12px; }
-body:not(.dark-mode) .month-countdown{ background: rgba(15,23,42,.92); }
+
 
     /* Phase 1 (sous le cercle) */
     .trajectory-indicator{
@@ -375,21 +378,28 @@ body:not(.dark-mode) .month-countdown{ background: rgba(15,23,42,.92); }
     }
     body:not(.dark-mode) .daily-micro{ color: rgba(255,255,255,.78); }
 
-    /* Texte “gain potentiel restant” sous chaque objectif */
+    /* Badge “gain potentiel restant” (à droite du titre) */
     .remaining-potential{
-      margin-top: 10px;
-      margin-bottom: 12px;
-      text-align: center;
-      font-size: 12px;
-      font-weight: 850;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 900;
       letter-spacing: .02em;
-      color: rgba(17,24,39,.78);
-      line-height: 1.25;
-      clear: both;
+      line-height: 1;
+      white-space: nowrap;
+      background: rgba(15,23,42,.06);
+      border: 1px solid rgba(15,23,42,.10);
+      color: rgba(15,23,42,.78);
+      flex: 0 0 auto;
     }
-    .remaining-potential b{ font-weight: 900; }
+    .remaining-potential b{ font-weight: 950; }
     body.dark-mode .remaining-potential{
-      color: rgba(255,255,255,.78);
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.14);
+      color: rgba(255,255,255,.85);
     }
 
     /* pulse unique quand palier franchi */
@@ -599,6 +609,35 @@ body:not(.dark-mode) .badge-winner{
     .dir-tile-link{ display:block; padding: 16px; color: inherit; text-decoration:none; }
     .dir-tile-title{ font-size: 15px; font-weight: 900; color: var(--text-main); }
     .dir-tile-sub{ font-size: 12px; font-weight: 700; color: var(--text-muted); margin-top: 6px; word-break: break-all; }
+    .dir-tile-icon{
+      width: 44px;
+      height: 44px;
+      border-radius: 16px;
+      border: 1px solid rgba(148,163,184,.22);
+      background: rgba(0,0,0,0.03);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+      font-size: 20px;
+      flex: 0 0 auto;
+    }
+    body.dark-mode .dir-tile-icon{ background: rgba(255,255,255,0.05); border-color: rgba(148,163,184,.16); }
+    .dir-tile-icon img{ width:100%; height:100%; object-fit:cover; }
+    .dir-badge{
+      padding: 5px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 950;
+      letter-spacing: .10em;
+      text-transform: uppercase;
+      background: rgba(37,99,235,.10);
+      color: rgba(37,99,235,.95);
+      border: 1px solid rgba(37,99,235,.20);
+      flex: 0 0 auto;
+    }
+    body.dark-mode .dir-badge{ background: rgba(37,99,235,.18); border-color: rgba(37,99,235,.35); color: rgba(191,219,254,.95); }
+    .dir-tile-desc{ margin-top: 8px; font-size: 12px; font-weight: 750; color: var(--text-muted); line-height: 1.25; }
     .dir-tile-actions{ position:absolute; top:10px; right:10px; display:flex; gap:8px; }
     .dir-empty{ text-align:center; padding: 18px; color: var(--text-muted); font-weight: 800; }
     .dir-form .dir-label{ font-size: 11px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
@@ -608,10 +647,11 @@ body:not(.dark-mode) .badge-winner{
     .milestones::before { content: ''; position: absolute; top: 18px; left: 30px; right: 30px; height: 6px; background: var(--border-color); z-index: 0; border-radius: 6px; }
     .ms-item { z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; width: 30%; position: relative; }
     .ms-circle { width: 42px; height: 42px; background: var(--card-bg); border: 4px solid #cbd5e1; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #94a3b8; transition: 0.3s; font-size: 16px; }
-    .ms-item.unlocked .ms-circle { border-color: var(--success); background: #ecfdf5; color: var(--success); transform: scale(1.15); font-size: 22px; }
+    /* Palier validé : vert plus “pro” (un cran moins flashy) */
+    .ms-item.unlocked .ms-circle { border-color: rgba(22,163,74,.95); background: rgba(22,163,74,.10); color: rgba(22,163,74,.95); transform: scale(1.15); font-size: 22px; }
     .ms-prize { font-size: 14px; background: #f8fafc; padding: 6px 10px; border-radius: 8px; border: 2px solid var(--border-color); font-weight: 900; color: var(--text-muted); }
     body.dark-mode .ms-prize { background: #0f172a; }
-    .ms-item.unlocked .ms-prize { background: var(--success); color: white; border-color: var(--success); }
+    .ms-item.unlocked .ms-prize { background: #15803d; color: #ffffff; border-color: rgba(22,163,74,.95); }
     .ms-threshold { position: absolute; top: -30px; font-size: 11px; font-weight: 900; color: var(--text-main); background: var(--card-bg); padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border-color); }
 
     .fixed-bonus-block { background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 15px; text-align: center; color: #64748b; font-weight: 800; }
@@ -1013,6 +1053,85 @@ body.dark-mode .global-menu-link{ background: rgba(255,255,255,0.04); }
   box-shadow: 0 14px 35px rgba(0,0,0,0.06);
 }
 .section-muted{ color: var(--text-muted); font-weight: 700; font-size: 13px; }
+
+/* Dashboard: aperçu sites utiles */
+.sites-mini-panel{
+  margin-top: 10px;
+  padding: 12px 12px 10px;
+  border-radius: 18px;
+  border: 1px solid var(--border-color);
+  background: rgba(0,0,0,0.02);
+  box-shadow: 0 14px 35px rgba(0,0,0,0.06);
+}
+body.dark-mode .sites-mini-panel{ background: rgba(255,255,255,0.04); }
+.sites-mini-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+.sites-mini-title{ font-weight: 950; font-size: 13px; color: var(--text-main); }
+.sites-mini-all{ font-size: 12px; font-weight: 900; color: var(--primary); text-decoration: none; }
+
+.sites-mini-row{
+  display:flex;
+  gap:10px;
+  overflow-x:auto;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+.sites-mini-row::-webkit-scrollbar{ height: 6px; }
+.sites-mini-row::-webkit-scrollbar-thumb{ background: rgba(17,24,39,.18); border-radius: 999px; }
+
+.site-chip{
+  min-width: 180px;
+  flex: 0 0 auto;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  padding: 12px;
+  text-decoration: none;
+  color: var(--text-main);
+  display:flex;
+  gap: 10px;
+  align-items:center;
+}
+.site-chip-icon{
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  border: 1px solid var(--border-color);
+  background: rgba(0,0,0,0.03);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size: 18px;
+  overflow:hidden;
+}
+body.dark-mode .site-chip-icon{ background: rgba(255,255,255,0.05); }
+.site-chip-icon img{ width:100%; height:100%; object-fit:cover; }
+.site-chip-main{ flex:1; min-width: 0; }
+.site-chip-name{ font-weight: 950; font-size: 13px; white-space: nowrap; overflow:hidden; text-overflow: ellipsis; }
+.site-chip-meta{ margin-top: 2px; font-size: 11px; font-weight: 800; color: var(--text-muted); white-space: nowrap; overflow:hidden; text-overflow: ellipsis; }
+.site-chip-desc{ margin-top: 6px; font-size: 11px; font-weight: 750; color: var(--text-muted); line-height: 1.25; max-height: 2.5em; overflow:hidden; }
+
+.sites-bottom-row{
+  margin-top: 12px;
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (min-width: 760px){
+  .sites-bottom-row{ grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.site-card-mini{
+  border-radius: 18px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  padding: 12px;
+  text-decoration:none;
+  color: var(--text-main);
+  display:flex;
+  gap: 10px;
+  align-items:center;
+}
+.site-card-mini .site-chip-icon{ width: 38px; height: 38px; border-radius: 14px; }
+.site-card-mini .site-chip-name{ font-size: 12px; }
 .simple-list{ margin: 10px 0 0 0; padding-left: 18px; color: var(--text-main); }
 .simple-list li{ margin: 6px 0; font-weight: 700; }
 .links-grid{
@@ -1077,6 +1196,15 @@ body.dark-mode .focus-pill{ background: rgba(255,255,255,0.04); }
   scroll-snap-align: start;
 }
 
+/* Hint visuel : le bonus à droite “saute” légèrement pour inviter à scroller */
+.secondary-carousel .carousel-item.peek{
+  animation: peekBounce 900ms ease-in-out 2;
+}
+@keyframes peekBounce{
+  0%,100%{ transform: translateY(0); }
+  50%{ transform: translateY(-10px); }
+}
+
 @media (min-width: 900px){
   .secondary-carousel .carousel-item{ flex-basis: 48%; }
 }
@@ -1135,9 +1263,9 @@ body:not(.dark-mode) .global-score-container .global-score-value{
 
 /* Cadre "en attente" : bord gris plus lisible (surtout en mode jour) */
 body:not(.dark-mode) .global-score-container .global-score-pill{
-  border-color: rgba(148,163,184,.65);
-  background: rgba(226,232,240,.22);
-  color: rgba(255,255,255,.92);
+  border-color: rgba(148,163,184,.70);
+  background: rgba(148,163,184,.30);
+  color: rgba(255,255,255,.94);
 }
 
 /* Compteur sous le cercle : même lisibilité en mode jour */
@@ -1304,6 +1432,12 @@ body:not(.dark-mode) .obj-validated{
 body.dark-mode .global-score-container{
   border: 2px solid rgba(255,255,255,.16);
   box-shadow: 0 18px 55px rgba(0,0,0,.38), 0 0 0 6px rgba(96,165,250,.08);
+}
+
+/* MODE NUIT : anneau “accent” un peu plus visible (sans effet arcade) */
+body.dark-mode .global-score-container::before{
+  opacity: .78;
+  filter: saturate(1.15) brightness(1.05);
 }
 
 /* Hint swipe (objectifs secondaires) : petit rebond vers la droite, sans flèches */

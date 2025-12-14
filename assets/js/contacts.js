@@ -241,10 +241,23 @@ function renderSites(){
     tile.className = 'dir-tile';
     const url = (it.url || "").toString();
     const safeUrl = sanitizeUrl(url);
+    const logo = (it.imageData || it.imageUrl || '').toString().trim();
+    const icon = (it.icon || '🔗').toString().trim() || '🔗';
     tile.innerHTML = `
       <a class="dir-tile-link" href="${safeUrl || '#'}" ${safeUrl ? 'target="_blank" rel="noopener"' : ''}>
-        <div class="dir-tile-title">${escapeHtml(it.label || 'Lien')}</div>
-        <div class="dir-tile-sub">${escapeHtml(url || '—')}</div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <div class="dir-tile-icon" aria-hidden="true">
+            ${logo ? `<img src="${escapeAttr(logo)}" alt="">` : escapeHtml(icon)}
+          </div>
+          <div style="flex:1; min-width:0;">
+            <div class="dir-tile-title" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(it.label || 'Lien')}</span>
+              ${it.category ? `<span class="dir-badge">${escapeHtml(it.category)}</span>` : ''}
+            </div>
+            <div class="dir-tile-sub">${escapeHtml(url || '—')}</div>
+            ${it.description ? `<div class="dir-tile-desc">${escapeHtml(it.description)}</div>` : ''}
+          </div>
+        </div>
       </a>
       ${canEdit ? `
         <div class="dir-tile-actions">
@@ -295,11 +308,47 @@ function openDirModal(type, key){
         <div class="dir-label">URL</div>
         <input id="dirUrl" type="url" placeholder="https://..." value="${escapeAttr(item.url || '')}">
       </div>
+      <div class="input-group">
+        <div class="dir-label">Catégorie</div>
+        <input id="dirCategory" type="text" placeholder="Ex : Aides / Santé / Loisirs" value="${escapeAttr(item.category || '')}">
+      </div>
+      <div class="input-group">
+        <div class="dir-label">Description (optionnel)</div>
+        <input id="dirDesc" type="text" placeholder="Ex : Support, déclaration, réservation..." value="${escapeAttr(item.description || '')}">
+      </div>
+      <div class="input-group">
+        <div class="dir-label">Icône (emoji) (optionnel)</div>
+        <input id="dirIcon" type="text" placeholder="🔗" value="${escapeAttr(item.icon || '')}">
+      </div>
+      <div class="input-group">
+        <div class="dir-label">Image (URL) (optionnel)</div>
+        <input id="dirImageUrl" type="url" placeholder="https://..." value="${escapeAttr(item.imageUrl || '')}">
+      </div>
+      <div class="input-group">
+        <div class="dir-label">Ou importer une image (petite) (optionnel)</div>
+        <input id="dirImageFile" type="file" accept="image/*">
+        <input id="dirImageData" type="hidden" value="${escapeAttr(item.imageData || '')}">
+      </div>
       <div class="dir-tip">Conseil : mets toujours une URL complète (https://...).</div>
     `;
   }
 
   modal.style.display = 'flex';
+
+  // Bind upload (convertit en base64 compact)
+  const file = document.getElementById('dirImageFile');
+  if(file){
+    file.onchange = async () => {
+      const f = file.files && file.files[0];
+      if(!f) return;
+      try{
+        const dataUrl = await toSmallDataURL(f, 240, 240, 0.82);
+        const hid = document.getElementById('dirImageData');
+        if(hid) hid.value = dataUrl;
+        showToast('🖼️ Image ajoutée');
+      }catch(e){ alert('Image non prise en charge'); }
+    };
+  }
 }
 window.openDirModal = openDirModal;
 
@@ -326,7 +375,12 @@ function saveDirItem(){
     });
   } else {
     const url = (document.getElementById('dirUrl')?.value || '').trim();
-    const payload = { label, url };
+    const category = (document.getElementById('dirCategory')?.value || '').trim();
+    const description = (document.getElementById('dirDesc')?.value || '').trim();
+    const icon = (document.getElementById('dirIcon')?.value || '').trim();
+    const imageUrl = (document.getElementById('dirImageUrl')?.value || '').trim();
+    const imageData = (document.getElementById('dirImageData')?.value || '').trim();
+    const payload = { label, url, category, description, icon, imageUrl, imageData };
     const ref = editingKey ? db.ref('directory/sites/' + editingKey) : db.ref('directory/sites').push();
     ref.set(payload).then(() => {
       showToast('✅ Lien enregistré');
@@ -357,6 +411,32 @@ function sanitizeUrl(url){
   // only allow http(s)
   if(/^https?:\/\//i.test(u)) return u;
   return '';
+}
+
+async function toSmallDataURL(file, maxW, maxH, quality){
+  const img = new Image();
+  const data = await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(new Error('read'));
+    r.readAsDataURL(file);
+  });
+  img.src = data;
+  await new Promise((resolve, reject) => {
+    img.onload = () => resolve(true);
+    img.onerror = () => reject(new Error('img'));
+  });
+  let w = img.width, h = img.height;
+  const scale = Math.min(1, maxW / w, maxH / h);
+  w = Math.round(w * scale);
+  h = Math.round(h * scale);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0, w, h);
+  const q = (typeof quality === 'number') ? quality : 0.82;
+  try{ return c.toDataURL('image/webp', q); }
+  catch(e){ return c.toDataURL('image/jpeg', q); }
 }
 
 // Default tab
