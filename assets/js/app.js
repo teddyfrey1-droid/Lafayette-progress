@@ -21,6 +21,24 @@
     let globalSettings = { budget: 0 };
     const BASE_HOURS = 35;
     const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
+    // Seuil d'alerte (en %) pour "coût primes / CA" en simulation.
+    // Persisté en Firebase (settings/guardrailMaxPctOfCA) et modifiable Super Admin.
+    const DEFAULT_GUARDRAIL_MAX_PCT_OF_CA = 20;
+
+    function getGuardrailMaxPctOfCA(){
+      const v = (globalSettings && globalSettings.guardrailMaxPctOfCA != null)
+        ? parseFloat(globalSettings.guardrailMaxPctOfCA)
+        : NaN;
+      return (isFinite(v) && v > 0) ? v : DEFAULT_GUARDRAIL_MAX_PCT_OF_CA;
+    }
+
+    function isSuperAdmin() {
+      return !!(currentUser && currentUser.email && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
+    }
+
+    function isAdminUser() {
+      return !!(currentUser && (currentUser.role === 'admin' || isSuperAdmin()));
+    }
 
     // CALENDAR DATA
     const calEvents = [
@@ -184,23 +202,114 @@
     function logAction(action, detail) {
         db.ref("logs").push({ user: currentUser ? currentUser.name : "Inconnu", action: action, detail: detail || "", type: "action", time: Date.now() });
     }
-    function showToast(message) {
+    // HAPTICS (mobile): subtle, only on key moments
+    function haptic(kind){
+      try{
+        if(!("vibrate" in navigator)) return;
+        // Keep it subtle and professional
+        if(kind === "milestone") navigator.vibrate([12]);
+        else if(kind === "win") navigator.vibrate([18, 12, 18]);
+      }catch(e){}
+    }
+
+    // MONTH KEY (YYYY-MM)
+    function monthKeyFromTs(ts){
+      const d = new Date(ts || Date.now());
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      return `${y}-${m}`;
+    }
+
+    // Save lightweight monthly snapshot per user (primes débloquées + % objectifs validés)
+    function saveMonthlyUserHistory(primesUnlocked, pctValidated){
+      if(!currentUser) return;
+      const key = monthKeyFromTs(Date.now());
+      const uid = currentUser.uid;
+      const payload = {
+        month: key,
+        primes: Number(primesUnlocked || 0),
+        validatedPct: Number(pctValidated || 0),
+        updatedAt: Date.now()
+      };
+
+      // throttle writes (max 1 every 2 hours per device)
+      const throttleKey = `hist_save_${uid}_${key}`;
+      const now = Date.now();
+      let last = 0;
+      try{ last = Number(localStorage.getItem(throttleKey) || "0"); }catch(e){ last = 0; }
+      if(now - last < 2*60*60*1000) return;
+
+      db.ref(`history/users/${uid}/${key}`).update(payload).then(()=>{
+        try{ localStorage.setItem(throttleKey, String(now)); }catch(e){}
+      }).catch(()=>{});
+    }
+
+    // Render simple monthly history (last 3 months)
+    function renderUserHistory(){
+      if(renderUserHistory._bound) return;
+      renderUserHistory._bound = true;
+      if(!currentUser) return;
+      const panel = document.getElementById("historyPanel");
+      const list = document.getElementById("historyList");
+      if(!panel || !list) return;
+
+      db.ref(`history/users/${currentUser.uid}`).limitToLast(6).on('value', s=>{
+        const v = s.val() || {};
+        const rows = Object.values(v).sort((a,b)=> (b.month||"").localeCompare(a.month||""));
+        if(rows.length === 0){
+          panel.style.display = "none";
+          return;
+        }
+        panel.style.display = "";
+        list.innerHTML = rows.slice(0,3).map(r=>{
+          const m = (r.month || "").replace("-", " / ");
+          const primes = (Number(r.primes||0)).toFixed(0);
+          const pct = (Number(r.validatedPct||0)).toFixed(0);
+          return `
+            <div class="history-row">
+              <div class="history-month">${m}</div>
+              <div class="history-metrics">
+                <div class="history-pill">💶 ${primes}€</div>
+                <div class="history-pill">✅ ${pct}%</div>
+              </div>
+            </div>
+          `;
+        }).join("");
+      });
+    }
+
+function showToast(message) {
         const toast = document.getElementById("toast"); toast.textContent = message; toast.className = "show";
         setTimeout(() => { toast.className = "hide"; }, 3000);
     }
 
     function loadData() {
       db.ref('objectives').on('value', s => { 
-          allObjs = s.val() || {}; 
+          allObjs = s.val() || {};
+          // attach keys for stable UI state tracking
+          try{ Object.keys(allObjs).forEach(k=>{ if(allObjs[k] && typeof allObjs[k]==='object') allObjs[k]._id = k; }); }catch(e){} 
           try {
              renderDashboard(); 
-             if(currentUser && (currentUser.role === 'admin' || currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase())) {
-                 renderAdminObjs(); renderSimulator();
+             if(isAdminUser()) {
+                 renderAdminObjs();
+             }
+             if(isSuperAdmin()) {
+                 renderSimulator();
              }
           } catch(e) { console.error(e); }
       });
-      db.ref('users').on('value', s => { allUsers = s.val() || {}; if(currentUser && (currentUser.role==='admin' || currentUser.email === SUPER_ADMIN_EMAIL)) { renderAdminUsers(); renderSimulator(); } });
-      db.ref('settings').on('value', s => { globalSettings = s.val() || { budget: 0 }; if(currentUser && (currentUser.role==='admin' || currentUser.email === SUPER_ADMIN_EMAIL)) { renderSimulator(); } });
+      db.ref('users').on('value', s => { 
+        allUsers = s.val() || {}; 
+        if(isAdminUser()) { renderAdminUsers(); }
+        if(isSuperAdmin()) { renderSimulator(); }
+      });
+      db.ref('settings').on('value', s => { 
+        globalSettings = s.val() || { budget: 0 }; 
+        if(globalSettings.guardrailMaxPctOfCA == null) {
+          globalSettings.guardrailMaxPctOfCA = DEFAULT_GUARDRAIL_MAX_PCT_OF_CA;
+        }
+        if(isSuperAdmin()) { renderSimulator(); }
+      });
       db.ref('logs').limitToLast(2000).on('value', s => { allLogs = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); });
       db.ref('feedbacks').on('value', s => { allFeedbacks = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderFeedbacks(allFeedbacks); });
       
@@ -239,10 +348,13 @@
       document.getElementById("userName").textContent = currentUser.name;
       document.getElementById("userHours").textContent = (currentUser.hours || 35) + "h";
       
-      const isSuperUser = (currentUser.email && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
-      const isAdmin = (currentUser.role === 'admin' || isSuperUser);
+      const isSuperUser = isSuperAdmin();
+      const isAdmin = isAdminUser();
 
       document.getElementById("btnAdmin").style.display = isAdmin ? 'block' : 'none';
+      // Bind monthly history (lightweight)
+      renderUserHistory();
+
       
       // SHOW TAB BUTTONS ONLY FOR SUPER ADMIN
       document.getElementById("btnTabLogs").style.display = isSuperUser ? 'block' : 'none';
@@ -250,17 +362,21 @@
 
       const globalBudgetInput = document.getElementById("simGlobalBudget");
       const saveBudgetBtn = document.getElementById("btnSaveGlobalBudget");
+      const simCAInput = document.getElementById('simMonthlyCA');
+      const superAdminBlock = document.getElementById('superAdminBudget');
       
-      if(isSuperUser) {
-          globalBudgetInput.disabled = false;
-          saveBudgetBtn.style.display = 'inline-block';
-      } else {
-          globalBudgetInput.disabled = true;
-          saveBudgetBtn.style.display = 'none';
-      }
+      // Pilotage & simulation: visible uniquement Super Admin
+      if(superAdminBlock) superAdminBlock.style.display = isSuperUser ? 'block' : 'none';
+      if(globalBudgetInput) globalBudgetInput.disabled = !isSuperUser;
+      if(saveBudgetBtn) saveBudgetBtn.style.display = isSuperUser ? 'inline-block' : 'none';
+      if(simCAInput) simCAInput.disabled = !isSuperUser;
       
       if(isAdmin) {
           renderAdminObjs();
+          // le simulateur (Pilotage) est Super Admin uniquement
+      }
+
+      if(isSuperUser) {
           renderSimulator();
       }
 
@@ -405,6 +521,17 @@
         container.innerHTML = "";
         simObjs = JSON.parse(JSON.stringify(allObjs)); 
         document.getElementById("simGlobalBudget").value = globalSettings.budget || 0;
+        // CA de simulation (local) - ne touche pas Firebase
+        const storedCA = localStorage.getItem('heiko_sim_monthly_ca');
+        const simCAInput = document.getElementById('simMonthlyCA');
+        if(simCAInput) {
+          simCAInput.value = storedCA ? String(storedCA) : '';
+        }
+        // Seuil garde-fou (persisté Firebase)
+        const guardPctInput = document.getElementById('simGuardrailPct');
+        if(guardPctInput) {
+          guardPctInput.value = String(getGuardrailMaxPctOfCA());
+        }
         let totalPotential35h = 0;
         Object.keys(simObjs).forEach(k => {
             const o = simObjs[k];
@@ -466,6 +593,9 @@
 
 function updateSim() {
        const budget = parseFloat(document.getElementById("simGlobalBudget").value) || 0;
+       const simCAEl = document.getElementById('simMonthlyCA');
+       const simCA = simCAEl ? (parseFloat(simCAEl.value) || 0) : 0;
+       if(simCAEl) localStorage.setItem('heiko_sim_monthly_ca', simCAEl.value || '');
        let totalUserRatio = 0;
        Object.values(allUsers).forEach(u => { totalUserRatio += (u.hours/BASE_HOURS); });
        let maxLiability = 0;
@@ -490,14 +620,57 @@ function updateSim() {
        document.getElementById("simUsed").innerText = `${maxLiability.toFixed(0)}€ Engagés`;
        document.getElementById("simLeft").innerText = `Reste : ${(budget - maxLiability).toFixed(0)}€`;
        document.getElementById("simTotalPerUser").innerText = `${totalPotential35h.toFixed(0)}€`;
+
+       // --- Phase 2: affichage % du CA (simulation) ---
+       const pctEl = document.getElementById('simPctCA');
+       if(pctEl) {
+         if(simCA > 0) {
+           const pctCA = (maxLiability / simCA) * 100;
+           pctEl.textContent = `${pctCA.toFixed(1)}% du CA`;
+         } else {
+           pctEl.textContent = '—';
+         }
+       }
+
+       // --- Phase 2: garde-fous (alertes non bloquantes) ---
+       const guardBox = document.getElementById('guardrailBox');
+       const guardText = document.getElementById('guardrailText');
+       const warnings = [];
+       if(budget <= 0) {
+         warnings.push("Budget max non défini : impossible d'évaluer le dépassement.");
+       } else if(maxLiability > budget) {
+         warnings.push(`Dépassement budget : ${(maxLiability - budget).toFixed(0)}€ au-dessus du budget max.`);
+       }
+       if(simCA > 0) {
+         const pctCA = (maxLiability / simCA) * 100;
+         const seuil = getGuardrailMaxPctOfCA();
+         if(pctCA > seuil) {
+           warnings.push(`Coût primes élevé : ${pctCA.toFixed(1)}% du CA (seuil ${seuil}%).`);
+         }
+       }
+       // cohérence: objectifs publiés sans paliers/primes définies
+       Object.keys(simObjs).forEach(k => {
+         const o = simObjs[k];
+         if(!o || !o.published) return;
+         if(!o.paliers || !Array.isArray(o.paliers) || o.paliers.length === 0) {
+           warnings.push(`Objectif "${o.name || 'Sans nom'}" publié sans paliers.`);
+         }
+       });
+       if(guardBox && guardText) {
+         if(warnings.length > 0) {
+           guardText.innerHTML = warnings.map(w => `• ${w}`).join('<br>');
+           guardBox.style.display = 'block';
+         } else {
+           guardBox.style.display = 'none';
+         }
+       }
     }
     function publishSim() {
+        if(!isSuperAdmin()) return;
         if(confirm("📡 Confirmer la publication des nouveaux montants ?")) {
             const updates = {};
-            if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
-                const newBudget = parseFloat(document.getElementById("simGlobalBudget").value);
-                db.ref('settings/budget').set(newBudget);
-            }
+            const newBudget = parseFloat(document.getElementById("simGlobalBudget").value);
+            if(!isNaN(newBudget)) db.ref('settings/budget').set(newBudget);
             Object.keys(simObjs).forEach(k => { updates['objectives/' + k + '/paliers'] = simObjs[k].paliers; });
             db.ref().update(updates).then(() => { showToast("✅ Pilotage Appliqué !"); logAction("Pilotage", "Mise à jour globale budget & primes"); });
         }
@@ -673,7 +846,8 @@ function computeNextMilestone(userRatio, primOk){
       let prev = 0;
       try { prev = Number(localStorage.getItem(key) || "0"); } catch(e){ prev = 0; }
       if(unlockedCount > prev){
-        const sc = document.getElementById("scoreCircle");
+          haptic("milestone");
+          const sc = document.getElementById("scoreCircle");
         if(sc){
           sc.classList.remove("milestone");
           void sc.offsetWidth;
@@ -798,6 +972,25 @@ function renderDashboard() {
       const myGainEl = document.getElementById("myTotalGain");
       if(myGainEl) myGainEl.textContent = gainText;
 
+      // Monthly history (per user): primes débloquées + % objectifs validés (sur objectifs visibles)
+      try{
+        const visibleObjs = Object.values(allObjs || {}).filter(o => o && o.published && (o.isPrimary || primOk));
+        const winCount = visibleObjs.filter(o => {
+          const pct = getPct(o.current, o.target, o.isInverse);
+          if(o.isFixed){
+            if(o.isNumeric) return parseFloat(o.current) >= o.target;
+            return pct >= 100;
+          } else if(o.paliers && o.paliers[0]){
+            if(o.isNumeric) return parseFloat(o.current) >= o.paliers[0].threshold;
+            return pct >= o.paliers[0].threshold;
+          }
+          return false;
+        }).length;
+        const pctValidated = visibleObjs.length ? (winCount / visibleObjs.length) * 100 : 0;
+        saveMonthlyUserHistory(totalMyGain, pctValidated);
+      }catch(e){}
+
+
       // UI: résumé (aujourd’hui + prochain palier)
       updateGainToday(totalMyGain);
       computeNextMilestone(ratio, primOk);
@@ -919,7 +1112,20 @@ function renderDashboard() {
           }
       }
 
-      const el = document.createElement("div");
+            // Haptic on objective validation (per user, per objective)
+      try{
+        if(currentUser && obj && obj._id){
+          const hk = `win_${currentUser.uid}_${obj._id}`;
+          const prevWin = (localStorage.getItem(hk) === "1");
+          if(isWin && !prevWin){
+            haptic("win");
+            localStorage.setItem(hk, "1");
+          } else if(!isWin && prevWin){
+            localStorage.setItem(hk, "0");
+          }
+        }
+      }catch(e){}
+const el = document.createElement("div");
       let cls = "card";
       if(isPrimary) cls += " primary-card";
       if(isLocked) cls += " is-locked";
@@ -1306,7 +1512,37 @@ function renderDashboard() {
       });
     }
 
-    function saveGlobalBudget() { const val = parseFloat(document.getElementById("globalBudgetInput").value); if(!isNaN(val)) { db.ref('settings/budget').set(val); showToast("💰 Sauvegardé"); } }
+    function saveGlobalBudget() {
+      // Super Admin uniquement
+      if(!isSuperAdmin()) return;
+      const el = document.getElementById("simGlobalBudget");
+      const val = el ? parseFloat(el.value) : NaN;
+      if(!isNaN(val)) {
+        db.ref('settings/budget').set(val);
+        showToast("💰 Budget sauvegardé");
+        logAction("Budget", `Budget max = ${val}€`);
+      }
+    }
+
+    // Super Admin: sauvegarde du seuil garde-fou (% du CA) pour la simulation
+    function saveGuardrailMaxPct(){
+      if(!isSuperAdmin()) return;
+      const el = document.getElementById('simGuardrailPct');
+      const raw = el ? parseFloat(el.value) : NaN;
+      if(!isFinite(raw)) {
+        showToast("⚠️ Seuil invalide");
+        return;
+      }
+      const val = Math.max(1, Math.min(100, raw));
+      db.ref('settings/guardrailMaxPctOfCA').set(val).then(() => {
+        showToast(`✅ Seuil garde-fou = ${val}%`);
+        logAction("Guardrail", `Seuil coût primes/CA = ${val}%`);
+        // refléter tout de suite en local
+        if(globalSettings) globalSettings.guardrailMaxPctOfCA = val;
+        updateSim();
+      });
+    }
+    window.saveGuardrailMaxPct = saveGuardrailMaxPct;
     function checkBudget() {
        const budget = globalSettings.budget || 0; let maxLiability = 0; let totalUserRatio = 0;
        Object.values(allUsers).forEach(u => { if(!u.email || u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) totalUserRatio += (u.hours/BASE_HOURS); });
