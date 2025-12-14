@@ -354,7 +354,9 @@
 
     .status-badge { position: absolute; top: 0; left: 0; right: 0; padding: 12px; text-align: center; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; border-radius: var(--radius) var(--radius) 0 0; }
     .badge-locked { background: #fff7ed; color: #c2410c; border-bottom: 2px solid #ffedd5; }
-    .badge-winner { background: rgba(22,163,74,.14); color: #14532d; border-bottom: 2px solid rgba(22,163,74,.35); }
+    .badge-winner { background: rgba(22,163,74,.16); color: #14532d; border-bottom: 2px solid rgba(22,163,74,.38); }
+    /* meilleure lisibilité en mode nuit, sans effet "arcade" */
+    body.dark-mode .badge-winner { background: rgba(16,185,129,.22); color: #ecfdf5; border-bottom-color: rgba(16,185,129,.42); }
     .badge-ready { background: rgba(37,99,235,.10); color: #1e40af; border-bottom: 2px solid rgba(37,99,235,.15); }
 
     .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; margin-top: 25px; gap: 15px; }
@@ -511,7 +513,8 @@
     body.dark-mode .fixed-bonus-block { background: #0f172a; border-color: #334155; }
     .fixed-bonus-block.unlocked { background: #dcfce7; border: 2px solid #22c55e; color: #15803d; animation: pulse-green 2s infinite; }
     .earned-badge-container { margin-top: 30px; display: flex; justify-content: center; }
-    .earned-badge { background: rgba(22,163,74,.14); color: #14532d; padding: 12px 18px; border-radius: 999px; font-weight: 900; font-size: 14px; display:flex; align-items:center; gap: 10px; border: 1px solid rgba(22,163,74,.28); box-shadow: 0 10px 26px rgba(0,0,0,0.10); }
+    .earned-badge { background: rgba(22,163,74,.18); color: #14532d; padding: 12px 18px; border-radius: 999px; font-weight: 900; font-size: 14px; display:flex; align-items:center; gap: 10px; border: 1px solid rgba(22,163,74,.34); box-shadow: 0 10px 26px rgba(0,0,0,0.10); }
+    body.dark-mode .earned-badge { background: rgba(16,185,129,.20); color: #ecfdf5; border-color: rgba(16,185,129,.38); }
 
     /* --- NATIVE CALENDAR --- */
     .native-cal-container { margin-top: 60px; background: var(--card-bg); border-radius: 20px; padding: 20px; box-shadow: 0 15px 40px -5px rgba(0,0,0,0.06); border: 1px solid var(--border-color); }
@@ -553,10 +556,18 @@
     .pub-item { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 12px; border-bottom: 1px solid #f3f4f6; }
     .pub-name { font-weight: 700; font-size: 13px; color: var(--text-main); }
     .user-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--input-bg); border-radius: 10px; margin-bottom: 8px; border: 1px solid var(--border-color); }
+    .pub-row .user-meta{ margin-top: 6px; }
+    .pub-state{ font-size: 10px; font-weight: 900; letter-spacing: .08em; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border-color); color: var(--text-muted); background: rgba(148,163,184,.12); }
+    .pub-state.on{ color: #065f46; border-color: rgba(22,163,74,.25); background: rgba(22,163,74,.16); }
+    body.dark-mode .pub-state.on{ color: #ecfdf5; border-color: rgba(16,185,129,.38); background: rgba(16,185,129,.22); }
+    .pub-state.off{ color: #991b1b; border-color: rgba(239,68,68,.25); background: rgba(239,68,68,.12); }
+    body.dark-mode .pub-state.off{ color: #fee2e2; border-color: rgba(248,113,113,.35); background: rgba(239,68,68,.18); }
     .user-info { display: flex; flex-direction: column; }
     .user-name { font-weight: 700; font-size: 13px; color: var(--text-main); }
     .user-meta { font-size: 11px; color: var(--text-muted); }
-    .user-gain { font-weight: 800; font-size: 13px; color: var(--success); background: #ecfdf5; padding: 2px 8px; border-radius: 6px; margin-right: 10px; }
+    .user-gain { font-weight: 900; font-size: 13px; color: #047857; background: #dcfce7; padding: 6px 10px; border-radius: 999px; margin-right: 10px; border: 1px solid rgba(22,163,74,.22); }
+    body.dark-mode .user-gain { color: #ecfdf5; background: rgba(16,185,129,.22); border-color: rgba(16,185,129,.38); }
+
     .total-row { background: #1e293b; color: white; padding: 15px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; font-weight: 900; margin-top: 15px; font-size: 14px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
     .budget-box { background: #f0f9ff; padding: 15px; border-radius: 12px; border: 1px solid #bae6fd; margin-bottom: 20px; }
     .budget-bar-bg { height: 10px; background: #e2e8f0; border-radius: 10px; overflow: hidden; margin-top: 5px; }
@@ -568,8 +579,12 @@
     .check-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; color: var(--text-main); cursor: pointer; padding: 5px; border-radius: 6px; transition: background 0.2s; }
     .check-label:hover { background: #dbeafe; }
     .check-label input { width: 18px; height: 18px; margin: 0; cursor: pointer; accent-color: var(--primary); transform: scale(1.1); }
-    .action-btn { font-size: 18px; background: white; border: 1px solid var(--border-color); border-radius: 8px; width: 36px; height: 36px; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; }
-    .action-btn:hover { background: #f1f5f9; transform: scale(1.1); }
+    .user-actions { display:flex; align-items:center; gap:10px; }
+    .user-actions .btn-group { display:flex; align-items:center; gap:8px; padding:4px; border-radius: 12px; background: rgba(148,163,184,.12); border: 1px solid var(--border-color); }
+    body.dark-mode .user-actions .btn-group { background: rgba(148,163,184,.10); }
+
+    .action-btn { font-size: 18px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; width: 38px; height: 38px; cursor: pointer; transition: all 0.18s; display: inline-flex; align-items: center; justify-content: center; }
+    .action-btn:hover { background: rgba(148,163,184,.18); transform: translateY(-1px); }
     .action-btn.delete:hover { background: #fee2e2; border-color: #fca5a5; }
     .section-header-large { font-size: 16px; color: var(--primary); font-weight: 900; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
     .forgot-link { display:block; margin-top:15px; font-size:11px; color:var(--text-muted); text-decoration:underline; cursor:pointer; }
@@ -989,8 +1004,9 @@ body.dark-mode .focus-pill{ background: rgba(255,255,255,0.04); }
 /* --- CERCLE CENTRAL: visibilité garantie en mode jour --- */
 body:not(.dark-mode) .global-score-container{
   background: linear-gradient(180deg, #0b1220 0%, #111827 100%);
-  border: 2px solid rgba(15,23,42,.18);
-  box-shadow: 0 18px 55px rgba(0,0,0,.28);
+  /* même rendu que le mode nuit pour lisibilité maximale */
+  border: 2px solid rgba(255,255,255,.10);
+  box-shadow: 0 18px 55px rgba(0,0,0,.35);
 }
 body:not(.dark-mode) .global-score-container .global-score-value,
 body:not(.dark-mode) .global-score-container .global-score-label,

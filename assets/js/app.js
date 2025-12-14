@@ -984,8 +984,24 @@ function renderDashboard() {
       const ol = document.getElementById("objList"); ol.innerHTML = "";
       Object.keys(allObjs).forEach(k => {
         const o = allObjs[k];
-        const d1 = document.createElement("div"); d1.className="pub-item";
-        d1.innerHTML = `<span class="pub-name">${o.name}</span><label class="switch"><input type="checkbox" ${o.published?'checked':''} onchange="togglePub('${k}', this.checked)"><span class="slider"></span></label>`;
+        const d1 = document.createElement("div"); d1.className="user-item pub-row";
+        const state = o.published ? 'ACTIF' : 'INACTIF';
+        d1.innerHTML = `
+          <div class="user-info">
+            <div class="user-header" style="gap:10px;">
+              <span class="user-name">${o.name} ${o.isInverse?'📉':''} ${o.isFixed?'🎁':''}</span>
+              <span class="pub-state ${o.published?'on':'off'}">${state}</span>
+            </div>
+            <div class="user-meta">Publication + activation/désactivation</div>
+          </div>
+          <div class="user-actions">
+            <label class="switch" title="Activer / désactiver"><input type="checkbox" ${o.published?'checked':''} onchange="togglePub('${k}', this.checked)"><span class="slider"></span></label>
+            <div class="btn-group">
+              <button onclick="openEditObj('${k}')" class="action-btn" title="Modifier">✏️</button>
+              <button onclick="deleteObj('${k}')" class="action-btn delete" title="Supprimer">🗑️</button>
+            </div>
+          </div>
+        `;
         pl.appendChild(d1);
         const d2 = document.createElement("div"); d2.className="user-item";
         d2.id = "row-" + k; 
@@ -1150,9 +1166,11 @@ function renderDashboard() {
                 </div>
                 <div class="user-actions">
                     <div class="user-gain">${userBonus.toFixed(2)}€</div>
-                    <button onclick="resendInvite('${u.email}')" class="action-btn" title="Renvoyer Invitation">📩</button>
-                    <button onclick="editUser('${k}')" class="action-btn" title="Modifier">✏️</button>
-                    <button onclick="deleteUser('${k}')" class="action-btn delete" title="Supprimer">🗑️</button>
+                    <div class="btn-group">
+                      <button onclick="resendInvite('${u.email}')" class="action-btn" title="Renvoyer Invitation">📩</button>
+                      <button onclick="editUser('${k}')" class="action-btn" title="Modifier">✏️</button>
+                      <button onclick="deleteUser('${k}')" class="action-btn delete" title="Supprimer">🗑️</button>
+                    </div>
                 </div>`; 
             d.appendChild(div); 
         }); 
