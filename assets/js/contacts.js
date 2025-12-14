@@ -49,6 +49,39 @@ function toggleDarkMode(){
   if(icon) icon.textContent = isDark ? '☀️' : '🌙';
 }
 
+// --- PWA: service worker + bouton d'installation (si disponible) ---
+(function initPWA(){
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    const btn = document.getElementById('installAppBtn');
+    if(btn){
+      btn.style.display = 'inline-flex';
+      btn.onclick = async () => {
+        try{
+          btn.disabled = true;
+          deferredPrompt.prompt();
+          await deferredPrompt.userChoice;
+        } catch(_){ }
+        deferredPrompt = null;
+        btn.style.display = 'none';
+        btn.disabled = false;
+      };
+    }
+  });
+  window.addEventListener('appinstalled', () => {
+    const btn = document.getElementById('installAppBtn');
+    if(btn) btn.style.display = 'none';
+    deferredPrompt = null;
+  });
+})();
+
 // AUTH UI helpers
 document.getElementById("btnLogin").onclick = () => {
   const email = document.getElementById("loginEmail").value.trim();

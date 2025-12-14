@@ -53,6 +53,44 @@
         if(icon) icon.textContent = isDark ? '☀️' : '🌙';
     }
 
+    // --- PWA: service worker + bouton d'installation (si disponible) ---
+    (function initPWA(){
+      // Service worker
+      if('serviceWorker' in navigator){
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js').catch(() => {});
+        });
+      }
+
+      // Install prompt (Chrome/Edge/Android)
+      let deferredPrompt = null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        const btn = document.getElementById('installAppBtn');
+        if(btn){
+          btn.style.display = 'block';
+          btn.onclick = async () => {
+            try{
+              btn.disabled = true;
+              deferredPrompt.prompt();
+              await deferredPrompt.userChoice;
+            } catch(_){
+              // ignore
+            }
+            deferredPrompt = null;
+            btn.style.display = 'none';
+            btn.disabled = false;
+          };
+        }
+      });
+      window.addEventListener('appinstalled', () => {
+        const btn = document.getElementById('installAppBtn');
+        if(btn) btn.style.display = 'none';
+        deferredPrompt = null;
+      });
+    })();
+
     
     // GLOBAL MENU (all users)
     function toggleGlobalMenu(force) {
@@ -758,13 +796,15 @@ function renderDashboard() {
         if(!prims.length){
           msg = "📝 Publie les objectifs pour activer les primes.";
         } else if(!primOk){
-          msg = "⚡ Priorités d’abord : les bonus s’ouvrent après validation.";
+          // demandé : ne pas afficher ce message dans le cercle (mode jour & nuit)
+          msg = "";
         } else if(pending < 0.01){
           msg = "✅ Tout est débloqué pour ce mois. Maintiens le niveau.";
         } else {
           msg = "🎯 Prochain palier : focus sur le +1 aujourd’hui.";
         }
         microEl.textContent = msg;
+        microEl.style.display = msg ? "block" : "none";
       }
 
 
