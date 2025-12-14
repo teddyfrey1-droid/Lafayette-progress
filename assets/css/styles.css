@@ -1021,6 +1021,13 @@ body:not(.dark-mode) .global-score-container .global-score-micro{
   color: #ffffff;
 }
 
+/* Rectangle du montant : plus visible en mode jour (sans rien ajouter dans le contenu) */
+body:not(.dark-mode) .global-score-container .global-score-value{
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow: 0 10px 26px rgba(0,0,0,.35);
+}
+
 
 
 /* --- PILOTAGE BUDGET & PRIMES: objectif compact (ligne) + ouverture --- */
