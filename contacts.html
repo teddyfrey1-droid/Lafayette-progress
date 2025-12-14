@@ -9,6 +9,8 @@
   <meta name="theme-color" content="#2563eb">
   <meta name="mobile-web-app-capable" content="yes">
 
+  <link rel="manifest" href="manifest.webmanifest">
+
   <title>Heiko - Contacts & Sites utiles</title>
 
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -53,6 +55,7 @@
         <span class="user-badge" id="userRole">--</span>
       </div>
       <div style="display:flex; gap:10px; align-items:center;">
+        <button id="installAppBtn" class="btn" style="width:auto; padding:8px 16px; font-size:11px; display:none;">⬇️ Installer</button>
         <a class="btn" href="index.html#dashboard" style="width:auto; padding:8px 16px; font-size:11px; background:var(--card-bg); border:1px solid var(--border-color);">← Dashboard</a>
         <button onclick="logout()" class="btn" style="width:auto; padding:8px 16px; font-size:11px; background:var(--card-bg); color:#ef4444; border:1px solid #fca5a5;">Déconnexion</button>
       </div>
