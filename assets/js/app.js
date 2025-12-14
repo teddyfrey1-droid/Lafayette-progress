@@ -569,13 +569,32 @@ function updateSim() {
     }
 
     
-function updateDaysLeft(){
-      const el = document.getElementById("daysLeft");
-      if(!el) return;
-      const now = new Date();
-      const lastDay = new Date(now.getFullYear(), now.getMonth()+1, 0);
-      const daysLeft = Math.max(0, lastDay.getDate() - now.getDate());
-      el.textContent = daysLeft === 0 ? "Dernier jour du mois" : `${daysLeft} jour${daysLeft>1?'s':''} restant${daysLeft>1?'s':''} ce mois`;
+let __monthCountdownTimer = null;
+
+function updateMonthCountdown(){
+  const el = document.getElementById("monthCountdown");
+  if(!el) return;
+
+  const now = new Date();
+  // Fin du mois = début du mois suivant (00:00:00) : diff = temps restant
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
+  let diff = Math.max(0, end.getTime() - now.getTime());
+
+  const totalSec = Math.floor(diff / 1000);
+  const days = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+
+  const pad2 = (n) => String(n).padStart(2, "0");
+
+  // Ex: "⏳ Fin du mois dans 02j 14h 03m 12s"
+  el.innerHTML = `<span class="mc-label">⏳ Fin du mois dans</span> <span class="mc-time"><b>${pad2(days)}</b>j <b>${pad2(hours)}</b>h <b>${pad2(mins)}</b>m <b>${pad2(secs)}</b>s</span>`;
+
+  // Démarre un timer unique (si pas déjà actif)
+  if(!__monthCountdownTimer){
+    __monthCountdownTimer = setInterval(updateMonthCountdown, 1000);
+  }
 }
 
 function computeNextMilestone(userRatio, primOk){
@@ -782,7 +801,7 @@ function renderDashboard() {
       // UI: résumé (aujourd’hui + prochain palier)
       updateGainToday(totalMyGain);
       computeNextMilestone(ratio, primOk);
-      updateDaysLeft();
+      updateMonthCountdown();
 
       // UI: primes en attente (potentiel - acquis)
       const pending = Math.max(0, totalPotential - totalMyGain);
