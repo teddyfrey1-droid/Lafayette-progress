@@ -981,7 +981,7 @@ function renderDashboard() {
 
     function renderAdminObjs() {
       const pl = document.getElementById("pubList"); pl.innerHTML = "";
-      const ol = document.getElementById("objList"); ol.innerHTML = "";
+      const ol = document.getElementById("objList"); if(ol) ol.innerHTML = "";
       Object.keys(allObjs).forEach(k => {
         const o = allObjs[k];
         const d1 = document.createElement("div"); d1.className="user-item pub-row";
@@ -1003,10 +1003,13 @@ function renderDashboard() {
           </div>
         `;
         pl.appendChild(d1);
+        if(ol){
         const d2 = document.createElement("div"); d2.className="user-item";
         d2.id = "row-" + k; 
         d2.innerHTML = `<span>${o.name} ${o.isInverse?'📉':''} ${o.isFixed?'🎁':''}</span><div style="display:flex; gap:10px;"><button onclick="openEditObj('${k}')" class="action-btn">✏️</button> <button onclick="deleteObj('${k}')" class="action-btn delete">🗑️</button></div>`;
         ol.appendChild(d2);
+
+        }
       });
     }
 
