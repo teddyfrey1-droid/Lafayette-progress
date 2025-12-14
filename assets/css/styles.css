@@ -1124,3 +1124,72 @@ body.dark-mode .total-row{
   background: rgba(255,255,255,.06);
   border: 1px solid rgba(255,255,255,.12);
 }
+
+
+/* --- HISTORY PANEL (monthly) --- */
+.history-panel{
+  margin: 14px 14px 0;
+  padding: 14px 14px 10px;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.10);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  backdrop-filter: blur(10px);
+}
+body.dark .history-panel{
+  background: rgba(15, 23, 42, 0.35);
+  border-color: rgba(148, 163, 184, 0.20);
+}
+.history-header{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:10px;
+}
+.history-title{
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+.history-subtitle{
+  font-size: 12px;
+  opacity: 0.8;
+}
+.history-list{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.history-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.55);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+body.dark .history-row{
+  background: rgba(2, 6, 23, 0.30);
+  border-color: rgba(148, 163, 184, 0.14);
+}
+.history-month{
+  font-weight: 800;
+}
+.history-metrics{
+  display:flex;
+  gap:10px;
+  font-size: 12px;
+  opacity: 0.92;
+  white-space:nowrap;
+}
+.history-pill{
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(148, 163, 184, 0.10);
+}
+body.dark .history-pill{
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(148, 163, 184, 0.08);
+}
