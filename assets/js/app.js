@@ -178,6 +178,8 @@ let _objProgUnsub = null;
       const data = window.__sitesData || {};
       const items = Object.entries(data).map(([k,v]) => ({ key:k, ...(v||{}) }))
         .filter(it => it && (it.url || it.label));
+
+      // group by category
       items.sort((a,b) => (a.category||'').localeCompare(b.category||'') || (a.label||'').localeCompare(b.label||''));
 
       const miniRow = document.getElementById('sitesMiniRow');
@@ -188,22 +190,37 @@ let _objProgUnsub = null;
       const top = items.slice(0, 12);
       const bottom = items.slice(0, 6);
 
+      const renderChip = (it) => {
+        const safe = sanitizeUrl(it.url);
+        const a = document.createElement('a');
+        a.className = 'site-chip';
+        a.href = safe || 'contacts.html';
+        a.target = safe ? '_blank' : '_self';
+        a.rel = safe ? 'noopener noreferrer' : '';
+        const icon = (it.imageData ? `<img class="site-chip-img" src="${it.imageData}" alt="">` :
+                     (it.imageUrl ? `<img class="site-chip-img" src="${escapeHtml(it.imageUrl)}" alt="">` :
+                     `<span class="site-chip-ico">${escapeHtml(it.icon || '🔗')}</span>`));
+        a.innerHTML = `${icon}<span class="site-chip-txt"><span class="site-chip-title">${escapeHtml(it.label || it.url || 'Site')}</span><span class="site-chip-cat">${escapeHtml(it.category || 'Autre')}</span></span>`;
+        return a;
+      };
+
       if(miniRow && (__sitesMiniOpen || forceMini)){
+        let currentCat = null;
+        let block = null;
         top.forEach(it => {
-          const safe = sanitizeUrl(it.url);
-          const a = document.createElement('a');
-          a.className = 'site-chip';
-          a.href = safe || 'contacts.html';
-          if(safe){ a.target = '_blank'; a.rel = 'noopener'; }
-          a.innerHTML = `
-            <div class="site-chip-icon">${siteLogoHtml(it)}</div>
-            <div class="site-chip-main">
-              <div class="site-chip-name">${escapeHtml(it.label || 'Lien')}</div>
-              <div class="site-chip-meta">${escapeHtml((it.category||'').trim() || '—')}</div>
-              ${it.description ? `<div class="site-chip-desc">${escapeHtml(it.description)}</div>` : ''}
-            </div>
-          `;
-          miniRow.appendChild(a);
+          const cat = (it.category || 'Autre').trim();
+          if(cat !== currentCat){
+            currentCat = cat;
+            block = document.createElement('div');
+            block.className = 'site-cat-block';
+            block.innerHTML = `<div class="site-cat-title">${escapeHtml(currentCat)}</div>`;
+            const row = document.createElement('div');
+            row.className = 'site-cat-row';
+            block.appendChild(row);
+            miniRow.appendChild(block);
+          }
+          const row = block.querySelector('.site-cat-row');
+          row.appendChild(renderChip(it));
         });
       }
 
@@ -211,16 +228,13 @@ let _objProgUnsub = null;
         bottom.forEach(it => {
           const safe = sanitizeUrl(it.url);
           const a = document.createElement('a');
-          a.className = 'site-card-mini';
+          a.className = 'site-rect';
           a.href = safe || 'contacts.html';
-          if(safe){ a.target = '_blank'; a.rel = 'noopener'; }
-          a.innerHTML = `
-            <div class="site-chip-icon">${siteLogoHtml(it)}</div>
-            <div class="site-chip-main">
-              <div class="site-chip-name">${escapeHtml(it.label || 'Lien')}</div>
-              <div class="site-chip-meta">${escapeHtml((it.category||'').trim() || (it.url||'—'))}</div>
-            </div>
-          `;
+          a.target = safe ? '_blank' : '_self';
+          a.rel = safe ? 'noopener noreferrer' : '';
+          const icon = it.imageData ? `<img class="site-rect-img" src="${it.imageData}" alt="">`
+            : (it.imageUrl ? `<img class="site-rect-img" src="${escapeHtml(it.imageUrl)}" alt="">` : `<span class="site-rect-ico">${escapeHtml(it.icon || '🔗')}</span>`);
+          a.innerHTML = `${icon}<div class="site-rect-meta"><div class="site-rect-title">${escapeHtml(it.label || 'Site')}</div><div class="site-rect-sub">${escapeHtml(it.category || '')}</div></div>`;
           bottomRow.appendChild(a);
         });
       }
@@ -1377,6 +1391,8 @@ const el = document.createElement("div");
         ? `<span class="remaining-potential">Reste <b>${remainingPotential.toFixed(2)}€</b> à débloquer</span>`
         : "";
 
+      const graphBtnHtml = ((isAdmin || isSuperAdmin) ? `<button class="obj-graph-btn" type="button" title="Suivi (graph)" onclick="openObjectiveProgress(\'${key}\')">📈</button>` : "");
+
       let middleHtml = "";
       if(obj.isFixed) {
           const prizeAmount = (obj.paliers && obj.paliers[0]) ? parse(obj.paliers[0].prize) : 0;
@@ -1413,9 +1429,10 @@ const el = document.createElement("div");
           <div class="obj-info-group">
              <div class="obj-icon">${isPrimary?'⚡':'💎'}</div>
              <div style="flex:1">
-               <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+               <div class="obj-title-row">
                  <h3 style="font-weight:800; font-size:20px; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${obj.name}</h3>
                  ${remainingHtml}
+                 ${graphBtnHtml}
                </div>
                <div style="font-size:12px; color:var(--text-muted); font-weight:700;">${isPrimary ? 'OBJECTIF OBLIGATOIRE' : 'BONUS SECONDAIRE'} ${obj.isInverse ? '📉 (Inversé)' : ''}</div>
              </div>
@@ -2145,3 +2162,23 @@ const el = document.createElement("div");
       if(!window.__swReloaded){ window.__swReloaded = true; window.location.reload(); }
     });
   }
+
+
+    // Menu: aller à la section Contacts & Sites (dashboard) + ouvrir l'aperçu
+    document.addEventListener('DOMContentLoaded', () => {
+      const jump = document.getElementById('menuDirectoryJump');
+      if(jump){
+        jump.addEventListener('click', (e) => {
+          try{
+            // on reste sur la page dashboard
+            if(location.hash !== '#quick-directory'){ location.hash = '#quick-directory'; }
+            setTimeout(() => {
+              try{ toggleSitesMini(true); }catch(err){}
+              const el = document.getElementById('quick-directory');
+              if(el){ el.scrollIntoView({behavior:'smooth', block:'start'}); }
+            }, 120);
+          }catch(err){}
+        });
+      }
+    });
+
