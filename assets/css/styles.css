@@ -9,7 +9,7 @@
       
       --primary: #2563eb; 
       --accent: #f59e0b;
-      --success: #16a34a; 
+      --success: #15803d; 
       --danger: #ef4444;
       --radius: 28px;
       --font-stack: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -314,16 +314,26 @@
     .month-countdown .mc-label{ color: rgba(255,255,255,.72); font-weight: 700; }
     .month-countdown .mc-time b{ color: rgba(255,255,255,1); font-weight: 900; }
 
-/* MODE JOUR : compteur + phase 1 lisibles sur fond clair (style pro, type "timer") */
+/* MODE JOUR : style "timer" clair (lisible sur fond clair) */
 body:not(.dark-mode) .month-countdown,
 body:not(.dark-mode) .trajectory-indicator,
 body:not(.dark-mode) .daily-micro{
-  background: rgba(15,23,42,.88);
-  border: 1px solid rgba(148,163,184,.35);
-  box-shadow: 0 16px 40px rgba(0,0,0,.16);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(226,232,240,.92);
+  border: 1px solid rgba(148,163,184,.55);
+  box-shadow: 0 16px 40px rgba(15,23,42,.12);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: rgba(15,23,42,.92);
 }
+body:not(.dark-mode) .trajectory-indicator{
+  color: rgba(15,23,42,.92);
+  text-shadow: none;
+}
+body:not(.dark-mode) .daily-micro{
+  color: rgba(15,23,42,.78);
+}
+body:not(.dark-mode) .month-countdown .mc-label{ color: rgba(15,23,42,.65); }
+body:not(.dark-mode) .month-countdown .mc-time b{ color: rgba(15,23,42,.95); }
 body:not(.dark-mode) .trajectory-indicator,
 body:not(.dark-mode) .daily-micro{
   width: min(520px, 92vw);
@@ -368,11 +378,14 @@ body:not(.dark-mode) .month-countdown{ background: rgba(15,23,42,.92); }
     /* Texte “gain potentiel restant” sous chaque objectif */
     .remaining-potential{
       margin-top: 10px;
+      margin-bottom: 12px;
       text-align: center;
       font-size: 12px;
       font-weight: 850;
       letter-spacing: .02em;
       color: rgba(17,24,39,.78);
+      line-height: 1.25;
+      clear: both;
     }
     .remaining-potential b{ font-weight: 900; }
     body.dark-mode .remaining-potential{
@@ -1122,8 +1135,9 @@ body:not(.dark-mode) .global-score-container .global-score-value{
 
 /* Cadre "en attente" : bord gris plus lisible (surtout en mode jour) */
 body:not(.dark-mode) .global-score-container .global-score-pill{
-  border-color: rgba(148,163,184,.45);
-  background: rgba(255,255,255,.08);
+  border-color: rgba(148,163,184,.65);
+  background: rgba(226,232,240,.22);
+  color: rgba(255,255,255,.92);
 }
 
 /* Compteur sous le cercle : même lisibilité en mode jour */
@@ -1277,4 +1291,28 @@ body.dark .history-row{
 body.dark .history-pill{
   border-color: rgba(148, 163, 184, 0.18);
   background: rgba(148, 163, 184, 0.08);
+}
+
+/* MODE JOUR : 🎉 OBJECTIF VALIDÉ plus pro (gris foncé) */
+body:not(.dark-mode) .obj-validated{
+  background: rgba(148,163,184,.28);
+  border: 1px solid rgba(148,163,184,.45);
+  color: rgba(15,23,42,.88);
+}
+
+/* MODE NUIT : anneau du cercle un peu plus voyant (pro) */
+body.dark-mode .global-score-container{
+  border: 2px solid rgba(255,255,255,.16);
+  box-shadow: 0 18px 55px rgba(0,0,0,.38), 0 0 0 6px rgba(96,165,250,.08);
+}
+
+/* Hint swipe (objectifs secondaires) : petit rebond vers la droite, sans flèches */
+@keyframes nudgeRight {
+  0%{ transform: translateX(0); }
+  60%{ transform: translateX(-10px); }
+  100%{ transform: translateX(0); }
+}
+/* applique au track au chargement (desktop+mobile) */
+.carousel-track.nudge{
+  animation: nudgeRight 1.2s ease-in-out 2;
 }

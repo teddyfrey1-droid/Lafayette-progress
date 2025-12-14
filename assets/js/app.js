@@ -954,16 +954,22 @@ function createSecondaryCarousel(objs, primOk, ratio){
       btnPrev.className = "carousel-btn prev";
       btnPrev.type = "button";
       btnPrev.setAttribute("aria-label", "Objectifs précédents");
-      btnPrev.innerHTML = "<span>‹</span>";
+      btnPrev.innerHTML = ""; btnPrev.style.display="none";
 
       const btnNext = document.createElement("button");
       btnNext.className = "carousel-btn next";
       btnNext.type = "button";
       btnNext.setAttribute("aria-label", "Objectifs suivants");
-      btnNext.innerHTML = "<span>›</span>";
+      btnNext.innerHTML = ""; btnNext.style.display="none";
 
       const track = document.createElement("div");
       track.className = "carousel-track";
+      // hint swipe (sans flèches)
+      if(!window.__carouselNudged){
+        window.__carouselNudged = true;
+        track.classList.add("nudge");
+        setTimeout(()=>track.classList.remove("nudge"), 2600);
+      }
 
       objs.forEach(o => {
         const item = document.createElement("div");
@@ -1986,3 +1992,11 @@ const el = document.createElement("div");
       if(!tv) return 0; return (cv/tv)*100;
     }
     function parse(s) { return parseFloat(String(s).replace(/[^0-9.]/g,''))||0; }
+
+  // PWA: force check update (évite les versions figées)
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      // si un nouveau SW prend le contrôle, on recharge une fois (sans boucle)
+      if(!window.__swReloaded){ window.__swReloaded = true; window.location.reload(); }
+    });
+  }

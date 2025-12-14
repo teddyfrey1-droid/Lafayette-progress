@@ -361,3 +361,11 @@ function sanitizeUrl(url){
 
 // Default tab
 switchDirectoryTab('contacts');
+
+  // PWA: force check update (évite les versions figées)
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      // si un nouveau SW prend le contrôle, on recharge une fois (sans boucle)
+      if(!window.__swReloaded){ window.__swReloaded = true; window.location.reload(); }
+    });
+  }
