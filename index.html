@@ -24,7 +24,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
-  <link rel="stylesheet" href="assets/css/styles.css?v=20251214_201">
+  <link rel="stylesheet" href="assets/css/styles.css">
 
   <!-- Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -162,7 +162,23 @@
       </div>
       <nav class="global-menu-links">
         <a class="global-menu-link" href="index.html#dashboard" onclick="toggleGlobalMenu(false)">📊 Dashboard</a>
-        <a class="global-menu-link" href="#quick-directory" id="menuDirectoryJump" onclick="toggleGlobalMenu(false)">📇 Contacts &amp; Sites</a>
+        <button class="global-menu-link global-menu-accordion" type="button" onclick="toggleMenuDirectory()">
+          <span>📇 Contacts &amp; Sites</span>
+          <span id="menuDirChev" style="opacity:.8; font-weight:900;">▸</span>
+        </button>
+        <div class="global-menu-sub" id="menuDirSub" style="display:none;">
+          <div class="menu-sub-head">
+            <div class="menu-sub-title">📞 Contacts</div>
+            <a class="menu-sub-link" href="contacts.html" onclick="toggleGlobalMenu(false)">Voir tout</a>
+          </div>
+          <div class="menu-preview-grid" id="menuContactsPreview"></div>
+
+          <div class="menu-sub-head" style="margin-top:12px;">
+            <div class="menu-sub-title">🔗 Sites utiles</div>
+            <a class="menu-sub-link" href="contacts.html" onclick="toggleGlobalMenu(false)">Voir tout</a>
+          </div>
+          <div class="menu-preview-grid" id="menuSitesPreview"></div>
+        </div>
       </nav>
       <div class="global-menu-foot">
         <button id="installAppBtn" class="btn" style="width:100%; margin-top:10px; display:none;">⬇️ Installer l’app</button>
@@ -487,6 +503,6 @@
     <button class="btn" onclick="document.getElementById('editObjPanel').classList.remove('active')" style="background:white; color:#666; border:1px solid #ccc; margin-top:10px;">Annuler</button>
   </div>
 
-  <script src="assets/js/app.js?v=20251214_201"></script>
+  <script src="assets/js/app.js"></script>
 </body>
 </html>

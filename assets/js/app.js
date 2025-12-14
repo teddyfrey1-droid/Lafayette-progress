@@ -135,6 +135,7 @@ let _objProgUnsub = null;
             menu.classList.remove("open");
             backdrop.classList.remove("open");
             document.body.style.overflow = "";
+            try{ toggleMenuDirectory(false); }catch(e){}
         }
     }
     document.addEventListener("keydown", (e) => {
@@ -154,6 +155,80 @@ let _objProgUnsub = null;
       if(next){ try{ renderSitesPreview(true); }catch(e){} }
     }
     window.toggleSitesMini = toggleSitesMini;
+
+    // --- Global menu : Contacts & Sites (aperçu sans quitter le dashboard) ---
+    let __menuDirOpen = false;
+    function toggleMenuDirectory(force){
+      const sub = document.getElementById('menuDirSub');
+      const chev = document.getElementById('menuDirChev');
+      if(!sub) return;
+      const next = (typeof force === 'boolean') ? force : !__menuDirOpen;
+      __menuDirOpen = next;
+      sub.style.display = next ? 'block' : 'none';
+      if(chev) chev.textContent = next ? '▾' : '▸';
+      if(next){
+        try{ renderMenuDirectoryPreview(); }catch(e){}
+      }
+    }
+    window.toggleMenuDirectory = toggleMenuDirectory;
+
+    function renderMenuDirectoryPreview(){
+      // Contacts
+      const cRoot = document.getElementById('menuContactsPreview');
+      if(cRoot){
+        const data = window.__contactsData || {};
+        const items = Object.entries(data).map(([k,v]) => ({ key:k, ...(v||{}) }))
+          .filter(it => it && (it.label || it.value));
+        items.sort((a,b) => (a.label||'').localeCompare(b.label||''));
+        cRoot.innerHTML = '';
+        items.slice(0, 6).forEach(it => {
+          const value = (it.value || '').toString().trim();
+          const isPhone = /^[+0-9][0-9 .-]{6,}$/.test(value);
+          const href = isPhone ? `tel:${value.replace(/\s+/g,'')}` : '';
+          const a = document.createElement('a');
+          a.className = 'menu-preview-chip';
+          a.href = href || 'contacts.html';
+          a.innerHTML = `
+            <div class="menu-preview-title">${escapeHtml(it.label || 'Contact')}</div>
+            <div class="menu-preview-sub">${escapeHtml(value || '—')}</div>
+          `;
+          cRoot.appendChild(a);
+        });
+        if(items.length === 0){
+          cRoot.innerHTML = '<div class="menu-preview-empty">Aucun contact.</div>';
+        }
+      }
+
+      // Sites
+      const sRoot = document.getElementById('menuSitesPreview');
+      if(sRoot){
+        const data = window.__sitesData || {};
+        const items = Object.entries(data).map(([k,v]) => ({ key:k, ...(v||{}) }))
+          .filter(it => it && (it.url || it.label));
+        items.sort((a,b) => (a.category||'').localeCompare(b.category||'') || (a.label||'').localeCompare(b.label||''));
+        sRoot.innerHTML = '';
+        items.slice(0, 8).forEach(it => {
+          const safe = sanitizeUrl(it.url);
+          const a = document.createElement('a');
+          a.className = 'menu-preview-chip';
+          a.href = safe || 'contacts.html';
+          if(safe){ a.target = '_blank'; a.rel = 'noopener'; }
+          a.innerHTML = `
+            <div class="menu-preview-row">
+              <div class="menu-preview-icon">${siteLogoHtml(it)}</div>
+              <div style="min-width:0;">
+                <div class="menu-preview-title">${escapeHtml(it.label || 'Lien')}</div>
+                <div class="menu-preview-sub">${escapeHtml((it.category||'').trim() || (it.url||'—'))}</div>
+              </div>
+            </div>
+          `;
+          sRoot.appendChild(a);
+        });
+        if(items.length === 0){
+          sRoot.innerHTML = '<div class="menu-preview-empty">Aucun lien.</div>';
+        }
+      }
+    }
 
     function escapeHtml(str){
       return (str || '').toString().replace(/[&<>\"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
@@ -488,6 +563,10 @@ function showToast(message) {
       db.ref('directory/sites').on('value', s => {
         window.__sitesData = s.val() || {};
         try{ renderSitesPreview(); }catch(e){ console.error(e); }
+      });
+      db.ref('directory/contacts').on('value', s => {
+        window.__contactsData = s.val() || {};
+        try{ renderMenuDirectoryPreview(); }catch(e){}
       });
       db.ref('logs').limitToLast(2000).on('value', s => { allLogs = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); });
       db.ref('feedbacks').on('value', s => { allFeedbacks = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderFeedbacks(allFeedbacks); });
@@ -1377,6 +1456,10 @@ const el = document.createElement("div");
         ? `<span class="remaining-potential">Reste <b>${remainingPotential.toFixed(2)}€</b> à débloquer</span>`
         : "";
 
+      const graphBtn = (isAdminUser() && obj && obj._id)
+        ? `<button class="obj-graph-btn" type="button" onclick="openObjectiveProgress('${obj._id}')" title="Suivi (graph)">📈</button>`
+        : "";
+
       let middleHtml = "";
       if(obj.isFixed) {
           const prizeAmount = (obj.paliers && obj.paliers[0]) ? parse(obj.paliers[0].prize) : 0;
@@ -1413,9 +1496,11 @@ const el = document.createElement("div");
           <div class="obj-info-group">
              <div class="obj-icon">${isPrimary?'⚡':'💎'}</div>
              <div style="flex:1">
-               <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-                 <h3 style="font-weight:800; font-size:20px; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${obj.name}</h3>
-                 ${remainingHtml}
+               <div class="obj-title-row">
+                 <h3 class="obj-title">${obj.name}</h3>
+                 <div class="obj-title-actions">
+                   ${remainingHtml}${graphBtn}
+                 </div>
                </div>
                <div style="font-size:12px; color:var(--text-muted); font-weight:700;">${isPrimary ? 'OBJECTIF OBLIGATOIRE' : 'BONUS SECONDAIRE'} ${obj.isInverse ? '📉 (Inversé)' : ''}</div>
              </div>
