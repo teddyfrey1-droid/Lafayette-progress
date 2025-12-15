@@ -472,6 +472,22 @@ let _objProgUnsub = null;
     }
     window.openUpdatesModalFromMenu = openUpdatesModalFromMenu;
 
+    // Mon historique (open modal from menu)
+    function openHistoryModalFromMenu(){
+      const modal = document.getElementById('historyModal');
+      if(modal) modal.style.display = 'flex';
+      toggleGlobalMenu(false);
+      // Ensure history is rendered once user is available
+      try{ renderUserHistory(); }catch(e){}
+    }
+    function closeHistoryModal(){
+      const modal = document.getElementById('historyModal');
+      if(modal) modal.style.display = 'none';
+    }
+    window.openHistoryModalFromMenu = openHistoryModalFromMenu;
+    window.closeHistoryModal = closeHistoryModal;
+
+
     // --- Dashboard: aperçu Sites utiles (mini) ---
     let __sitesMiniOpen = false;
     function toggleSitesMini(force){
@@ -858,7 +874,7 @@ function renderMenuSitesPreview(){
       // Special display for "TEMPS RESTANT" : bigger under the circle (one line)
       if(msg === "TEMPS RESTANT"){
         el.classList.add('time-remaining');
-        el.textContent = '⏳ TEMPS RESTANT';
+        el.textContent = '⏳ TEMPS RESTANT ⏳';
       } else {
         el.classList.remove('time-remaining');
         el.textContent = msg || "";
@@ -1761,11 +1777,7 @@ function renderDashboard() {
       // Money rain disabled (kept for backward compatibility)
       const rainContainer = document.getElementById("moneyRain");
       if(rainContainer) rainContainer.innerHTML = "";
-
-      const lastUpdateEl = document.getElementById("lastUpdate");
-      if(lastUpdateEl) lastUpdateEl.textContent = "Mise à jour : " + d.toLocaleDateString('fr-FR');
-
-      // KPI cards
+// KPI cards
       const kMy = document.getElementById("kpiMyGain");
       if(kMy) kMy.textContent = gainText;
 
@@ -2820,53 +2832,165 @@ const el = document.createElement("div");
         if(el) el.classList.toggle('open');
     }
 
-    function renderLogs(logs) {
-      const container = document.getElementById("logsContainer"); container.innerHTML = "";
+    
+function renderLogs(logs) {
+      const container = document.getElementById("logsContainer");
+      if(!container) return;
+      container.innerHTML = "";
+
       const grouped = {};
       Object.values(logs || {}).forEach(log => {
+          if(!log || !log.user) return;
           if(!grouped[log.user]) grouped[log.user] = { lastSeen: 0, sessions: [], actions: [] };
-          if(log.type === 'session') { grouped[log.user].sessions.push(log); if(log.lastSeen > grouped[log.user].lastSeen) grouped[log.user].lastSeen = log.lastSeen; } 
-          else { grouped[log.user].actions.push(log); if(log.time > grouped[log.user].lastSeen) grouped[log.user].lastSeen = log.time; }
+          if(log.type === 'session') {
+            grouped[log.user].sessions.push(log);
+            if((log.lastSeen||0) > grouped[log.user].lastSeen) grouped[log.user].lastSeen = (log.lastSeen||0);
+          } else {
+            grouped[log.user].actions.push(log);
+            if((log.time||0) > grouped[log.user].lastSeen) grouped[log.user].lastSeen = (log.time||0);
+          }
       });
-      const sortedUsers = Object.keys(grouped).sort((a,b) => grouped[b].lastSeen - grouped[a].lastSeen);
-      
+
+      const sortedUsers = Object.keys(grouped).sort((a,b) => (grouped[b].lastSeen||0) - (grouped[a].lastSeen||0));
+
+      const fmtDateTime = (ts) => {
+        try{
+          const d = new Date(ts||0);
+          if(!ts) return "—";
+          return d.toLocaleString('fr-FR');
+        }catch(e){ return "—"; }
+      };
+      const fmtTime = (ts) => {
+        try{
+          const d = new Date(ts||0);
+          if(!ts) return "—";
+          return d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
+        }catch(e){ return "—"; }
+      };
+      const fmtDate = (ts) => {
+        try{
+          const d = new Date(ts||0);
+          if(!ts) return "—";
+          return d.toLocaleDateString('fr-FR');
+        }catch(e){ return "—"; }
+      };
+      const fmtDur = (start, end) => {
+        const a = Number(start||0), b = Number(end||0);
+        if(!a || !b || b < a) return "—";
+        const ms = b - a;
+        const m = Math.floor(ms / 60000);
+        if(m >= 60) return Math.floor(m/60) + "h " + (m%60) + "m";
+        return m + "m";
+      };
+
       sortedUsers.forEach(uName => {
           const g = grouped[uName];
-          const d = new Date(g.lastSeen);
-          g.sessions.sort((a,b) => b.startTime - a.startTime); g.actions.sort((a,b) => b.time - a.time);
-          
-          // Generate Safe ID
           const safeId = 'log-group-' + uName.replace(/[^a-zA-Z0-9]/g, '');
+          g.sessions.sort((a,b) => (b.startTime||0) - (a.startTime||0));
+          g.actions.sort((a,b) => (b.time||0) - (a.time||0));
 
-          const div = document.createElement("div"); div.className = "log-user-group";
+          const lastSeen = fmtDateTime(g.lastSeen);
+          const sessionCount = g.sessions.length;
+          const actionCount = g.actions.length;
+
+          const div = document.createElement("div");
+          div.className = "log-user-group";
+
           div.innerHTML = `
-             <div class="group-header">
-                <div class="group-info" onclick="toggleUserLogs('${safeId}')" style="flex:1;">
-                   👤 ${uName} <span style="font-weight:400; font-size:11px; color:var(--text-muted); margin-left:10px;">(Dernière: ${d.toLocaleString()}) ▼</span>
+            <div class="group-header">
+              <div class="group-info" onclick="toggleUserLogs('${safeId}')" style="flex:1;">
+                <div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">
+                  <span style="font-weight:900;">👤 ${escapeHtml(uName)}</span>
+                  <span class="log-badge">Dernière activité : ${escapeHtml(lastSeen)}</span>
+                  <span class="log-badge">🔌 ${sessionCount} connexion${sessionCount>1?'s':''}</span>
+                  <span class="log-badge">🛠️ ${actionCount} action${actionCount>1?'s':''}</span>
                 </div>
-                <button onclick="deleteUserLogs('${uName}')" class="btn-clear-hist" title="Effacer historique">🗑️ Effacer</button>
-             </div>
-             <div class="group-body" id="${safeId}">
-                <div><div class="log-col-title">🔌 Connexions</div><div class="log-list" id="sess-${safeId}"></div></div>
-                <div><div class="log-col-title">🛠️ Activité</div><div class="log-list" id="act-${safeId}"></div></div>
-             </div>`;
-          container.appendChild(div);
-          
-          const sc = document.getElementById(`sess-${safeId}`); 
-          if(g.sessions.length===0) sc.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; 
-          else g.sessions.forEach(s=>{ 
-              const st=new Date(s.startTime); const m=Math.floor((s.lastSeen-s.startTime)/60000); const dt=(m>60)?Math.floor(m/60)+"h "+(m%60)+"m":m+"m"; 
-              sc.innerHTML+=`<div class="log-entry"><span class="log-dot">🟢</span><span class="log-time-s">${st.toLocaleDateString().slice(0,5)} ${st.toLocaleTimeString().slice(0,5)}</span><span class="log-dur">${dt}</span></div>`; 
-          });
+                <div style="font-size:10px; color:#94a3b8; margin-top:6px;">Clique pour ouvrir / fermer le détail <span style="font-size:10px;">▼</span></div>
+              </div>
+              <button onclick="deleteUserLogs(${json.dumps('PLACEHOLDER')})" class="btn-clear-hist" title="Effacer historique">🗑️ Effacer</button>
+            </div>
 
-          const ac = document.getElementById(`act-${safeId}`); 
-          if(g.actions.length===0) ac.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; 
-          else g.actions.forEach(a=>{ 
-              const at=new Date(a.time); 
-              ac.innerHTML+=`<div class="log-entry"><span class="log-dot">🔵</span><span class="log-time-s">${at.toLocaleDateString().slice(0,5)} ${at.toLocaleTimeString().slice(0,5)}</span><span class="log-desc">${a.action} <span style="color:#94a3b8;">${a.detail}</span></span></div>`; 
-          });
+            <div class="group-body" id="${safeId}">
+              <div class="log-col">
+                <div class="log-col-title">🔌 Connexions</div>
+                <div class="log-table-wrap">
+                  <table class="log-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Heure</th>
+                        <th>Durée</th>
+                      </tr>
+                    </thead>
+                    <tbody id="sess-${safeId}"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="log-col">
+                <div class="log-col-title">🛠️ Activité</div>
+                <div class="log-table-wrap">
+                  <table class="log-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Heure</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="act-${safeId}"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          `;
+          // Patch the placeholder safely without breaking HTML
+          div.innerHTML = div.innerHTML.replace('deleteUserLogs("PLACEHOLDER")', 'deleteUserLogs(' + JSON.stringify(uName) + ')');
+          container.appendChild(div);
+
+          const sc = document.getElementById(`sess-${safeId}`);
+          if(!sc) return;
+
+          if(g.sessions.length === 0){
+            sc.innerHTML = `<tr><td colspan="3" style="color:#94a3b8;">—</td></tr>`;
+          } else {
+            g.sessions.slice(0,20).forEach(s => {
+              const st = s.startTime || 0;
+              const lt = s.lastSeen || 0;
+              sc.innerHTML += `
+                <tr>
+                  <td>${escapeHtml(fmtDate(st))}</td>
+                  <td>${escapeHtml(fmtTime(st))}</td>
+                  <td>${escapeHtml(fmtDur(st, lt))}</td>
+                </tr>
+              `;
+            });
+          }
+
+          const ac = document.getElementById(`act-${safeId}`);
+          if(!ac) return;
+          if(g.actions.length === 0){
+            ac.innerHTML = `<tr><td colspan="3" style="color:#94a3b8;">—</td></tr>`;
+          } else {
+            g.actions.slice(0,30).forEach(a => {
+              const at = a.time || 0;
+              const action = (a.action || '—').toString().trim();
+              const detail = (a.detail || '').toString().trim();
+              ac.innerHTML += `
+                <tr>
+                  <td>${escapeHtml(fmtDate(at))}</td>
+                  <td>${escapeHtml(fmtTime(at))}</td>
+                  <td>
+                    <span style="font-weight:800;">${escapeHtml(action)}</span>
+                    ${detail ? `<div style="font-size:11px; color:#94a3b8; margin-top:2px;">${escapeHtml(detail)}</div>` : ''}
+                  </td>
+                </tr>
+              `;
+            });
+          }
       });
     }
+
 
     function saveGlobalBudget() {
       // Admin + Super Admin
