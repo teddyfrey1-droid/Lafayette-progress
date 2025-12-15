@@ -12,12 +12,226 @@
     const auth = firebase.auth();
     const db = firebase.database();
 
+    // --- Cloud Functions helper (pour envoyer des notifications) ---
+    function _uniq(arr){ return [...new Set(arr.filter(Boolean))]; }
+
+    async function _getFunctionsRegion(){
+      if(_functionsRegionCache) return _functionsRegionCache;
+      try{
+        const snap = await db.ref('config/functionsRegion').get();
+        const r = snap.exists() ? String(snap.val()||'').trim() : '';
+        if(r){ _functionsRegionCache = r; return r; }
+      }catch(e){}
+      // fallback: last known in localStorage
+      try{
+        const r2 = localStorage.getItem('heiko_functions_region');
+        if(r2){ _functionsRegionCache = r2; return r2; }
+      }catch(e){}
+      return '';
+    }
+
+    function _getFunctionsRegionsToTry(region){
+      // On essaye d’abord la région configurée, puis des valeurs fréquentes
+      const list = _uniq([region, 'europe-west1', 'us-central1']);
+      return list;
+    }
+
+    async function _callSendPush(data){
+      if(!firebase.functions) throw new Error("Firebase Functions SDK manquant");
+      const configured = await _getFunctionsRegion();
+      const regions = _getFunctionsRegionsToTry(configured);
+      let lastErr = null;
+
+      for(const r of regions){
+        try{
+          const fns = r ? firebase.app().functions(r) : firebase.functions();
+          const fn = fns.httpsCallable('sendPush'); // new callable
+          const res = await fn(data);
+          try{ localStorage.setItem('heiko_functions_region', r); }catch(e){}
+          _functionsRegionCache = r;
+          return res && res.data ? res.data : res;
+        }catch(err){
+          lastErr = err;
+          const msg = (err && err.message) ? String(err.message) : '';
+          const code = (err && err.code) ? String(err.code) : '';
+          // si la fonction n’existe pas dans cette région, on essaye la suivante
+          if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
+          // sinon on stoppe
+          break;
+        }
+      }
+      throw lastErr || new Error("Échec d’appel sendPush");
+    }
+
+    function _notifCfg(){
+      const d = { autoOnUpdate:false, autoOnObjChange:false, autoOnPilotage:false, autoAudience:'all' };
+      const s = (globalSettings && globalSettings.notifications) ? globalSettings.notifications : {};
+      return { ...d, ...s };
+    }
+
+    async function sendAdminNotification(){
+      if(!isAdminUser()) return;
+      const titleEl = document.getElementById('notifTitle');
+      const bodyEl = document.getElementById('notifBody');
+      const linkEl = document.getElementById('notifLink');
+      const audEl = document.getElementById('notifAudience');
+      if(!titleEl || !bodyEl || !audEl) return;
+
+      const title = String(titleEl.value||'').trim();
+      const body = String(bodyEl.value||'').trim();
+      const link = linkEl ? String(linkEl.value||'').trim() : '';
+      const audience = audEl ? String(audEl.value||'all') : 'all';
+
+      if(!title || !body){
+        showToast("Titre + message requis.");
+        return;
+      }
+
+      const btn = document.getElementById('btnSendNotif');
+      if(btn){ btn.disabled = true; btn.style.opacity = .7; }
+
+      try{
+        const data = await _callSendPush({ title, body, link: link || '/index.html#dashboard', audience });
+        showToast(`✅ Notification envoyée (${data && data.sent != null ? data.sent : 'OK'})`);
+        // log RTDB (historique)
+        try{
+          await db.ref('notifications/sent').push({
+            title, body, link: link || '/index.html#dashboard', audience,
+            by: (currentUser && currentUser.name) ? currentUser.name : 'Admin',
+            uid: (currentUser && currentUser.uid) ? currentUser.uid : null,
+            at: Date.now(),
+            result: data || null
+          });
+        }catch(e){}
+        // clear
+        titleEl.value = '';
+        bodyEl.value = '';
+      }catch(err){
+        console.error(err);
+        showToast("Erreur envoi notif (Functions).");
+      }finally{
+        if(btn){ btn.disabled = false; btn.style.opacity = 1; }
+      }
+    }
+
+    async function saveFunctionsRegion(){
+      if(!isAdminUser()) return;
+      const el = document.getElementById('functionsRegion');
+      if(!el) return;
+      const r = String(el.value||'').trim();
+      if(!r){ showToast("Région vide."); return; }
+      try{
+        await db.ref('config/functionsRegion').set(r);
+        _functionsRegionCache = r;
+        try{ localStorage.setItem('heiko_functions_region', r); }catch(e){}
+        showToast("✅ Région Functions enregistrée");
+      }catch(e){
+        showToast("Erreur sauvegarde région.");
+      }
+    }
+
+    async function saveNotifSettings(){
+      if(!isAdminUser()) return;
+      const s = {
+        autoOnUpdate: !!document.getElementById('autoNotifOnUpdate')?.checked,
+        autoOnObjChange: !!document.getElementById('autoNotifOnObjChange')?.checked,
+        autoOnPilotage: !!document.getElementById('autoNotifOnPilotage')?.checked,
+        autoAudience: String(document.getElementById('autoNotifAudience')?.value || 'all')
+      };
+      try{
+        await db.ref('settings/notifications').set(s);
+        showToast("✅ Réglages notif enregistrés");
+      }catch(e){
+        showToast("Erreur réglages notif.");
+      }
+    }
+
+    function renderNotifPanel(){
+      if(!isAdminUser()) return;
+      const cfg = _notifCfg();
+      const cb1 = document.getElementById('autoNotifOnUpdate');
+      const cb2 = document.getElementById('autoNotifOnObjChange');
+      const cb3 = document.getElementById('autoNotifOnPilotage');
+      const aud = document.getElementById('autoNotifAudience');
+      if(cb1) cb1.checked = !!cfg.autoOnUpdate;
+      if(cb2) cb2.checked = !!cfg.autoOnObjChange;
+      if(cb3) cb3.checked = !!cfg.autoOnPilotage;
+      if(aud) aud.value = cfg.autoAudience || 'all';
+
+      // region input
+      const rEl = document.getElementById('functionsRegion');
+      if(rEl){
+        _getFunctionsRegion().then(r => { if(r && !rEl.value) rEl.value = r; });
+      }
+    }
+
+    function renderNotifHistory(){
+      if(!isAdminUser()) return;
+      const box = document.getElementById('notifHistory');
+      if(!box) return;
+      const arr = [];
+      Object.keys(allNotifsSent || {}).forEach(k => arr.push({id:k, ...(allNotifsSent[k]||{})}));
+      arr.sort((a,b) => (b.at||0) - (a.at||0));
+      if(arr.length === 0){
+        box.innerHTML = "<div style='color:#999;font-style:italic;'>Aucune notification envoyée.</div>";
+        return;
+      }
+      box.innerHTML = "";
+      arr.slice(0, 50).forEach(n => {
+        const d = n.at ? new Date(n.at).toLocaleString('fr-FR') : '';
+        const div = document.createElement('div');
+        div.className = 'update-card';
+        div.style.marginBottom = '10px';
+        const aud = n.audience ? String(n.audience) : 'all';
+        const who = n.by ? String(n.by) : '';
+        div.innerHTML = `
+          <div class="update-header">
+            <span style="font-weight:900; font-size:11px;">${d} • ${aud.toUpperCase()}</span>
+            <span style="font-size:11px; color:var(--text-muted);">${who}</span>
+          </div>
+          <div style="font-weight:900;">${escapeHtml(n.title||'')}</div>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">${escapeHtml(n.body||'')}</div>
+        `;
+        box.appendChild(div);
+      });
+    }
+
+    async function _maybeAutoNotify(kind, payload){
+      // kind: 'update' | 'objective' | 'pilotage'
+      if(!isAdminUser()) return;
+      const cfg = _notifCfg();
+      const ok = (kind==='update' && cfg.autoOnUpdate) || (kind==='objective' && cfg.autoOnObjChange) || (kind==='pilotage' && cfg.autoOnPilotage);
+      if(!ok) return;
+      const audience = cfg.autoAudience || 'all';
+
+      try{
+        const data = await _callSendPush({ ...payload, audience });
+        try{
+          await db.ref('notifications/sent').push({
+            ...payload,
+            audience,
+            by: (currentUser && currentUser.name) ? currentUser.name : 'Admin',
+            uid: (currentUser && currentUser.uid) ? currentUser.uid : null,
+            at: Date.now(),
+            autoKind: kind,
+            result: data || null
+          });
+        }catch(e){}
+      }catch(e){
+        // pas bloquant
+        console.error(e);
+      }
+    }
+
+
     let currentUser = null;
     let allUsers = {};
     let allObjs = {};
     let allLogs = {};
     let allFeedbacks = {};
     let allUpdates = {};
+    let allNotifsSent = {};
+    let _functionsRegionCache = null;
     let globalSettings = { budget: 0 };
     const BASE_HOURS = 35;
     const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
@@ -691,6 +905,10 @@ function showToast(message) {
         if(globalSettings.guardrailMaxPctOfCA == null) {
           globalSettings.guardrailMaxPctOfCA = DEFAULT_GUARDRAIL_MAX_PCT_OF_CA;
         }
+        // Defaults notifications
+        if(!globalSettings.notifications) globalSettings.notifications = { autoOnUpdate:false, autoOnObjChange:false, autoOnPilotage:false, autoAudience:'all' };
+        if(globalSettings.notifications.autoAudience == null) globalSettings.notifications.autoAudience = 'all';
+        if(isAdminUser()) { try{ renderNotifPanel(); }catch(e){} }
         if(isSuperAdmin()) { renderSimulator(); }
       });
 
@@ -705,7 +923,13 @@ function showToast(message) {
       });
       db.ref('logs').limitToLast(2000).on('value', s => { allLogs = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); });
       db.ref('feedbacks').on('value', s => { allFeedbacks = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderFeedbacks(allFeedbacks); });
-      
+
+      // LOAD NOTIFICATIONS (Admin)
+      db.ref('notifications/sent').limitToLast(200).on('value', s => {
+        allNotifsSent = s.val() || {};
+        if(isAdminUser()) { try{ renderNotifHistory(); }catch(e){} }
+      });
+
       // LOAD UPDATES & CHECK ALERT
       db.ref('updates').on('value', s => { 
           allUpdates = s.val() || {}; 
@@ -753,6 +977,10 @@ function showToast(message) {
       document.getElementById("btnTabLogs").style.display = isSuperUser ? 'block' : 'none';
       document.getElementById("btnTabFeedbacks").style.display = isSuperUser ? 'block' : 'none';
 
+      // Notifications tab: Admin + Super Admin
+      const btnNotifs = document.getElementById("btnTabNotifs");
+      if(btnNotifs) btnNotifs.style.display = isAdmin ? 'block' : 'none';
+
       const globalBudgetInput = document.getElementById("simGlobalBudget");
       const saveBudgetBtn = document.getElementById("btnSaveGlobalBudget");
       const simCAInput = document.getElementById('simMonthlyCA');
@@ -787,15 +1015,17 @@ function showToast(message) {
 
         if(id) {
             // MODE MODIFICATION
-            db.ref('updates/' + id).update({ title:t, desc:d, type:type }).then(() => {
+            db.ref('updates/' + id).update({ title:t, desc:d, type:type }).then(async () => {
                 showToast("✅ Mise à jour modifiée !");
                 cancelUpdateEdit();
+                try{ await _maybeAutoNotify('update', { title: "🛠️ " + t, body: d, link: "/index.html#dashboard" }); }catch(e){}
             });
         } else {
             // MODE CREATION
-            db.ref('updates').push({ title:t, desc:d, type:type, date:Date.now() }).then(() => {
+            db.ref('updates').push({ title:t, desc:d, type:type, date:Date.now() }).then(async () => {
                 showToast("📢 Publié !");
                 cancelUpdateEdit();
+                try{ await _maybeAutoNotify('update', { title: "📢 " + t, body: d, link: "/index.html#dashboard" }); }catch(e){}
             });
         }
     }
@@ -1065,7 +1295,9 @@ function updateSim() {
             const newBudget = parseFloat(document.getElementById("simGlobalBudget").value);
             if(!isNaN(newBudget)) db.ref('settings/budget').set(newBudget);
             Object.keys(simObjs).forEach(k => { updates['objectives/' + k + '/paliers'] = simObjs[k].paliers; });
-            db.ref().update(updates).then(() => { showToast("✅ Pilotage Appliqué !"); logAction("Pilotage", "Mise à jour globale budget & primes"); });
+            db.ref().update(updates).then(async () => { showToast("✅ Pilotage Appliqué !"); logAction("Pilotage", "Mise à jour globale budget & primes");
+              try{ await _maybeAutoNotify('pilotage', { title: "📡 Pilotage publié", body: "Les primes & paliers ont été mis à jour.", link: "/index.html#dashboard" }); }catch(e){}
+            });
         }
     }
 
@@ -1655,11 +1887,14 @@ const el = document.createElement("div");
        if(t === 'objs') document.getElementById('btnTabObjs').classList.add('active');
        if(t === 'logs') document.getElementById('btnTabLogs').classList.add('active');
        if(t === 'feedbacks') document.getElementById('btnTabFeedbacks').classList.add('active');
+       if(t === 'notifs') document.getElementById('btnTabNotifs').classList.add('active');
        
        document.getElementById('tab-team').style.display = t==='team'?'block':'none';
        document.getElementById('tab-objs').style.display = t==='objs'?'block':'none';
        document.getElementById('tab-logs').style.display = t==='logs'?'block':'none';
        document.getElementById('tab-feedbacks').style.display = t==='feedbacks'?'block':'none';
+       const tn = document.getElementById('tab-notifs'); if(tn) tn.style.display = t==='notifs'?'block':'none';
+       if(t==='notifs') { try{ renderNotifPanel(); renderNotifHistory(); }catch(e){} }
     }
     function toggleCreateInputs() { document.getElementById("createTiersBlock").style.display = document.getElementById("noFixed").checked ? 'none' : 'block'; }
     function toggleEditInputs() { document.getElementById("editTiersBlock").style.display = document.getElementById("eoFixed").checked ? 'none' : 'block'; }
@@ -1780,6 +2015,25 @@ const el = document.createElement("div");
       }).then(() => {
           showToast("✅ Objectif Modifié !");
           document.getElementById("editObjPanel").classList.remove("active");
+
+          // Auto notif (optionnel)
+          try{
+            const oName = String(newName||"Objectif");
+            const curNum = parseFloat(String(newCurrentRaw).replace(',', '.'));
+            const tarNum = parseFloat(String(newTargetRaw).replace(',', '.'));
+            const hideCur = !!document.getElementById("eoHideCurrent").checked;
+            const hideTar = !!document.getElementById("eoHideTarget").checked;
+            let msg = "";
+            if((hideCur || hideTar) && isFinite(curNum) && isFinite(tarNum)) {
+              const pct = getPct(curNum, tarNum, newIsInverse);
+              msg = `${oName} : ${pct.toFixed(0)}%`;
+            } else if(isFinite(curNum) && isFinite(tarNum)) {
+              msg = `${oName} : ${curNum}/${tarNum}`;
+            } else {
+              msg = `${oName} mis à jour`;
+            }
+            _maybeAutoNotify('objective', { title: "🎯 Objectif mis à jour", body: msg, link: "/index.html#dashboard" });
+          }catch(e){}
 
           // Phase demandée : graph auto -> on enregistre un point du jour quand la valeur (current) est saisie/éditée
           try{

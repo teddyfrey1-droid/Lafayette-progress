@@ -24,6 +24,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 
   <link rel="stylesheet" href="assets/css/styles.css">
 
@@ -298,6 +299,7 @@
     <div class="tab-nav">
       <button id="btnTabTeam" onclick="switchTab('team')" class="btn-tab active">👥 Équipe</button>
       <button id="btnTabObjs" onclick="switchTab('objs')" class="btn-tab">🎯 Pilotage</button>
+      <button id="btnTabNotifs" onclick="switchTab('notifs')" class="btn-tab" style="display:none;">🔔 Notifications</button>
       <button id="btnTabLogs" onclick="switchTab('logs')" class="btn-tab" style="display:none;">🕒 Historique</button>
       <button id="btnTabFeedbacks" onclick="switchTab('feedbacks')" class="btn-tab" style="display:none;">💬 Avis & News</button>
     </div>
@@ -354,6 +356,63 @@
         <div id="feedbacksContainer" class="logs-wrapper"></div>
       </div>
     </div>
+
+    
+    <div id="tab-notifs" style="display:none;">
+      <div class="admin-section" style="border-left:4px solid var(--primary);">
+        <h3 class="section-header-large">🔔 Notifications</h3>
+        <div style="font-size:11px; color:var(--text-muted); margin-bottom:12px;">
+          Envoie une notification push (uniquement pour ceux qui ont installé l’app + activé 🔔).
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <select id="notifAudience">
+            <option value="all">Tout le monde</option>
+            <option value="team">Équipe (hors admins)</option>
+            <option value="admins">Admins uniquement</option>
+          </select>
+          <input id="notifLink" type="text" placeholder="Lien (ex: /index.html#dashboard)">
+        </div>
+
+        <input id="notifTitle" type="text" placeholder="Titre (ex: Nouveau palier ✅)">
+        <textarea id="notifBody" class="fb-input" style="height:90px;" placeholder="Message..."></textarea>
+
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <button class="btn" id="btnSendNotif" onclick="sendAdminNotification()">📨 Envoyer</button>
+          <div style="font-size:11px; color:var(--text-muted);">
+            Région Functions (optionnel) :
+            <input id="functionsRegion" type="text" placeholder="us-central1 / europe-west1" style="width:140px; margin-left:6px; padding:8px 10px; border-radius:10px; border:1px solid rgba(148,163,184,.25); background:rgba(15,23,42,.04); color:var(--text-main);">
+          </div>
+          <button class="btn" onclick="saveFunctionsRegion()" style="background:rgba(59,130,246,.14); color:var(--primary);">💾</button>
+        </div>
+      </div>
+
+      <div class="admin-section">
+        <h3 class="section-header-large">⚙️ Automatisations</h3>
+        <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">
+          Active ce que tu veux. Ça n’affecte pas les calculs : ça envoie juste un push.
+        </div>
+        <div class="options-row" style="gap:14px; flex-wrap:wrap;">
+          <label class="check-label"><input type="checkbox" id="autoNotifOnUpdate"> Quand je publie/modifie une nouveauté</label>
+          <label class="check-label"><input type="checkbox" id="autoNotifOnObjChange"> Quand je modifie un objectif</label>
+          <label class="check-label"><input type="checkbox" id="autoNotifOnPilotage"> Quand je clique “📡 PUBLIER” (pilotage)</label>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap;">
+          <select id="autoNotifAudience">
+            <option value="all">Audience auto : tout le monde</option>
+            <option value="team">Audience auto : équipe</option>
+            <option value="admins">Audience auto : admins</option>
+          </select>
+          <button class="btn" onclick="saveNotifSettings()">💾 Enregistrer</button>
+        </div>
+      </div>
+
+      <div class="admin-section">
+        <h3 class="section-header-large">📜 Historique</h3>
+        <div id="notifHistory" class="logs-wrapper" style="max-height:240px;"></div>
+      </div>
+    </div>
+
 
     <div id="tab-objs" style="display:none;">
       
