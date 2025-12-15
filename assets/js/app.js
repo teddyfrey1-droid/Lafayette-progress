@@ -8,9 +8,19 @@
       messagingSenderId: "910113283000",
       appId: "1:910113283000:web:0951fd9dca01aa6e46cd4d"
     };
-    firebase.initializeApp(firebaseConfig);
+    // Sécurité: éviter un crash si l'app est initialisée 2 fois (PWA / reload / cache)
+    try{
+      if(!firebase.apps || !firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    }catch(e){
+      // Si déjà initialisée, on continue.
+    }
     const auth = firebase.auth();
     const db = firebase.database();
+
+    // Helper DOM (évite les crashs si un élément n'existe pas suite à un cache / upload partiel)
+    const $id = (id) => {
+      try{ return document.getElementById(id); }catch(e){ return null; }
+    };
 
     let currentUser = null;
     let allUsers = {};
@@ -358,9 +368,12 @@ let _objProgUnsub = null;
 
 // AUTH
     auth.onAuthStateChanged(user => {
-      if (user) {
-        document.getElementById("loginOverlay").style.display = "none";
-        document.getElementById("appContent").style.display = "block";
+      try{
+        const loginOverlayEl = $id('loginOverlay');
+        const appContentEl = $id('appContent');
+        if (user) {
+          if(loginOverlayEl) loginOverlayEl.style.display = 'none';
+          if(appContentEl) appContentEl.style.display = 'block';
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('mode') === 'resetPassword') { /* Handled */ }
 
@@ -398,40 +411,52 @@ let _objProgUnsub = null;
         loadData();
         renderNativeCalendar();
         bindLiveNotifications();
-      } else {
-        document.getElementById("loginOverlay").style.display = "flex";
-        document.getElementById("appContent").style.display = "none";
+        } else {
+          if(loginOverlayEl) loginOverlayEl.style.display = 'flex';
+          if(appContentEl) appContentEl.style.display = 'none';
+        }
+      }catch(e){
+        console.error('Auth init error:', e);
       }
     });
 
-    document.getElementById("btnLogin").onclick = () => {
-      const email = document.getElementById("loginEmail").value.trim();
-      const pass = document.getElementById("loginPass").value;
-      auth.signInWithEmailAndPassword(email, pass).catch(e => {
-          // LOGIN ERROR FEEDBACK
-          document.getElementById("loginPass").classList.add("error");
-          document.getElementById("loginEmail").classList.add("error");
-          setTimeout(() => {
-             document.getElementById("loginPass").classList.remove("error");
-             document.getElementById("loginEmail").classList.remove("error");
-          }, 1000); // Remove animation but keep red border logic if preferred, here just animate
-          alert("❌ Mot de passe incorrect !");
-      });
-    };
+    const __btnLogin = $id('btnLogin');
+    if(__btnLogin){
+      __btnLogin.onclick = () => {
+        const emailEl = $id('loginEmail');
+        const passEl = $id('loginPass');
+        const email = (emailEl && emailEl.value ? emailEl.value : '').trim();
+        const pass = (passEl && passEl.value) ? passEl.value : '';
+        auth.signInWithEmailAndPassword(email, pass).catch(e => {
+            // LOGIN ERROR FEEDBACK
+            if(passEl) passEl.classList.add('error');
+            if(emailEl) emailEl.classList.add('error');
+            setTimeout(() => {
+               if(passEl) passEl.classList.remove('error');
+               if(emailEl) emailEl.classList.remove('error');
+            }, 1000);
+            alert('❌ Mot de passe incorrect !');
+        });
+      };
+    }
 
     function clearLoginError() {
-        document.getElementById("loginPass").classList.remove("error");
-        document.getElementById("loginEmail").classList.remove("error");
+        const p = $id('loginPass');
+        const e = $id('loginEmail');
+        if(p) p.classList.remove('error');
+        if(e) e.classList.remove('error');
     }
 
     function togglePass() {
-        const x = document.getElementById("loginPass");
-        x.type = (x.type === "password") ? "text" : "password";
+        const x = $id('loginPass');
+        if(!x) return;
+        x.type = (x.type === 'password') ? 'text' : 'password';
     }
 
     function logout() { auth.signOut(); location.reload(); }
     window.resetPassword = () => {
-      let email = document.getElementById("loginEmail").value.trim();
+      const emailEl = $id('loginEmail');
+      let email = (emailEl && emailEl.value ? emailEl.value : '').trim();
       if (!email) email = prompt("Email pour réinitialisation :");
       if(email) auth.sendPasswordResetEmail(email).then(() => alert("Email envoyé !")).catch(e => alert(e.message));
     };
