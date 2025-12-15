@@ -12,6 +12,83 @@
     const auth = firebase.auth();
     const db = firebase.database();
 
+
+    function _fmtDateLong(ts){
+      try{
+        const d = new Date(ts);
+        return d.toLocaleDateString('fr-FR', { day:'2-digit', month:'long', year:'numeric' });
+      }catch(e){ return ''; }
+    }
+
+    function _clientLabel(c){
+      if(c === 'app') return 'Application';
+      if(c === 'web') return 'Web';
+      return '';
+    }
+
+    async function _updateClientFlags(){
+      try{
+        if(!currentUser || !currentUser.uid) return;
+        const client = _isStandalonePWA() ? 'app' : 'web';
+        const perm = (typeof Notification !== 'undefined' && Notification.permission) ? Notification.permission : 'unsupported';
+        await db.ref('users/'+currentUser.uid).update({ lastClient: client, lastClientAt: Date.now(), pushPermission: perm });
+      }catch(e){}
+    }
+
+    function _renderNotifUsers(){
+      // Remplit le select cible + statut
+      const sel = document.getElementById('notifTargetUser');
+      const list = document.getElementById('notifStatusList');
+      if(sel){
+        const cur = sel.value;
+        sel.innerHTML = '<option value="">Choisir un utilisateur…</option>';
+        Object.keys(allUsers||{}).forEach(uid=>{
+          const u = allUsers[uid]||{};
+          const name = u.name || u.email || uid;
+          const opt = document.createElement('option');
+          opt.value = uid;
+          opt.textContent = name;
+          sel.appendChild(opt);
+        });
+        if(cur) sel.value = cur;
+      }
+      if(list){
+        list.innerHTML = '';
+        const users = Object.keys(allUsers||{}).map(uid=>({uid, ...(allUsers[uid]||{})}));
+        users.sort((a,b)=> String(a.name||'').localeCompare(String(b.name||''), 'fr'));
+        users.forEach(u=>{
+          const item = document.createElement('div');
+          item.className = 'notif-status-item';
+          const last = u.lastClientAt ? _fmtDateLong(u.lastClientAt) : '';
+          const clientLbl = _clientLabel(u.lastClient);
+          const sub = [clientLbl ? (clientLbl + (last ? ' • ' + last : '')) : '', u.email ? u.email : ''].filter(Boolean).join(' — ');
+          const badges = [];
+          if(u.lastClient === 'app') badges.push('<span class="pill pill-app">Application</span>');
+          if(u.pushEnabled) badges.push('<span class="pill pill-push">🔔</span>');
+          item.innerHTML = `
+            <div class="notif-status-left">
+              <div class="notif-status-name">${escapeHTML(u.name||'Utilisateur')}</div>
+              <div class="notif-status-sub">${escapeHTML(sub||'')}</div>
+            </div>
+            <div class="notif-status-badges">${badges.join(' ')}</div>
+          `;
+          list.appendChild(item);
+        });
+      }
+    }
+
+    function _setupNotifAudienceUI(){
+      const audEl = document.getElementById('notifAudience');
+      const wrap = document.getElementById('notifTargetWrap');
+      if(!audEl || !wrap) return;
+      const refresh = ()=>{
+        wrap.style.display = (String(audEl.value||'') === 'user') ? 'block' : 'none';
+      };
+      audEl.addEventListener('change', refresh);
+      refresh();
+    }
+
+
     // --- Cloud Functions helper (pour envoyer des notifications) ---
     function _uniq(arr){ return [...new Set(arr.filter(Boolean))]; }
 
@@ -81,7 +158,10 @@
       const body = String(bodyEl.value||'').trim();
       const link = linkEl ? String(linkEl.value||'').trim() : '';
       const audience = audEl ? String(audEl.value||'all') : 'all';
+      const targetEl = document.getElementById('notifTargetUser');
+      const targetUid = (audience === 'user' && targetEl) ? String(targetEl.value||'').trim() : '';
 
+      if(audience==='user' && !targetUid){ showToast("Choisis un utilisateur."); return; }
       if(!title || !body){
         showToast("Titre + message requis.");
         return;
@@ -91,12 +171,12 @@
       if(btn){ btn.disabled = true; btn.style.opacity = .7; }
 
       try{
-        const data = await _callSendPush({ title, body, link: link || '/index.html#dashboard', audience });
+        const data = await _callSendPush({ title, body, link: link || '/index.html#dashboard', audience, targetUid: targetUid || null, targetUid });
         showToast(`✅ Notification envoyée (${data && data.sent != null ? data.sent : 'OK'})`);
         // log RTDB (historique)
         try{
           await db.ref('notifications/sent').push({
-            title, body, link: link || '/index.html#dashboard', audience,
+            title, body, link: link || '/index.html#dashboard', audience, targetUid: targetUid || null,
             by: (currentUser && currentUser.name) ? currentUser.name : 'Admin',
             uid: (currentUser && currentUser.uid) ? currentUser.uid : null,
             at: Date.now(),
@@ -340,7 +420,7 @@ let _objProgUnsub = null;
         try{ _messaging = firebase.messaging(); }catch(e){ _messaging = null; }
 
         // Affiche le bouton uniquement si on a un user connecté (uid) et un SW prêt
-        btn.style.display = (_swRegForPush && currentUser && currentUser.uid && _messaging) ? 'block' : 'none';
+        btn.style.display = (_supportsPush()) ? 'block' : 'none';
 
         btn.onclick = async () => {
           if(!currentUser || !currentUser.uid){
@@ -387,6 +467,9 @@ let _objProgUnsub = null;
               createdAt: Date.now(),
               ua: navigator.userAgent
             });
+
+            try{ await db.ref('users/'+currentUser.uid).update({ pushEnabled: true, pushEnabledAt: Date.now(), pushPermission: 'granted' }); }catch(e){}
+            try{ if(isAdminUser()) _renderNotifUsers(); }catch(e){}
 
             showToast("Notifications activées ✅");
           }catch(err){
@@ -659,7 +742,10 @@ let _objProgUnsub = null;
           }
           currentUser.uid = user.uid; currentUser.email = user.email;
           const newLogRef = db.ref("logs").push();
-          newLogRef.set({ user: currentUser.name, action: "Connexion", type: "session", startTime: Date.now(), lastSeen: Date.now() });
+          const __client = _isStandalonePWA() ? 'app' : 'web';
+          const __perm = (typeof Notification !== 'undefined' && Notification.permission) ? Notification.permission : 'unsupported';
+          newLogRef.set({ user: currentUser.name, action: "Connexion", type: "session", client: __client, pushPermission: __perm, startTime: Date.now(), lastSeen: Date.now() });
+          try{ db.ref('users/'+user.uid).update({ lastClient: __client, lastClientAt: Date.now(), pushPermission: __perm }); }catch(e){}
           setInterval(() => { newLogRef.update({ lastSeen: Date.now() }); }, 60000);
           updateUI();
         });
@@ -905,6 +991,7 @@ function showToast(message) {
       db.ref('users').on('value', s => { 
         allUsers = s.val() || {}; 
         if(isAdminUser()) { renderAdminUsers(); }
+        if(isAdminUser()) { try{ _renderNotifUsers(); }catch(e){} }
         if(isAdminUser()) { renderSimulator(); }
       });
       db.ref('settings').on('value', s => { 
@@ -2167,7 +2254,7 @@ const el = document.createElement("div");
             div.innerHTML = `
                 <div class="user-info">
                     <div class="user-header">
-                        <span class="user-name">${u.name} ${adminBadge}</span>
+                        <span class="user-name">${u.name} ${adminBadge} ${ (u.lastClient==='app') ? '<span class="pill pill-app" style="margin-left:8px;">Application</span>' : '' } ${ (u.pushEnabled) ? '<span class="pill pill-push" style="margin-left:6px;">🔔</span>' : '' }</span>
                         <div style="display:flex; align-items:center;">
                             <span class="status-dot ${statusClass}"></span>
                             <span class="status-text">${statusLabel}</span>
@@ -2778,14 +2865,19 @@ const el = document.createElement("div");
           if(g.sessions.length===0) sc.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; 
           else g.sessions.forEach(s=>{ 
               const st=new Date(s.startTime); const m=Math.floor((s.lastSeen-s.startTime)/60000); const dt=(m>60)?Math.floor(m/60)+"h "+(m%60)+"m":m+"m"; 
-              sc.innerHTML+=`<div class="log-entry"><span class="log-dot">🟢</span><span class="log-time-s">${st.toLocaleDateString().slice(0,5)} ${st.toLocaleTimeString().slice(0,5)}</span><span class="log-dur">${dt}</span></div>`; 
+              const c = s.client || '';
+              const cBadge = (c==='app') ? '<span class="pill pill-app" style="margin-left:8px;">Application</span>' : (c==='web' ? '<span class="pill" style="margin-left:8px;">Web</span>' : '');
+              const pBadge = (s.pushPermission==='granted' || s.push===true) ? '<span class="pill pill-push" style="margin-left:6px;">🔔</span>' : '';
+              const when = st.toLocaleDateString('fr-FR', { day:'2-digit', month:'short' }) + ' ' + st.toLocaleTimeString().slice(0,5);
+              sc.innerHTML+=`<div class="log-entry"><span class="log-dot">🟢</span><span class="log-act">Connexion${cBadge}${pBadge}</span><span class="log-time-s">${when}</span><span class="log-dur">${dt}</span></div>`; 
           });
 
           const ac = document.getElementById(`act-${safeId}`); 
           if(g.actions.length===0) ac.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; 
           else g.actions.forEach(a=>{ 
               const at=new Date(a.time); 
-              ac.innerHTML+=`<div class="log-entry"><span class="log-dot">🔵</span><span class="log-time-s">${at.toLocaleDateString().slice(0,5)} ${at.toLocaleTimeString().slice(0,5)}</span><span class="log-desc">${a.action} <span style="color:#94a3b8;">${a.detail}</span></span></div>`; 
+              const whenA = at.toLocaleDateString('fr-FR', { day:'2-digit', month:'short' }) + ' ' + at.toLocaleTimeString().slice(0,5);
+              ac.innerHTML+=`<div class="log-entry"><span class="log-dot">🔵</span><span class="log-time-s">${whenA}</span><span class="log-desc">${a.action} <span style="color:#94a3b8;">${a.detail}</span></span></div>`; 
           });
       });
     }

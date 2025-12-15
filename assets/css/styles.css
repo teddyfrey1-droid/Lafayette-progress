@@ -1792,3 +1792,61 @@ body.dark-mode .global-score-container::before{
       border: 1px solid rgba(148,163,184,0.22);
       box-shadow: 0 10px 30px rgba(0,0,0,0.35);
     }
+
+
+
+/* --- Badges (Application / Notifications) --- */
+.pill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:3px 10px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:800;
+  line-height:1;
+  border:1px solid rgba(148,163,184,.45);
+  background:rgba(15,23,42,.04);
+  color:var(--text-main);
+}
+.pill-app{
+  border-color: rgba(34,197,94,.35);
+  background: rgba(34,197,94,.12);
+  color: #16a34a;
+}
+.pill-push{
+  border-color: rgba(59,130,246,.35);
+  background: rgba(59,130,246,.12);
+  color: var(--primary);
+}
+.notif-status-list{
+  display:grid;
+  grid-template-columns: 1fr;
+  gap:10px;
+}
+.notif-status-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 12px;
+  border-radius:14px;
+  border:1px solid rgba(148,163,184,.25);
+  background: var(--card-bg);
+}
+.notif-status-left{ display:flex; flex-direction:column; gap:3px; }
+.notif-status-name{ font-weight:900; }
+.notif-status-sub{ font-size:11px; color:var(--text-muted); }
+.notif-status-badges{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+
+/* --- Header compact (mobile) --- */
+@media (max-width: 520px){
+  .top-bar{ flex-wrap:nowrap !important; gap:8px !important; }
+  .user-welcome{ font-size:14px !important; gap:6px !important; flex-wrap:nowrap !important; }
+  .user-badge{ padding:3px 8px !important; font-size:11px !important; }
+  .news-btn{ font-size:12px !important; padding:6px 10px !important; }
+  #btnAdmin{ padding:6px 10px !important; font-size:10px !important; }
+  #logoutBtn{ padding:6px 10px !important; font-size:10px !important; }
+  #logoutBtn .logout-icon{ font-size:14px !important; }
+  #globalMenuBtn{ font-size:24px !important; width:44px !important; height:44px !important; }
+}
