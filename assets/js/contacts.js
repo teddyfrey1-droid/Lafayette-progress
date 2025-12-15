@@ -245,38 +245,12 @@ function renderContacts(){
 }
 
 
-
 function renderSuppliers(){
   const root = document.getElementById('suppliersList');
   if(!root) return;
 
   const items = Object.entries(suppliersData || {}).map(([k,v]) => ({ key:k, ...(v||{}) }));
-
-  // If order is missing for some suppliers, assign a stable order once (by label) for better UX
-  const hasMissingOrder = items.some(it => !(Number.isFinite(Number(it.order))));
-  if(canEdit && hasMissingOrder && !renderSuppliers._orderFixed){
-    renderSuppliers._orderFixed = true;
-    const byLabel = [...items].sort((a,b) => (a.label||"").localeCompare(b.label||""));
-    const updates = {};
-    byLabel.forEach((it, idx) => {
-      if(!Number.isFinite(Number(it.order))){
-        updates[`directory/suppliers/${it.key}/order`] = idx + 1;
-      }
-    });
-    if(Object.keys(updates).length){
-      db.ref().update(updates).catch(()=>{});
-    }
-  }
-
-  items.sort((a,b) => {
-    const ao = Number(a.order); const bo = Number(b.order);
-    const aHas = Number.isFinite(ao); const bHas = Number.isFinite(bo);
-    if(aHas && bHas && ao !== bo) return ao - bo;
-    if(aHas && !bHas) return -1;
-    if(!aHas && bHas) return 1;
-    return (a.label||"").localeCompare(b.label||"");
-  });
-
+  items.sort((a,b) => (a.label||"").localeCompare(b.label||""));
   root.innerHTML = "";
 
   if(items.length === 0){
@@ -284,124 +258,50 @@ function renderSuppliers(){
     return;
   }
 
-  root.innerHTML = `
-    <div class="dir-table-wrap">
-      <table class="dir-table">
-        <thead>
-          <tr>
-            <th style="width:110px;">Ordre</th>
-            <th>Fournisseur</th>
-            <th>Commercial</th>
-            <th>Téléphone</th>
-            <th>Livraisons</th>
-            <th style="width:120px;">Délai</th>
-            <th style="width:140px;">Min. commande</th>
-            <th style="width:140px;">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="suppliersTbody"></tbody>
-      </table>
-    </div>
-  `;
+  items.forEach(it => {
+    const row = document.createElement('div');
+    row.className = 'dir-item';
 
-  const tbody = document.getElementById('suppliersTbody');
-  if(!tbody) return;
-
-  items.forEach((it, idx) => {
-    const label = (it.label || 'Fournisseur').toString().trim();
-    const commercial = (it.commercial || '').toString().trim();
     const phone = (it.phone || '').toString().trim();
-
+    const commercial = (it.commercial || '').toString().trim();
     const deliveryDaysRaw = it.deliveryDays;
-    const deliveryDaysArr = Array.isArray(deliveryDaysRaw)
-      ? deliveryDaysRaw.map(v => (v||'').toString().trim()).filter(Boolean)
-      : (deliveryDaysRaw || '').toString().split(/[\/|,]/).map(s => s.trim()).filter(Boolean);
-
+    const deliveryDays = Array.isArray(deliveryDaysRaw)
+      ? deliveryDaysRaw.map(v => (v||'').toString().trim()).filter(Boolean).join(' / ')
+      : (deliveryDaysRaw || '').toString().trim();
     const cutoffTime = (it.cutoffTime || '').toString().trim();
     const leadTime = (it.leadTime || '').toString().trim();
-
-    let minOrder = (it.minOrder || '').toString().trim();
-    if(minOrder){
-      // Ensure € sign (display)
-      const hasEuro = /€/.test(minOrder);
-      if(!hasEuro) minOrder = `${minOrder} €`;
-    }
+    const minOrder = (it.minOrder || '').toString().trim();
 
     const isPhone = /^[+0-9][0-9 .-]{6,}$/.test(phone);
     const href = isPhone ? `tel:${phone.replace(/\s+/g,'')}` : null;
 
-    const daysText = deliveryDaysArr.length ? deliveryDaysArr.join(' / ') : '';
-    const liv = daysText
-      ? `📦 ${escapeHtml(daysText)}${cutoffTime ? ` <span class="muted">(avant ${escapeHtml(cutoffTime)})</span>` : ''}`
-      : (cutoffTime ? `📦 <span class="muted">commande avant ${escapeHtml(cutoffTime)}</span>` : '<span class="muted">—</span>');
+    const meta = [];
+    if(commercial) meta.push(`👤 ${escapeHtml(commercial)}`);
+    if(phone) meta.push(`📞 ${href ? `<a href="${href}" class="dir-link">${escapeHtml(phone)}</a>` : escapeHtml(phone)}`);
+    if(deliveryDays){
+      meta.push(`📦 ${escapeHtml(deliveryDays)}${cutoffTime ? ` (commande avant ${escapeHtml(cutoffTime)})` : ''}`);
+    } else if(cutoffTime){
+      meta.push(`📦 commande avant ${escapeHtml(cutoffTime)}`);
+    }
+if(leadTime) meta.push(`⏱️ ${escapeHtml(leadTime)} j`);
+    if(minOrder) meta.push(`💶 ${escapeHtml(minOrder)}`);
 
-    const orderVal = Number.isFinite(Number(it.order)) ? Number(it.order) : (idx+1);
-
-    const canMoveUp = canEdit && idx > 0;
-    const canMoveDown = canEdit && idx < items.length-1;
-
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>
-        <div class="dir-order">
-          <span style="font-weight:900;">${orderVal}</span>
-          ${canEdit ? `
-            <button class="icon-btn" title="Monter" ${canMoveUp ? '' : 'disabled'} onclick="moveSupplier('${it.key}', -1)">⬆️</button>
-            <button class="icon-btn" title="Descendre" ${canMoveDown ? '' : 'disabled'} onclick="moveSupplier('${it.key}', 1)">⬇️</button>
-          ` : ''}
+    row.innerHTML = `
+      <div class="dir-item-main">
+        <div class="dir-item-title">${escapeHtml(it.label || 'Fournisseur')}</div>
+        <div class="dir-item-value">${commercial ? escapeHtml(commercial) : (phone ? (href ? `<a href="${href}" class="dir-link">${escapeHtml(phone)}</a>` : escapeHtml(phone)) : '—')}</div>
+        ${meta.length ? `<div class="dir-item-note">${meta.join(' • ')}</div>` : ''}
+      </div>
+      ${canEdit ? `
+        <div class="dir-actions">
+          <button class="icon-btn" title="Modifier" onclick="openDirModal('supplier','${it.key}')">✏️</button>
+          <button class="icon-btn danger" title="Supprimer" onclick="deleteDirItem('supplier','${it.key}')">🗑️</button>
         </div>
-      </td>
-      <td><div style="font-weight:900;">${escapeHtml(label)}</div></td>
-      <td>${commercial ? escapeHtml(commercial) : '<span class="muted">—</span>'}</td>
-      <td>${phone ? (href ? `<a href="${href}" class="dir-link">${escapeHtml(phone)}</a>` : escapeHtml(phone)) : '<span class="muted">—</span>'}</td>
-      <td>${liv}</td>
-      <td>${leadTime ? `⏱️ ${escapeHtml(leadTime)} j` : '<span class="muted">—</span>'}</td>
-      <td>${minOrder ? `💶 ${escapeHtml(minOrder)}` : '<span class="muted">—</span>'}</td>
-      <td>
-        ${canEdit ? `
-          <div style="display:flex; gap:8px; align-items:center;">
-            <button class="icon-btn" title="Modifier" onclick="openDirModal('supplier','${it.key}')">✏️</button>
-            <button class="icon-btn danger" title="Supprimer" onclick="deleteDirItem('supplier','${it.key}')">🗑️</button>
-          </div>
-        ` : '<span class="muted">—</span>'}
-      </td>
+      ` : ''}
     `;
-    tbody.appendChild(tr);
+    root.appendChild(row);
   });
 }
-window.renderSuppliers = renderSuppliers;
-
-// Déplacer un fournisseur (modifier la place) : swap d'ordre avec le voisin
-function moveSupplier(key, dir){
-  if(!canEdit) return;
-  const items = Object.entries(suppliersData || {}).map(([k,v]) => ({ key:k, ...(v||{}) }));
-  items.sort((a,b) => {
-    const ao = Number(a.order); const bo = Number(b.order);
-    const aHas = Number.isFinite(ao); const bHas = Number.isFinite(bo);
-    if(aHas && bHas && ao !== bo) return ao - bo;
-    if(aHas && !bHas) return -1;
-    if(!aHas && bHas) return 1;
-    return (a.label||"").localeCompare(b.label||"");
-  });
-  const idx = items.findIndex(it => it.key === key);
-  if(idx < 0) return;
-  const j = idx + (dir>0 ? 1 : -1);
-  if(j < 0 || j >= items.length) return;
-
-  const a = items[idx];
-  const b = items[j];
-
-  const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : (idx+1);
-  const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : (j+1);
-
-  const updates = {};
-  updates[`directory/suppliers/${a.key}/order`] = bo;
-  updates[`directory/suppliers/${b.key}/order`] = ao;
-
-  db.ref().update(updates).catch(()=>{});
-}
-window.moveSupplier = moveSupplier;
-
 
 function renderSites(){
   const root = document.getElementById('sitesGrid');
@@ -630,22 +530,7 @@ function saveDirItem(){
     const leadTime = (document.getElementById('dirLeadTime')?.value || '').trim();
     const minOrder = (document.getElementById('dirMinOrder')?.value || '').trim();
 
-    
-    // Ordre d'affichage (pour déplacer / réorganiser)
-    let order = null;
-    try{
-      if(editingKey && suppliersData && suppliersData[editingKey] && Number.isFinite(Number(suppliersData[editingKey].order))){
-        order = Number(suppliersData[editingKey].order);
-      }
-      if(order == null || !Number.isFinite(order)){
-        const maxOrder = Math.max(0, ...Object.values(suppliersData||{}).map(v => Number(v && v.order)).filter(n => Number.isFinite(n)));
-        order = maxOrder + 1;
-      }
-    }catch(e){
-      order = Date.now();
-    }
-
-    const payload = { label, commercial, phone, deliveryDays, cutoffTime, leadTime, minOrder, order };
+    const payload = { label, commercial, phone, deliveryDays, cutoffTime, leadTime, minOrder };
     const ref = editingKey ? db.ref('directory/suppliers/' + editingKey) : db.ref('directory/suppliers').push();
     ref.set(payload).then(() => {
       showToast('✅ Fournisseur enregistré');
