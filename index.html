@@ -131,7 +131,6 @@
       <div class="user-welcome">
         👤 <span id="userName">--</span> 
         <span class="user-badge" id="userHours">--h</span>
-        <button onclick="document.getElementById('updatesModal').style.display='flex'" style="border:none; background:#eff6ff; color:#3b82f6; border-radius:20px; padding:5px 12px; font-size:11px; font-weight:800; cursor:pointer; margin-left:5px;">📢 Nouveautés</button>
       </div>
       <div class="top-actions">
         <button id="btnAdmin" class="btn admin-btn" style="display:none;"><span class="admin-icon" aria-hidden="true">⚙️</span><span class="admin-text">Admin</span></button>
@@ -153,6 +152,10 @@
       </div>
       <nav class="global-menu-links">
         <a class="global-menu-link menu-dashboard" href="index.html#dashboard" onclick="toggleGlobalMenu(false)"><span class="menu-dashboard-label">📊 Dashboard</span></a>
+        <button class="global-menu-link" type="button" onclick="openUpdatesModalFromMenu()">
+          <span>📰 News</span>
+          <span style="opacity:.55; font-weight:900;">›</span>
+        </button>
         <div class="global-menu-sep" aria-hidden="true"></div>
         <!-- 2 catégories séparées : Sites utiles puis Contacts (1 seule ouverte à la fois) -->
         <button class="global-menu-link global-menu-accordion" type="button" onclick="toggleMenuSites()">

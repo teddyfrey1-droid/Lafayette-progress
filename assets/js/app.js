@@ -464,6 +464,14 @@ let _objProgUnsub = null;
         if(e.key === "Escape") toggleGlobalMenu(false);
     });
 
+    // News / Nouveautés (open modal from menu to save space in top bar)
+    function openUpdatesModalFromMenu(){
+      const modal = document.getElementById('updatesModal');
+      if(modal) modal.style.display = 'flex';
+      toggleGlobalMenu(false);
+    }
+    window.openUpdatesModalFromMenu = openUpdatesModalFromMenu;
+
     // --- Dashboard: aperçu Sites utiles (mini) ---
     let __sitesMiniOpen = false;
     function toggleSitesMini(force){
