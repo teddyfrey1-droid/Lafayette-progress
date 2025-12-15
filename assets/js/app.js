@@ -456,6 +456,7 @@ let _objProgUnsub = null;
             backdrop.classList.remove("open");
             document.body.style.overflow = "";
             try{ toggleMenuSites(false); }catch(e){}
+            try{ toggleMenuSuppliers(false); }catch(e){}
             try{ toggleMenuContacts(false); }catch(e){}
         }
     }
@@ -480,32 +481,61 @@ let _objProgUnsub = null;
     // --- Global menu : 2 catégories séparées (Sites utiles puis Contacts) ---
     let __menuSitesOpen = false;
     let __menuContactsOpen = false;
+    let __menuSuppliersOpen = false;
 
     function _setMenuAccordion(which, open){
-      const isSites = which === 'sites';
-      const sub = document.getElementById(isSites ? 'menuSitesSub' : 'menuContactsSub');
-      const chev = document.getElementById(isSites ? 'menuSitesChev' : 'menuContactsChev');
+      const map = {
+        sites: { sub: 'menuSitesSub', chev: 'menuSitesChev' },
+        suppliers: { sub: 'menuSuppliersSub', chev: 'menuSuppliersChev' },
+        contacts: { sub: 'menuContactsSub', chev: 'menuContactsChev' }
+      };
+      const cfg = map[which] || map.contacts;
+      const sub = document.getElementById(cfg.sub);
+      const chev = document.getElementById(cfg.chev);
       if(sub) sub.style.display = open ? 'block' : 'none';
       if(chev) chev.textContent = open ? '▾' : '▸';
     }
 
+
     function toggleMenuSites(force){
       const next = (typeof force === 'boolean') ? force : !__menuSitesOpen;
       __menuSitesOpen = next;
-      if(next){ __menuContactsOpen = false; _setMenuAccordion('contacts', false); }
+      if(next){
+        __menuContactsOpen = false; _setMenuAccordion('contacts', false);
+        __menuSuppliersOpen = false; _setMenuAccordion('suppliers', false);
+      }
       _setMenuAccordion('sites', next);
       if(next){ try{ renderMenuSitesPreview(); }catch(e){} }
     }
     window.toggleMenuSites = toggleMenuSites;
 
+
+
     function toggleMenuContacts(force){
       const next = (typeof force === 'boolean') ? force : !__menuContactsOpen;
       __menuContactsOpen = next;
-      if(next){ __menuSitesOpen = false; _setMenuAccordion('sites', false); }
+      if(next){
+        __menuSitesOpen = false; _setMenuAccordion('sites', false);
+        __menuSuppliersOpen = false; _setMenuAccordion('suppliers', false);
+      }
       _setMenuAccordion('contacts', next);
       if(next){ try{ renderMenuContactsPreview(); }catch(e){} }
     }
     window.toggleMenuContacts = toggleMenuContacts;
+    function toggleMenuSuppliers(force){
+      const next = (typeof force === 'boolean') ? force : !__menuSuppliersOpen;
+      __menuSuppliersOpen = next;
+      if(next){
+        __menuSitesOpen = false; _setMenuAccordion('sites', false);
+        __menuContactsOpen = false; _setMenuAccordion('contacts', false);
+      }
+      _setMenuAccordion('suppliers', next);
+      if(next){ try{ renderMenuSuppliersPreview(); }catch(e){} }
+    }
+    window.toggleMenuSuppliers = toggleMenuSuppliers;
+
+
+
 
     function renderMenuContactsPreview(){
       const cRoot = document.getElementById('menuContactsPreview');
@@ -533,7 +563,34 @@ let _objProgUnsub = null;
       }
     }
 
-    function renderMenuSitesPreview(){
+    function renderMenuSuppliersPreview(){
+      const root = document.getElementById('menuSuppliersPreview');
+      if(!root) return;
+      const data = window.__suppliersData || {};
+      const items = Object.entries(data).map(([k,v]) => ({ key:k, ...(v||{}) }))
+        .filter(it => it && (it.label || it.phone || it.commercial));
+      items.sort((a,b) => (a.label||'').localeCompare(b.label||''));
+      root.innerHTML = '';
+      items.slice(0, 8).forEach(it => {
+        const phone = (it.phone || '').toString().trim();
+        const commercial = (it.commercial || '').toString().trim();
+        const isPhone = /^[+0-9][0-9 .-]{6,}$/.test(phone);
+        const href = isPhone ? `tel:${phone.replace(/\s+/g,'')}` : 'contacts.html#fournisseurs';
+        const a = document.createElement('a');
+        a.className = 'menu-preview-chip';
+        a.href = href;
+        a.innerHTML = `
+          <div class="menu-preview-title">${escapeHtml(it.label || 'Fournisseur')}</div>
+          <div class="menu-preview-sub">${escapeHtml((commercial || '').trim() || (phone || '').trim() || '—')}</div>
+        `;
+        root.appendChild(a);
+      });
+      if(items.length === 0){
+        root.innerHTML = '<div class="menu-preview-empty">Aucun fournisseur.</div>';
+      }
+    }
+
+function renderMenuSitesPreview(){
       const sRoot = document.getElementById('menuSitesPreview');
       if(!sRoot) return;
       const data = window.__sitesData || {};
@@ -562,6 +619,14 @@ let _objProgUnsub = null;
         sRoot.innerHTML = '<div class="menu-preview-empty">Aucun lien.</div>';
       }
     }
+
+    function renderMenuDirectoryPreview(){
+      try{ renderMenuSitesPreview(); }catch(e){}
+      try{ renderMenuSuppliersPreview(); }catch(e){}
+      try{ renderMenuContactsPreview(); }catch(e){}
+    }
+    window.renderMenuDirectoryPreview = renderMenuDirectoryPreview;
+
 
     function escapeHtml(str){
       return (str || '').toString().replace(/[&<>\"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
@@ -928,6 +993,11 @@ function showToast(message) {
         window.__contactsData = s.val() || {};
         try{ renderMenuDirectoryPreview(); }catch(e){}
       });
+      db.ref('directory/suppliers').on('value', s => {
+        window.__suppliersData = s.val() || {};
+        try{ renderMenuDirectoryPreview(); }catch(e){}
+      });
+
       db.ref('logs').limitToLast(2000).on('value', s => { allLogs = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); });
       db.ref('feedbacks').on('value', s => { allFeedbacks = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderFeedbacks(allFeedbacks); });
 

@@ -459,6 +459,10 @@ body:not(.dark-mode) .daily-micro{ margin-top: 0; margin-bottom: 12px; }
     .obj-graph-btn:active{ transform: translateY(1px); }
 
     @media (max-width: 520px){
+  .top-actions{ gap: 6px; }
+  .admin-text{ display:none; }
+  #btnAdmin{ padding: 8px 10px !important; font-size: 11px !important; }
+
       .obj-title-row{
         flex-direction: column;
         align-items: flex-start;
@@ -982,12 +986,16 @@ body { font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Robo
 }
 .logout-btn{ display:inline-flex; align-items:center; gap:6px; }
 .logout-icon{ font-size: 16px; line-height: 1; }
+.admin-btn{ display:inline-flex; align-items:center; gap:6px; }
+.admin-icon{ font-size: 16px; line-height: 1; }
+
 
 @media (max-width: 520px){
   .top-bar{ padding: 10px 12px; }
-  #globalMenuBtn{ width: 48px; height: 48px; font-size: 26px; }
+  #globalMenuBtn{ width: 40px; height: 40px; font-size: 22px; }
   .logout-text{ display: none; }
-  .logout-btn{ padding: 10px 12px !important; }
+  .logout-btn{ padding: 8px 10px !important; gap:5px; }
+  .logout-icon{ font-size: 14px; }
   .user-welcome{ font-size: 13px !important; }
 }
 body.dark-mode .top-bar{
@@ -1607,7 +1615,7 @@ body.dark-mode .total-row{
 
 /* --- HISTORY PANEL (monthly) --- */
 .history-panel{
-  margin: 14px 14px 0;
+  margin: 14px 14px 18px;
   padding: 14px 14px 10px;
   border-radius: 18px;
   background: rgba(15, 23, 42, 0.10);

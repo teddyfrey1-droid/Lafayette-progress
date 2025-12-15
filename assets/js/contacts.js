@@ -23,12 +23,13 @@ const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
 let currentUser = null;
 let canEdit = false;
 let currentTab = "sites";
-let editingType = null; // 'contact' | 'site'
+let editingType = null; // 'contact' | 'site' | 'supplier'
 let editingKey = null;
 
 // Data (live)
 let contactsData = {};
 let sitesData = {};
+let suppliersData = {};
 
 // THEME
 if(localStorage.getItem('heiko_dark_mode') === null) {
@@ -155,6 +156,8 @@ function syncRights(){
   document.getElementById('accessHint').textContent = canEdit ? "Mode édition (Admin)" : "Lecture seule";
   document.getElementById('btnAddContact').style.display = canEdit ? 'inline-flex' : 'none';
   document.getElementById('btnAddSite').style.display = canEdit ? 'inline-flex' : 'none';
+  const bSup = document.getElementById('btnAddSupplier');
+  if(bSup) bSup.style.display = canEdit ? 'inline-flex' : 'none';
 }
 
 function bindDirectory(){
@@ -167,6 +170,11 @@ function bindDirectory(){
     sitesData = s.val() || {};
     renderSites();
   });
+  db.ref('directory/suppliers').on('value', s => {
+    suppliersData = s.val() || {};
+    renderSuppliers();
+  });
+
 
   // Defaults if empty (first run only)
   db.ref('directory/contacts').get().then(s => {
@@ -182,10 +190,22 @@ function bindDirectory(){
 
 function switchDirectoryTab(tab){
   currentTab = tab;
-  document.getElementById('tabContacts').classList.toggle('active', tab === 'contacts');
-  document.getElementById('tabSites').classList.toggle('active', tab === 'sites');
-  document.getElementById('panelContacts').style.display = (tab === 'contacts') ? 'block' : 'none';
-  document.getElementById('panelSites').style.display = (tab === 'sites') ? 'block' : 'none';
+
+  const tC = document.getElementById('tabContacts');
+  const tS = document.getElementById('tabSites');
+  const tSup = document.getElementById('tabSuppliers');
+
+  if(tC) tC.classList.toggle('active', tab === 'contacts');
+  if(tS) tS.classList.toggle('active', tab === 'sites');
+  if(tSup) tSup.classList.toggle('active', tab === 'suppliers');
+
+  const pC = document.getElementById('panelContacts');
+  const pS = document.getElementById('panelSites');
+  const pSup = document.getElementById('panelSuppliers');
+
+  if(pC) pC.style.display = (tab === 'contacts') ? 'block' : 'none';
+  if(pS) pS.style.display = (tab === 'sites') ? 'block' : 'none';
+  if(pSup) pSup.style.display = (tab === 'suppliers') ? 'block' : 'none';
 }
 window.switchDirectoryTab = switchDirectoryTab;
 
@@ -217,6 +237,57 @@ function renderContacts(){
         <div class="dir-actions">
           <button class="icon-btn" title="Modifier" onclick="openDirModal('contact','${it.key}')">✏️</button>
           <button class="icon-btn danger" title="Supprimer" onclick="deleteDirItem('contact','${it.key}')">🗑️</button>
+        </div>
+      ` : ''}
+    `;
+    root.appendChild(row);
+  });
+}
+
+
+function renderSuppliers(){
+  const root = document.getElementById('suppliersList');
+  if(!root) return;
+
+  const items = Object.entries(suppliersData || {}).map(([k,v]) => ({ key:k, ...(v||{}) }));
+  items.sort((a,b) => (a.label||"").localeCompare(b.label||""));
+  root.innerHTML = "";
+
+  if(items.length === 0){
+    root.innerHTML = `<div class="dir-empty">Aucun fournisseur pour l’instant.</div>`;
+    return;
+  }
+
+  items.forEach(it => {
+    const row = document.createElement('div');
+    row.className = 'dir-item';
+
+    const phone = (it.phone || '').toString().trim();
+    const commercial = (it.commercial || '').toString().trim();
+    const deliveryDays = (it.deliveryDays || '').toString().trim();
+    const leadTime = (it.leadTime || '').toString().trim();
+    const minOrder = (it.minOrder || '').toString().trim();
+
+    const isPhone = /^[+0-9][0-9 .-]{6,}$/.test(phone);
+    const href = isPhone ? `tel:${phone.replace(/\s+/g,'')}` : null;
+
+    const meta = [];
+    if(commercial) meta.push(`👤 ${escapeHtml(commercial)}`);
+    if(phone) meta.push(`📞 ${href ? `<a href="${href}" class="dir-link">${escapeHtml(phone)}</a>` : escapeHtml(phone)}`);
+    if(deliveryDays) meta.push(`📦 ${escapeHtml(deliveryDays)}`);
+    if(leadTime) meta.push(`⏱️ ${escapeHtml(leadTime)} j`);
+    if(minOrder) meta.push(`💶 ${escapeHtml(minOrder)}`);
+
+    row.innerHTML = `
+      <div class="dir-item-main">
+        <div class="dir-item-title">${escapeHtml(it.label || 'Fournisseur')}</div>
+        <div class="dir-item-value">${commercial ? escapeHtml(commercial) : (phone ? (href ? `<a href="${href}" class="dir-link">${escapeHtml(phone)}</a>` : escapeHtml(phone)) : '—')}</div>
+        ${meta.length ? `<div class="dir-item-note">${meta.join(' • ')}</div>` : ''}
+      </div>
+      ${canEdit ? `
+        <div class="dir-actions">
+          <button class="icon-btn" title="Modifier" onclick="openDirModal('supplier','${it.key}')">✏️</button>
+          <button class="icon-btn danger" title="Supprimer" onclick="deleteDirItem('supplier','${it.key}')">🗑️</button>
         </div>
       ` : ''}
     `;
@@ -304,7 +375,7 @@ function openDirModal(type, key){
   const title = document.getElementById('dirModalTitle');
   const form = document.getElementById('dirForm');
   const modal = document.getElementById('dirModal');
-  const item = (type === 'contact') ? (contactsData[key] || {}) : (sitesData[key] || {});
+  const item = (type === 'contact') ? (contactsData[key] || {}) : (type === 'supplier' ? (suppliersData[key] || {}) : (sitesData[key] || {}));
 
   if(type === 'contact'){
     title.textContent = key ? '✏️ Modifier contact' : '＋ Ajouter contact';
@@ -320,6 +391,34 @@ function openDirModal(type, key){
       <div class="input-group">
         <div class="dir-label">Note (optionnel)</div>
         <input id="dirNote" type="text" placeholder="Ex : Appeler avant 11h" value="${escapeAttr(item.note || '')}">
+      </div>
+    `;
+  } else if(type === 'supplier'){
+    title.textContent = key ? '✏️ Modifier fournisseur' : '＋ Ajouter fournisseur';
+    form.innerHTML = `
+      <div class="input-group">
+        <div class="dir-label">Fournisseur</div>
+        <input id="dirLabel" type="text" placeholder="Ex : Métro" value="${escapeAttr(item.label || '')}">
+      </div>
+      <div class="input-group">
+        <div class="dir-label">Nom du commercial</div>
+        <input id="dirCommercial" type="text" placeholder="Ex : Paul" value="${escapeAttr(item.commercial || '')}">
+      </div>
+      <div class="input-group">
+        <div class="dir-label">Numéro</div>
+        <input id="dirPhone" type="text" placeholder="Ex : 06 00 00 00 00" value="${escapeAttr(item.phone || '')}">
+      </div>
+      <div class="input-group">
+        <div class="dir-label">Jours de livraisons</div>
+        <input id="dirDeliveryDays" type="text" placeholder="Ex : Lun / Mer / Ven" value="${escapeAttr(item.deliveryDays || '')}">
+      </div>
+      <div class="input-group">
+        <div class="dir-label">Délai commande → livraison (jours)</div>
+        <input id="dirLeadTime" type="text" placeholder="Ex : 1" value="${escapeAttr(item.leadTime || '')}">
+      </div>
+      <div class="input-group">
+        <div class="dir-label">Minimum de commande</div>
+        <input id="dirMinOrder" type="text" placeholder="Ex : 150€" value="${escapeAttr(item.minOrder || '')}">
       </div>
     `;
   } else {
@@ -398,6 +497,18 @@ function saveDirItem(){
       showToast('✅ Contact enregistré');
       closeDirModal();
     });
+  } else if(editingType === 'supplier'){
+    const commercial = (document.getElementById('dirCommercial')?.value || '').trim();
+    const phone = (document.getElementById('dirPhone')?.value || '').trim();
+    const deliveryDays = (document.getElementById('dirDeliveryDays')?.value || '').trim();
+    const leadTime = (document.getElementById('dirLeadTime')?.value || '').trim();
+    const minOrder = (document.getElementById('dirMinOrder')?.value || '').trim();
+    const payload = { label, commercial, phone, deliveryDays, leadTime, minOrder };
+    const ref = editingKey ? db.ref('directory/suppliers/' + editingKey) : db.ref('directory/suppliers').push();
+    ref.set(payload).then(() => {
+      showToast('✅ Fournisseur enregistré');
+      closeDirModal();
+    });
   } else {
     const url = (document.getElementById('dirUrl')?.value || '').trim();
     const category = (document.getElementById('dirCategory')?.value || '').trim();
@@ -418,7 +529,10 @@ window.saveDirItem = saveDirItem;
 function deleteDirItem(type, key){
   if(!canEdit) return;
   if(!confirm('Supprimer cet élément ?')) return;
-  const path = (type === 'contact') ? ('directory/contacts/' + key) : ('directory/sites/' + key);
+  let path = '';
+  if(type === 'contact') path = 'directory/contacts/' + key;
+  else if(type === 'supplier') path = 'directory/suppliers/' + key;
+  else path = 'directory/sites/' + key;
   db.ref(path).remove().then(() => showToast('🗑️ Supprimé'));
 }
 window.deleteDirItem = deleteDirItem;
@@ -464,10 +578,11 @@ async function toSmallDataURL(file, maxW, maxH, quality){
   catch(e){ return c.toDataURL('image/jpeg', q); }
 }
 
-// Default tab (hash : #sites / #contacts)
+// Default tab (hash : #sites / #fournisseurs / #contacts)
 (() => {
-  const h = (window.location.hash || '').replace('#','').trim().toLowerCase();
-  if(h === 'contacts' || h === 'sites') switchDirectoryTab(h);
+  const hRaw = (window.location.hash || '').replace('#','').trim().toLowerCase();
+  const h = (hRaw === 'fournisseurs' || hRaw === 'suppliers') ? 'suppliers' : hRaw;
+  if(h === 'contacts' || h === 'sites' || h === 'suppliers') switchDirectoryTab(h);
   else switchDirectoryTab('sites');
 })();
 

@@ -74,7 +74,8 @@
 
       <div class="dir-tabs" role="tablist" aria-label="Navigation">
         <button class="dir-tab active" id="tabSites" onclick="switchDirectoryTab('sites')" role="tab">🔗 Sites utiles</button>
-        <button class="dir-tab" id="tabContacts" onclick="switchDirectoryTab('contacts')" role="tab">📞 Contacts</button>
+                <button class="dir-tab" id="tabSuppliers" onclick="switchDirectoryTab('suppliers')" role="tab">📦 Contact fournisseurs</button>
+<button class="dir-tab" id="tabContacts" onclick="switchDirectoryTab('contacts')" role="tab">📞 Contacts</button>
       </div>
 
       <section class="dir-panel" id="panelSites" role="tabpanel">
@@ -85,6 +86,18 @@
         </div>
         <div class="dir-grid" id="sitesGrid"></div>
       </section>
+
+      <section class="dir-panel" id="panelSuppliers" role="tabpanel" style="display:none;">
+        <div class="dir-head">
+          <div>
+            <div class="dir-title">Contacts fournisseurs</div>
+            <div class="dir-sub">Commercial, téléphone, livraisons, délai, minimum…</div>
+          </div>
+          <button class="btn dir-add" id="btnAddSupplier" onclick="openDirModal('supplier')" style="display:none; width:auto;">＋ Ajouter</button>
+        </div>
+        <div class="dir-list" id="suppliersList"></div>
+      </section>
+
 
       <section class="dir-panel" id="panelContacts" role="tabpanel" style="display:none;">
         <div class="dir-head">
