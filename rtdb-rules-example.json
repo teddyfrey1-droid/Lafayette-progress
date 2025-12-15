@@ -1,0 +1,22 @@
+// Example RTDB rules snippet (ADAPT to your existing rules!)
+{
+  "rules": {
+    "config": {
+      "vapidKey": { ".read": true, ".write": false }
+    },
+    "fcmTokens": {
+      "$uid": {
+        ".read": false,
+        "$tokenId": {
+          ".write": "auth != null && auth.uid === $uid"
+        }
+      }
+    },
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid", // user reads own profile
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    }
+  }
+}
