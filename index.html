@@ -51,7 +51,7 @@
   <div id="updatesModal" class="modal-overlay">
       <div class="modal-box">
           <div class="modal-title">
-             <span>📢 Dernières Nouveautés</span>
+             <span>📰 Dernières News</span>
              <button style="border:none; background:none; font-size:20px; cursor:pointer; color:var(--text-main);" onclick="document.getElementById('updatesModal').style.display='none'">×</button>
           </div>
           <div id="publicUpdatesList" style="display:flex; flex-direction:column; gap:10px;">
@@ -131,7 +131,7 @@
       <div class="user-welcome">
         👤 <span id="userName">--</span> 
         <span class="user-badge" id="userHours">--h</span>
-        <button onclick="document.getElementById('updatesModal').style.display='flex'" style="border:none; background:#eff6ff; color:#3b82f6; border-radius:20px; padding:5px 12px; font-size:11px; font-weight:800; cursor:pointer; margin-left:5px;">📢 Nouveautés</button>
+        <button onclick="document.getElementById('updatesModal').style.display='flex'" style="border:none; background:#eff6ff; color:#3b82f6; border-radius:20px; padding:5px 12px; font-size:11px; font-weight:800; cursor:pointer; margin-left:5px;">📰 News</button>
       </div>
       <div class="top-actions">
         <button id="btnAdmin" class="btn" style="width:auto; padding:8px 16px; font-size:11px; display:none;">⚙️ Admin</button>
@@ -181,6 +181,17 @@
       </nav>
       <div class="global-menu-foot">
         <button id="installAppBtn" class="btn" style="width:100%; margin-top:10px; display:none;">⬇️ Installer l’app</button>
+        <div id="pushToggleRow" class="push-toggle-row" style="width:100%; margin-top:10px; display:none;">
+          <div class="push-toggle-left">
+            <div class="push-toggle-title">🔔 Notifications</div>
+            <div class="push-toggle-sub" id="pushToggleStatus">—</div>
+          </div>
+          <label class="switch" aria-label="Activer les notifications">
+            <input type="checkbox" id="pushToggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+        
         <button id="enablePushBtn" class="btn" style="width:100%; margin-top:10px; display:none;">🔔 Activer les notifications</button>
       </div>
     </aside>
@@ -335,7 +346,7 @@
     <div id="tab-feedbacks" style="display:none;">
       
       <div class="admin-section" style="border-left:4px solid var(--accent);">
-         <h3 class="section-header-large" style="color:var(--accent);">📢 Gérer les Nouveautés</h3>
+         <h3 class="section-header-large" style="color:var(--accent);">📢 Gérer les News</h3>
          <div style="font-size:11px; color:#64748b; margin-bottom:10px;">Ajoutez, Modifiez ou Supprimez les annonces visibles par l'équipe.</div>
          
          <input type="hidden" id="uptId"> <input type="text" id="uptTitle" placeholder="Titre (ex: Nouveau Design)">
@@ -376,6 +387,17 @@
           </select>
           <input id="notifLink" type="text" placeholder="Lien (ex: /index.html#dashboard)">
         </div>
+
+
+        <div class="notif-targeting-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px;">
+          <select id="notifTargetMode" style="min-width:220px;">
+            <option value="all">Tous les utilisateurs</option>
+            <option value="pushEnabled">Utilisateurs avec notifications activées</option>
+            <option value="custom">Sélection personnalisée</option>
+          </select>
+          <div id="notifTargetCount" style="font-size:11px; color:var(--text-muted);">Cibles : —</div>
+        </div>
+        <div id="notifTargetList" class="notif-target-list" style="display:none; margin-top:10px;"></div>
 
         <input id="notifTitle" type="text" placeholder="Titre (ex: Nouveau palier ✅)">
         <textarea id="notifBody" class="fb-input" style="height:90px;" placeholder="Message..."></textarea>
