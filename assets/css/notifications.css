@@ -1,0 +1,182 @@
+/* ==========================================
+   SYSTÈME DE NOTIFICATIONS & BADGES
+   ========================================== */
+
+/* Toggle Switch pour notifications */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider-notif {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #cbd5e1;
+  transition: .3s;
+  border-radius: 26px;
+}
+
+.toggle-slider-notif:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+
+input:checked + .toggle-slider-notif {
+  background-color: #10b981;
+}
+
+input:checked + .toggle-slider-notif:before {
+  transform: translateX(22px);
+}
+
+/* Pastille verte "application" */
+.app-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Badge connexion type (Web/App) */
+.connection-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.connection-badge.web {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.connection-badge.app {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+/* Sélection utilisateurs pour notifications */
+#customUsersList {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+#customUsersList label {
+  display: block;
+  padding: 6px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+#customUsersList label:hover {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+#customUsersList input[type="checkbox"] {
+  width: auto;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+#notifCount {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  font-weight: 700;
+}
+
+/* Box de notification settings */
+.notif-settings-box {
+  margin-bottom: 20px;
+  padding: 14px;
+  background: rgba(59, 130, 246, 0.06);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: 10px;
+}
+
+.notif-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.notif-settings-label {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--text-main);
+}
+
+.notif-settings-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Corrections mobile */
+@media (max-width: 768px) {
+  /* Badge admin plus petit */
+  .admin-tag,
+  #btnAdmin {
+    font-size: 9px !important;
+    padding: 5px 8px !important;
+  }
+  
+  /* Bouton déconnexion plus petit */
+  .top-btn[title="Déconnexion"] {
+    font-size: 14px !important;
+    padding: 6px 8px !important;
+  }
+  
+  /* Bouton News plus compact */
+  button[onclick*="updatesModal"] {
+    padding: 4px 8px !important;
+    font-size: 10px !important;
+  }
+  
+  /* Espacement optimisé dans top-bar */
+  .top-actions {
+    gap: 6px !important;
+  }
+  
+  /* User badge plus petit */
+  .user-badge {
+    font-size: 11px !important;
+    padding: 4px 8px !important;
+  }
+}
