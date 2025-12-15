@@ -782,7 +782,14 @@ let _objProgUnsub = null;
         // Persist once/day in Firebase (optional but useful across devices)
         db.ref(`dailyMicro/${uid}/${dayKey}`).set({ msg, time: Date.now() }).catch(() => {});
       }
-      el.textContent = msg || "";
+      // Special display for "TEMPS RESTANT" : bigger under the circle (one line)
+      if(msg === "TEMPS RESTANT"){
+        el.classList.add('time-remaining');
+        el.textContent = '⏳TEMPS RESTANT';
+      } else {
+        el.classList.remove('time-remaining');
+        el.textContent = msg || "";
+      }
       el.style.display = msg ? 'block' : 'none';
     }
     // HAPTICS (mobile): subtle, only on key moments
@@ -890,7 +897,7 @@ function showToast(message) {
              if(isAdminUser()) {
                  renderAdminObjs();
              }
-             if(isSuperAdmin()) {
+             if(isAdminUser()) {
                  renderSimulator();
              }
           } catch(e) { console.error(e); }
@@ -898,7 +905,7 @@ function showToast(message) {
       db.ref('users').on('value', s => { 
         allUsers = s.val() || {}; 
         if(isAdminUser()) { renderAdminUsers(); }
-        if(isSuperAdmin()) { renderSimulator(); }
+        if(isAdminUser()) { renderSimulator(); }
       });
       db.ref('settings').on('value', s => { 
         globalSettings = s.val() || { budget: 0 }; 
@@ -909,7 +916,7 @@ function showToast(message) {
         if(!globalSettings.notifications) globalSettings.notifications = { autoOnUpdate:false, autoOnObjChange:false, autoOnPilotage:false, autoAudience:'all' };
         if(globalSettings.notifications.autoAudience == null) globalSettings.notifications.autoAudience = 'all';
         if(isAdminUser()) { try{ renderNotifPanel(); }catch(e){} }
-        if(isSuperAdmin()) { renderSimulator(); }
+        if(isAdminUser()) { renderSimulator(); }
       });
 
       // Aperçu "Sites utiles" sur le dashboard
@@ -986,18 +993,15 @@ function showToast(message) {
       const simCAInput = document.getElementById('simMonthlyCA');
       const superAdminBlock = document.getElementById('superAdminBudget');
       
-      // Pilotage & simulation: visible uniquement Super Admin
-      if(superAdminBlock) superAdminBlock.style.display = isSuperUser ? 'block' : 'none';
-      if(globalBudgetInput) globalBudgetInput.disabled = !isSuperUser;
-      if(saveBudgetBtn) saveBudgetBtn.style.display = isSuperUser ? 'inline-block' : 'none';
-      if(simCAInput) simCAInput.disabled = !isSuperUser;
+      // Pilotage & simulation: Admin + Super Admin (requested)
+      const pilotageAllowed = isAdmin;
+      if(superAdminBlock) superAdminBlock.style.display = pilotageAllowed ? 'block' : 'none';
+      if(globalBudgetInput) globalBudgetInput.disabled = !pilotageAllowed;
+      if(saveBudgetBtn) saveBudgetBtn.style.display = pilotageAllowed ? 'inline-block' : 'none';
+      if(simCAInput) simCAInput.disabled = !pilotageAllowed;
       
       if(isAdmin) {
           renderAdminObjs();
-          // le simulateur (Pilotage) est Super Admin uniquement
-      }
-
-      if(isSuperUser) {
           renderSimulator();
       }
 
@@ -1710,9 +1714,18 @@ function renderDashboard() {
       }
 
       // UI: "Focus du jour" line (simple + motivating)
+      const focusPillEl = document.getElementById("focusPill");
       const focusTextEl = document.getElementById("focusText");
       const focusEmojiEl = document.getElementById("focusEmoji");
+
+      // If the main objective is not unlocked, we show "TEMPS RESTANT" under the circle (dailyMicro)
+      // and we hide the pill under "Mon historique" to keep the page clean.
+      if(!primOk){
+        if(focusPillEl) focusPillEl.style.display = 'none';
+      }
+
       if(focusTextEl && focusEmojiEl){
+        if(focusPillEl && primOk) focusPillEl.style.display = '';
         const publishedObjs = Object.values(allObjs || {}).filter(o => o && o.published);
         let winCount = 0;
         publishedObjs.forEach(o => {
@@ -1735,8 +1748,6 @@ function renderDashboard() {
 
         if(n === 0){
           msgs = [{ e: "📝", t: "Publie les objectifs du jour pour lancer la journée." }];
-        } else if(!primOk){
-          msgs = [{ e: "⏳", t: "TEMPS RESTANT" }];
         } else if(winCount === n){
           msgs = [{ e: "🎉", t: "Tout est validé : garde ce rythme, c’est parfait." }];
         } else {
@@ -2347,13 +2358,105 @@ const el = document.createElement("div");
 
     // --- Suivi (graph) par objectif (Admin/Super Admin) ---
     let _objProgMode = 'pct'; // 'pct' ou 'num'
+    // Date helpers (ISO yyyy-mm-dd -> affichage FR lisible)
+    function _isoToLocalTs(iso){
+      if(!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return NaN;
+      const p = String(iso).split('-');
+      const y = parseInt(p[0],10);
+      const m = parseInt(p[1],10);
+      const d = parseInt(p[2],10);
+      if(!isFinite(y)||!isFinite(m)||!isFinite(d)) return NaN;
+      return new Date(y, m-1, d).getTime();
+    }
+    function _formatIsoDateFR(iso){
+      const ts = _isoToLocalTs(iso);
+      if(!isFinite(ts)) return iso || '';
+      const d = new Date(ts);
+      const day = d.getDate();
+      let month = d.toLocaleDateString('fr-FR', { month: 'long' });
+      const year = d.getFullYear();
+      // Capitalise month (ex: "Décembre") for a more readable, app-like format
+      month = month ? (month.charAt(0).toUpperCase() + month.slice(1)) : '';
+      return `${day} ${month} ${year}`.trim();
+    }
     let _objProgHit = [];
 
     function _bindObjProgCanvas(){
       const canvas = document.getElementById('objProgCanvas');
       if(!canvas || canvas._bound) return;
       canvas._bound = true;
-      canvas.style.cursor = 'pointer';
+
+      const tip = document.getElementById('objProgTooltip');
+      const hideTip = () => { if(tip) tip.style.display = 'none'; };
+
+      const showTip = (text, cssX, cssY, rect) => {
+        if(!tip) return;
+        tip.textContent = text;
+        tip.style.display = 'block';
+
+        const wrap = tip.parentElement;
+        const w = (wrap && wrap.clientWidth) ? wrap.clientWidth : rect.width;
+        const h = (wrap && wrap.clientHeight) ? wrap.clientHeight : rect.height;
+
+        // After display, we can measure tooltip size
+        const tw = tip.offsetWidth || 180;
+        const th = tip.offsetHeight || 44;
+
+        let left = cssX + 12;
+        let top  = cssY - (th + 12);
+
+        if(left + tw > w) left = Math.max(6, w - tw - 6);
+        if(top < 6) top = cssY + 12;
+        if(top + th > h) top = Math.max(6, h - th - 6);
+
+        tip.style.left = left + 'px';
+        tip.style.top  = top  + 'px';
+      };
+
+      const findNearest = (x, y) => {
+        let best = null;
+        let bestD = 1e9;
+        for(const p of (_objProgHit || [])){
+          const dx = x - p.x;
+          const dy = y - p.y;
+          const d = Math.sqrt(dx*dx + dy*dy);
+          if(d < bestD){ bestD = d; best = p; }
+        }
+        return { best, bestD };
+      };
+
+      canvas.style.cursor = 'default';
+
+      canvas.addEventListener('mousemove', (ev) => {
+        if(!_objProgHit || !_objProgHit.length){
+          hideTip();
+          canvas.style.cursor = 'default';
+          return;
+        }
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / Math.max(1, rect.width);
+        const scaleY = canvas.height / Math.max(1, rect.height);
+        const x = (ev.clientX - rect.left) * scaleX;
+        const y = (ev.clientY - rect.top) * scaleY;
+
+        const { best, bestD } = findNearest(x, y);
+        if(best && bestD <= 18){
+          canvas.style.cursor = 'pointer';
+          const cssX = best.x / scaleX;
+          const cssY = best.y / scaleY;
+          showTip(best.label, cssX, cssY, rect);
+        } else {
+          hideTip();
+          canvas.style.cursor = 'default';
+        }
+      });
+
+      canvas.addEventListener('mouseleave', () => {
+        hideTip();
+        canvas.style.cursor = 'default';
+      });
+
+      // Click still works (useful on mobile)
       canvas.addEventListener('click', (ev) => {
         if(!_objProgHit || !_objProgHit.length) return;
         const rect = canvas.getBoundingClientRect();
@@ -2361,14 +2464,7 @@ const el = document.createElement("div");
         const scaleY = canvas.height / Math.max(1, rect.height);
         const x = (ev.clientX - rect.left) * scaleX;
         const y = (ev.clientY - rect.top) * scaleY;
-        let best = null;
-        let bestD = 1e9;
-        for(const p of _objProgHit){
-          const dx = x - p.x;
-          const dy = y - p.y;
-          const d = Math.sqrt(dx*dx + dy*dy);
-          if(d < bestD){ bestD = d; best = p; }
-        }
+        const { best, bestD } = findNearest(x, y);
         if(best && bestD <= 18){
           showToast(best.label);
         }
@@ -2485,10 +2581,10 @@ const el = document.createElement("div");
           div.innerHTML = `
             <div class="user-info">
               <div class="user-header" style="gap:10px;">
-                <span class="user-name">${r.date}</span>
+                <span class="user-name">${_formatIsoDateFR(r.date)}</span>
                 <span class="pub-state on" style="text-transform:none;">${badge}</span>
               </div>
-              <div class="user-meta">Mise à jour (auto / admin)</div>
+              <div class="user-meta">Mise à jour</div>
             </div>
             <div class="user-actions">
               <div class="btn-group">
@@ -2563,7 +2659,7 @@ const el = document.createElement("div");
 
       if(!rows || rows.length < 1) return;
 
-      const xs = rows.map(r => new Date(r.date).getTime()).filter(t => isFinite(t));
+      const xs = rows.map(r => _isoToLocalTs(r.date)).filter(t => isFinite(t));
       if(xs.length === 0) return;
       const minX = Math.min(...xs);
       const maxX = Math.max(...xs);
@@ -2581,7 +2677,7 @@ const el = document.createElement("div");
       const spanY = Math.max(1e-9, maxY - minY);
 
       const pts = rows.map(r => {
-        const tx = new Date(r.date).getTime();
+        const tx = _isoToLocalTs(r.date);
         const vx = (tx - minX) / spanX;
         const vy = (Number(r._y) - minY) / spanY;
         const x = pad + vx * (w - 2*pad);
@@ -2592,7 +2688,8 @@ const el = document.createElement("div");
       // Hit points (click) : affiche date + valeur/%
       _objProgHit = pts.map((p, i) => {
         const r = rows[i];
-        const date = (r && r.date) ? r.date : '';
+        const dateIso = (r && r.date) ? r.date : '';
+        const date = _formatIsoDateFR(dateIso);
         let label = date;
         if(mode === 'num'){
           const v = (r && isFinite(r._y)) ? Number(r._y) : NaN;
@@ -2694,8 +2791,8 @@ const el = document.createElement("div");
     }
 
     function saveGlobalBudget() {
-      // Super Admin uniquement
-      if(!isSuperAdmin()) return;
+      // Admin + Super Admin
+      if(!isAdminUser()) return;
       const el = document.getElementById("simGlobalBudget");
       const val = el ? parseFloat(el.value) : NaN;
       if(!isNaN(val)) {
@@ -2707,7 +2804,7 @@ const el = document.createElement("div");
 
     // Super Admin: sauvegarde du seuil garde-fou (% du CA) pour la simulation
     function saveGuardrailMaxPct(){
-      if(!isSuperAdmin()) return;
+      if(!isAdminUser()) return;
       const el = document.getElementById('simGuardrailPct');
       const raw = el ? parseFloat(el.value) : NaN;
       if(!isFinite(raw)) {

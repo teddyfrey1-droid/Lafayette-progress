@@ -86,10 +86,10 @@
         <span>📈 Suivi — <span id="objProgName">—</span></span>
         <button style="border:none; background:none; font-size:20px; cursor:pointer; color:var(--text-main);" onclick="closeObjectiveProgress()">×</button>
       </div>
-      <div id="objProgHint" style="font-size:12px; color:var(--text-muted); font-weight:700; margin-bottom:12px;">
-        Auto : un point se crée quand la valeur d’un objectif est modifiée. Tu peux aussi ajouter un point si besoin.
-      </div>
+<div class="objprog-canvas-wrap">
       <canvas id="objProgCanvas" width="720" height="220" style="width:100%; border:1px solid var(--border-color); border-radius:14px; background:rgba(0,0,0,0.02);"></canvas>
+      <div id="objProgTooltip" class="objprog-tooltip" style="display:none;"></div>
+    </div>
       <div style="height:12px;"></div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
         <div style="flex:1; min-width:160px;">
@@ -135,7 +135,10 @@
       </div>
       <div class="top-actions">
         <button id="btnAdmin" class="btn" style="width:auto; padding:8px 16px; font-size:11px; display:none;">⚙️ Admin</button>
-        <button onclick="logout()" class="btn" style="width:auto; padding:8px 16px; font-size:11px; background:var(--card-bg); color:#ef4444; border:1px solid #fca5a5;">Déconnexion</button>
+        <button id="logoutBtn" onclick="logout()" class="btn logout-btn" style="width:auto; padding:8px 16px; font-size:11px; background:var(--card-bg); color:#ef4444; border:1px solid #fca5a5;">
+          <span class="logout-icon" aria-hidden="true">🚪</span>
+          <span class="logout-text">Déconnexion</span>
+        </button>
               <button class="icon-btn" id="globalMenuBtn" onclick="toggleGlobalMenu()">☰</button>
       </div>
     </div>
@@ -450,7 +453,7 @@
               <div style="display:flex; align-items:center; gap:8px;">
                 <input type="number" id="simGuardrailPct" placeholder="Ex: 20" min="1" max="100" style="max-width:90px;">
                 <button id="btnSaveGuardrailPct" onclick="saveGuardrailMaxPct()" style="border:none; background:rgba(59,130,246,.14); color:var(--primary); padding:6px 10px; border-radius:6px; font-size:11px; font-weight:900; cursor:pointer;">OK</button>
-                <div style="font-size:11px; color:var(--text-muted);">Super Admin</div>
+                <div style="font-size:11px; color:var(--text-muted);">Admin</div>
               </div>
             </div>
             <div id="guardrailBox" class="section-card" style="padding:12px; display:none; border:1px solid rgba(239,68,68,.25); background:rgba(239,68,68,.06);">
