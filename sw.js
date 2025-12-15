@@ -4,6 +4,63 @@
    - garde le SW uniquement pour les critères d'installation PWA
 */
 
+
+/* --- Firebase Messaging (background) --- 
+   Nécessaire pour afficher les notifications push en arrière-plan.
+   (FCM + Safari iOS PWA)
+*/
+try{
+  importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
+  importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
+
+  var firebaseConfig = {
+      apiKey: "AIzaSyAGaitqmFwExvJ9ZUpkdUdCKAqqDOP2cdQ",
+      authDomain: "objectif-restaurant.firebaseapp.com",
+      databaseURL: "https://objectif-restaurant-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "objectif-restaurant",
+      storageBucket: "objectif-restaurant.firebasestorage.app",
+      messagingSenderId: "910113283000",
+      appId: "1:910113283000:web:0951fd9dca01aa6e46cd4d"
+    };
+
+  // SW context : init firebase
+  firebase.initializeApp(firebaseConfig);
+
+  const messaging = firebase.messaging();
+
+  messaging.onBackgroundMessage((payload) => {
+    const title = payload?.notification?.title || 'Heiko';
+    const body = payload?.notification?.body || '';
+    const dataUrl = (payload?.fcmOptions && payload.fcmOptions.link) || (payload?.data && payload.data.link) || '/';
+    const icon = '/assets/icons/icon-192.png';
+    self.registration.showNotification(title, {
+      body,
+      icon,
+      badge: icon,
+      data: { url: dataUrl }
+    });
+  });
+
+  self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const urlToOpen = (event.notification && event.notification.data && event.notification.data.url) ? event.notification.data.url : '/';
+    event.waitUntil((async () => {
+      const allClients = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const client of allClients) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.focus();
+          if ('navigate' in client) client.navigate(urlToOpen);
+          return;
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(urlToOpen);
+    })());
+  });
+
+}catch(e){
+  // ignore (push disabled)
+}
+
 const SW_VERSION = 'v3-nocache-' + Date.now();
 
 self.addEventListener('install', (event) => {

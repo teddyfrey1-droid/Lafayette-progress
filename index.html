@@ -23,6 +23,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 
   <link rel="stylesheet" href="assets/css/styles.css">
 
@@ -147,11 +148,12 @@
         <button class="icon-btn" type="button" onclick="toggleGlobalMenu(false)" aria-label="Fermer">×</button>
       </div>
       <nav class="global-menu-links">
-        <a class="global-menu-link" href="index.html#dashboard" onclick="toggleGlobalMenu(false)">📊 Dashboard</a>
+        <a class="global-menu-link menu-dashboard" href="index.html#dashboard" onclick="toggleGlobalMenu(false)"><span class="menu-dashboard-label">📊 Dashboard</span></a>
+        <div class="global-menu-sep" aria-hidden="true"></div>
         <!-- 2 catégories séparées : Sites utiles puis Contacts (1 seule ouverte à la fois) -->
         <button class="global-menu-link global-menu-accordion" type="button" onclick="toggleMenuSites()">
           <span>🔗 Sites utiles</span>
-          <span id="menuSitesChev" style="opacity:.8; font-weight:900;">▸</span>
+          <span id="menuSitesChev" class="menu-chev" aria-hidden="true">▸</span>
         </button>
         <div class="global-menu-sub" id="menuSitesSub" style="display:none;">
           <div class="menu-sub-head">
@@ -163,7 +165,7 @@
 
         <button class="global-menu-link global-menu-accordion" type="button" onclick="toggleMenuContacts()">
           <span>📞 Contacts</span>
-          <span id="menuContactsChev" style="opacity:.8; font-weight:900;">▸</span>
+          <span id="menuContactsChev" class="menu-chev" aria-hidden="true">▸</span>
         </button>
         <div class="global-menu-sub" id="menuContactsSub" style="display:none;">
           <div class="menu-sub-head">
@@ -175,6 +177,7 @@
       </nav>
       <div class="global-menu-foot">
         <button id="installAppBtn" class="btn" style="width:100%; margin-top:10px; display:none;">⬇️ Installer l’app</button>
+        <button id="enablePushBtn" class="btn" style="width:100%; margin-top:10px; display:none;">🔔 Activer les notifications</button>
       </div>
     </aside>
 

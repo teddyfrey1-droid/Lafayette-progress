@@ -85,6 +85,112 @@ let _objProgUnsub = null;
       if('serviceWorker' in navigator){
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('sw.js').catch(() => {});
+      // --- PUSH NOTIFICATIONS (Firebase Cloud Messaging / Safari iOS PWA) ---
+      // Requiert :
+      // - PWA ajoutée à l’écran d’accueil (iOS/iPadOS)
+      // - VAPID public key (Firebase Console > Cloud Messaging > Web Push certificates)
+      // Option : tu peux aussi stocker la clé dans RTDB : /config/vapidKey
+      let _messaging = null;
+      let _swRegForPush = null;
+
+      async function _getVapidKey(){
+        try{
+          const snap = await db.ref('config/vapidKey').get();
+          const k = snap.exists() ? String(snap.val()||'').trim() : '';
+          return k;
+        }catch(e){ return ''; }
+      }
+
+      function _isStandalonePWA(){
+        return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (window.navigator && window.navigator.standalone === true);
+      }
+
+      function _supportsPush(){
+        return ('Notification' in window) && ('serviceWorker' in navigator) && (typeof firebase !== 'undefined') && (firebase.messaging);
+      }
+
+      async function _setupPushUI(){
+        const btn = document.getElementById('enablePushBtn');
+        if(!btn) return;
+
+        if(!_supportsPush()){
+          btn.style.display = 'none';
+          return;
+        }
+
+        try{
+          _swRegForPush = await navigator.serviceWorker.ready;
+        }catch(e){ _swRegForPush = null; }
+
+        // Messaging instance (FCM)
+        try{ _messaging = firebase.messaging(); }catch(e){ _messaging = null; }
+
+        // Affiche le bouton uniquement si on a un user connecté (uid) et un SW prêt
+        btn.style.display = (_swRegForPush && currentUser && currentUser.uid && _messaging) ? 'block' : 'none';
+
+        btn.onclick = async () => {
+          if(!currentUser || !currentUser.uid){
+            showToast("Connecte-toi pour activer les notifications.");
+            return;
+          }
+          if(!_isStandalonePWA()){
+            showToast("Installe l’app (Ajouter à l’écran d’accueil) pour recevoir des notifications.");
+            return;
+          }
+          if(!_swRegForPush){
+            showToast("Service Worker non prêt. Recharge la page.");
+            return;
+          }
+
+          // Demande d’autorisation (doit venir d’un clic)
+          let perm = "default";
+          try{ perm = await Notification.requestPermission(); }catch(e){ perm = "denied"; }
+          if(perm !== "granted"){
+            showToast("Notifications refusées.");
+            return;
+          }
+
+          const vapidKey = (await _getVapidKey()) || "";
+          if(!vapidKey){
+            showToast("Clé VAPID manquante (config/vapidKey).");
+            return;
+          }
+
+          try{
+            const token = await _messaging.getToken({
+              vapidKey,
+              serviceWorkerRegistration: _swRegForPush
+            });
+
+            if(!token){
+              showToast("Impossible d’obtenir le token de notification.");
+              return;
+            }
+
+            // Sauvegarde dans RTDB
+            await db.ref('fcmTokens/' + currentUser.uid).push({
+              token,
+              createdAt: Date.now(),
+              ua: navigator.userAgent
+            });
+
+            showToast("Notifications activées ✅");
+          }catch(err){
+            console.error(err);
+            showToast("Erreur notifications. Vérifie la clé VAPID et la config Firebase.");
+          }
+        };
+
+        // Foreground messages (quand l’app est ouverte)
+        try{
+          _messaging.onMessage((payload) => {
+            const title = payload?.notification?.title || "Heiko";
+            const body = payload?.notification?.body || "";
+            showToast(body ? (title + " — " + body) : title);
+          });
+        }catch(e){}
+      }
+
         });
       }
 
@@ -329,8 +435,10 @@ let _objProgUnsub = null;
              const def = { name: "Utilisateur", hours:35, role:'staff', email: user.email, status: 'pending' };
              db.ref('users/'+user.uid).set(def);
              currentUser = def;
+             try{ _setupPushUI(); }catch(e){}
           } else { 
-             currentUser = val; 
+             currentUser = val;
+             try{ _setupPushUI(); }catch(e){} 
              if(currentUser.status !== 'active') {
                  db.ref('users/'+user.uid).update({ status: 'active', lastLogin: Date.now() });
              }
@@ -1396,7 +1504,7 @@ function renderDashboard() {
         if(n === 0){
           msgs = [{ e: "📝", t: "Publie les objectifs du jour pour lancer la journée." }];
         } else if(!primOk){
-          msgs = [{ e: "⚡", t: "Priorités d’abord : débloque le principal pour ouvrir les bonus." }];
+          msgs = [{ e: "⏳", t: "TEMPS RESTANT" }];
         } else if(winCount === n){
           msgs = [{ e: "🎉", t: "Tout est validé : garde ce rythme, c’est parfait." }];
         } else {
@@ -2007,7 +2115,7 @@ const el = document.createElement("div");
           const d = Math.sqrt(dx*dx + dy*dy);
           if(d < bestD){ bestD = d; best = p; }
         }
-        if(best && bestD <= 12){
+        if(best && bestD <= 18){
           showToast(best.label);
         }
       });
@@ -2256,7 +2364,7 @@ const el = document.createElement("div");
       ctx.fillStyle = isDark ? 'rgba(255,255,255,0.92)' : 'rgba(17,24,39,0.88)';
       pts.forEach(p => {
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 6, 0, Math.PI*2);
+        ctx.arc(p.x, p.y, 9, 0, Math.PI*2);
         ctx.fill();
         ctx.strokeStyle = isDark ? 'rgba(59,130,246,0.55)' : 'rgba(37,99,235,0.45)';
         ctx.lineWidth = 2;

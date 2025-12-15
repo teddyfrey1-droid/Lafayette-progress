@@ -17,3 +17,9 @@ mais en le découpant pour pouvoir ajouter des fonctionnalités plus facilement.
 ## Déploiement (Render / Static site)
 
 Déploie ce dossier comme un site statique. `index.html` est à la racine.
+
+
+## Notifications (PWA)
+- iOS/iPadOS : nécessite ajout à l’écran d’accueil.
+- Config : /config/vapidKey dans RTDB (clé VAPID Web Push Certificates).
+- Bouton 🔔 dans le menu dashboard.
