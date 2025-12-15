@@ -8,19 +8,9 @@
       messagingSenderId: "910113283000",
       appId: "1:910113283000:web:0951fd9dca01aa6e46cd4d"
     };
-    // Sécurité: éviter un crash si l'app est initialisée 2 fois (PWA / reload / cache)
-    try{
-      if(!firebase.apps || !firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    }catch(e){
-      // Si déjà initialisée, on continue.
-    }
+    firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
-
-    // Helper DOM (évite les crashs si un élément n'existe pas suite à un cache / upload partiel)
-    const $id = (id) => {
-      try{ return document.getElementById(id); }catch(e){ return null; }
-    };
 
     let currentUser = null;
     let allUsers = {};
@@ -56,47 +46,6 @@ let _objProgUnsub = null;
 
     function isAdminUser() {
       return !!(currentUser && (currentUser.role === 'admin' || isSuperAdmin()));
-    }
-
-    // --- Client context (web vs application PWA) + notification permission ---
-    function getClientPlatform(){
-      try{
-        const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (window.navigator && window.navigator.standalone === true);
-        return standalone ? 'app' : 'web';
-      }catch(e){
-        return 'web';
-      }
-    }
-
-    function getNotifPermission(){
-      try{
-        return ('Notification' in window) ? (Notification.permission || 'default') : 'unsupported';
-      }catch(e){
-        return 'unsupported';
-      }
-    }
-
-    function syncClientStatus(){
-      if(!currentUser || !currentUser.uid) return;
-      const uid = currentUser.uid;
-      const platform = getClientPlatform();
-      const now = Date.now();
-      const perm = getNotifPermission();
-
-      const payload = {
-        lastSeen: now,
-        lastPlatform: platform,
-        notifPermission: perm,
-        notifEnabled: (perm === 'granted'),
-        notifUpdatedAt: now
-      };
-      if(platform === 'app'){
-        payload.lastAppSeen = now;
-        payload.appEver = true;
-      } else {
-        payload.lastWebSeen = now;
-      }
-      db.ref('users/' + uid + '/clientStatus').update(payload).catch(() => {});
     }
 
     // CALENDAR DATA
@@ -368,12 +317,9 @@ let _objProgUnsub = null;
 
 // AUTH
     auth.onAuthStateChanged(user => {
-      try{
-        const loginOverlayEl = $id('loginOverlay');
-        const appContentEl = $id('appContent');
-        if (user) {
-          if(loginOverlayEl) loginOverlayEl.style.display = 'none';
-          if(appContentEl) appContentEl.style.display = 'block';
+      if (user) {
+        document.getElementById("loginOverlay").style.display = "none";
+        document.getElementById("appContent").style.display = "block";
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('mode') === 'resetPassword') { /* Handled */ }
 
@@ -390,79 +336,53 @@ let _objProgUnsub = null;
              }
           }
           currentUser.uid = user.uid; currentUser.email = user.email;
-          // Client status (web/app) + session log (guarded to avoid duplicates on profile updates)
-          syncClientStatus();
-          try{
-            const platform = getClientPlatform();
-            const now = Date.now();
-            if(!window.__sessionLogUid || window.__sessionLogUid !== currentUser.uid){
-              window.__sessionLogUid = currentUser.uid;
-              if(window.__sessionLogTimer) clearInterval(window.__sessionLogTimer);
-              window.__sessionLogRef = db.ref("logs").push();
-              window.__sessionLogRef.set({ user: currentUser.name, action: "Connexion", type: "session", platform: platform, startTime: now, lastSeen: now });
-              window.__sessionLogTimer = setInterval(() => {
-                if(window.__sessionLogRef) window.__sessionLogRef.update({ lastSeen: Date.now(), platform: getClientPlatform() });
-                syncClientStatus();
-              }, 60000);
-            }
-          }catch(_){ }
+          const newLogRef = db.ref("logs").push();
+          newLogRef.set({ user: currentUser.name, action: "Connexion", type: "session", startTime: Date.now(), lastSeen: Date.now() });
+          setInterval(() => { newLogRef.update({ lastSeen: Date.now() }); }, 60000);
           updateUI();
         });
         loadData();
         renderNativeCalendar();
-        bindLiveNotifications();
-        } else {
-          if(loginOverlayEl) loginOverlayEl.style.display = 'flex';
-          if(appContentEl) appContentEl.style.display = 'none';
-        }
-      }catch(e){
-        console.error('Auth init error:', e);
+      } else {
+        document.getElementById("loginOverlay").style.display = "flex";
+        document.getElementById("appContent").style.display = "none";
       }
     });
 
-    const __btnLogin = $id('btnLogin');
-    if(__btnLogin){
-      __btnLogin.onclick = () => {
-        const emailEl = $id('loginEmail');
-        const passEl = $id('loginPass');
-        const email = (emailEl && emailEl.value ? emailEl.value : '').trim();
-        const pass = (passEl && passEl.value) ? passEl.value : '';
-        auth.signInWithEmailAndPassword(email, pass).catch(e => {
-            // LOGIN ERROR FEEDBACK
-            if(passEl) passEl.classList.add('error');
-            if(emailEl) emailEl.classList.add('error');
-            setTimeout(() => {
-               if(passEl) passEl.classList.remove('error');
-               if(emailEl) emailEl.classList.remove('error');
-            }, 1000);
-            alert('❌ Mot de passe incorrect !');
-        });
-      };
-    }
+    document.getElementById("btnLogin").onclick = () => {
+      const email = document.getElementById("loginEmail").value.trim();
+      const pass = document.getElementById("loginPass").value;
+      auth.signInWithEmailAndPassword(email, pass).catch(e => {
+          // LOGIN ERROR FEEDBACK
+          document.getElementById("loginPass").classList.add("error");
+          document.getElementById("loginEmail").classList.add("error");
+          setTimeout(() => {
+             document.getElementById("loginPass").classList.remove("error");
+             document.getElementById("loginEmail").classList.remove("error");
+          }, 1000); // Remove animation but keep red border logic if preferred, here just animate
+          alert("❌ Mot de passe incorrect !");
+      });
+    };
 
     function clearLoginError() {
-        const p = $id('loginPass');
-        const e = $id('loginEmail');
-        if(p) p.classList.remove('error');
-        if(e) e.classList.remove('error');
+        document.getElementById("loginPass").classList.remove("error");
+        document.getElementById("loginEmail").classList.remove("error");
     }
 
     function togglePass() {
-        const x = $id('loginPass');
-        if(!x) return;
-        x.type = (x.type === 'password') ? 'text' : 'password';
+        const x = document.getElementById("loginPass");
+        x.type = (x.type === "password") ? "text" : "password";
     }
 
     function logout() { auth.signOut(); location.reload(); }
     window.resetPassword = () => {
-      const emailEl = $id('loginEmail');
-      let email = (emailEl && emailEl.value ? emailEl.value : '').trim();
+      let email = document.getElementById("loginEmail").value.trim();
       if (!email) email = prompt("Email pour réinitialisation :");
       if(email) auth.sendPasswordResetEmail(email).then(() => alert("Email envoyé !")).catch(e => alert(e.message));
     };
 
     function logAction(action, detail) {
-        db.ref("logs").push({ user: currentUser ? currentUser.name : "Inconnu", action: action, detail: detail || "", type: "action", platform: getClientPlatform(), time: Date.now() });
+        db.ref("logs").push({ user: currentUser ? currentUser.name : "Inconnu", action: action, detail: detail || "", type: "action", time: Date.now() });
     }
 
     // --- Phase 1 helpers: trajectoire + micro feedback journalier ---
@@ -636,140 +556,6 @@ const fmtMonth = (key) => {
 function showToast(message) {
         const toast = document.getElementById("toast"); toast.textContent = message; toast.className = "show";
         setTimeout(() => { toast.className = "hide"; }, 3000);
-    }
-
-    // --- Notifications UI (opt-in) + live in-app notifications (via Firebase DB) ---
-    function openNotifModal(){
-      const m = document.getElementById('notifModal');
-      if(m){ m.style.display = 'flex'; }
-      refreshNotifModal();
-    }
-    function closeNotifModal(){
-      const m = document.getElementById('notifModal');
-      if(m){ m.style.display = 'none'; }
-    }
-    window.openNotifModal = openNotifModal;
-    window.closeNotifModal = closeNotifModal;
-
-    function refreshNotifModal(){
-      const status = document.getElementById('notifStatus');
-      const btn = document.getElementById('enableNotifsBtn');
-      const adminBox = document.getElementById('adminNotifBox');
-      const perm = getNotifPermission();
-
-      if(status){
-        if(perm === 'granted') status.textContent = '✅ Notifications activées';
-        else if(perm === 'denied') status.textContent = '⛔ Notifications bloquées (réglages du téléphone/navigateur)';
-        else if(perm === 'default') status.textContent = '🔔 Notifications désactivées';
-        else status.textContent = '⚠️ Notifications non supportées sur cet appareil';
-      }
-
-      if(btn){
-        if(perm === 'unsupported'){
-          btn.style.display = 'none';
-        } else {
-          btn.style.display = 'inline-flex';
-          btn.disabled = (perm === 'granted');
-          btn.textContent = (perm === 'granted') ? '✅ Déjà activées' : 'Activer les notifications';
-        }
-      }
-
-      if(adminBox){
-        adminBox.style.display = isAdminUser() ? 'block' : 'none';
-        if(isAdminUser()) populateNotifTargets();
-      }
-    }
-
-    async function enableNotifications(){
-      if(!('Notification' in window)){
-        showToast('⚠️ Notifications non supportées');
-        return;
-      }
-      try{
-        const perm = await Notification.requestPermission();
-        if(currentUser && currentUser.uid){
-          db.ref('users/' + currentUser.uid + '/clientStatus').update({
-            notifPermission: perm,
-            notifEnabled: (perm === 'granted'),
-            notifUpdatedAt: Date.now()
-          }).catch(() => {});
-        }
-        syncClientStatus();
-        refreshNotifModal();
-        showToast(perm === 'granted' ? '✅ Notifications activées' : (perm === 'denied' ? '⛔ Notifications refusées' : '🔔 Notifications non activées'));
-      }catch(e){
-        showToast('⚠️ Impossible d’activer');
-      }
-    }
-    window.enableNotifications = enableNotifications;
-
-    function populateNotifTargets(){
-      const sel = document.getElementById('notifTarget');
-      if(!sel) return;
-      const usersArr = Object.entries(allUsers || {}).map(([uid, u]) => ({ uid, ...(u||{}) }))
-        .filter(u => u && u.uid && (u.name || u.email));
-      usersArr.sort((a,b) => (a.name||'').localeCompare(b.name||''));
-      sel.innerHTML = '';
-      const optAll = document.createElement('option');
-      optAll.value = 'all';
-      optAll.textContent = '🌍 Tous les utilisateurs';
-      sel.appendChild(optAll);
-      usersArr.forEach(u => {
-        const o = document.createElement('option');
-        o.value = u.uid;
-        o.textContent = `${u.name || u.email}`;
-        sel.appendChild(o);
-      });
-    }
-
-    function sendAdminNotification(){
-      if(!isAdminUser()) return;
-      const sel = document.getElementById('notifTarget');
-      const msgEl = document.getElementById('notifMessage');
-      const to = sel ? sel.value : 'all';
-      const message = (msgEl ? msgEl.value : '').trim();
-      if(!message){ showToast('⚠️ Message vide'); return; }
-      const payload = {
-        to: to || 'all',
-        message: message,
-        createdAt: Date.now(),
-        createdBy: currentUser ? (currentUser.name || currentUser.email || 'Admin') : 'Admin',
-        createdByUid: currentUser ? currentUser.uid : ''
-      };
-      db.ref('pushNotifs').push(payload).then(() => {
-        if(msgEl) msgEl.value = '';
-        showToast('✅ Notification envoyée');
-        logAction('Notification', `Envoi -> ${payload.to}`);
-      }).catch(() => {
-        showToast('❌ Erreur envoi');
-      });
-    }
-    window.sendAdminNotification = sendAdminNotification;
-
-    function deliverLocalNotification(message){
-      if(!message) return;
-      showToast('🔔 ' + message);
-      try{
-        if('Notification' in window && Notification.permission === 'granted'){
-          new Notification('Heiko', { body: message });
-        }
-      }catch(_){ }
-    }
-
-    function bindLiveNotifications(){
-      if(bindLiveNotifications._bound) return;
-      bindLiveNotifications._bound = true;
-
-      const boundAt = Date.now();
-      db.ref('pushNotifs').limitToLast(50).on('child_added', snap => {
-        const v = snap.val() || {};
-        const createdAt = Number(v.createdAt || 0);
-        if(createdAt && createdAt < (boundAt - 1500)) return; // ignore old ones at bind time
-        if(!currentUser || !currentUser.uid) return;
-        const to = v.to || 'all';
-        if(to !== 'all' && to !== currentUser.uid) return;
-        deliverLocalNotification(v.message || '');
-      });
     }
 
     function loadData() {
@@ -2005,10 +1791,6 @@ const el = document.createElement("div");
             const statusLabel = (u.status === 'active') ? 'ACTIF' : 'EN ATTENTE';
             let adminBadge = ""; if(u.role === 'admin') adminBadge = `<span class="admin-tag">ADMIN</span>`;
 
-            const cs = u.clientStatus || {};
-            const appTag = (cs.appEver || cs.lastAppSeen) ? `<span class="client-tag app">🟢 application</span>` : '';
-            const notifTag = (cs.notifPermission === 'granted') ? `<span class="client-tag notif">🔔 notifs</span>` : '';
-
             div.innerHTML = `
                 <div class="user-info">
                     <div class="user-header">
@@ -2019,7 +1801,7 @@ const el = document.createElement("div");
                         </div>
                     </div>
                     <div class="user-email-sub">${u.email}</div>
-                    <div class="user-meta">${u.hours}h ${appTag} ${notifTag}</div>
+                    <div class="user-meta">${u.hours}h</div>
                 </div>
                 <div class="user-actions">
                     <div class="user-gain">${userBonus.toFixed(2)}€</div>
@@ -2537,8 +2319,7 @@ const el = document.createElement("div");
           if(g.sessions.length===0) sc.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; 
           else g.sessions.forEach(s=>{ 
               const st=new Date(s.startTime); const m=Math.floor((s.lastSeen-s.startTime)/60000); const dt=(m>60)?Math.floor(m/60)+"h "+(m%60)+"m":m+"m"; 
-              const pIcon = (s.platform === 'app') ? '📱' : (s.platform === 'web' ? '💻' : '🟢');
-              sc.innerHTML+=`<div class="log-entry"><span class="log-dot">${pIcon}</span><span class="log-time-s">${st.toLocaleDateString().slice(0,5)} ${st.toLocaleTimeString().slice(0,5)}</span><span class="log-dur">${dt}</span></div>`; 
+              sc.innerHTML+=`<div class="log-entry"><span class="log-dot">🟢</span><span class="log-time-s">${st.toLocaleDateString().slice(0,5)} ${st.toLocaleTimeString().slice(0,5)}</span><span class="log-dur">${dt}</span></div>`; 
           });
 
           const ac = document.getElementById(`act-${safeId}`); 

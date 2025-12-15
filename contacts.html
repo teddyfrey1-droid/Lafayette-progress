@@ -60,9 +60,8 @@
       </div>
       <div style="display:flex; gap:10px; align-items:center;">
         <button id="installAppBtn" class="btn" style="width:auto; padding:8px 16px; font-size:11px; display:none;">⬇️ Installer</button>
-        <button class="icon-btn" type="button" onclick="openNotifModal()" title="Notifications">🔔</button>
         <a class="btn" href="index.html#dashboard" style="width:auto; padding:8px 16px; font-size:11px; background:var(--card-bg); border:1px solid var(--border-color);">← Dashboard</a>
-        <button onclick="logout()" class="btn" title="Déconnexion" style="width:auto; padding:8px 12px; font-size:11px; background:var(--card-bg); color:#ef4444; border:1px solid #fca5a5;">🚪</button>
+        <button onclick="logout()" class="btn" style="width:auto; padding:8px 16px; font-size:11px; background:var(--card-bg); color:#ef4444; border:1px solid #fca5a5;">Déconnexion</button>
       </div>
     </div>
 
@@ -108,31 +107,6 @@
       <div style="display:flex; gap:10px; margin-top:14px;">
         <button class="btn" id="dirSaveBtn" onclick="saveDirItem()">Enregistrer</button>
         <button class="btn" style="background:var(--border-color); color:var(--text-muted);" onclick="closeDirModal()">Fermer</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Notifications (in-app + système si autorisé) -->
-  <div id="notifModal" class="modal-overlay" style="display:none;">
-    <div class="modal-box" style="max-width:520px;">
-      <div class="modal-title">
-        <span>🔔 Notifications</span>
-        <button style="border:none; background:none; font-size:20px; cursor:pointer; color:var(--text-main);" onclick="closeNotifModal()">×</button>
-      </div>
-      <div id="notifStatus" style="font-size:12px; color:var(--text-muted); font-weight:700; margin-bottom:12px;">—</div>
-      <button class="btn" id="enableNotifsBtn" onclick="enableNotifications()">Activer les notifications</button>
-
-      <div id="adminNotifBox" style="display:none; margin-top:18px; border-top:1px solid var(--border-color); padding-top:14px;">
-        <div style="font-size:12px; font-weight:900; color:var(--text-main); margin-bottom:8px;">📣 Envoyer une notification</div>
-        <div style="display:grid; grid-template-columns:1fr; gap:10px;">
-          <select id="notifTarget"></select>
-          <input type="text" id="notifMessage" placeholder="Message (court)" />
-        </div>
-        <div style="display:flex; gap:10px; margin-top:10px;">
-          <button class="btn" style="width:auto; padding:12px 16px;" onclick="sendAdminNotification()">Envoyer</button>
-          <button class="btn" style="width:auto; padding:12px 16px; background:var(--border-color); color:var(--text-main);" onclick="closeNotifModal()">Fermer</button>
-        </div>
-        <div style="font-size:11px; color:var(--text-muted); margin-top:10px;">⚠️ Affiche une alerte dans l’app (et une notification système si l’utilisateur l’a autorisée). Ce n’est pas une “push” quand l’app est fermée.</div>
       </div>
     </div>
   </div>

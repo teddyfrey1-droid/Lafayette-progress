@@ -819,25 +819,7 @@ body:not(.dark-mode) .badge-winner{
     .status-dot.pending { background-color: #ef4444; box-shadow: 0 0 0 2px #fee2e2; }
     .status-text { font-size: 9px; text-transform: uppercase; font-weight: 800; color: #94a3b8; margin-left: 4px; }
     .admin-tag { background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; margin-left: 5px; letter-spacing: 0.5px; }
-    
-    /* --- Badges client (application / notifications) --- */
-    .user-item .user-meta { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
-    .client-tag{
-      display:inline-flex;
-      align-items:center;
-      padding:2px 8px;
-      border-radius:999px;
-      font-size:10px;
-      font-weight:900;
-      letter-spacing:.2px;
-      border:1px solid var(--border-color);
-      background: rgba(0,0,0,0.03);
-      white-space:nowrap;
-    }
-    body.dark-mode .client-tag{ background: rgba(255,255,255,0.06); }
-    .client-tag.app{ border-color: rgba(16,185,129,0.45); }
-    .client-tag.notif{ border-color: rgba(59,130,246,0.45); }
-.user-email-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
+    .user-email-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
 
     /* LOGS */
     .logs-wrapper { display: flex; flex-direction: column; gap: 15px; }
