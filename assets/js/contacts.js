@@ -264,7 +264,11 @@ function renderSuppliers(){
 
     const phone = (it.phone || '').toString().trim();
     const commercial = (it.commercial || '').toString().trim();
-    const deliveryDays = (it.deliveryDays || '').toString().trim();
+    const deliveryDaysRaw = it.deliveryDays;
+    const deliveryDays = Array.isArray(deliveryDaysRaw)
+      ? deliveryDaysRaw.map(v => (v||'').toString().trim()).filter(Boolean).join(' / ')
+      : (deliveryDaysRaw || '').toString().trim();
+    const cutoffTime = (it.cutoffTime || '').toString().trim();
     const leadTime = (it.leadTime || '').toString().trim();
     const minOrder = (it.minOrder || '').toString().trim();
 
@@ -274,8 +278,12 @@ function renderSuppliers(){
     const meta = [];
     if(commercial) meta.push(`👤 ${escapeHtml(commercial)}`);
     if(phone) meta.push(`📞 ${href ? `<a href="${href}" class="dir-link">${escapeHtml(phone)}</a>` : escapeHtml(phone)}`);
-    if(deliveryDays) meta.push(`📦 ${escapeHtml(deliveryDays)}`);
-    if(leadTime) meta.push(`⏱️ ${escapeHtml(leadTime)} j`);
+    if(deliveryDays){
+      meta.push(`📦 ${escapeHtml(deliveryDays)}${cutoffTime ? ` (commande avant ${escapeHtml(cutoffTime)})` : ''}`);
+    } else if(cutoffTime){
+      meta.push(`📦 commande avant ${escapeHtml(cutoffTime)}`);
+    }
+if(leadTime) meta.push(`⏱️ ${escapeHtml(leadTime)} j`);
     if(minOrder) meta.push(`💶 ${escapeHtml(minOrder)}`);
 
     row.innerHTML = `
@@ -408,10 +416,25 @@ function openDirModal(type, key){
         <div class="dir-label">Numéro</div>
         <input id="dirPhone" type="text" placeholder="Ex : 06 00 00 00 00" value="${escapeAttr(item.phone || '')}">
       </div>
+
       <div class="input-group">
         <div class="dir-label">Jours de livraisons</div>
-        <input id="dirDeliveryDays" type="text" placeholder="Ex : Lun / Mer / Ven" value="${escapeAttr(item.deliveryDays || '')}">
+        <div class="day-grid" aria-label="Jours de livraisons">
+          <label class="day-chip"><input class="day-check" type="checkbox" value="Lun" ${(Array.isArray(item.deliveryDays) ? item.deliveryDays.includes('Lun') : (String(item.deliveryDays||'').toLowerCase().includes('lun'))) ? 'checked' : ''}> Lun</label>
+          <label class="day-chip"><input class="day-check" type="checkbox" value="Mar" ${(Array.isArray(item.deliveryDays) ? item.deliveryDays.includes('Mar') : (String(item.deliveryDays||'').toLowerCase().includes('mar'))) ? 'checked' : ''}> Mar</label>
+          <label class="day-chip"><input class="day-check" type="checkbox" value="Mer" ${(Array.isArray(item.deliveryDays) ? item.deliveryDays.includes('Mer') : (String(item.deliveryDays||'').toLowerCase().includes('mer'))) ? 'checked' : ''}> Mer</label>
+          <label class="day-chip"><input class="day-check" type="checkbox" value="Jeu" ${(Array.isArray(item.deliveryDays) ? item.deliveryDays.includes('Jeu') : (String(item.deliveryDays||'').toLowerCase().includes('jeu'))) ? 'checked' : ''}> Jeu</label>
+          <label class="day-chip"><input class="day-check" type="checkbox" value="Ven" ${(Array.isArray(item.deliveryDays) ? item.deliveryDays.includes('Ven') : (String(item.deliveryDays||'').toLowerCase().includes('ven'))) ? 'checked' : ''}> Ven</label>
+          <label class="day-chip"><input class="day-check" type="checkbox" value="Sam" ${(Array.isArray(item.deliveryDays) ? item.deliveryDays.includes('Sam') : (String(item.deliveryDays||'').toLowerCase().includes('sam'))) ? 'checked' : ''}> Sam</label>
+          <label class="day-chip"><input class="day-check" type="checkbox" value="Dim" ${(Array.isArray(item.deliveryDays) ? item.deliveryDays.includes('Dim') : (String(item.deliveryDays||'').toLowerCase().includes('dim'))) ? 'checked' : ''}> Dim</label>
+        </div>
       </div>
+
+      <div class="input-group">
+        <div class="dir-label">Commander avant</div>
+        <input id="dirCutoffTime" type="time" value="${escapeAttr(item.cutoffTime || '')}">
+      </div>
+
       <div class="input-group">
         <div class="dir-label">Délai commande → livraison (jours)</div>
         <input id="dirLeadTime" type="text" placeholder="Ex : 1" value="${escapeAttr(item.leadTime || '')}">
@@ -420,7 +443,7 @@ function openDirModal(type, key){
         <div class="dir-label">Minimum de commande</div>
         <input id="dirMinOrder" type="text" placeholder="Ex : 150€" value="${escapeAttr(item.minOrder || '')}">
       </div>
-    `;
+`;
   } else {
     title.textContent = key ? '✏️ Modifier site' : '＋ Ajouter site';
     form.innerHTML = `
@@ -500,10 +523,14 @@ function saveDirItem(){
   } else if(editingType === 'supplier'){
     const commercial = (document.getElementById('dirCommercial')?.value || '').trim();
     const phone = (document.getElementById('dirPhone')?.value || '').trim();
-    const deliveryDays = (document.getElementById('dirDeliveryDays')?.value || '').trim();
+    const deliveryDays = Array.from(document.querySelectorAll('#dirForm .day-check:checked'))
+      .map(el => (el.value || '').trim())
+      .filter(Boolean);
+    const cutoffTime = (document.getElementById('dirCutoffTime')?.value || '').trim();
     const leadTime = (document.getElementById('dirLeadTime')?.value || '').trim();
     const minOrder = (document.getElementById('dirMinOrder')?.value || '').trim();
-    const payload = { label, commercial, phone, deliveryDays, leadTime, minOrder };
+
+    const payload = { label, commercial, phone, deliveryDays, cutoffTime, leadTime, minOrder };
     const ref = editingKey ? db.ref('directory/suppliers/' + editingKey) : db.ref('directory/suppliers').push();
     ref.set(payload).then(() => {
       showToast('✅ Fournisseur enregistré');

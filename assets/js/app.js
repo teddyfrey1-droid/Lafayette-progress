@@ -858,7 +858,7 @@ function renderMenuSitesPreview(){
       // Special display for "TEMPS RESTANT" : bigger under the circle (one line)
       if(msg === "TEMPS RESTANT"){
         el.classList.add('time-remaining');
-        el.textContent = '⏳TEMPS RESTANT';
+        el.textContent = '⏳ TEMPS RESTANT';
       } else {
         el.classList.remove('time-remaining');
         el.textContent = msg || "";

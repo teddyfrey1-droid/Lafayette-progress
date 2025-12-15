@@ -152,6 +152,42 @@ body { font-family: var(--font-stack); background: var(--bg-gradient); color: va
     .login-title { font-size: 24px; font-weight: 900; color: var(--text-main); margin-bottom: 20px; }
     
     .input-group { position: relative; margin-bottom: 10px; }
+
+    /* ---- Fournisseurs : jours de livraisons (checkboxes rapides) ---- */
+    .day-grid{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      padding: 10px 0 2px;
+    }
+    .day-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,.28);
+      background: rgba(255,255,255,.08);
+      color: var(--text-main);
+      font-weight: 800;
+      font-size: 12px;
+      cursor: pointer;
+      user-select:none;
+    }
+    body.dark-mode .day-chip{
+      background: rgba(148,163,184,.10);
+      border-color: rgba(148,163,184,.18);
+    }
+    .day-chip input{
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      padding: 0;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+      accent-color: var(--success);
+    }
     input, select { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border-color); font-size: 13px; background: var(--input-bg); color: var(--text-main); outline: none; transition: 0.3s; }
     input.error { border-color: var(--danger); animation: shake 0.3s; background-color: rgba(239, 68, 68, 0.05); }
     .toggle-password { position: absolute; right: 12px; top: 12px; cursor: pointer; opacity: 0.5; font-size: 16px; }
@@ -505,7 +541,21 @@ body:not(.dark-mode) .daily-micro{ margin-top: 0; margin-bottom: 12px; }
     
     .card { background: var(--card-bg); border-radius: var(--radius); padding: 35px; box-shadow: 0 15px 40px -5px rgba(0,0,0,0.06); position: relative; overflow: hidden; border: 1px solid rgba(0,0,0,0.02); margin-bottom: 30px; transition: transform 0.2s; z-index:0; }
 
-    /* TEMPS RESTANT : priorité visuelle (sobre, pro) */
+    
+    /* ---- Objectifs : effet glass plus pro (uniquement dans la liste d'objectifs) ---- */
+    .objectives-wrapper .card{
+      background: rgba(255,255,255,.58);
+      border: 1px solid rgba(148,163,184,.22);
+      box-shadow: 0 18px 60px rgba(0,0,0,.08);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+    body.dark-mode .objectives-wrapper .card{
+      background: rgba(17,24,39,.44);
+      border-color: rgba(148,163,184,.16);
+      box-shadow: 0 22px 78px rgba(0,0,0,.40);
+    }
+/* TEMPS RESTANT : priorité visuelle (sobre, pro) */
     .card.primary-card{
         border: 1px solid rgba(37,99,235,.22);
         box-shadow: 0 18px 52px rgba(37,99,235,.10);
@@ -545,16 +595,17 @@ body:not(.dark-mode) .daily-micro{ margin-top: 0; margin-bottom: 12px; }
 
     .status-badge { position: absolute; top: 0; left: 0; right: 0; padding: 12px; text-align: center; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; border-radius: var(--radius) var(--radius) 0 0; }
     .badge-locked { background: #fff7ed; color: #c2410c; border-bottom: 2px solid #ffedd5; }
-    .badge-winner { background: rgba(22,163,74,.16); color: #14532d; border-bottom: 2px solid rgba(22,163,74,.38); }
+    .badge-winner { background: rgba(16,185,129,.18); color: #064e3b; border-bottom: 2px solid rgba(16,185,129,.35); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: inset 0 -1px 0 rgba(255,255,255,.18); }
 /* MODE JOUR : rendre "OBJECTIF VALIDÉ" plus sobre (gris foncé pro) */
 body:not(.dark-mode) .badge-winner{
-  /* fond vert pro (pas flashy) */
-  background: rgba(21,128,61,.14);
-  color: #065f46;
-  border-bottom-color: rgba(21,128,61,.30);
+  background: rgba(16,185,129,.20);
+  color: #064e3b;
+  border-bottom-color: rgba(16,185,129,.40);
+  border-top: 1px solid rgba(16,185,129,.20);
 }
+
     /* meilleure lisibilité en mode nuit, sans effet "arcade" */
-    body.dark-mode .badge-winner { background: rgba(16,185,129,.22); color: #ecfdf5; border-bottom-color: rgba(16,185,129,.42); }
+    body.dark-mode .badge-winner { background: rgba(16,185,129,.20); color: #ecfdf5; border-bottom-color: rgba(16,185,129,.45); border-top: 1px solid rgba(255,255,255,.06); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
     .badge-ready { background: rgba(37,99,235,.10); color: #1e40af; border-bottom: 2px solid rgba(37,99,235,.15); }
 
     .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; margin-top: 25px; gap: 15px; }
@@ -1629,14 +1680,14 @@ body.dark-mode .total-row{
 
 /* --- HISTORY PANEL (monthly) --- */
 .history-panel{
-  margin: 14px 14px 18px;
+  margin: 14px 14px 26px;
   padding: 14px 14px 10px;
   border-radius: 18px;
   background: rgba(15, 23, 42, 0.10);
   border: 1px solid rgba(148, 163, 184, 0.18);
   backdrop-filter: blur(10px);
 }
-body.dark .history-panel{
+body.dark-mode .history-panel{
   background: rgba(15, 23, 42, 0.35);
   border-color: rgba(148, 163, 184, 0.20);
 }
