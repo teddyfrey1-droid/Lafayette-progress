@@ -23,6 +23,8 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 
   <link rel="stylesheet" href="assets/css/styles.css">
 
@@ -84,10 +86,10 @@
         <span>📈 Suivi — <span id="objProgName">—</span></span>
         <button style="border:none; background:none; font-size:20px; cursor:pointer; color:var(--text-main);" onclick="closeObjectiveProgress()">×</button>
       </div>
-      <div id="objProgHint" style="font-size:12px; color:var(--text-muted); font-weight:700; margin-bottom:12px;">
-        Auto : un point se crée quand la valeur d’un objectif est modifiée. Tu peux aussi ajouter un point si besoin.
-      </div>
+<div class="objprog-canvas-wrap">
       <canvas id="objProgCanvas" width="720" height="220" style="width:100%; border:1px solid var(--border-color); border-radius:14px; background:rgba(0,0,0,0.02);"></canvas>
+      <div id="objProgTooltip" class="objprog-tooltip" style="display:none;"></div>
+    </div>
       <div style="height:12px;"></div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
         <div style="flex:1; min-width:160px;">
@@ -133,7 +135,10 @@
       </div>
       <div class="top-actions">
         <button id="btnAdmin" class="btn" style="width:auto; padding:8px 16px; font-size:11px; display:none;">⚙️ Admin</button>
-        <button onclick="logout()" class="btn" style="width:auto; padding:8px 16px; font-size:11px; background:var(--card-bg); color:#ef4444; border:1px solid #fca5a5;">Déconnexion</button>
+        <button id="logoutBtn" onclick="logout()" class="btn logout-btn" style="width:auto; padding:8px 16px; font-size:11px; background:var(--card-bg); color:#ef4444; border:1px solid #fca5a5;">
+          <span class="logout-icon" aria-hidden="true">🚪</span>
+          <span class="logout-text">Déconnexion</span>
+        </button>
               <button class="icon-btn" id="globalMenuBtn" onclick="toggleGlobalMenu()">☰</button>
       </div>
     </div>
@@ -147,11 +152,12 @@
         <button class="icon-btn" type="button" onclick="toggleGlobalMenu(false)" aria-label="Fermer">×</button>
       </div>
       <nav class="global-menu-links">
-        <a class="global-menu-link" href="index.html#dashboard" onclick="toggleGlobalMenu(false)">📊 Dashboard</a>
+        <a class="global-menu-link menu-dashboard" href="index.html#dashboard" onclick="toggleGlobalMenu(false)"><span class="menu-dashboard-label">📊 Dashboard</span></a>
+        <div class="global-menu-sep" aria-hidden="true"></div>
         <!-- 2 catégories séparées : Sites utiles puis Contacts (1 seule ouverte à la fois) -->
         <button class="global-menu-link global-menu-accordion" type="button" onclick="toggleMenuSites()">
           <span>🔗 Sites utiles</span>
-          <span id="menuSitesChev" style="opacity:.8; font-weight:900;">▸</span>
+          <span id="menuSitesChev" class="menu-chev" aria-hidden="true">▸</span>
         </button>
         <div class="global-menu-sub" id="menuSitesSub" style="display:none;">
           <div class="menu-sub-head">
@@ -163,7 +169,7 @@
 
         <button class="global-menu-link global-menu-accordion" type="button" onclick="toggleMenuContacts()">
           <span>📞 Contacts</span>
-          <span id="menuContactsChev" style="opacity:.8; font-weight:900;">▸</span>
+          <span id="menuContactsChev" class="menu-chev" aria-hidden="true">▸</span>
         </button>
         <div class="global-menu-sub" id="menuContactsSub" style="display:none;">
           <div class="menu-sub-head">
@@ -175,6 +181,7 @@
       </nav>
       <div class="global-menu-foot">
         <button id="installAppBtn" class="btn" style="width:100%; margin-top:10px; display:none;">⬇️ Installer l’app</button>
+        <button id="enablePushBtn" class="btn" style="width:100%; margin-top:10px; display:none;">🔔 Activer les notifications</button>
       </div>
     </aside>
 
@@ -295,6 +302,7 @@
     <div class="tab-nav">
       <button id="btnTabTeam" onclick="switchTab('team')" class="btn-tab active">👥 Équipe</button>
       <button id="btnTabObjs" onclick="switchTab('objs')" class="btn-tab">🎯 Pilotage</button>
+      <button id="btnTabNotifs" onclick="switchTab('notifs')" class="btn-tab" style="display:none;">🔔 Notifications</button>
       <button id="btnTabLogs" onclick="switchTab('logs')" class="btn-tab" style="display:none;">🕒 Historique</button>
       <button id="btnTabFeedbacks" onclick="switchTab('feedbacks')" class="btn-tab" style="display:none;">💬 Avis & News</button>
     </div>
@@ -352,6 +360,63 @@
       </div>
     </div>
 
+    
+    <div id="tab-notifs" style="display:none;">
+      <div class="admin-section" style="border-left:4px solid var(--primary);">
+        <h3 class="section-header-large">🔔 Notifications</h3>
+        <div style="font-size:11px; color:var(--text-muted); margin-bottom:12px;">
+          Envoie une notification push (uniquement pour ceux qui ont installé l’app + activé 🔔).
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <select id="notifAudience">
+            <option value="all">Tout le monde</option>
+            <option value="team">Équipe (hors admins)</option>
+            <option value="admins">Admins uniquement</option>
+          </select>
+          <input id="notifLink" type="text" placeholder="Lien (ex: /index.html#dashboard)">
+        </div>
+
+        <input id="notifTitle" type="text" placeholder="Titre (ex: Nouveau palier ✅)">
+        <textarea id="notifBody" class="fb-input" style="height:90px;" placeholder="Message..."></textarea>
+
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <button class="btn" id="btnSendNotif" onclick="sendAdminNotification()">📨 Envoyer</button>
+          <div style="font-size:11px; color:var(--text-muted);">
+            Région Functions (optionnel) :
+            <input id="functionsRegion" type="text" placeholder="us-central1 / europe-west1" style="width:140px; margin-left:6px; padding:8px 10px; border-radius:10px; border:1px solid rgba(148,163,184,.25); background:rgba(15,23,42,.04); color:var(--text-main);">
+          </div>
+          <button class="btn" onclick="saveFunctionsRegion()" style="background:rgba(59,130,246,.14); color:var(--primary);">💾</button>
+        </div>
+      </div>
+
+      <div class="admin-section">
+        <h3 class="section-header-large">⚙️ Automatisations</h3>
+        <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">
+          Active ce que tu veux. Ça n’affecte pas les calculs : ça envoie juste un push.
+        </div>
+        <div class="options-row" style="gap:14px; flex-wrap:wrap;">
+          <label class="check-label"><input type="checkbox" id="autoNotifOnUpdate"> Quand je publie/modifie une nouveauté</label>
+          <label class="check-label"><input type="checkbox" id="autoNotifOnObjChange"> Quand je modifie un objectif</label>
+          <label class="check-label"><input type="checkbox" id="autoNotifOnPilotage"> Quand je clique “📡 PUBLIER” (pilotage)</label>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap;">
+          <select id="autoNotifAudience">
+            <option value="all">Audience auto : tout le monde</option>
+            <option value="team">Audience auto : équipe</option>
+            <option value="admins">Audience auto : admins</option>
+          </select>
+          <button class="btn" onclick="saveNotifSettings()">💾 Enregistrer</button>
+        </div>
+      </div>
+
+      <div class="admin-section">
+        <h3 class="section-header-large">📜 Historique</h3>
+        <div id="notifHistory" class="logs-wrapper" style="max-height:240px;"></div>
+      </div>
+    </div>
+
+
     <div id="tab-objs" style="display:none;">
       
       <div class="admin-section" id="superAdminBudget" style="border: 2px solid var(--primary); display:block;">
@@ -388,7 +453,7 @@
               <div style="display:flex; align-items:center; gap:8px;">
                 <input type="number" id="simGuardrailPct" placeholder="Ex: 20" min="1" max="100" style="max-width:90px;">
                 <button id="btnSaveGuardrailPct" onclick="saveGuardrailMaxPct()" style="border:none; background:rgba(59,130,246,.14); color:var(--primary); padding:6px 10px; border-radius:6px; font-size:11px; font-weight:900; cursor:pointer;">OK</button>
-                <div style="font-size:11px; color:var(--text-muted);">Super Admin</div>
+                <div style="font-size:11px; color:var(--text-muted);">Admin</div>
               </div>
             </div>
             <div id="guardrailBox" class="section-card" style="padding:12px; display:none; border:1px solid rgba(239,68,68,.25); background:rgba(239,68,68,.06);">

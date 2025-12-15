@@ -12,12 +12,226 @@
     const auth = firebase.auth();
     const db = firebase.database();
 
+    // --- Cloud Functions helper (pour envoyer des notifications) ---
+    function _uniq(arr){ return [...new Set(arr.filter(Boolean))]; }
+
+    async function _getFunctionsRegion(){
+      if(_functionsRegionCache) return _functionsRegionCache;
+      try{
+        const snap = await db.ref('config/functionsRegion').get();
+        const r = snap.exists() ? String(snap.val()||'').trim() : '';
+        if(r){ _functionsRegionCache = r; return r; }
+      }catch(e){}
+      // fallback: last known in localStorage
+      try{
+        const r2 = localStorage.getItem('heiko_functions_region');
+        if(r2){ _functionsRegionCache = r2; return r2; }
+      }catch(e){}
+      return '';
+    }
+
+    function _getFunctionsRegionsToTry(region){
+      // On essaye d’abord la région configurée, puis des valeurs fréquentes
+      const list = _uniq([region, 'europe-west1', 'us-central1']);
+      return list;
+    }
+
+    async function _callSendPush(data){
+      if(!firebase.functions) throw new Error("Firebase Functions SDK manquant");
+      const configured = await _getFunctionsRegion();
+      const regions = _getFunctionsRegionsToTry(configured);
+      let lastErr = null;
+
+      for(const r of regions){
+        try{
+          const fns = r ? firebase.app().functions(r) : firebase.functions();
+          const fn = fns.httpsCallable('sendPush'); // new callable
+          const res = await fn(data);
+          try{ localStorage.setItem('heiko_functions_region', r); }catch(e){}
+          _functionsRegionCache = r;
+          return res && res.data ? res.data : res;
+        }catch(err){
+          lastErr = err;
+          const msg = (err && err.message) ? String(err.message) : '';
+          const code = (err && err.code) ? String(err.code) : '';
+          // si la fonction n’existe pas dans cette région, on essaye la suivante
+          if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
+          // sinon on stoppe
+          break;
+        }
+      }
+      throw lastErr || new Error("Échec d’appel sendPush");
+    }
+
+    function _notifCfg(){
+      const d = { autoOnUpdate:false, autoOnObjChange:false, autoOnPilotage:false, autoAudience:'all' };
+      const s = (globalSettings && globalSettings.notifications) ? globalSettings.notifications : {};
+      return { ...d, ...s };
+    }
+
+    async function sendAdminNotification(){
+      if(!isAdminUser()) return;
+      const titleEl = document.getElementById('notifTitle');
+      const bodyEl = document.getElementById('notifBody');
+      const linkEl = document.getElementById('notifLink');
+      const audEl = document.getElementById('notifAudience');
+      if(!titleEl || !bodyEl || !audEl) return;
+
+      const title = String(titleEl.value||'').trim();
+      const body = String(bodyEl.value||'').trim();
+      const link = linkEl ? String(linkEl.value||'').trim() : '';
+      const audience = audEl ? String(audEl.value||'all') : 'all';
+
+      if(!title || !body){
+        showToast("Titre + message requis.");
+        return;
+      }
+
+      const btn = document.getElementById('btnSendNotif');
+      if(btn){ btn.disabled = true; btn.style.opacity = .7; }
+
+      try{
+        const data = await _callSendPush({ title, body, link: link || '/index.html#dashboard', audience });
+        showToast(`✅ Notification envoyée (${data && data.sent != null ? data.sent : 'OK'})`);
+        // log RTDB (historique)
+        try{
+          await db.ref('notifications/sent').push({
+            title, body, link: link || '/index.html#dashboard', audience,
+            by: (currentUser && currentUser.name) ? currentUser.name : 'Admin',
+            uid: (currentUser && currentUser.uid) ? currentUser.uid : null,
+            at: Date.now(),
+            result: data || null
+          });
+        }catch(e){}
+        // clear
+        titleEl.value = '';
+        bodyEl.value = '';
+      }catch(err){
+        console.error(err);
+        showToast("Erreur envoi notif (Functions).");
+      }finally{
+        if(btn){ btn.disabled = false; btn.style.opacity = 1; }
+      }
+    }
+
+    async function saveFunctionsRegion(){
+      if(!isAdminUser()) return;
+      const el = document.getElementById('functionsRegion');
+      if(!el) return;
+      const r = String(el.value||'').trim();
+      if(!r){ showToast("Région vide."); return; }
+      try{
+        await db.ref('config/functionsRegion').set(r);
+        _functionsRegionCache = r;
+        try{ localStorage.setItem('heiko_functions_region', r); }catch(e){}
+        showToast("✅ Région Functions enregistrée");
+      }catch(e){
+        showToast("Erreur sauvegarde région.");
+      }
+    }
+
+    async function saveNotifSettings(){
+      if(!isAdminUser()) return;
+      const s = {
+        autoOnUpdate: !!document.getElementById('autoNotifOnUpdate')?.checked,
+        autoOnObjChange: !!document.getElementById('autoNotifOnObjChange')?.checked,
+        autoOnPilotage: !!document.getElementById('autoNotifOnPilotage')?.checked,
+        autoAudience: String(document.getElementById('autoNotifAudience')?.value || 'all')
+      };
+      try{
+        await db.ref('settings/notifications').set(s);
+        showToast("✅ Réglages notif enregistrés");
+      }catch(e){
+        showToast("Erreur réglages notif.");
+      }
+    }
+
+    function renderNotifPanel(){
+      if(!isAdminUser()) return;
+      const cfg = _notifCfg();
+      const cb1 = document.getElementById('autoNotifOnUpdate');
+      const cb2 = document.getElementById('autoNotifOnObjChange');
+      const cb3 = document.getElementById('autoNotifOnPilotage');
+      const aud = document.getElementById('autoNotifAudience');
+      if(cb1) cb1.checked = !!cfg.autoOnUpdate;
+      if(cb2) cb2.checked = !!cfg.autoOnObjChange;
+      if(cb3) cb3.checked = !!cfg.autoOnPilotage;
+      if(aud) aud.value = cfg.autoAudience || 'all';
+
+      // region input
+      const rEl = document.getElementById('functionsRegion');
+      if(rEl){
+        _getFunctionsRegion().then(r => { if(r && !rEl.value) rEl.value = r; });
+      }
+    }
+
+    function renderNotifHistory(){
+      if(!isAdminUser()) return;
+      const box = document.getElementById('notifHistory');
+      if(!box) return;
+      const arr = [];
+      Object.keys(allNotifsSent || {}).forEach(k => arr.push({id:k, ...(allNotifsSent[k]||{})}));
+      arr.sort((a,b) => (b.at||0) - (a.at||0));
+      if(arr.length === 0){
+        box.innerHTML = "<div style='color:#999;font-style:italic;'>Aucune notification envoyée.</div>";
+        return;
+      }
+      box.innerHTML = "";
+      arr.slice(0, 50).forEach(n => {
+        const d = n.at ? new Date(n.at).toLocaleString('fr-FR') : '';
+        const div = document.createElement('div');
+        div.className = 'update-card';
+        div.style.marginBottom = '10px';
+        const aud = n.audience ? String(n.audience) : 'all';
+        const who = n.by ? String(n.by) : '';
+        div.innerHTML = `
+          <div class="update-header">
+            <span style="font-weight:900; font-size:11px;">${d} • ${aud.toUpperCase()}</span>
+            <span style="font-size:11px; color:var(--text-muted);">${who}</span>
+          </div>
+          <div style="font-weight:900;">${escapeHtml(n.title||'')}</div>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">${escapeHtml(n.body||'')}</div>
+        `;
+        box.appendChild(div);
+      });
+    }
+
+    async function _maybeAutoNotify(kind, payload){
+      // kind: 'update' | 'objective' | 'pilotage'
+      if(!isAdminUser()) return;
+      const cfg = _notifCfg();
+      const ok = (kind==='update' && cfg.autoOnUpdate) || (kind==='objective' && cfg.autoOnObjChange) || (kind==='pilotage' && cfg.autoOnPilotage);
+      if(!ok) return;
+      const audience = cfg.autoAudience || 'all';
+
+      try{
+        const data = await _callSendPush({ ...payload, audience });
+        try{
+          await db.ref('notifications/sent').push({
+            ...payload,
+            audience,
+            by: (currentUser && currentUser.name) ? currentUser.name : 'Admin',
+            uid: (currentUser && currentUser.uid) ? currentUser.uid : null,
+            at: Date.now(),
+            autoKind: kind,
+            result: data || null
+          });
+        }catch(e){}
+      }catch(e){
+        // pas bloquant
+        console.error(e);
+      }
+    }
+
+
     let currentUser = null;
     let allUsers = {};
     let allObjs = {};
     let allLogs = {};
     let allFeedbacks = {};
     let allUpdates = {};
+    let allNotifsSent = {};
+    let _functionsRegionCache = null;
     let globalSettings = { budget: 0 };
     const BASE_HOURS = 35;
     const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
@@ -85,6 +299,112 @@ let _objProgUnsub = null;
       if('serviceWorker' in navigator){
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('sw.js').catch(() => {});
+      // --- PUSH NOTIFICATIONS (Firebase Cloud Messaging / Safari iOS PWA) ---
+      // Requiert :
+      // - PWA ajoutée à l’écran d’accueil (iOS/iPadOS)
+      // - VAPID public key (Firebase Console > Cloud Messaging > Web Push certificates)
+      // Option : tu peux aussi stocker la clé dans RTDB : /config/vapidKey
+      let _messaging = null;
+      let _swRegForPush = null;
+
+      async function _getVapidKey(){
+        try{
+          const snap = await db.ref('config/vapidKey').get();
+          const k = snap.exists() ? String(snap.val()||'').trim() : '';
+          return k;
+        }catch(e){ return ''; }
+      }
+
+      function _isStandalonePWA(){
+        return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (window.navigator && window.navigator.standalone === true);
+      }
+
+      function _supportsPush(){
+        return ('Notification' in window) && ('serviceWorker' in navigator) && (typeof firebase !== 'undefined') && (firebase.messaging);
+      }
+
+      async function _setupPushUI(){
+        const btn = document.getElementById('enablePushBtn');
+        if(!btn) return;
+
+        if(!_supportsPush()){
+          btn.style.display = 'none';
+          return;
+        }
+
+        try{
+          _swRegForPush = await navigator.serviceWorker.ready;
+        }catch(e){ _swRegForPush = null; }
+
+        // Messaging instance (FCM)
+        try{ _messaging = firebase.messaging(); }catch(e){ _messaging = null; }
+
+        // Affiche le bouton uniquement si on a un user connecté (uid) et un SW prêt
+        btn.style.display = (_swRegForPush && currentUser && currentUser.uid && _messaging) ? 'block' : 'none';
+
+        btn.onclick = async () => {
+          if(!currentUser || !currentUser.uid){
+            showToast("Connecte-toi pour activer les notifications.");
+            return;
+          }
+          if(!_isStandalonePWA()){
+            showToast("Installe l’app (Ajouter à l’écran d’accueil) pour recevoir des notifications.");
+            return;
+          }
+          if(!_swRegForPush){
+            showToast("Service Worker non prêt. Recharge la page.");
+            return;
+          }
+
+          // Demande d’autorisation (doit venir d’un clic)
+          let perm = "default";
+          try{ perm = await Notification.requestPermission(); }catch(e){ perm = "denied"; }
+          if(perm !== "granted"){
+            showToast("Notifications refusées.");
+            return;
+          }
+
+          const vapidKey = (await _getVapidKey()) || "";
+          if(!vapidKey){
+            showToast("Clé VAPID manquante (config/vapidKey).");
+            return;
+          }
+
+          try{
+            const token = await _messaging.getToken({
+              vapidKey,
+              serviceWorkerRegistration: _swRegForPush
+            });
+
+            if(!token){
+              showToast("Impossible d’obtenir le token de notification.");
+              return;
+            }
+
+            // Sauvegarde dans RTDB
+            await db.ref('fcmTokens/' + currentUser.uid).push({
+              token,
+              createdAt: Date.now(),
+              ua: navigator.userAgent
+            });
+
+            showToast("Notifications activées ✅");
+          }catch(err){
+            console.error(err);
+            showToast("Erreur notifications. Vérifie la clé VAPID et la config Firebase.");
+          }
+        };
+
+        // Foreground messages (quand l’app est ouverte)
+        try{
+          _messaging.onMessage((payload) => {
+            const title = payload?.notification?.title || "Heiko";
+            const body = payload?.notification?.body || "";
+            showToast(body ? (title + " — " + body) : title);
+          });
+        }catch(e){}
+      }
+
         });
       }
 
@@ -329,8 +649,10 @@ let _objProgUnsub = null;
              const def = { name: "Utilisateur", hours:35, role:'staff', email: user.email, status: 'pending' };
              db.ref('users/'+user.uid).set(def);
              currentUser = def;
+             try{ _setupPushUI(); }catch(e){}
           } else { 
-             currentUser = val; 
+             currentUser = val;
+             try{ _setupPushUI(); }catch(e){} 
              if(currentUser.status !== 'active') {
                  db.ref('users/'+user.uid).update({ status: 'active', lastLogin: Date.now() });
              }
@@ -460,7 +782,14 @@ let _objProgUnsub = null;
         // Persist once/day in Firebase (optional but useful across devices)
         db.ref(`dailyMicro/${uid}/${dayKey}`).set({ msg, time: Date.now() }).catch(() => {});
       }
-      el.textContent = msg || "";
+      // Special display for "TEMPS RESTANT" : bigger under the circle (one line)
+      if(msg === "TEMPS RESTANT"){
+        el.classList.add('time-remaining');
+        el.textContent = '⏳TEMPS RESTANT';
+      } else {
+        el.classList.remove('time-remaining');
+        el.textContent = msg || "";
+      }
       el.style.display = msg ? 'block' : 'none';
     }
     // HAPTICS (mobile): subtle, only on key moments
@@ -568,7 +897,7 @@ function showToast(message) {
              if(isAdminUser()) {
                  renderAdminObjs();
              }
-             if(isSuperAdmin()) {
+             if(isAdminUser()) {
                  renderSimulator();
              }
           } catch(e) { console.error(e); }
@@ -576,14 +905,18 @@ function showToast(message) {
       db.ref('users').on('value', s => { 
         allUsers = s.val() || {}; 
         if(isAdminUser()) { renderAdminUsers(); }
-        if(isSuperAdmin()) { renderSimulator(); }
+        if(isAdminUser()) { renderSimulator(); }
       });
       db.ref('settings').on('value', s => { 
         globalSettings = s.val() || { budget: 0 }; 
         if(globalSettings.guardrailMaxPctOfCA == null) {
           globalSettings.guardrailMaxPctOfCA = DEFAULT_GUARDRAIL_MAX_PCT_OF_CA;
         }
-        if(isSuperAdmin()) { renderSimulator(); }
+        // Defaults notifications
+        if(!globalSettings.notifications) globalSettings.notifications = { autoOnUpdate:false, autoOnObjChange:false, autoOnPilotage:false, autoAudience:'all' };
+        if(globalSettings.notifications.autoAudience == null) globalSettings.notifications.autoAudience = 'all';
+        if(isAdminUser()) { try{ renderNotifPanel(); }catch(e){} }
+        if(isAdminUser()) { renderSimulator(); }
       });
 
       // Aperçu "Sites utiles" sur le dashboard
@@ -597,7 +930,13 @@ function showToast(message) {
       });
       db.ref('logs').limitToLast(2000).on('value', s => { allLogs = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); });
       db.ref('feedbacks').on('value', s => { allFeedbacks = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderFeedbacks(allFeedbacks); });
-      
+
+      // LOAD NOTIFICATIONS (Admin)
+      db.ref('notifications/sent').limitToLast(200).on('value', s => {
+        allNotifsSent = s.val() || {};
+        if(isAdminUser()) { try{ renderNotifHistory(); }catch(e){} }
+      });
+
       // LOAD UPDATES & CHECK ALERT
       db.ref('updates').on('value', s => { 
           allUpdates = s.val() || {}; 
@@ -645,23 +984,24 @@ function showToast(message) {
       document.getElementById("btnTabLogs").style.display = isSuperUser ? 'block' : 'none';
       document.getElementById("btnTabFeedbacks").style.display = isSuperUser ? 'block' : 'none';
 
+      // Notifications tab: Admin + Super Admin
+      const btnNotifs = document.getElementById("btnTabNotifs");
+      if(btnNotifs) btnNotifs.style.display = isAdmin ? 'block' : 'none';
+
       const globalBudgetInput = document.getElementById("simGlobalBudget");
       const saveBudgetBtn = document.getElementById("btnSaveGlobalBudget");
       const simCAInput = document.getElementById('simMonthlyCA');
       const superAdminBlock = document.getElementById('superAdminBudget');
       
-      // Pilotage & simulation: visible uniquement Super Admin
-      if(superAdminBlock) superAdminBlock.style.display = isSuperUser ? 'block' : 'none';
-      if(globalBudgetInput) globalBudgetInput.disabled = !isSuperUser;
-      if(saveBudgetBtn) saveBudgetBtn.style.display = isSuperUser ? 'inline-block' : 'none';
-      if(simCAInput) simCAInput.disabled = !isSuperUser;
+      // Pilotage & simulation: Admin + Super Admin (requested)
+      const pilotageAllowed = isAdmin;
+      if(superAdminBlock) superAdminBlock.style.display = pilotageAllowed ? 'block' : 'none';
+      if(globalBudgetInput) globalBudgetInput.disabled = !pilotageAllowed;
+      if(saveBudgetBtn) saveBudgetBtn.style.display = pilotageAllowed ? 'inline-block' : 'none';
+      if(simCAInput) simCAInput.disabled = !pilotageAllowed;
       
       if(isAdmin) {
           renderAdminObjs();
-          // le simulateur (Pilotage) est Super Admin uniquement
-      }
-
-      if(isSuperUser) {
           renderSimulator();
       }
 
@@ -679,15 +1019,17 @@ function showToast(message) {
 
         if(id) {
             // MODE MODIFICATION
-            db.ref('updates/' + id).update({ title:t, desc:d, type:type }).then(() => {
+            db.ref('updates/' + id).update({ title:t, desc:d, type:type }).then(async () => {
                 showToast("✅ Mise à jour modifiée !");
                 cancelUpdateEdit();
+                try{ await _maybeAutoNotify('update', { title: "🛠️ " + t, body: d, link: "/index.html#dashboard" }); }catch(e){}
             });
         } else {
             // MODE CREATION
-            db.ref('updates').push({ title:t, desc:d, type:type, date:Date.now() }).then(() => {
+            db.ref('updates').push({ title:t, desc:d, type:type, date:Date.now() }).then(async () => {
                 showToast("📢 Publié !");
                 cancelUpdateEdit();
+                try{ await _maybeAutoNotify('update', { title: "📢 " + t, body: d, link: "/index.html#dashboard" }); }catch(e){}
             });
         }
     }
@@ -957,7 +1299,9 @@ function updateSim() {
             const newBudget = parseFloat(document.getElementById("simGlobalBudget").value);
             if(!isNaN(newBudget)) db.ref('settings/budget').set(newBudget);
             Object.keys(simObjs).forEach(k => { updates['objectives/' + k + '/paliers'] = simObjs[k].paliers; });
-            db.ref().update(updates).then(() => { showToast("✅ Pilotage Appliqué !"); logAction("Pilotage", "Mise à jour globale budget & primes"); });
+            db.ref().update(updates).then(async () => { showToast("✅ Pilotage Appliqué !"); logAction("Pilotage", "Mise à jour globale budget & primes");
+              try{ await _maybeAutoNotify('pilotage', { title: "📡 Pilotage publié", body: "Les primes & paliers ont été mis à jour.", link: "/index.html#dashboard" }); }catch(e){}
+            });
         }
     }
 
@@ -1370,9 +1714,18 @@ function renderDashboard() {
       }
 
       // UI: "Focus du jour" line (simple + motivating)
+      const focusPillEl = document.getElementById("focusPill");
       const focusTextEl = document.getElementById("focusText");
       const focusEmojiEl = document.getElementById("focusEmoji");
+
+      // If the main objective is not unlocked, we show "TEMPS RESTANT" under the circle (dailyMicro)
+      // and we hide the pill under "Mon historique" to keep the page clean.
+      if(!primOk){
+        if(focusPillEl) focusPillEl.style.display = 'none';
+      }
+
       if(focusTextEl && focusEmojiEl){
+        if(focusPillEl && primOk) focusPillEl.style.display = '';
         const publishedObjs = Object.values(allObjs || {}).filter(o => o && o.published);
         let winCount = 0;
         publishedObjs.forEach(o => {
@@ -1395,8 +1748,6 @@ function renderDashboard() {
 
         if(n === 0){
           msgs = [{ e: "📝", t: "Publie les objectifs du jour pour lancer la journée." }];
-        } else if(!primOk){
-          msgs = [{ e: "⚡", t: "Priorités d’abord : débloque le principal pour ouvrir les bonus." }];
         } else if(winCount === n){
           msgs = [{ e: "🎉", t: "Tout est validé : garde ce rythme, c’est parfait." }];
         } else {
@@ -1547,11 +1898,14 @@ const el = document.createElement("div");
        if(t === 'objs') document.getElementById('btnTabObjs').classList.add('active');
        if(t === 'logs') document.getElementById('btnTabLogs').classList.add('active');
        if(t === 'feedbacks') document.getElementById('btnTabFeedbacks').classList.add('active');
+       if(t === 'notifs') document.getElementById('btnTabNotifs').classList.add('active');
        
        document.getElementById('tab-team').style.display = t==='team'?'block':'none';
        document.getElementById('tab-objs').style.display = t==='objs'?'block':'none';
        document.getElementById('tab-logs').style.display = t==='logs'?'block':'none';
        document.getElementById('tab-feedbacks').style.display = t==='feedbacks'?'block':'none';
+       const tn = document.getElementById('tab-notifs'); if(tn) tn.style.display = t==='notifs'?'block':'none';
+       if(t==='notifs') { try{ renderNotifPanel(); renderNotifHistory(); }catch(e){} }
     }
     function toggleCreateInputs() { document.getElementById("createTiersBlock").style.display = document.getElementById("noFixed").checked ? 'none' : 'block'; }
     function toggleEditInputs() { document.getElementById("editTiersBlock").style.display = document.getElementById("eoFixed").checked ? 'none' : 'block'; }
@@ -1672,6 +2026,25 @@ const el = document.createElement("div");
       }).then(() => {
           showToast("✅ Objectif Modifié !");
           document.getElementById("editObjPanel").classList.remove("active");
+
+          // Auto notif (optionnel)
+          try{
+            const oName = String(newName||"Objectif");
+            const curNum = parseFloat(String(newCurrentRaw).replace(',', '.'));
+            const tarNum = parseFloat(String(newTargetRaw).replace(',', '.'));
+            const hideCur = !!document.getElementById("eoHideCurrent").checked;
+            const hideTar = !!document.getElementById("eoHideTarget").checked;
+            let msg = "";
+            if((hideCur || hideTar) && isFinite(curNum) && isFinite(tarNum)) {
+              const pct = getPct(curNum, tarNum, newIsInverse);
+              msg = `${oName} : ${pct.toFixed(0)}%`;
+            } else if(isFinite(curNum) && isFinite(tarNum)) {
+              msg = `${oName} : ${curNum}/${tarNum}`;
+            } else {
+              msg = `${oName} mis à jour`;
+            }
+            _maybeAutoNotify('objective', { title: "🎯 Objectif mis à jour", body: msg, link: "/index.html#dashboard" });
+          }catch(e){}
 
           // Phase demandée : graph auto -> on enregistre un point du jour quand la valeur (current) est saisie/éditée
           try{
@@ -1985,13 +2358,105 @@ const el = document.createElement("div");
 
     // --- Suivi (graph) par objectif (Admin/Super Admin) ---
     let _objProgMode = 'pct'; // 'pct' ou 'num'
+    // Date helpers (ISO yyyy-mm-dd -> affichage FR lisible)
+    function _isoToLocalTs(iso){
+      if(!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return NaN;
+      const p = String(iso).split('-');
+      const y = parseInt(p[0],10);
+      const m = parseInt(p[1],10);
+      const d = parseInt(p[2],10);
+      if(!isFinite(y)||!isFinite(m)||!isFinite(d)) return NaN;
+      return new Date(y, m-1, d).getTime();
+    }
+    function _formatIsoDateFR(iso){
+      const ts = _isoToLocalTs(iso);
+      if(!isFinite(ts)) return iso || '';
+      const d = new Date(ts);
+      const day = d.getDate();
+      let month = d.toLocaleDateString('fr-FR', { month: 'long' });
+      const year = d.getFullYear();
+      // Capitalise month (ex: "Décembre") for a more readable, app-like format
+      month = month ? (month.charAt(0).toUpperCase() + month.slice(1)) : '';
+      return `${day} ${month} ${year}`.trim();
+    }
     let _objProgHit = [];
 
     function _bindObjProgCanvas(){
       const canvas = document.getElementById('objProgCanvas');
       if(!canvas || canvas._bound) return;
       canvas._bound = true;
-      canvas.style.cursor = 'pointer';
+
+      const tip = document.getElementById('objProgTooltip');
+      const hideTip = () => { if(tip) tip.style.display = 'none'; };
+
+      const showTip = (text, cssX, cssY, rect) => {
+        if(!tip) return;
+        tip.textContent = text;
+        tip.style.display = 'block';
+
+        const wrap = tip.parentElement;
+        const w = (wrap && wrap.clientWidth) ? wrap.clientWidth : rect.width;
+        const h = (wrap && wrap.clientHeight) ? wrap.clientHeight : rect.height;
+
+        // After display, we can measure tooltip size
+        const tw = tip.offsetWidth || 180;
+        const th = tip.offsetHeight || 44;
+
+        let left = cssX + 12;
+        let top  = cssY - (th + 12);
+
+        if(left + tw > w) left = Math.max(6, w - tw - 6);
+        if(top < 6) top = cssY + 12;
+        if(top + th > h) top = Math.max(6, h - th - 6);
+
+        tip.style.left = left + 'px';
+        tip.style.top  = top  + 'px';
+      };
+
+      const findNearest = (x, y) => {
+        let best = null;
+        let bestD = 1e9;
+        for(const p of (_objProgHit || [])){
+          const dx = x - p.x;
+          const dy = y - p.y;
+          const d = Math.sqrt(dx*dx + dy*dy);
+          if(d < bestD){ bestD = d; best = p; }
+        }
+        return { best, bestD };
+      };
+
+      canvas.style.cursor = 'default';
+
+      canvas.addEventListener('mousemove', (ev) => {
+        if(!_objProgHit || !_objProgHit.length){
+          hideTip();
+          canvas.style.cursor = 'default';
+          return;
+        }
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / Math.max(1, rect.width);
+        const scaleY = canvas.height / Math.max(1, rect.height);
+        const x = (ev.clientX - rect.left) * scaleX;
+        const y = (ev.clientY - rect.top) * scaleY;
+
+        const { best, bestD } = findNearest(x, y);
+        if(best && bestD <= 18){
+          canvas.style.cursor = 'pointer';
+          const cssX = best.x / scaleX;
+          const cssY = best.y / scaleY;
+          showTip(best.label, cssX, cssY, rect);
+        } else {
+          hideTip();
+          canvas.style.cursor = 'default';
+        }
+      });
+
+      canvas.addEventListener('mouseleave', () => {
+        hideTip();
+        canvas.style.cursor = 'default';
+      });
+
+      // Click still works (useful on mobile)
       canvas.addEventListener('click', (ev) => {
         if(!_objProgHit || !_objProgHit.length) return;
         const rect = canvas.getBoundingClientRect();
@@ -1999,15 +2464,8 @@ const el = document.createElement("div");
         const scaleY = canvas.height / Math.max(1, rect.height);
         const x = (ev.clientX - rect.left) * scaleX;
         const y = (ev.clientY - rect.top) * scaleY;
-        let best = null;
-        let bestD = 1e9;
-        for(const p of _objProgHit){
-          const dx = x - p.x;
-          const dy = y - p.y;
-          const d = Math.sqrt(dx*dx + dy*dy);
-          if(d < bestD){ bestD = d; best = p; }
-        }
-        if(best && bestD <= 12){
+        const { best, bestD } = findNearest(x, y);
+        if(best && bestD <= 18){
           showToast(best.label);
         }
       });
@@ -2123,10 +2581,10 @@ const el = document.createElement("div");
           div.innerHTML = `
             <div class="user-info">
               <div class="user-header" style="gap:10px;">
-                <span class="user-name">${r.date}</span>
+                <span class="user-name">${_formatIsoDateFR(r.date)}</span>
                 <span class="pub-state on" style="text-transform:none;">${badge}</span>
               </div>
-              <div class="user-meta">Mise à jour (auto / admin)</div>
+              <div class="user-meta">Mise à jour</div>
             </div>
             <div class="user-actions">
               <div class="btn-group">
@@ -2201,7 +2659,7 @@ const el = document.createElement("div");
 
       if(!rows || rows.length < 1) return;
 
-      const xs = rows.map(r => new Date(r.date).getTime()).filter(t => isFinite(t));
+      const xs = rows.map(r => _isoToLocalTs(r.date)).filter(t => isFinite(t));
       if(xs.length === 0) return;
       const minX = Math.min(...xs);
       const maxX = Math.max(...xs);
@@ -2219,7 +2677,7 @@ const el = document.createElement("div");
       const spanY = Math.max(1e-9, maxY - minY);
 
       const pts = rows.map(r => {
-        const tx = new Date(r.date).getTime();
+        const tx = _isoToLocalTs(r.date);
         const vx = (tx - minX) / spanX;
         const vy = (Number(r._y) - minY) / spanY;
         const x = pad + vx * (w - 2*pad);
@@ -2230,7 +2688,8 @@ const el = document.createElement("div");
       // Hit points (click) : affiche date + valeur/%
       _objProgHit = pts.map((p, i) => {
         const r = rows[i];
-        const date = (r && r.date) ? r.date : '';
+        const dateIso = (r && r.date) ? r.date : '';
+        const date = _formatIsoDateFR(dateIso);
         let label = date;
         if(mode === 'num'){
           const v = (r && isFinite(r._y)) ? Number(r._y) : NaN;
@@ -2256,7 +2715,7 @@ const el = document.createElement("div");
       ctx.fillStyle = isDark ? 'rgba(255,255,255,0.92)' : 'rgba(17,24,39,0.88)';
       pts.forEach(p => {
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 6, 0, Math.PI*2);
+        ctx.arc(p.x, p.y, 9, 0, Math.PI*2);
         ctx.fill();
         ctx.strokeStyle = isDark ? 'rgba(59,130,246,0.55)' : 'rgba(37,99,235,0.45)';
         ctx.lineWidth = 2;
@@ -2332,8 +2791,8 @@ const el = document.createElement("div");
     }
 
     function saveGlobalBudget() {
-      // Super Admin uniquement
-      if(!isSuperAdmin()) return;
+      // Admin + Super Admin
+      if(!isAdminUser()) return;
       const el = document.getElementById("simGlobalBudget");
       const val = el ? parseFloat(el.value) : NaN;
       if(!isNaN(val)) {
@@ -2345,7 +2804,7 @@ const el = document.createElement("div");
 
     // Super Admin: sauvegarde du seuil garde-fou (% du CA) pour la simulation
     function saveGuardrailMaxPct(){
-      if(!isSuperAdmin()) return;
+      if(!isAdminUser()) return;
       const el = document.getElementById('simGuardrailPct');
       const raw = el ? parseFloat(el.value) : NaN;
       if(!isFinite(raw)) {
