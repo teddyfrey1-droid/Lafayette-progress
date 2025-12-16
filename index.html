@@ -138,7 +138,6 @@
           <span class="logout-icon" aria-hidden="true">🚪</span>
           <span class="logout-text">Déconnexion</span>
         </button>
-              <button class="icon-btn push-icon-btn push-pulse" id="enablePushTopBtn" type="button" style="display:none;" aria-label="Activer les notifications" title="Activer les notifications">🔔</button>
               <button class="icon-btn" id="globalMenuBtn" onclick="toggleGlobalMenu()">☰</button>
       </div>
     </div>
@@ -207,15 +206,6 @@
         <div class="header-pill">🚀 Dashboard Live</div>
         <h1>OBJECTIFS HEIKO LAFAYETTE</h1>
         <div class="last-update" id="lastUpdate">Chargement...</div>
-        <div id="pushCtaCard" class="push-cta-card" style="display:none;">
-          <div class="push-cta-row">
-            <div>
-              <div class="push-cta-title">🔔 Notifications</div>
-              <div class="push-cta-text">Active-les pour recevoir les alertes importantes (objectifs, news, etc.).</div>
-            </div>
-            <button id="enablePushMainBtn" class="btn push-cta-btn" type="button">🔔 Activer</button>
-          </div>
-        </div>
         
         <div class="global-score-container" id="scoreCircle">
           <div class="money-rain" id="moneyRain"></div>
@@ -252,7 +242,12 @@
           <div class="kpi-value" id="kpiBonusState">—</div>
           <div class="kpi-sub" id="kpiBonusSub">—</div>
         </div>
-</section>
+        <div class="kpi-card">
+          <div class="kpi-label">Mise à jour</div>
+          <div class="kpi-value" id="kpiUpdated">—</div>
+          <div class="kpi-sub">Aujourd’hui</div>
+        </div>
+      </section>
 
       <!-- Historique simple (perso) -->
       <section class="history-panel" id="historyPanel" aria-label="Historique mensuel" style="display:none;">
@@ -394,14 +389,8 @@
             <option value="all">Tout le monde</option>
             <option value="team">Équipe (hors admins)</option>
             <option value="admins">Admins uniquement</option>
-                      <option value="user">Utilisateur en particulier</option>
-</select>
+          </select>
           <input id="notifLink" type="text" placeholder="Lien (ex: /index.html#dashboard)">
-        </div>
-
-        <div id="notifUserRow" style="display:none; margin-top:10px;">
-          <select id="notifUserUid"></select>
-          <div style="margin-top:6px; font-size:12px; opacity:.8;">Astuce: tu peux cibler une personne précise.</div>
         </div>
 
         <input id="notifTitle" type="text" placeholder="Titre (ex: Nouveau palier ✅)">
@@ -438,22 +427,7 @@
       </div>
 
       <div class="admin-section">
-  
-      <div class="admin-section" style="border:1px solid rgba(255,255,255,0.08);">
-        <h3 class="section-header-large">📲 Installation & 🔔 Notifications</h3>
-        <div style="font-size:13px; opacity:.85; margin-top:6px;">
-          Liste (côté serveur) des utilisateurs ayant installé/lancé l’app (PWA) et/ou activé les notifications (token FCM).
-        </div>
-
-        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px;">
-          <button class="btn" id="btnRefreshPushAudit">🔄 Rafraîchir</button>
-          <span id="pushAuditMeta" style="font-size:12px; opacity:.75;"></span>
-        </div>
-
-        <div id="pushAuditTable" class="logs-wrapper" style="margin-top:12px; max-height:260px; overflow:auto;"></div>
-      </div>
-
-      <h3 class="section-header-large">📜 Historique</h3>
+        <h3 class="section-header-large">📜 Historique</h3>
         <div id="notifHistory" class="logs-wrapper" style="max-height:240px;"></div>
       </div>
     </div>
@@ -602,7 +576,6 @@
     <button class="btn" onclick="saveObj()">Enregistrer Modifications</button>
     <button class="btn" onclick="document.getElementById('editObjPanel').classList.remove('active')" style="background:white; color:#666; border:1px solid #ccc; margin-top:10px;">Annuler</button>
   </div>
-  <button id="enablePushFabBtn" class="push-fab push-pulse" type="button" style="display:none;" aria-label="Activer les notifications" title="Activer les notifications">🔔</button>
 
   <script src="assets/js/app.js"></script>
 </body>

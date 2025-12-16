@@ -63,69 +63,7 @@
       throw lastErr || new Error("Échec d’appel sendPush");
     }
 
-    
-    async function _callGetPushAudit(){
-      const configured = await _getFunctionsRegion();
-      const regions = _getFunctionsRegionsToTry(configured);
-      let lastErr = null;
-      for(const r of regions){
-        try{
-          const fns = r ? firebase.app().functions(r) : firebase.functions();
-          const fn = fns.httpsCallable('getPushAudit');
-          const res = await fn({});
-          return res && res.data ? res.data : res;
-        }catch(err){
-          lastErr = err;
-        }
-      }
-      throw lastErr || new Error('getPushAudit failed');
-    }
-
-    async function refreshPushAudit(){
-      const box = document.getElementById('pushAuditTable');
-      const meta = document.getElementById('pushAuditMeta');
-      if(!box) return;
-      box.innerHTML = '<div class="log-entry">Chargement...</div>';
-      if(meta) meta.textContent = '';
-      try{
-        const data = await _callGetPushAudit();
-        const users = (data && data.users) ? data.users : [];
-        const gen = data && data.generatedAt ? new Date(data.generatedAt) : null;
-        if(meta && gen) meta.textContent = 'Mis à jour: ' + gen.toLocaleString('fr-FR');
-
-        if(!users.length){
-          box.innerHTML = '<div class="log-entry">Aucune donnée.</div>';
-          return;
-        }
-
-        const rows = users.map(u => {
-          const role = String(u.role||'staff');
-          const tokenCount = Number(u.tokenCount||0);
-          const pwa = (Number(u.pwaInstalledAt||0) > 0) || (Number(u.lastSeenStandaloneAt||0) > 0) || !!u.anyStandalone;
-          const push = tokenCount > 0;
-          const lastTokenAt = Number(u.lastTokenAt||0);
-          const last = lastTokenAt ? new Date(lastTokenAt).toLocaleString('fr-FR') : '—';
-          return `
-            <div class="log-entry" style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-              <div style="min-width:240px;">
-                <div style="font-weight:900;">${escapeHtml(String(u.name||u.uid||''))}</div>
-                <div style="font-size:12px; opacity:.75;">${escapeHtml(String(u.uid||''))} · ${escapeHtml(role)}</div>
-              </div>
-              <div style="display:flex; gap:12px; align-items:center;">
-                <span style="font-size:12px;">📲 ${pwa ? 'Oui' : 'Non'}</span>
-                <span style="font-size:12px;">🔔 ${push ? ('Oui ('+tokenCount+')') : 'Non'}</span>
-                <span style="font-size:12px; opacity:.75;">Dernier token: ${escapeHtml(last)}</span>
-              </div>
-            </div>
-          `;
-        }).join('');
-        box.innerHTML = rows;
-      }catch(err){
-        box.innerHTML = `<div class="log-entry" style="color:#ef4444; font-weight:900;">⛔ Audit push impossible: ${escapeHtml(err && err.message ? err.message : String(err))}</div>`;
-      }
-    }
-
-function _notifCfg(){
+    function _notifCfg(){
       const d = { autoOnUpdate:false, autoOnObjChange:false, autoOnPilotage:false, autoAudience:'all' };
       const s = (globalSettings && globalSettings.notifications) ? globalSettings.notifications : {};
       return { ...d, ...s };
@@ -210,37 +148,7 @@ function _notifCfg(){
 
     function renderNotifPanel(){
       if(!isAdminUser()) return;
-      
-      // Audience -> user targeting UI
-      const audSel = document.getElementById('notifAudience');
-      const userRow = document.getElementById('notifUserRow');
-      const userSel = document.getElementById('notifUserUid');
-
-      if(audSel && !audSel._boundAudienceChange){
-        audSel._boundAudienceChange = true;
-        audSel.addEventListener('change', () => {
-          if(userRow) userRow.style.display = (audSel.value === 'user') ? 'block' : 'none';
-        });
-      }
-      if(userSel){
-        const entries = Object.entries(allUsers || {}).map(([uid, u]) => ({
-          uid,
-          name: (u && (u.name || u.displayName || u.email)) ? String(u.name || u.displayName || u.email) : uid,
-          role: u && u.role ? String(u.role) : 'staff'
-        }));
-        entries.sort((a,b)=>a.name.localeCompare(b.name));
-        userSel.innerHTML = '<option value="">— Choisir un utilisateur —</option>' + 
-          entries.map(e=>`<option value="${escapeHtml(e.uid)}">${escapeHtml(e.name)} (${escapeHtml(e.role)})</option>`).join('');
-      }
-      if(audSel && userRow) userRow.style.display = (audSel.value === 'user') ? 'block' : 'none';
-
-      // Push audit button
-      const btnAudit = document.getElementById('btnRefreshPushAudit');
-      if(btnAudit && !btnAudit._boundAudit){
-        btnAudit._boundAudit = true;
-        btnAudit.addEventListener('click', () => refreshPushAudit());
-      }
-const cfg = _notifCfg();
+      const cfg = _notifCfg();
       const cb1 = document.getElementById('autoNotifOnUpdate');
       const cb2 = document.getElementById('autoNotifOnObjChange');
       const cb3 = document.getElementById('autoNotifOnPilotage');
@@ -390,7 +298,7 @@ let _objProgUnsub = null;
       // Service worker
       if('serviceWorker' in navigator){
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('firebase-messaging-sw.js').catch(() => {});
+          navigator.serviceWorker.register('sw.js').catch(() => {});
       // --- PUSH NOTIFICATIONS (Firebase Cloud Messaging / Safari iOS PWA) ---
       // Requiert :
       // - PWA ajoutée à l’écran d’accueil (iOS/iPadOS)
@@ -416,42 +324,14 @@ let _objProgUnsub = null;
       }
 
       async function _setupPushUI(){
-        const btnMenu = document.getElementById('enablePushBtn');         // inside menu
-        const btnTop  = document.getElementById('enablePushTopBtn');      // top bar bell
-        const btnMain = document.getElementById('enablePushMainBtn');     // dashboard CTA
-        const btnFab  = document.getElementById('enablePushFabBtn');      // floating bell (mobile)
-        const card    = document.getElementById('pushCtaCard');
-
-        const allBtns = [btnMenu, btnTop, btnMain, btnFab].filter(Boolean);
-
-        // If no UI exists, nothing to do
-        if(allBtns.length === 0 && !card) return;
-
-        const hideAll = () => {
-          if(btnMenu) btnMenu.style.display = 'none';
-          if(btnTop)  btnTop.style.display  = 'none';
-          if(btnMain) btnMain.style.display = 'none';
-          if(btnFab)  btnFab.style.display  = 'none';
-          if(card)    card.style.display    = 'none';
-          allBtns.forEach(b => b.classList.remove('push-pulse'));
-        };
-
-        const showAll = () => {
-          // Menu button (visible when menu is open)
-          if(btnMenu){ btnMenu.style.display = 'block'; btnMenu.classList.add('push-pulse'); }
-          // Always-visible buttons
-          if(btnTop){  btnTop.style.display  = 'inline-flex'; btnTop.classList.add('push-pulse'); }
-          if(btnMain){ btnMain.style.display = 'inline-block'; btnMain.classList.add('push-pulse'); }
-          if(btnFab){  btnFab.style.display  = 'inline-flex'; btnFab.classList.add('push-pulse'); }
-          if(card){    card.style.display    = 'block'; }
-        };
+        const btn = document.getElementById('enablePushBtn');
+        if(!btn) return;
 
         if(!_supportsPush()){
-          hideAll();
+          btn.style.display = 'none';
           return;
         }
 
-        // Ensure SW is ready
         try{
           _swRegForPush = await navigator.serviceWorker.ready;
         }catch(e){ _swRegForPush = null; }
@@ -459,18 +339,10 @@ let _objProgUnsub = null;
         // Messaging instance (FCM)
         try{ _messaging = firebase.messaging(); }catch(e){ _messaging = null; }
 
-        const isLogged = !!(currentUser && currentUser.uid);
-        const canWork  = !!(_swRegForPush && _messaging);
-        const alreadyGranted = (typeof Notification !== 'undefined' && Notification.permission === 'granted');
+        // Affiche le bouton uniquement si on a un user connecté (uid) et un SW prêt
+        btn.style.display = (_swRegForPush && currentUser && currentUser.uid && _messaging) ? 'block' : 'none';
 
-        // Show big CTA + bells only when it can work and not already enabled
-        if(isLogged && canWork && !alreadyGranted){
-          showAll();
-        }else{
-          hideAll();
-        }
-
-        const handleEnableClick = async () => {
+        btn.onclick = async () => {
           if(!currentUser || !currentUser.uid){
             showToast("Connecte-toi pour activer les notifications.");
             return;
@@ -481,10 +353,6 @@ let _objProgUnsub = null;
           }
           if(!_swRegForPush){
             showToast("Service Worker non prêt. Recharge la page.");
-            return;
-          }
-          if(!_messaging){
-            showToast("Notifications indisponibles. Recharge la page.");
             return;
           }
 
@@ -513,18 +381,13 @@ let _objProgUnsub = null;
               return;
             }
 
-            const meta = {
+            // Sauvegarde dans RTDB
+            await db.ref('fcmTokens/' + currentUser.uid).push({
               token,
-              ua: navigator.userAgent,
-              standalone: _isStandalonePWA(),
               createdAt: Date.now(),
-              updatedAt: Date.now()
-            };
+              ua: navigator.userAgent
+            });
 
-            await db.ref(`fcmTokens/${currentUser.uid}`).push(meta);
-
-            // Hide UI once enabled
-            hideAll();
             showToast("Notifications activées ✅");
           }catch(err){
             console.error(err);
@@ -532,12 +395,7 @@ let _objProgUnsub = null;
           }
         };
 
-        // Bind all visible buttons to same handler (no duplicates)
-        allBtns.forEach(b => {
-          b.onclick = handleEnableClick;
-        });
-
-        // Foreground message -> toast
+        // Foreground messages (quand l’app est ouverte)
         try{
           _messaging.onMessage((payload) => {
             const title = payload?.notification?.title || "Heiko";
@@ -545,6 +403,9 @@ let _objProgUnsub = null;
             showToast(body ? (title + " — " + body) : title);
           });
         }catch(e){}
+      }
+
+        });
       }
 
       // Install prompt (Chrome/Edge/Android)
@@ -997,7 +858,7 @@ function renderMenuSitesPreview(){
       // Special display for "TEMPS RESTANT" : bigger under the circle (one line)
       if(msg === "TEMPS RESTANT"){
         el.classList.add('time-remaining');
-        el.textContent = '⏳ TEMPS RESTANT';
+        el.textContent = '⏳TEMPS RESTANT';
       } else {
         el.classList.remove('time-remaining');
         el.textContent = msg || "";
@@ -1145,27 +1006,10 @@ function showToast(message) {
         try{ renderMenuDirectoryPreview(); }catch(e){}
       });
 
-      db.ref('logs').limitToLast(2000).on('value', s => {
-        allLogs = s.val() || {};
-        if(isSuperAdmin()) renderLogs(allLogs);
-      }, err => {
-        console.error(err);
-        if(isSuperAdmin()){
-          const el = document.getElementById('logsContainer');
-          if(el) el.innerHTML = '<div class="log-entry" style="color:#ef4444; font-weight:900;">⛔ Accès refusé à l\'historique (rules Firebase)</div>';
-        }
-      });
-db.ref('feedbacks').on('value', s => {
-        allFeedbacks = s.val() || {};
-        if(isSuperAdmin()) renderFeedbacks(allFeedbacks);
-      }, err => {
-        console.error(err);
-        if(isSuperAdmin()){
-          const el = document.getElementById('feedbacksContainer');
-          if(el) el.innerHTML = '<div class="log-entry" style="color:#ef4444; font-weight:900;">⛔ Accès refusé aux feedbacks (rules Firebase)</div>';
-        }
-      });
-// LOAD NOTIFICATIONS (Admin)
+      db.ref('logs').limitToLast(2000).on('value', s => { allLogs = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); });
+      db.ref('feedbacks').on('value', s => { allFeedbacks = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderFeedbacks(allFeedbacks); });
+
+      // LOAD NOTIFICATIONS (Admin)
       db.ref('notifications/sent').limitToLast(200).on('value', s => {
         allNotifsSent = s.val() || {};
         if(isAdminUser()) { try{ renderNotifHistory(); }catch(e){} }
@@ -1217,14 +1061,6 @@ db.ref('feedbacks').on('value', s => {
       // SHOW TAB BUTTONS ONLY FOR SUPER ADMIN
       document.getElementById("btnTabLogs").style.display = isSuperUser ? 'block' : 'none';
       document.getElementById("btnTabFeedbacks").style.display = isSuperUser ? 'block' : 'none';
-
-      // Important: logs/feedbacks may have loaded before currentUser was available.
-      // So we render here as soon as we know we are Super Admin.
-      if(isSuperUser){
-        try{ renderLogs(allLogs || {}); }catch(e){}
-        try{ renderFeedbacks(allFeedbacks || {}); }catch(e){}
-      }
-
 
       // Notifications tab: Admin + Super Admin
       const btnNotifs = document.getElementById("btnTabNotifs");
@@ -2147,10 +1983,7 @@ const el = document.createElement("div");
        document.getElementById('tab-logs').style.display = t==='logs'?'block':'none';
        document.getElementById('tab-feedbacks').style.display = t==='feedbacks'?'block':'none';
        const tn = document.getElementById('tab-notifs'); if(tn) tn.style.display = t==='notifs'?'block':'none';
-       // Ensure logs/feedbacks render even if data loaded before user role was known
-       if(t==='logs'){ try{ renderLogs(allLogs || {}); }catch(e){} }
-       if(t==='feedbacks'){ try{ renderFeedbacks(allFeedbacks || {}); }catch(e){} }
-       if(t==='notifs') { try{ renderNotifPanel(); renderNotifHistory(); refreshPushAudit(); }catch(e){} }
+       if(t==='notifs') { try{ renderNotifPanel(); renderNotifHistory(); }catch(e){} }
     }
     function toggleCreateInputs() { document.getElementById("createTiersBlock").style.display = document.getElementById("noFixed").checked ? 'none' : 'block'; }
     function toggleEditInputs() { document.getElementById("editTiersBlock").style.display = document.getElementById("eoFixed").checked ? 'none' : 'block'; }
