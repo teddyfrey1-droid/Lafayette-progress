@@ -138,6 +138,7 @@
           <span class="logout-icon" aria-hidden="true">🚪</span>
           <span class="logout-text">Déconnexion</span>
         </button>
+              <button class="icon-btn push-icon-btn push-pulse" id="enablePushTopBtn" type="button" style="display:none;" aria-label="Activer les notifications" title="Activer les notifications">🔔</button>
               <button class="icon-btn" id="globalMenuBtn" onclick="toggleGlobalMenu()">☰</button>
       </div>
     </div>
@@ -206,6 +207,15 @@
         <div class="header-pill">🚀 Dashboard Live</div>
         <h1>OBJECTIFS HEIKO LAFAYETTE</h1>
         <div class="last-update" id="lastUpdate">Chargement...</div>
+        <div id="pushCtaCard" class="push-cta-card" style="display:none;">
+          <div class="push-cta-row">
+            <div>
+              <div class="push-cta-title">🔔 Notifications</div>
+              <div class="push-cta-text">Active-les pour recevoir les alertes importantes (objectifs, news, etc.).</div>
+            </div>
+            <button id="enablePushMainBtn" class="btn push-cta-btn" type="button">🔔 Activer</button>
+          </div>
+        </div>
         
         <div class="global-score-container" id="scoreCircle">
           <div class="money-rain" id="moneyRain"></div>
@@ -592,6 +602,7 @@
     <button class="btn" onclick="saveObj()">Enregistrer Modifications</button>
     <button class="btn" onclick="document.getElementById('editObjPanel').classList.remove('active')" style="background:white; color:#666; border:1px solid #ccc; margin-top:10px;">Annuler</button>
   </div>
+  <button id="enablePushFabBtn" class="push-fab push-pulse" type="button" style="display:none;" aria-label="Activer les notifications" title="Activer les notifications">🔔</button>
 
   <script src="assets/js/app.js"></script>
 </body>

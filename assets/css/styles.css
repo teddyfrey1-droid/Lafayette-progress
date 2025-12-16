@@ -1097,6 +1097,82 @@ body.dark-mode .top-bar{
 }
 .icon-btn:hover{ transform: translateY(-1px); }
 
+/* Push notifications: make the bell impossible to miss */
+.push-icon-btn{
+  background: var(--primary);
+  color: #ffffff;
+  border-color: transparent;
+}
+.push-cta-card{
+  margin: 14px auto 0;
+  width: min(880px, 100%);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  box-shadow: 0 10px 26px rgba(0,0,0,0.06);
+  padding: 14px 14px;
+}
+.push-cta-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 12px;
+}
+.push-cta-title{
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+}
+.push-cta-text{
+  margin-top: 2px;
+  font-size: 12px;
+  opacity: .8;
+}
+.push-cta-btn{
+  width: auto !important;
+  padding: 10px 14px !important;
+  border-radius: 14px !important;
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+  font-weight: 900 !important;
+}
+.push-fab{
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  border: 0;
+  background: var(--primary);
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.22);
+  z-index: 9999;
+  cursor: pointer;
+}
+.push-fab:active{ transform: translateY(1px); }
+.push-pulse{
+  animation: pushPulse 1.3s ease-in-out infinite;
+}
+@keyframes pushPulse{
+  0%{ box-shadow: 0 0 0 0 rgba(37,99,235,0.45), 0 16px 40px rgba(0,0,0,0.22); }
+  70%{ box-shadow: 0 0 0 14px rgba(37,99,235,0.0), 0 16px 40px rgba(0,0,0,0.22); }
+  100%{ box-shadow: 0 0 0 0 rgba(37,99,235,0.0), 0 16px 40px rgba(0,0,0,0.22); }
+}
+
+/* On very small screens, keep CTA compact */
+@media (max-width: 520px){
+  .push-cta-text{ display:none; }
+  .push-cta-btn{ padding: 10px 12px !important; }
+}
+
+
 /* Header: slightly more compact */
 header{ margin-bottom: 22px !important; }
 header h1{

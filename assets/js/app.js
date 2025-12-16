@@ -416,14 +416,42 @@ let _objProgUnsub = null;
       }
 
       async function _setupPushUI(){
-        const btn = document.getElementById('enablePushBtn');
-        if(!btn) return;
+        const btnMenu = document.getElementById('enablePushBtn');         // inside menu
+        const btnTop  = document.getElementById('enablePushTopBtn');      // top bar bell
+        const btnMain = document.getElementById('enablePushMainBtn');     // dashboard CTA
+        const btnFab  = document.getElementById('enablePushFabBtn');      // floating bell (mobile)
+        const card    = document.getElementById('pushCtaCard');
+
+        const allBtns = [btnMenu, btnTop, btnMain, btnFab].filter(Boolean);
+
+        // If no UI exists, nothing to do
+        if(allBtns.length === 0 && !card) return;
+
+        const hideAll = () => {
+          if(btnMenu) btnMenu.style.display = 'none';
+          if(btnTop)  btnTop.style.display  = 'none';
+          if(btnMain) btnMain.style.display = 'none';
+          if(btnFab)  btnFab.style.display  = 'none';
+          if(card)    card.style.display    = 'none';
+          allBtns.forEach(b => b.classList.remove('push-pulse'));
+        };
+
+        const showAll = () => {
+          // Menu button (visible when menu is open)
+          if(btnMenu){ btnMenu.style.display = 'block'; btnMenu.classList.add('push-pulse'); }
+          // Always-visible buttons
+          if(btnTop){  btnTop.style.display  = 'inline-flex'; btnTop.classList.add('push-pulse'); }
+          if(btnMain){ btnMain.style.display = 'inline-block'; btnMain.classList.add('push-pulse'); }
+          if(btnFab){  btnFab.style.display  = 'inline-flex'; btnFab.classList.add('push-pulse'); }
+          if(card){    card.style.display    = 'block'; }
+        };
 
         if(!_supportsPush()){
-          btn.style.display = 'none';
+          hideAll();
           return;
         }
 
+        // Ensure SW is ready
         try{
           _swRegForPush = await navigator.serviceWorker.ready;
         }catch(e){ _swRegForPush = null; }
@@ -431,10 +459,18 @@ let _objProgUnsub = null;
         // Messaging instance (FCM)
         try{ _messaging = firebase.messaging(); }catch(e){ _messaging = null; }
 
-        // Affiche le bouton uniquement si on a un user connecté (uid) et un SW prêt
-        btn.style.display = (_swRegForPush && currentUser && currentUser.uid && _messaging) ? 'block' : 'none';
+        const isLogged = !!(currentUser && currentUser.uid);
+        const canWork  = !!(_swRegForPush && _messaging);
+        const alreadyGranted = (typeof Notification !== 'undefined' && Notification.permission === 'granted');
 
-        btn.onclick = async () => {
+        // Show big CTA + bells only when it can work and not already enabled
+        if(isLogged && canWork && !alreadyGranted){
+          showAll();
+        }else{
+          hideAll();
+        }
+
+        const handleEnableClick = async () => {
           if(!currentUser || !currentUser.uid){
             showToast("Connecte-toi pour activer les notifications.");
             return;
@@ -445,6 +481,10 @@ let _objProgUnsub = null;
           }
           if(!_swRegForPush){
             showToast("Service Worker non prêt. Recharge la page.");
+            return;
+          }
+          if(!_messaging){
+            showToast("Notifications indisponibles. Recharge la page.");
             return;
           }
 
@@ -473,13 +513,18 @@ let _objProgUnsub = null;
               return;
             }
 
-            // Sauvegarde dans RTDB
-            await db.ref('fcmTokens/' + currentUser.uid).push({
+            const meta = {
               token,
+              ua: navigator.userAgent,
+              standalone: _isStandalonePWA(),
               createdAt: Date.now(),
-              ua: navigator.userAgent
-            });
+              updatedAt: Date.now()
+            };
 
+            await db.ref(`fcmTokens/${currentUser.uid}`).push(meta);
+
+            // Hide UI once enabled
+            hideAll();
             showToast("Notifications activées ✅");
           }catch(err){
             console.error(err);
@@ -487,7 +532,12 @@ let _objProgUnsub = null;
           }
         };
 
-        // Foreground messages (quand l’app est ouverte)
+        // Bind all visible buttons to same handler (no duplicates)
+        allBtns.forEach(b => {
+          b.onclick = handleEnableClick;
+        });
+
+        // Foreground message -> toast
         try{
           _messaging.onMessage((payload) => {
             const title = payload?.notification?.title || "Heiko";
@@ -495,9 +545,6 @@ let _objProgUnsub = null;
             showToast(body ? (title + " — " + body) : title);
           });
         }catch(e){}
-      }
-
-        });
       }
 
       // Install prompt (Chrome/Edge/Android)
