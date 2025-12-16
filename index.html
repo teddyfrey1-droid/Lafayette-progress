@@ -585,6 +585,24 @@
     <button class="btn" onclick="document.getElementById('editObjPanel').classList.remove('active')" style="background:white; color:#666; border:1px solid #ccc; margin-top:10px;">Annuler</button>
   </div>
 
-  <script src="assets/js/app.js"></script>
+    <script>
+    // Failsafe UI: si un overlay invisible bloque les clics ou si les données ne chargent pas
+    window.__APP_READY__ = false;
+    setTimeout(() => {
+      try{
+        if(window.__APP_READY__) return;
+        const bar = document.createElement('div');
+        bar.id = 'panicBar';
+        bar.style.cssText = 'position:fixed;bottom:12px;left:12px;z-index:999999;display:flex;gap:10px;flex-wrap:wrap';
+        bar.innerHTML = `
+          <button style="padding:10px 12px;border-radius:14px;border:none;font-weight:900;cursor:pointer" onclick="window.forceUnblockUI && window.forceUnblockUI()">Débloquer</button>
+          <button style="padding:10px 12px;border-radius:14px;border:none;font-weight:900;cursor:pointer" onclick="window.logout && window.logout()">Déconnexion</button>
+        `;
+        document.body.appendChild(bar);
+      }catch(e){}
+    }, 4000);
+  </script>
+  <script src="assets/js/app.js" onerror="alert('Erreur: assets/js/app.js ne se charge pas (vérifie le chemin / déploiement)');"></script>
+
 </body>
 </html>

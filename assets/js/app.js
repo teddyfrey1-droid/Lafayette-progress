@@ -11,6 +11,73 @@
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
+    // --- Robustness / diagnostics (anti-écran bloqué) ---
+    window.__APP_READY__ = false;
+
+    function showFatalBanner(message){
+      try{
+        let b = document.getElementById('fatalBanner');
+        if(!b){
+          b = document.createElement('div');
+          b.id = 'fatalBanner';
+          b.style.cssText = [
+            'position:fixed','top:12px','left:12px','right:12px',
+            'z-index:99999','padding:12px 14px',
+            'border-radius:14px','font-weight:900',
+            'background:rgba(239,68,68,0.92)','color:#fff',
+            'box-shadow:0 20px 60px rgba(0,0,0,0.25)',
+            'display:none'
+          ].join(';');
+          b.innerHTML = '<div id="fatalBannerText"></div><div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">'+
+            '<button id="fatalUnblockBtn" style="padding:8px 12px;border-radius:12px;border:none;font-weight:900;cursor:pointer">Débloquer l\'écran</button>'+
+            '<button id="fatalLogoutBtn" style="padding:8px 12px;border-radius:12px;border:none;font-weight:900;cursor:pointer">Déconnexion</button>'+
+            '</div>';
+          document.body.appendChild(b);
+          const ub = document.getElementById('fatalUnblockBtn');
+          if(ub) ub.onclick = () => forceUnblockUI();
+          const lb = document.getElementById('fatalLogoutBtn');
+          if(lb) lb.onclick = () => { try{ logout(); }catch(e){ try{ location.href = location.pathname; }catch(_e){} } };
+        }
+        const t = document.getElementById('fatalBannerText');
+        if(t) t.textContent = message || 'Erreur';
+        b.style.display = 'block';
+      }catch(e){}
+    }
+
+    function forceUnblockUI(){
+      try{
+        const backdrop = document.getElementById('globalMenuBackdrop');
+        const menu = document.getElementById('globalMenu');
+        if(backdrop){
+          backdrop.classList.remove('open');
+          backdrop.style.pointerEvents = 'none';
+          backdrop.style.opacity = '0';
+        }
+        if(menu){
+          menu.classList.remove('open');
+          menu.style.transform = '';
+        }
+        const updates = document.getElementById('updatesModal');
+        if(updates) updates.style.display = 'none';
+        const loginOv = document.getElementById('loginOverlay');
+        // ne force pas le login overlay ; on enlève juste la capture d'événements
+        document.body.style.overflow = '';
+      }catch(e){}
+    }
+    window.forceUnblockUI = forceUnblockUI;
+
+    function handleDbError(where, err){
+      try{
+        console.error('[DB]', where, err);
+        const msg = (err && err.message) ? err.message : String(err || '');
+        if(msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('denied')){
+          showFatalBanner('⛔ Accès refusé (rules Firebase) sur: ' + where + '. Ouvre la console Firebase > Realtime Database > Rules.');
+        }else{
+          showFatalBanner('⚠️ Problème de données ('+where+'): ' + msg);
+        }
+      }catch(e){}
+    }
+
 
     // --- Cloud Functions helper (pour envoyer des notifications) ---
     function _uniq(arr){ return [...new Set(arr.filter(Boolean))]; }
@@ -96,7 +163,7 @@
       if(btn){ btn.disabled = true; btn.style.opacity = .7; }
 
       try{
-        const data = await _callSendPush({ title, body, link: link || '/index.html#dashboard', audience, targetUid: targetUid || null });
+        const data = await _callSendPush({ title, body, link: link || '/index.html#dashboard', audience, targetUid: targetUid || null, targetUid });
         showToast(`✅ Notification envoyée (${data && data.sent != null ? data.sent : 'OK'})`);
         // log RTDB (historique)
         try{
@@ -1055,14 +1122,14 @@ function renderMenuSitesPreview(){
           const val = snap.val();
           if(!val) {
              const def = { name: "Utilisateur", hours:35, role:'staff', email: user.email, status: 'pending' };
-             db.ref('users/'+user.uid).set(def);
+             db.ref('users/'+user.uid).set(def).catch(e=>handleDbError('users/'+user.uid+' write', e));
              currentUser = def;
              try{ window.HeikoPush && HeikoPush.refreshUI && HeikoPush.refreshUI(); }catch(e){}
           } else { 
              currentUser = val;
              try{ window.HeikoPush && HeikoPush.refreshUI && HeikoPush.refreshUI(); }catch(e){} 
              if(currentUser.status !== 'active') {
-                 db.ref('users/'+user.uid).update({ status: 'active', lastLogin: Date.now() });
+                 db.ref('users/'+user.uid).update({ status: 'active', lastLogin: Date.now() }).catch(e=>handleDbError('users/'+user.uid+' update', e));
              }
           }
           currentUser.uid = user.uid; currentUser.email = user.email;
@@ -1073,17 +1140,7 @@ function renderMenuSitesPreview(){
           newLogRef.set({ user: currentUser.name, action: "Connexion", type: "session", startTime: Date.now(), lastSeen: Date.now() });
           setInterval(() => { newLogRef.update({ lastSeen: Date.now() }); }, 60000);
           updateUI();
-        
-        }, err => {
-          console.error("RTDB /users read error:", err);
-          // Fallback minimal profile so UI doesn't stay stuck
-          currentUser = currentUser || { name: (user && user.email) ? user.email : "Utilisateur", hours:35, role:'staff', email: (user && user.email) ? user.email : null, status:'active' };
-          currentUser.uid = user && user.uid ? user.uid : (currentUser.uid || null);
-          currentUser.email = user && user.email ? user.email : (currentUser.email || null);
-          try{ showToast("⛔ Accès refusé à /users (rules Firebase)."); }catch(e){}
-          try{ updateUI(); }catch(e){}
         });
-
         loadData();
         renderNativeCalendar();
       } else {
@@ -1322,12 +1379,12 @@ function showToast(message) {
                  renderSimulator();
              }
           } catch(e) { console.error(e); }
-      });
+      }, (err) => handleDbError('objectives', err));
       db.ref('users').on('value', s => { 
         allUsers = s.val() || {}; 
         if(isAdminUser()) { renderAdminUsers(); }
         if(isAdminUser()) { renderSimulator(); }
-      });
+      }, (err) => handleDbError('users', err));
       db.ref('settings').on('value', s => { 
         globalSettings = s.val() || { budget: 0 }; 
         if(globalSettings.guardrailMaxPctOfCA == null) {
@@ -1338,7 +1395,7 @@ function showToast(message) {
         if(globalSettings.notifications.autoAudience == null) globalSettings.notifications.autoAudience = 'all';
         if(isAdminUser()) { try{ renderNotifPanel(); }catch(e){} }
         if(isAdminUser()) { renderSimulator(); }
-      });
+      }, (err) => handleDbError('settings', err));
 
       // Aperçu "Sites utiles" sur le dashboard
       db.ref('directory/sites').on('value', s => {
@@ -1410,65 +1467,61 @@ db.ref('feedbacks').on('value', s => {
         }
     }
 
-
     function updateUI() {
-      try{
-        if(!currentUser) return;
+      if(!currentUser) return;
+      document.getElementById("userName").textContent = currentUser.name;
+      document.getElementById("userHours").textContent = (currentUser.hours || 35) + "h";
+      
+      const isSuperUser = isSuperAdmin();
+      const isAdmin = isAdminUser();
 
-        const elName = document.getElementById("userName");
-        if(elName) elName.textContent = currentUser.name || "Utilisateur";
+      document.getElementById("btnAdmin").style.display = isAdmin ? 'block' : 'none';
+      // Bind monthly history (lightweight)
+      renderUserHistory();
 
-        const elHours = document.getElementById("userHours");
-        if(elHours) elHours.textContent = (currentUser.hours || 35) + "h";
+      
+      // SHOW TAB BUTTONS ONLY FOR SUPER ADMIN
+      document.getElementById("btnTabLogs").style.display = isSuperUser ? 'block' : 'none';
+      document.getElementById("btnTabFeedbacks").style.display = isSuperUser ? 'block' : 'none';
 
-        const roleEl = document.getElementById("userRole");
-        if(roleEl) roleEl.textContent = (currentUser.role === 'admin') ? 'ADMIN' : 'MEMBRE';
-
-        // Admin only parts (button + tab)
-        const isAdmin = (currentUser.role === 'admin');
-        const btnAdmin = document.getElementById("btnAdmin");
-        if(btnAdmin) btnAdmin.style.display = isAdmin ? 'block' : 'none';
-
-        const btnLogs = document.getElementById("btnTabLogs");
-        if(btnLogs) btnLogs.style.display = isAdmin ? 'block' : 'none';
-
-        const btnFeedbacks = document.getElementById("btnTabFeedbacks");
-        if(btnFeedbacks) btnFeedbacks.style.display = isAdmin ? 'block' : 'none';
-
-        const btnNotifs = document.getElementById("btnTabNotifs");
-        if(btnNotifs) btnNotifs.style.display = isAdmin ? 'block' : 'none';
-
-        if(isAdmin){
-          try{ startFcmTokensListenerIfAdmin(); }catch(e){ console.error(e); }
-          try{ renderNotifTargetUsers(); }catch(e){ console.error(e); }
-          try{ renderPushAudit(); }catch(e){ console.error(e); }
-        }
-        try{ window.HeikoPush && HeikoPush.refreshUI && HeikoPush.refreshUI(); }catch(e){}
-
-        // Keep original advanced UI updates (admin panels, simulator, history)
-        try{ renderUserHistory(); }catch(e){ console.error(e); }
-
-        const globalBudgetInput = document.getElementById("simGlobalBudget");
-        const saveBudgetBtn = document.getElementById("btnSaveGlobalBudget");
-        const simCAInput = document.getElementById('simMonthlyCA');
-        const saveCAButton = document.getElementById('btnSaveMonthlyCA');
-        if(globalBudgetInput) globalBudgetInput.value = (globalSettings && globalSettings.budget != null) ? globalSettings.budget : 0;
-        if(simCAInput) simCAInput.value = (globalSettings && globalSettings.monthlyCA != null) ? globalSettings.monthlyCA : 0;
-        if(saveBudgetBtn) saveBudgetBtn.style.display = isAdmin ? 'inline-block' : 'none';
-        if(saveCAButton) saveCAButton.style.display = isAdmin ? 'inline-block' : 'none';
-
-        if(isAdmin) {
-          try{ renderAdminObjs(); }catch(e){ console.error(e); }
-          try{ renderSimulator(); }catch(e){ console.error(e); }
-        }
-
-        try{ renderDashboard(); }catch(e){ console.error(e); }
-      }catch(e){
-        console.error(e);
-        try{ showToast("⚠️ Erreur UI : " + (e && e.message ? e.message : String(e))); }catch(_){}
+      // Important: logs/feedbacks may have loaded before currentUser was available.
+      // So we render here as soon as we know we are Super Admin.
+      if(isSuperUser){
+        try{ renderLogs(allLogs || {}); }catch(e){}
+        try{ renderFeedbacks(allFeedbacks || {}); }catch(e){}
       }
-    }
 
+
+      // Notifications tab: Admin + Super Admin
+      const btnNotifs = document.getElementById("btnTabNotifs");
+      if(btnNotifs) btnNotifs.style.display = isAdmin ? 'block' : 'none';
+
+      if(isAdmin){
+        try{ startFcmTokensListenerIfAdmin(); }catch(e){}
+        try{ renderNotifTargetUsers(); }catch(e){}
+        try{ renderPushAudit(); }catch(e){}
+      }
+      try{ window.HeikoPush && HeikoPush.refreshUI && HeikoPush.refreshUI(); }catch(e){}
+
+      const globalBudgetInput = document.getElementById("simGlobalBudget");
+      const saveBudgetBtn = document.getElementById("btnSaveGlobalBudget");
+      const simCAInput = document.getElementById('simMonthlyCA');
+      const superAdminBlock = document.getElementById('superAdminBudget');
+      
+      // Pilotage & simulation: Admin + Super Admin (requested)
+      const pilotageAllowed = isAdmin;
+      if(superAdminBlock) superAdminBlock.style.display = pilotageAllowed ? 'block' : 'none';
+      if(globalBudgetInput) globalBudgetInput.disabled = !pilotageAllowed;
+      if(saveBudgetBtn) saveBudgetBtn.style.display = pilotageAllowed ? 'inline-block' : 'none';
+      if(simCAInput) simCAInput.disabled = !pilotageAllowed;
+      
+      if(isAdmin) {
+          renderAdminObjs();
+          renderSimulator();
+      }
+
+      renderDashboard();
+    }
 
     // --- UPDATES LOGIC (CREATE, EDIT, DELETE) ---
     function saveUpdate() {
@@ -2027,7 +2080,6 @@ function createSecondaryCarousel(objs, primOk, ratio){
 function renderDashboard() {
       if(!currentUser) return;
       const container = document.getElementById("cardsContainer");
-      if(!container) return;
       container.innerHTML = "";
       const ratio = (currentUser.hours || 35) / BASE_HOURS;
       let totalMyGain = 0;
@@ -3314,3 +3366,6 @@ const el = document.createElement("div");
       if(!window.__swReloaded){ window.__swReloaded = true; window.location.reload(); }
     });
   }
+
+// Mark app JS as loaded
+try{ window.__APP_READY__ = true; }catch(e){}
