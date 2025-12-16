@@ -376,16 +376,21 @@
       <div class="admin-section" style="border-left:4px solid var(--primary);">
         <h3 class="section-header-large">🔔 Notifications</h3>
         <div style="font-size:11px; color:var(--text-muted); margin-bottom:12px;">
-          Envoie une notification push (uniquement pour ceux qui ont installé l’app + activé 🔔).
+          Envoie une notification push (Web/PWA). Sur iPhone/iPad, il faut “Ajouter à l’écran d’accueil” + activer 🔔.
         </div>
 
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-          <select id="notifAudience">
+          <select id="notifAudience" onchange="onNotifAudienceChange()">
             <option value="all">Tout le monde</option>
-            <option value="team">Équipe (hors admins)</option>
             <option value="admins">Admins uniquement</option>
+            <option value="users">Utilisateurs (hors admins)</option>
+            <option value="one">Un utilisateur précis</option>
           </select>
           <input id="notifLink" type="text" placeholder="Lien (ex: /index.html#dashboard)">
+        </div>
+
+        <div id="notifTargetWrap" style="display:none; margin-top:10px;">
+          <select id="notifTargetUid"></select>
         </div>
 
         <input id="notifTitle" type="text" placeholder="Titre (ex: Nouveau palier ✅)">
@@ -414,11 +419,19 @@
         <div style="display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap;">
           <select id="autoNotifAudience">
             <option value="all">Audience auto : tout le monde</option>
-            <option value="team">Audience auto : équipe</option>
             <option value="admins">Audience auto : admins</option>
+            <option value="users">Audience auto : utilisateurs</option>
           </select>
           <button class="btn" onclick="saveNotifSettings()">💾 Enregistrer</button>
         </div>
+      </div>
+
+      <div class="admin-section">
+        <h3 class="section-header-large">📲 App & 🔔 Notifications</h3>
+        <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">
+          Statuts par utilisateur : PWA (standalone) + push activées (token FCM).
+        </div>
+        <div id="pushAuditContainer" class="logs-wrapper" style="max-height:320px;"></div>
       </div>
 
       <div class="admin-section">
