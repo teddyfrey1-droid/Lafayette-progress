@@ -376,21 +376,22 @@
       <div class="admin-section" style="border-left:4px solid var(--primary);">
         <h3 class="section-header-large">🔔 Notifications</h3>
         <div style="font-size:11px; color:var(--text-muted); margin-bottom:12px;">
-          Envoie une notification push (Web/PWA). Sur iPhone/iPad, il faut “Ajouter à l’écran d’accueil” + activer 🔔.
+          Envoie une notification push (uniquement pour ceux qui ont installé l’app + activé 🔔).
         </div>
 
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-          <select id="notifAudience" onchange="onNotifAudienceChange()">
+          <select id="notifAudience">
             <option value="all">Tout le monde</option>
+            <option value="team">Équipe (hors admins)</option>
             <option value="admins">Admins uniquement</option>
-            <option value="users">Utilisateurs (hors admins)</option>
-            <option value="one">Un utilisateur précis</option>
-          </select>
+                      <option value="user">Utilisateur en particulier</option>
+</select>
           <input id="notifLink" type="text" placeholder="Lien (ex: /index.html#dashboard)">
         </div>
 
-        <div id="notifTargetWrap" style="display:none; margin-top:10px;">
-          <select id="notifTargetUid"></select>
+        <div id="notifUserRow" style="display:none; margin-top:10px;">
+          <select id="notifUserUid"></select>
+          <div style="margin-top:6px; font-size:12px; opacity:.8;">Astuce: tu peux cibler une personne précise.</div>
         </div>
 
         <input id="notifTitle" type="text" placeholder="Titre (ex: Nouveau palier ✅)">
@@ -419,23 +420,30 @@
         <div style="display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap;">
           <select id="autoNotifAudience">
             <option value="all">Audience auto : tout le monde</option>
+            <option value="team">Audience auto : équipe</option>
             <option value="admins">Audience auto : admins</option>
-            <option value="users">Audience auto : utilisateurs</option>
           </select>
           <button class="btn" onclick="saveNotifSettings()">💾 Enregistrer</button>
         </div>
       </div>
 
       <div class="admin-section">
-        <h3 class="section-header-large">📲 App & 🔔 Notifications</h3>
-        <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">
-          Statuts par utilisateur : PWA (standalone) + push activées (token FCM).
+  
+      <div class="admin-section" style="border:1px solid rgba(255,255,255,0.08);">
+        <h3 class="section-header-large">📲 Installation & 🔔 Notifications</h3>
+        <div style="font-size:13px; opacity:.85; margin-top:6px;">
+          Liste (côté serveur) des utilisateurs ayant installé/lancé l’app (PWA) et/ou activé les notifications (token FCM).
         </div>
-        <div id="pushAuditContainer" class="logs-wrapper" style="max-height:320px;"></div>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px;">
+          <button class="btn" id="btnRefreshPushAudit">🔄 Rafraîchir</button>
+          <span id="pushAuditMeta" style="font-size:12px; opacity:.75;"></span>
+        </div>
+
+        <div id="pushAuditTable" class="logs-wrapper" style="margin-top:12px; max-height:260px; overflow:auto;"></div>
       </div>
 
-      <div class="admin-section">
-        <h3 class="section-header-large">📜 Historique</h3>
+      <h3 class="section-header-large">📜 Historique</h3>
         <div id="notifHistory" class="logs-wrapper" style="max-height:240px;"></div>
       </div>
     </div>
@@ -585,24 +593,6 @@
     <button class="btn" onclick="document.getElementById('editObjPanel').classList.remove('active')" style="background:white; color:#666; border:1px solid #ccc; margin-top:10px;">Annuler</button>
   </div>
 
-    <script>
-    // Failsafe UI: si un overlay invisible bloque les clics ou si les données ne chargent pas
-    window.__APP_READY__ = false;
-    setTimeout(() => {
-      try{
-        if(window.__APP_READY__) return;
-        const bar = document.createElement('div');
-        bar.id = 'panicBar';
-        bar.style.cssText = 'position:fixed;bottom:12px;left:12px;z-index:999999;display:flex;gap:10px;flex-wrap:wrap';
-        bar.innerHTML = `
-          <button style="padding:10px 12px;border-radius:14px;border:none;font-weight:900;cursor:pointer" onclick="window.forceUnblockUI && window.forceUnblockUI()">Débloquer</button>
-          <button style="padding:10px 12px;border-radius:14px;border:none;font-weight:900;cursor:pointer" onclick="window.logout && window.logout()">Déconnexion</button>
-        `;
-        document.body.appendChild(bar);
-      }catch(e){}
-    }, 4000);
-  </script>
-  <script src="assets/js/app.js" onerror="alert('Erreur: assets/js/app.js ne se charge pas (vérifie le chemin / déploiement)');"></script>
-
+  <script src="assets/js/app.js"></script>
 </body>
 </html>

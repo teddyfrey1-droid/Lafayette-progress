@@ -11,73 +11,6 @@
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
-    // --- Robustness / diagnostics (anti-écran bloqué) ---
-    window.__APP_READY__ = false;
-
-    function showFatalBanner(message){
-      try{
-        let b = document.getElementById('fatalBanner');
-        if(!b){
-          b = document.createElement('div');
-          b.id = 'fatalBanner';
-          b.style.cssText = [
-            'position:fixed','top:12px','left:12px','right:12px',
-            'z-index:99999','padding:12px 14px',
-            'border-radius:14px','font-weight:900',
-            'background:rgba(239,68,68,0.92)','color:#fff',
-            'box-shadow:0 20px 60px rgba(0,0,0,0.25)',
-            'display:none'
-          ].join(';');
-          b.innerHTML = '<div id="fatalBannerText"></div><div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">'+
-            '<button id="fatalUnblockBtn" style="padding:8px 12px;border-radius:12px;border:none;font-weight:900;cursor:pointer">Débloquer l\'écran</button>'+
-            '<button id="fatalLogoutBtn" style="padding:8px 12px;border-radius:12px;border:none;font-weight:900;cursor:pointer">Déconnexion</button>'+
-            '</div>';
-          document.body.appendChild(b);
-          const ub = document.getElementById('fatalUnblockBtn');
-          if(ub) ub.onclick = () => forceUnblockUI();
-          const lb = document.getElementById('fatalLogoutBtn');
-          if(lb) lb.onclick = () => { try{ logout(); }catch(e){ try{ location.href = location.pathname; }catch(_e){} } };
-        }
-        const t = document.getElementById('fatalBannerText');
-        if(t) t.textContent = message || 'Erreur';
-        b.style.display = 'block';
-      }catch(e){}
-    }
-
-    function forceUnblockUI(){
-      try{
-        const backdrop = document.getElementById('globalMenuBackdrop');
-        const menu = document.getElementById('globalMenu');
-        if(backdrop){
-          backdrop.classList.remove('open');
-          backdrop.style.pointerEvents = 'none';
-          backdrop.style.opacity = '0';
-        }
-        if(menu){
-          menu.classList.remove('open');
-          menu.style.transform = '';
-        }
-        const updates = document.getElementById('updatesModal');
-        if(updates) updates.style.display = 'none';
-        const loginOv = document.getElementById('loginOverlay');
-        // ne force pas le login overlay ; on enlève juste la capture d'événements
-        document.body.style.overflow = '';
-      }catch(e){}
-    }
-    window.forceUnblockUI = forceUnblockUI;
-
-    function handleDbError(where, err){
-      try{
-        console.error('[DB]', where, err);
-        const msg = (err && err.message) ? err.message : String(err || '');
-        if(msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('denied')){
-          showFatalBanner('⛔ Accès refusé (rules Firebase) sur: ' + where + '. Ouvre la console Firebase > Realtime Database > Rules.');
-        }else{
-          showFatalBanner('⚠️ Problème de données ('+where+'): ' + msg);
-        }
-      }catch(e){}
-    }
-
 
     // --- Cloud Functions helper (pour envoyer des notifications) ---
     function _uniq(arr){ return [...new Set(arr.filter(Boolean))]; }
@@ -130,7 +63,69 @@
       throw lastErr || new Error("Échec d’appel sendPush");
     }
 
-    function _notifCfg(){
+    
+    async function _callGetPushAudit(){
+      const configured = await _getFunctionsRegion();
+      const regions = _getFunctionsRegionsToTry(configured);
+      let lastErr = null;
+      for(const r of regions){
+        try{
+          const fns = r ? firebase.app().functions(r) : firebase.functions();
+          const fn = fns.httpsCallable('getPushAudit');
+          const res = await fn({});
+          return res && res.data ? res.data : res;
+        }catch(err){
+          lastErr = err;
+        }
+      }
+      throw lastErr || new Error('getPushAudit failed');
+    }
+
+    async function refreshPushAudit(){
+      const box = document.getElementById('pushAuditTable');
+      const meta = document.getElementById('pushAuditMeta');
+      if(!box) return;
+      box.innerHTML = '<div class="log-entry">Chargement...</div>';
+      if(meta) meta.textContent = '';
+      try{
+        const data = await _callGetPushAudit();
+        const users = (data && data.users) ? data.users : [];
+        const gen = data && data.generatedAt ? new Date(data.generatedAt) : null;
+        if(meta && gen) meta.textContent = 'Mis à jour: ' + gen.toLocaleString('fr-FR');
+
+        if(!users.length){
+          box.innerHTML = '<div class="log-entry">Aucune donnée.</div>';
+          return;
+        }
+
+        const rows = users.map(u => {
+          const role = String(u.role||'staff');
+          const tokenCount = Number(u.tokenCount||0);
+          const pwa = (Number(u.pwaInstalledAt||0) > 0) || (Number(u.lastSeenStandaloneAt||0) > 0) || !!u.anyStandalone;
+          const push = tokenCount > 0;
+          const lastTokenAt = Number(u.lastTokenAt||0);
+          const last = lastTokenAt ? new Date(lastTokenAt).toLocaleString('fr-FR') : '—';
+          return `
+            <div class="log-entry" style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+              <div style="min-width:240px;">
+                <div style="font-weight:900;">${escapeHtml(String(u.name||u.uid||''))}</div>
+                <div style="font-size:12px; opacity:.75;">${escapeHtml(String(u.uid||''))} · ${escapeHtml(role)}</div>
+              </div>
+              <div style="display:flex; gap:12px; align-items:center;">
+                <span style="font-size:12px;">📲 ${pwa ? 'Oui' : 'Non'}</span>
+                <span style="font-size:12px;">🔔 ${push ? ('Oui ('+tokenCount+')') : 'Non'}</span>
+                <span style="font-size:12px; opacity:.75;">Dernier token: ${escapeHtml(last)}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+        box.innerHTML = rows;
+      }catch(err){
+        box.innerHTML = `<div class="log-entry" style="color:#ef4444; font-weight:900;">⛔ Audit push impossible: ${escapeHtml(err && err.message ? err.message : String(err))}</div>`;
+      }
+    }
+
+function _notifCfg(){
       const d = { autoOnUpdate:false, autoOnObjChange:false, autoOnPilotage:false, autoAudience:'all' };
       const s = (globalSettings && globalSettings.notifications) ? globalSettings.notifications : {};
       return { ...d, ...s };
@@ -148,14 +143,9 @@
       const body = String(bodyEl.value||'').trim();
       const link = linkEl ? String(linkEl.value||'').trim() : '';
       const audience = audEl ? String(audEl.value||'all') : 'all';
-      const targetUid = (audience === 'one') ? String(document.getElementById('notifTargetUid')?.value || '').trim() : '';
 
       if(!title || !body){
         showToast("Titre + message requis.");
-        return;
-      }
-      if(audience === 'one' && !targetUid){
-        showToast("Choisis un utilisateur.");
         return;
       }
 
@@ -163,12 +153,12 @@
       if(btn){ btn.disabled = true; btn.style.opacity = .7; }
 
       try{
-        const data = await _callSendPush({ title, body, link: link || '/index.html#dashboard', audience, targetUid: targetUid || null, targetUid });
+        const data = await _callSendPush({ title, body, link: link || '/index.html#dashboard', audience });
         showToast(`✅ Notification envoyée (${data && data.sent != null ? data.sent : 'OK'})`);
         // log RTDB (historique)
         try{
           await db.ref('notifications/sent').push({
-            title, body, link: link || '/index.html#dashboard', audience, targetUid: targetUid || null,
+            title, body, link: link || '/index.html#dashboard', audience,
             by: (currentUser && currentUser.name) ? currentUser.name : 'Admin',
             uid: (currentUser && currentUser.uid) ? currentUser.uid : null,
             at: Date.now(),
@@ -220,7 +210,37 @@
 
     function renderNotifPanel(){
       if(!isAdminUser()) return;
-      const cfg = _notifCfg();
+      
+      // Audience -> user targeting UI
+      const audSel = document.getElementById('notifAudience');
+      const userRow = document.getElementById('notifUserRow');
+      const userSel = document.getElementById('notifUserUid');
+
+      if(audSel && !audSel._boundAudienceChange){
+        audSel._boundAudienceChange = true;
+        audSel.addEventListener('change', () => {
+          if(userRow) userRow.style.display = (audSel.value === 'user') ? 'block' : 'none';
+        });
+      }
+      if(userSel){
+        const entries = Object.entries(allUsers || {}).map(([uid, u]) => ({
+          uid,
+          name: (u && (u.name || u.displayName || u.email)) ? String(u.name || u.displayName || u.email) : uid,
+          role: u && u.role ? String(u.role) : 'staff'
+        }));
+        entries.sort((a,b)=>a.name.localeCompare(b.name));
+        userSel.innerHTML = '<option value="">— Choisir un utilisateur —</option>' + 
+          entries.map(e=>`<option value="${escapeHtml(e.uid)}">${escapeHtml(e.name)} (${escapeHtml(e.role)})</option>`).join('');
+      }
+      if(audSel && userRow) userRow.style.display = (audSel.value === 'user') ? 'block' : 'none';
+
+      // Push audit button
+      const btnAudit = document.getElementById('btnRefreshPushAudit');
+      if(btnAudit && !btnAudit._boundAudit){
+        btnAudit._boundAudit = true;
+        btnAudit.addEventListener('click', () => refreshPushAudit());
+      }
+const cfg = _notifCfg();
       const cb1 = document.getElementById('autoNotifOnUpdate');
       const cb2 = document.getElementById('autoNotifOnObjChange');
       const cb3 = document.getElementById('autoNotifOnPilotage');
@@ -268,144 +288,6 @@
       });
     }
 
-
-    // --- Notifications: ciblage + audit (qui a installé / activé 🔔) ---
-    function onNotifAudienceChange(){
-      const aud = String(document.getElementById('notifAudience')?.value || 'all');
-      const wrap = document.getElementById('notifTargetWrap');
-      if(wrap) wrap.style.display = (aud === 'one') ? 'block' : 'none';
-      if(aud === 'one'){ try{ renderNotifTargetUsers(); }catch(e){} }
-    }
-    window.onNotifAudienceChange = onNotifAudienceChange;
-
-    function renderNotifTargetUsers(){
-      const sel = document.getElementById('notifTargetUid');
-      if(!sel) return;
-      const usersArr = Object.entries(allUsers || {}).map(([uid,u]) => ({ uid, ...(u||{}) }));
-      usersArr.sort((a,b) => String(a.name||'').localeCompare(String(b.name||'')));
-      const cur = sel.value;
-      sel.innerHTML = "";
-      const opt0 = document.createElement('option');
-      opt0.value = "";
-      opt0.textContent = "— Choisir un utilisateur —";
-      sel.appendChild(opt0);
-
-      usersArr.forEach(u => {
-        const role = String(u.role||'staff');
-        const label = `${u.name || 'Utilisateur'} • ${role}`;
-        const opt = document.createElement('option');
-        opt.value = u.uid;
-        opt.textContent = label;
-        sel.appendChild(opt);
-      });
-
-      if(cur) sel.value = cur;
-    }
-
-    function _fmtDate(ts){
-      if(!ts) return "—";
-      try{ return new Date(ts).toLocaleString('fr-FR'); }catch(e){ return "—"; }
-    }
-
-    function startFcmTokensListenerIfAdmin(){
-      if(_fcmTokensListenerAttached) return;
-      if(!isAdminUser()) return;
-      _fcmTokensListenerAttached = true;
-
-      db.ref('fcmTokens').on('value', s => {
-        _fcmTokensReadDenied = false;
-        _fcmTokensReadError = '';
-        allFcmTokens = s.val() || {};
-        try{ renderPushAudit(); }catch(e){}
-        try{ renderNotifTargetUsers(); }catch(e){}
-      }, err => {
-        _fcmTokensReadDenied = true;
-        _fcmTokensReadError = (err && err.message) ? String(err.message) : 'permission denied';
-        allFcmTokens = {};
-        try{ renderPushAudit(); }catch(e){}
-      });
-    }
-
-    function renderPushAudit(){
-      if(!isAdminUser()) return;
-      const box = document.getElementById('pushAuditContainer');
-      if(!box) return;
-
-      if(_fcmTokensReadDenied){
-        box.innerHTML = `<div class="log-entry" style="color:#ef4444; font-weight:900;">⛔ Accès refusé à fcmTokens (rules Firebase). ${escapeHtml(_fcmTokensReadError||'')}</div>`;
-        return;
-      }
-
-      const usersArr = Object.entries(allUsers || {}).map(([uid,u]) => ({ uid, ...(u||{}) }));
-      usersArr.sort((a,b) => String(a.name||'').localeCompare(String(b.name||'')));
-
-      if(usersArr.length === 0){
-        box.innerHTML = "<div style='color:#999;font-style:italic;'>Aucun utilisateur.</div>";
-        return;
-      }
-
-      const lines = usersArr.map(u => {
-        const tokensObj = (allFcmTokens && allFcmTokens[u.uid]) ? allFcmTokens[u.uid] : {};
-        const tokenCount = tokensObj ? Object.keys(tokensObj).length : 0;
-
-        const installed = !!u.pwaInstalled || !!u.pwaInstalledAt;
-        const pushEnabled = !!u.pushEnabled || tokenCount > 0;
-
-        const b1 = installed ? "📲 installée" : "📲 —";
-        const b2 = pushEnabled ? "🔔 ON" : "🔔 OFF";
-        const role = String(u.role||'staff');
-        const lastPwa = u.pwaLastSeenAt || u.pwaInstalledAt || null;
-        const lastWeb = u.webLastSeenAt || null;
-
-        let devicesHtml = "";
-        if(tokenCount){
-          const rows = Object.entries(tokensObj).map(([k,v]) => {
-            const meta = v || {};
-            const ua = String(meta.ua||'');
-            const shortUA = ua.length > 80 ? ua.slice(0,80) + "…" : ua;
-            const upd = meta.updatedAt || meta.createdAt || null;
-            const stand = meta.standalone ? "PWA" : "Web";
-            return `<div style="padding:6px 0; border-top:1px solid rgba(255,255,255,.06);">
-              <div style="display:flex; justify-content:space-between; gap:10px;">
-                <div style="font-weight:900; font-size:11px;">${stand}</div>
-                <div style="font-size:11px; color:var(--text-muted);">${_fmtDate(upd)}</div>
-              </div>
-              <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">${escapeHtml(shortUA)}</div>
-            </div>`;
-          }).join("");
-          devicesHtml = `<div style="margin-top:8px; padding-top:6px;">
-            <div style="font-size:11px; font-weight:900; margin-bottom:6px;">Devices / tokens : ${tokenCount}</div>
-            ${rows}
-          </div>`;
-        } else {
-          devicesHtml = `<div style="margin-top:8px; font-size:11px; color:var(--text-muted);">Aucun token enregistré.</div>`;
-        }
-
-        return `
-          <details class="log-entry" style="border-left:4px solid rgba(37,99,235,.7);">
-            <summary style="cursor:pointer; list-style:none;">
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
-                <div>
-                  <div style="font-weight:1000;">${escapeHtml(u.name||'Utilisateur')}</div>
-                  <div style="font-size:11px; color:var(--text-muted);">${escapeHtml(role)} • tokens: ${tokenCount}</div>
-                </div>
-                <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
-                  <span class="history-pill">${b1}</span>
-                  <span class="history-pill">${b2}</span>
-                </div>
-              </div>
-              <div style="display:flex; gap:10px; margin-top:6px; flex-wrap:wrap; color:var(--text-muted); font-size:11px;">
-                <span>🕒 PWA: ${_fmtDate(lastPwa)}</span>
-                <span>🌐 Web: ${_fmtDate(lastWeb)}</span>
-              </div>
-            </summary>
-            ${devicesHtml}
-          </details>
-        `;
-      });
-
-      box.innerHTML = lines.join("");
-    }
     async function _maybeAutoNotify(kind, payload){
       // kind: 'update' | 'objective' | 'pilotage'
       if(!isAdminUser()) return;
@@ -441,10 +323,6 @@
     let allFeedbacks = {};
     let allUpdates = {};
     let allNotifsSent = {};
-    let allFcmTokens = {};
-    let _fcmTokensListenerAttached = false;
-    let _fcmTokensReadDenied = false;
-    let _fcmTokensReadError = '';
     let _functionsRegionCache = null;
     let globalSettings = { budget: 0 };
     const BASE_HOURS = 35;
@@ -508,335 +386,147 @@ let _objProgUnsub = null;
     }
 
     // --- PWA: service worker + bouton d'installation (si disponible) ---
-    // --- PWA + PUSH (Firebase Cloud Messaging) ---
-    // Objectifs :
-    // - bouton "Installer l’app" (Chrome/Edge/Android)
-    // - bouton "Activer les notifications" (Web/PWA)
-    // - sauvegarde en DB : qui utilise l'app (standalone) + qui a activé les notifications (tokens FCM)
-    // Note iOS : les push Web ne fonctionnent que si l’app est "Ajouter à l’écran d’accueil".
-    (function initPWAAndPush(){
-      const LS_INSTALLED_FLAG = 'heiko_pwa_installed_flag';
-      let deferredPrompt = null;
-
+    (function initPWA(){
+      // Service worker
+      if('serviceWorker' in navigator){
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('firebase-messaging-sw.js').catch(() => {});
+      // --- PUSH NOTIFICATIONS (Firebase Cloud Messaging / Safari iOS PWA) ---
+      // Requiert :
+      // - PWA ajoutée à l’écran d’accueil (iOS/iPadOS)
+      // - VAPID public key (Firebase Console > Cloud Messaging > Web Push certificates)
+      // Option : tu peux aussi stocker la clé dans RTDB : /config/vapidKey
       let _messaging = null;
-      let _swReg = null;
-      let _vapidKeyCache = null;
-      let _pushInitDone = false;
-
-      function _isStandalonePWA(){
-        return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
-               (window.navigator && window.navigator.standalone === true);
-      }
-      function _isIOS(){
-        const ua = navigator.userAgent || '';
-        return /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
-      }
-      function _supportsPush(){
-        return ('Notification' in window) && ('serviceWorker' in navigator) && (typeof firebase !== 'undefined') && !!firebase.messaging;
-      }
+      let _swRegForPush = null;
 
       async function _getVapidKey(){
-        if(_vapidKeyCache) return _vapidKeyCache;
-
-        // 1) RTDB
         try{
           const snap = await db.ref('config/vapidKey').get();
           const k = snap.exists() ? String(snap.val()||'').trim() : '';
-          if(k){ _vapidKeyCache = k; return k; }
-        }catch(e){}
-
-        // 2) localStorage fallback
-        try{
-          const k2 = localStorage.getItem('heiko_vapid_key');
-          if(k2){ _vapidKeyCache = k2; return k2; }
-        }catch(e){}
-
-        return '';
+          return k;
+        }catch(e){ return ''; }
       }
 
-      function _fnv1a32(str){
-        let h = 0x811c9dc5;
-        for(let i=0;i<str.length;i++){
-          h ^= str.charCodeAt(i);
-          h = (h + ((h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24))) >>> 0;
-        }
-        return ('00000000' + h.toString(16)).slice(-8);
+      function _isStandalonePWA(){
+        return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (window.navigator && window.navigator.standalone === true);
       }
 
-      async function _hashToken(token){
-        try{
-          if(!window.crypto || !crypto.subtle) throw new Error('no-subtle');
-          const enc = new TextEncoder().encode(token);
-          const buf = await crypto.subtle.digest('SHA-256', enc);
-          const arr = Array.from(new Uint8Array(buf));
-          return arr.map(b => b.toString(16).padStart(2,'0')).join('').slice(0,40);
-        }catch(e){
-          return _fnv1a32(token);
-        }
+      function _supportsPush(){
+        return ('Notification' in window) && ('serviceWorker' in navigator) && (typeof firebase !== 'undefined') && (firebase.messaging);
       }
 
-      async function _ensureServiceWorker(){
-        if(!('serviceWorker' in navigator)) return null;
-        if(_swReg) return _swReg;
-        try{
-          // sw.js contient déjà la partie cache + onBackgroundMessage
-          _swReg = await navigator.serviceWorker.register('sw.js');
-        }catch(e){
-          _swReg = null;
-        }
-        return _swReg;
-      }
-
-      function _setInstallBtnVisible(visible){
-        const btn = document.getElementById('installAppBtn');
+      async function _setupPushUI(){
+        const btn = document.getElementById('enablePushBtn');
         if(!btn) return;
-        btn.style.display = visible ? 'block' : 'none';
-      }
 
-      async function recordAppState(){
-        if(!currentUser || !currentUser.uid) return;
-
-        const now = Date.now();
-        const updates = { lastSeenAt: now };
-
-        if(_isStandalonePWA()){
-          updates.pwaLastSeenAt = now;
-          updates.pwaInstalled = true;
-          if(!currentUser.pwaInstalledAt) updates.pwaInstalledAt = now;
-        }else{
-          updates.webLastSeenAt = now;
+        if(!_supportsPush()){
+          btn.style.display = 'none';
+          return;
         }
 
-        // Android/Chrome: si l'event appinstalled a été capté sur ce device
         try{
-          if(localStorage.getItem(LS_INSTALLED_FLAG) === '1'){
-            updates.pwaInstalled = true;
-            if(!currentUser.pwaInstalledAt) updates.pwaInstalledAt = now;
+          _swRegForPush = await navigator.serviceWorker.ready;
+        }catch(e){ _swRegForPush = null; }
+
+        // Messaging instance (FCM)
+        try{ _messaging = firebase.messaging(); }catch(e){ _messaging = null; }
+
+        // Affiche le bouton uniquement si on a un user connecté (uid) et un SW prêt
+        btn.style.display = (_swRegForPush && currentUser && currentUser.uid && _messaging) ? 'block' : 'none';
+
+        btn.onclick = async () => {
+          if(!currentUser || !currentUser.uid){
+            showToast("Connecte-toi pour activer les notifications.");
+            return;
           }
-        }catch(e){}
+          if(!_isStandalonePWA()){
+            showToast("Installe l’app (Ajouter à l’écran d’accueil) pour recevoir des notifications.");
+            return;
+          }
+          if(!_swRegForPush){
+            showToast("Service Worker non prêt. Recharge la page.");
+            return;
+          }
 
-        try{ await db.ref('users/' + currentUser.uid).update(updates); }catch(e){}
-      }
+          // Demande d’autorisation (doit venir d’un clic)
+          let perm = "default";
+          try{ perm = await Notification.requestPermission(); }catch(e){ perm = "denied"; }
+          if(perm !== "granted"){
+            showToast("Notifications refusées.");
+            return;
+          }
 
-      async function _upsertToken(token){
-        if(!currentUser || !currentUser.uid) return;
+          const vapidKey = (await _getVapidKey()) || "";
+          if(!vapidKey){
+            showToast("Clé VAPID manquante (config/vapidKey).");
+            return;
+          }
 
-        const tokenId = await _hashToken(token);
-        const now = Date.now();
+          try{
+            const token = await _messaging.getToken({
+              vapidKey,
+              serviceWorkerRegistration: _swRegForPush
+            });
 
-        const meta = {
-          token,
-          updatedAt: now,
-          ua: navigator.userAgent || '',
-          standalone: _isStandalonePWA()
+            if(!token){
+              showToast("Impossible d’obtenir le token de notification.");
+              return;
+            }
+
+            // Sauvegarde dans RTDB
+            await db.ref('fcmTokens/' + currentUser.uid).push({
+              token,
+              createdAt: Date.now(),
+              ua: navigator.userAgent
+            });
+
+            showToast("Notifications activées ✅");
+          }catch(err){
+            console.error(err);
+            showToast("Erreur notifications. Vérifie la clé VAPID et la config Firebase.");
+          }
         };
 
+        // Foreground messages (quand l’app est ouverte)
         try{
-          await db.ref(`fcmTokens/${currentUser.uid}/${tokenId}`).set(meta);
-          await db.ref(`users/${currentUser.uid}`).update({
-            pushEnabled: true,
-            pushEnabledAt: currentUser.pushEnabledAt || now,
-            pushLastTokenAt: now,
-            pushPermission: (typeof Notification !== 'undefined') ? Notification.permission : 'unsupported'
+          _messaging.onMessage((payload) => {
+            const title = payload?.notification?.title || "Heiko";
+            const body = payload?.notification?.body || "";
+            showToast(body ? (title + " — " + body) : title);
           });
         }catch(e){}
       }
 
-      async function enablePush(){
-        if(!currentUser || !currentUser.uid){
-          showToast("Connecte-toi pour activer les notifications.");
-          return;
-        }
-        if(!_supportsPush()){
-          showToast("Notifications non supportées sur cet appareil.");
-          return;
-        }
-
-        // iOS: push web seulement si standalone
-        if(_isIOS() && !_isStandalonePWA()){
-          showToast("Sur iPhone/iPad : installe l’app (Ajouter à l’écran d’accueil) avant d’activer 🔔.");
-          return;
-        }
-
-        await _ensureServiceWorker();
-        if(!navigator.serviceWorker || !navigator.serviceWorker.ready){
-          showToast("Service Worker non prêt. Recharge la page.");
-          return;
-        }
-        const swReady = await navigator.serviceWorker.ready;
-
-        if(!_messaging){
-          try{ _messaging = firebase.messaging(); }catch(e){ _messaging = null; }
-        }
-        if(!_messaging){
-          showToast("FCM indisponible (firebase-messaging).");
-          return;
-        }
-
-        // Permission (doit venir d’un clic)
-        let perm = 'default';
-        try{ perm = await Notification.requestPermission(); }catch(e){ perm = 'denied'; }
-
-        if(perm !== 'granted'){
-          try{
-            await db.ref(`users/${currentUser.uid}`).update({
-              pushEnabled: false,
-              pushPermission: perm,
-              pushPermissionUpdatedAt: Date.now()
-            });
-          }catch(e){}
-          showToast("Notifications refusées.");
-          refreshUI();
-          return;
-        }
-
-        const vapidKey = await _getVapidKey();
-        if(!vapidKey){
-          showToast("Clé VAPID manquante (RTDB: config/vapidKey).");
-          return;
-        }
-
-        try{
-          try{ localStorage.setItem('heiko_vapid_key', vapidKey); }catch(e){}
-          const token = await _messaging.getToken({ vapidKey, serviceWorkerRegistration: swReady });
-          if(!token){
-            showToast("Impossible d’obtenir le token de notification.");
-            return;
-          }
-          await _upsertToken(token);
-          showToast("Notifications activées ✅");
-          refreshUI();
-        }catch(err){
-          console.error(err);
-          showToast("Erreur notifications. Vérifie la clé VAPID et la config Firebase.");
-        }
+        });
       }
 
-      async function syncTokenSilently(){
-        // Si déjà accordé : on s’assure que le token est bien en DB (sans prompt)
-        if(!currentUser || !currentUser.uid) return;
-        if(!_supportsPush()) return;
-
-        if(typeof Notification === 'undefined' || Notification.permission !== 'granted') {
-          try{
-            await db.ref(`users/${currentUser.uid}`).update({
-              pushPermission: (typeof Notification !== 'undefined') ? Notification.permission : 'unsupported'
-            });
-          }catch(e){}
-          return;
-        }
-
-        // iOS non-standalone : on ne peut rien faire
-        if(_isIOS() && !_isStandalonePWA()) return;
-
-        await _ensureServiceWorker();
-        if(!navigator.serviceWorker || !navigator.serviceWorker.ready) return;
-        const swReady = await navigator.serviceWorker.ready;
-
-        if(!_messaging){
-          try{ _messaging = firebase.messaging(); }catch(e){ _messaging = null; }
-        }
-        if(!_messaging) return;
-
-        const vapidKey = await _getVapidKey();
-        if(!vapidKey) return;
-
-        try{
-          const token = await _messaging.getToken({ vapidKey, serviceWorkerRegistration: swReady });
-          if(token) await _upsertToken(token);
-        }catch(e){
-          // ignore
-        }
-      }
-
-      function refreshUI(){
-        const enableBtn = document.getElementById('enablePushBtn');
-        if(enableBtn){
-          if(!_supportsPush()){
-            enableBtn.style.display = 'none';
-          }else{
-            enableBtn.style.display = (currentUser && currentUser.uid) ? 'block' : 'none';
-
-            const perm = (typeof Notification !== 'undefined') ? Notification.permission : 'unsupported';
-            enableBtn.textContent = (perm === 'granted') ? '🔔 Notifications activées (clic pour rafraîchir)' : '🔔 Activer les notifications';
-            enableBtn.disabled = false;
-            enableBtn.style.opacity = 1;
-
-            enableBtn.onclick = async () => {
-              const btn = enableBtn;
+      // Install prompt (Chrome/Edge/Android)
+      let deferredPrompt = null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        const btn = document.getElementById('installAppBtn');
+        if(btn){
+          btn.style.display = 'block';
+          btn.onclick = async () => {
+            try{
               btn.disabled = true;
-              btn.style.opacity = 0.7;
-              try{ await enablePush(); }
-              finally{ refreshUI(); }
-            };
-          }
+              deferredPrompt.prompt();
+              await deferredPrompt.userChoice;
+            } catch(_){
+              // ignore
+            }
+            deferredPrompt = null;
+            btn.style.display = 'none';
+            btn.disabled = false;
+          };
         }
-
-        // Install button: seulement si le navigateur expose le prompt
-        _setInstallBtnVisible(!_isStandalonePWA() && !!deferredPrompt);
-
-        // Best effort : trace "app installée" / "web" / "pwa"
-        recordAppState().catch(()=>{});
-      }
-
-      document.addEventListener('DOMContentLoaded', async () => {
-        if(_pushInitDone) return;
-        _pushInitDone = true;
-
-        await _ensureServiceWorker();
-
-        // Foreground messages (quand l’app est ouverte)
-        if(_supportsPush()){
-          try{
-            _messaging = firebase.messaging();
-            _messaging.onMessage((payload) => {
-              const title = payload?.notification?.title || "Heiko";
-              const body = payload?.notification?.body || "";
-              showToast(body ? (title + " — " + body) : title);
-            });
-          }catch(e){}
-        }
-
-        // Install prompt (Chrome/Edge/Android)
-        window.addEventListener('beforeinstallprompt', (e) => {
-          e.preventDefault();
-          deferredPrompt = e;
-
-          const btn = document.getElementById('installAppBtn');
-          if(btn){
-            btn.style.display = 'block';
-            btn.onclick = async () => {
-              try{
-                btn.disabled = true;
-                deferredPrompt.prompt();
-                await deferredPrompt.userChoice;
-              }catch(_){}
-              deferredPrompt = null;
-              btn.style.display = 'none';
-              btn.disabled = false;
-              try{ localStorage.setItem(LS_INSTALLED_FLAG,'1'); }catch(e){}
-              recordAppState().catch(()=>{});
-            };
-          }
-        });
-
-        window.addEventListener('appinstalled', () => {
-          deferredPrompt = null;
-          _setInstallBtnVisible(false);
-          try{ localStorage.setItem(LS_INSTALLED_FLAG,'1'); }catch(e){}
-          recordAppState().catch(()=>{});
-        });
-
-        // iOS: pas de beforeinstallprompt -> on ne peut pas déclencher l’installation
-        if(_isIOS() && !_isStandalonePWA()){
-          _setInstallBtnVisible(false);
-        }
-
-        refreshUI();
       });
-
-      // Expose helpers utilisés ailleurs
-      window.HeikoPush = { refreshUI, enablePush, recordAppState, syncTokenSilently };
+      window.addEventListener('appinstalled', () => {
+        const btn = document.getElementById('installAppBtn');
+        if(btn) btn.style.display = 'none';
+        deferredPrompt = null;
+      });
     })();
 
     
@@ -1122,20 +812,17 @@ function renderMenuSitesPreview(){
           const val = snap.val();
           if(!val) {
              const def = { name: "Utilisateur", hours:35, role:'staff', email: user.email, status: 'pending' };
-             db.ref('users/'+user.uid).set(def).catch(e=>handleDbError('users/'+user.uid+' write', e));
+             db.ref('users/'+user.uid).set(def);
              currentUser = def;
-             try{ window.HeikoPush && HeikoPush.refreshUI && HeikoPush.refreshUI(); }catch(e){}
+             try{ _setupPushUI(); }catch(e){}
           } else { 
              currentUser = val;
-             try{ window.HeikoPush && HeikoPush.refreshUI && HeikoPush.refreshUI(); }catch(e){} 
+             try{ _setupPushUI(); }catch(e){} 
              if(currentUser.status !== 'active') {
-                 db.ref('users/'+user.uid).update({ status: 'active', lastLogin: Date.now() }).catch(e=>handleDbError('users/'+user.uid+' update', e));
+                 db.ref('users/'+user.uid).update({ status: 'active', lastLogin: Date.now() });
              }
           }
           currentUser.uid = user.uid; currentUser.email = user.email;
-          try{ window.HeikoPush && HeikoPush.recordAppState && HeikoPush.recordAppState(); }catch(e){}
-          try{ window.HeikoPush && HeikoPush.syncTokenSilently && HeikoPush.syncTokenSilently(); }catch(e){}
-          try{ window.HeikoPush && HeikoPush.refreshUI && HeikoPush.refreshUI(); }catch(e){}
           const newLogRef = db.ref("logs").push();
           newLogRef.set({ user: currentUser.name, action: "Connexion", type: "session", startTime: Date.now(), lastSeen: Date.now() });
           setInterval(() => { newLogRef.update({ lastSeen: Date.now() }); }, 60000);
@@ -1379,12 +1066,12 @@ function showToast(message) {
                  renderSimulator();
              }
           } catch(e) { console.error(e); }
-      }, (err) => handleDbError('objectives', err));
+      });
       db.ref('users').on('value', s => { 
         allUsers = s.val() || {}; 
         if(isAdminUser()) { renderAdminUsers(); }
         if(isAdminUser()) { renderSimulator(); }
-      }, (err) => handleDbError('users', err));
+      });
       db.ref('settings').on('value', s => { 
         globalSettings = s.val() || { budget: 0 }; 
         if(globalSettings.guardrailMaxPctOfCA == null) {
@@ -1395,7 +1082,7 @@ function showToast(message) {
         if(globalSettings.notifications.autoAudience == null) globalSettings.notifications.autoAudience = 'all';
         if(isAdminUser()) { try{ renderNotifPanel(); }catch(e){} }
         if(isAdminUser()) { renderSimulator(); }
-      }, (err) => handleDbError('settings', err));
+      });
 
       // Aperçu "Sites utiles" sur le dashboard
       db.ref('directory/sites').on('value', s => {
@@ -1495,13 +1182,6 @@ db.ref('feedbacks').on('value', s => {
       // Notifications tab: Admin + Super Admin
       const btnNotifs = document.getElementById("btnTabNotifs");
       if(btnNotifs) btnNotifs.style.display = isAdmin ? 'block' : 'none';
-
-      if(isAdmin){
-        try{ startFcmTokensListenerIfAdmin(); }catch(e){}
-        try{ renderNotifTargetUsers(); }catch(e){}
-        try{ renderPushAudit(); }catch(e){}
-      }
-      try{ window.HeikoPush && HeikoPush.refreshUI && HeikoPush.refreshUI(); }catch(e){}
 
       const globalBudgetInput = document.getElementById("simGlobalBudget");
       const saveBudgetBtn = document.getElementById("btnSaveGlobalBudget");
@@ -2423,7 +2103,7 @@ const el = document.createElement("div");
        // Ensure logs/feedbacks render even if data loaded before user role was known
        if(t==='logs'){ try{ renderLogs(allLogs || {}); }catch(e){} }
        if(t==='feedbacks'){ try{ renderFeedbacks(allFeedbacks || {}); }catch(e){} }
-       if(t==='notifs') { try{ startFcmTokensListenerIfAdmin(); renderNotifPanel(); renderNotifTargetUsers(); onNotifAudienceChange(); renderPushAudit(); renderNotifHistory(); }catch(e){} }
+       if(t==='notifs') { try{ renderNotifPanel(); renderNotifHistory(); refreshPushAudit(); }catch(e){} }
     }
     function toggleCreateInputs() { document.getElementById("createTiersBlock").style.display = document.getElementById("noFixed").checked ? 'none' : 'block'; }
     function toggleEditInputs() { document.getElementById("editTiersBlock").style.display = document.getElementById("eoFixed").checked ? 'none' : 'block'; }
@@ -3366,6 +3046,3 @@ const el = document.createElement("div");
       if(!window.__swReloaded){ window.__swReloaded = true; window.location.reload(); }
     });
   }
-
-// Mark app JS as loaded
-try{ window.__APP_READY__ = true; }catch(e){}
