@@ -1814,3 +1814,205 @@ body.dark-mode .global-score-container::before{
       border: 1px solid rgba(148,163,184,0.22);
       box-shadow: 0 10px 30px rgba(0,0,0,0.35);
     }
+
+
+/* =========================
+   V4.1 UI polish (glass + suppliers)
+   ========================= */
+
+/* Remove "Mise à jour" rectangle above the circle */
+.last-update{ display:none !important; }
+
+/* More glassy objective cards (pro & épuré) */
+.card{
+  background: rgba(255,255,255,.70) !important;
+  border: 1px solid rgba(255,255,255,.55) !important;
+  box-shadow: 0 18px 50px rgba(15,23,42,.08) !important;
+  backdrop-filter: blur(16px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(140%) !important;
+}
+body.dark-mode .card{
+  background: rgba(15,23,42,.58) !important;
+  border-color: rgba(148,163,184,.16) !important;
+  box-shadow: 0 18px 55px rgba(0,0,0,.40) !important;
+}
+
+/* Secondary objectives pop a bit more (without flashy colors) */
+.card.secondary-card{
+  border-color: rgba(59,130,246,.18) !important;
+  box-shadow: 0 20px 60px rgba(37,99,235,.10) !important;
+}
+body.dark-mode .card.secondary-card{
+  border-color: rgba(96,165,250,.18) !important;
+  box-shadow: 0 22px 70px rgba(37,99,235,.14) !important;
+}
+
+/* Glassy green badge for 🎉 OBJECTIF VALIDÉ */
+.badge-winner{
+  background: rgba(16,185,129,.14) !important;
+  color: #065f46 !important;
+  border: 1px solid rgba(16,185,129,.25) !important;
+  box-shadow: 0 12px 30px rgba(16,185,129,.10) !important;
+  backdrop-filter: blur(12px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(140%) !important;
+}
+body.dark-mode .badge-winner{
+  background: rgba(16,185,129,.12) !important;
+  color: rgba(236,253,245,.92) !important;
+  border-color: rgba(16,185,129,.20) !important;
+}
+
+/* Make "bonus" badge a bit more visible */
+.badge-ready{
+  background: rgba(59,130,246,.12) !important;
+  border: 1px solid rgba(59,130,246,.22) !important;
+  box-shadow: 0 12px 28px rgba(37,99,235,.10) !important;
+  backdrop-filter: blur(10px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(140%) !important;
+}
+
+/* Disable flashy winner border animation (keep subtle highlight) */
+.card.is-winner::before,
+.card.is-winner::after{
+  animation: none !important;
+}
+.card.is-winner{
+  border-color: rgba(16,185,129,.22) !important;
+  box-shadow: 0 22px 70px rgba(16,185,129,.10) !important;
+}
+
+/* Paliers dots less flashy */
+.ms-item.unlocked .ms-circle{
+  background: rgba(16,185,129,.10) !important;
+  border-color: rgba(16,185,129,.25) !important;
+  color: rgba(16,185,129,.85) !important;
+  transform: scale(1.05) !important;
+  box-shadow: 0 10px 22px rgba(16,185,129,.10) !important;
+}
+.ms-item.unlocked .ms-prize{
+  background: rgba(16,185,129,.12) !important;
+  color: rgba(6,95,70,.92) !important;
+  border: 1px solid rgba(16,185,129,.22) !important;
+  backdrop-filter: blur(10px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(140%) !important;
+}
+
+/* Suppliers: table view + reorder */
+.dir-table-wrap{ width:100%; overflow:auto; border-radius: 18px; }
+.dir-table{
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 780px;
+  background: rgba(255,255,255,.55);
+  border: 1px solid rgba(255,255,255,.55);
+  border-radius: 18px;
+  overflow: hidden;
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+body.dark-mode .dir-table{
+  background: rgba(15,23,42,.45);
+  border-color: rgba(148,163,184,.16);
+}
+.dir-table thead th{
+  position: sticky;
+  top: 0;
+  background: rgba(255,255,255,.78);
+  border-bottom: 1px solid rgba(148,163,184,.22);
+  padding: 12px 12px;
+  text-align: left;
+  font-size: 12px;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: rgba(71,85,105,.90);
+  z-index: 1;
+}
+body.dark-mode .dir-table thead th{
+  background: rgba(15,23,42,.75);
+  border-bottom-color: rgba(148,163,184,.16);
+  color: rgba(226,232,240,.82);
+}
+.dir-table tbody td{
+  padding: 12px 12px;
+  border-bottom: 1px solid rgba(148,163,184,.14);
+  vertical-align: top;
+  font-size: 14px;
+}
+.dir-table tbody tr:hover{
+  background: rgba(59,130,246,.06);
+}
+body.dark-mode .dir-table tbody tr:hover{
+  background: rgba(96,165,250,.08);
+}
+.dir-table .col-actions{ white-space: nowrap; }
+.dir-table .col-drag{ width: 34px; }
+.drag-handle{
+  display:inline-flex;
+  width: 26px; height: 26px;
+  align-items:center; justify-content:center;
+  border-radius: 10px;
+  border: 1px solid rgba(148,163,184,.22);
+  background: rgba(255,255,255,.55);
+  cursor: grab;
+  user-select: none;
+  opacity: .75;
+}
+body.dark-mode .drag-handle{
+  background: rgba(15,23,42,.55);
+  border-color: rgba(148,163,184,.14);
+}
+tr.is-dragging{ opacity: .75; }
+
+/* Small action buttons inside table */
+.dir-mini-btn{
+  border: 1px solid rgba(148,163,184,.22);
+  background: rgba(255,255,255,.55);
+  border-radius: 10px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-weight: 800;
+  margin-right: 6px;
+}
+.dir-mini-btn:hover{ transform: translateY(-1px); }
+.dir-mini-btn.danger{
+  border-color: rgba(239,68,68,.30);
+}
+
+/* Weekday checkboxes */
+.weekday-grid{
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.weekday-chip{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap: 6px;
+  padding: 10px 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(148,163,184,.22);
+  background: rgba(255,255,255,.55);
+  font-weight: 900;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+}
+.weekday-chip input{ margin: 0; transform: scale(1.05); }
+body.dark-mode .weekday-chip{
+  background: rgba(15,23,42,.55);
+  border-color: rgba(148,163,184,.16);
+}
+.weekday-chip:has(input:checked){
+  border-color: rgba(16,185,129,.28);
+  background: rgba(16,185,129,.10);
+}
+
+/* Ensure the TIME REMAINING chip is exactly as requested */
+.daily-micro.time-remaining{
+  letter-spacing: .10em !important;
+}

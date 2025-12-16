@@ -472,6 +472,15 @@ let _objProgUnsub = null;
     }
     window.openUpdatesModalFromMenu = openUpdatesModalFromMenu;
 
+
+    function openHistoryModalFromMenu(){
+      const modal = document.getElementById('historyModal');
+      if(modal) modal.style.display = 'flex';
+      toggleGlobalMenu(false);
+      try{ renderUserHistory(); }catch(e){}
+    }
+    window.openHistoryModalFromMenu = openHistoryModalFromMenu;
+
     // --- Dashboard: aperçu Sites utiles (mini) ---
     let __sitesMiniOpen = false;
     function toggleSitesMini(force){
@@ -858,7 +867,7 @@ function renderMenuSitesPreview(){
       // Special display for "TEMPS RESTANT" : bigger under the circle (one line)
       if(msg === "TEMPS RESTANT"){
         el.classList.add('time-remaining');
-        el.textContent = '⏳TEMPS RESTANT';
+        el.textContent = '⏳ TEMPS RESTANT ⏳';
       } else {
         el.classList.remove('time-remaining');
         el.textContent = msg || "";
@@ -912,46 +921,57 @@ function renderMenuSitesPreview(){
       if(renderUserHistory._bound) return;
       renderUserHistory._bound = true;
       if(!currentUser) return;
-      const panel = document.getElementById("historyPanel");
-      const list = document.getElementById("historyList");
-      if(!panel || !list) return;
 
-const fmtMonth = (key) => {
-  const k = String(key || '').trim();
-  const mt = /^(\d{4})-(\d{2})$/.exec(k);
-  if(!mt) return k;
-  const y = Number(mt[1]);
-  const mo = Number(mt[2]) - 1;
-  const d = new Date(y, mo, 1);
-  let s = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-  // Capitaliser la première lettre (ex: "Décembre 2025")
-  s = s ? (s.charAt(0).toUpperCase() + s.slice(1)) : k;
-  return s;
-};
+      const dashPanel = document.getElementById("historyPanel");
+      const dashList  = document.getElementById("historyList");
+      const modalList = document.getElementById("historyModalList");
+      if(!dashList && !modalList) return;
 
+      const fmtMonth = (key) => {
+        const k = String(key || '').trim();
+        const mt = /^(\d{4})-(\d{2})$/.exec(k);
+        if(!mt) return k;
+        const y = Number(mt[1]);
+        const mo = Number(mt[2]) - 1;
+        const d = new Date(y, mo, 1);
+        return d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+      };
 
-      db.ref(`history/users/${currentUser.uid}`).limitToLast(6).on('value', s=>{
-        const v = s.val() || {};
-        const rows = Object.values(v).sort((a,b)=> (b.month||"").localeCompare(a.month||""));
-        if(rows.length === 0){
-          panel.style.display = "none";
-          return;
-        }
-        panel.style.display = "";
-        list.innerHTML = rows.slice(0,3).map(r=>{
-          const m = fmtMonth(r.month);
-          const primes = (Number(r.primes||0)).toFixed(0);
-          const pct = (Number(r.validatedPct||0)).toFixed(0);
-          return `
-            <div class="history-row">
-              <div class="history-month">${m}</div>
-              <div class="history-metrics">
-                <div class="history-pill">💶 ${primes}€</div>
-                <div class="history-pill">✅ ${pct}%</div>
-              </div>
+      const makeRows = (rows) => rows.map(r=>{
+        const m = fmtMonth(r.month);
+        const primes = (Number(r.primes||0)).toFixed(0);
+        const pct = (Number(r.validatedPct||0)).toFixed(0);
+        return `
+          <div class="history-row">
+            <div class="history-month">${m}</div>
+            <div class="history-metrics">
+              <div class="history-pill">💶 ${primes}€</div>
+              <div class="history-pill">✅ ${pct}%</div>
             </div>
-          `;
-        }).join("");
+          </div>
+        `;
+      }).join("");
+
+      db.ref(`history/users/${currentUser.uid}`).on('value', snap=>{
+        const raw = snap.exists() ? (snap.val() || {}) : {};
+        const rows = Object.keys(raw).map(k => ({ month: k, ...(raw[k]||{}) }))
+          .sort((a,b)=> String(b.month).localeCompare(String(a.month)));
+
+        // Dashboard preview (if present)
+        if(dashPanel && dashList){
+          if(rows.length === 0){
+            dashPanel.style.display = 'none';
+            dashList.innerHTML = "";
+          } else {
+            dashPanel.style.display = '';
+            dashList.innerHTML = makeRows(rows.slice(0,3));
+          }
+        }
+
+        // Modal = full list
+        if(modalList){
+          modalList.innerHTML = rows.length ? makeRows(rows) : `<div style="text-align:center; color:#94a3b8; font-weight:700;">Aucune donnée pour le moment.</div>`;
+        }
       });
     }
 
@@ -1873,6 +1893,7 @@ function renderDashboard() {
 const el = document.createElement("div");
       let cls = "card";
       if(isPrimary) cls += " primary-card";
+      else cls += " secondary-card";
       if(isLocked) cls += " is-locked";
       if(isWin && !isLocked) cls += " is-winner";
       el.className = cls;

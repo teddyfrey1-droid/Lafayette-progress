@@ -250,7 +250,15 @@ function renderSuppliers(){
   if(!root) return;
 
   const items = Object.entries(suppliersData || {}).map(([k,v]) => ({ key:k, ...(v||{}) }));
-  items.sort((a,b) => (a.label||"").localeCompare(b.label||""));
+  const hasOrder = items.some(it => typeof it.order === 'number');
+
+  items.sort((a,b) => {
+    const ao = (typeof a.order === 'number') ? a.order : (hasOrder ? 1e15 : 0);
+    const bo = (typeof b.order === 'number') ? b.order : (hasOrder ? 1e15 : 0);
+    if(ao !== bo) return ao - bo;
+    return (a.label||"").localeCompare(b.label||"");
+  });
+
   root.innerHTML = "";
 
   if(items.length === 0){
@@ -258,44 +266,84 @@ function renderSuppliers(){
     return;
   }
 
-  items.forEach(it => {
-    const row = document.createElement('div');
-    row.className = 'dir-item';
+  // Tip (reorder)
+  if(canEdit){
+    const tip = document.createElement('div');
+    tip.className = 'dir-tip';
+    tip.style.marginBottom = '10px';
+    tip.innerHTML = `Astuce : tu peux réorganiser les fournisseurs (glisser-déposer ou ↑↓).`;
+    root.appendChild(tip);
+  }
 
-    const phone = (it.phone || '').toString().trim();
+  const wrap = document.createElement('div');
+  wrap.className = 'dir-table-wrap';
+
+  const table = document.createElement('table');
+  table.className = 'dir-table suppliers-table';
+
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th class="col-drag"></th>
+        <th>Fournisseur</th>
+        <th>Commercial</th>
+        <th>Téléphone</th>
+        <th>Livraisons</th>
+        <th>🕒 Avant</th>
+        <th>⏳ Délai</th>
+        <th>€ Min.</th>
+        <th class="col-actions">Actions</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  `;
+
+  const tbody = table.querySelector('tbody');
+
+  items.forEach((it, idx) => {
     const commercial = (it.commercial || '').toString().trim();
-    const deliveryDays = (it.deliveryDays || '').toString().trim();
+    const phone = (it.phone || '').toString().trim();
+    const deliveryDays = (Array.isArray(it.deliveryDays) ? it.deliveryDays.join(' / ') : (it.deliveryDays || '')).toString().trim();
+    const orderBefore = (it.orderBefore || '').toString().trim();
     const leadTime = (it.leadTime || '').toString().trim();
-    const minOrder = (it.minOrder || '').toString().trim();
+    const minOrderRaw = (it.minOrder || '').toString().trim();
+    const minOrder = minOrderRaw ? (minOrderRaw.includes('€') ? minOrderRaw : `${minOrderRaw}`) : "";
 
     const isPhone = /^[+0-9][0-9 .-]{6,}$/.test(phone);
     const href = isPhone ? `tel:${phone.replace(/\s+/g,'')}` : null;
 
-    const meta = [];
-    if(commercial) meta.push(`👤 ${escapeHtml(commercial)}`);
-    if(phone) meta.push(`📞 ${href ? `<a href="${href}" class="dir-link">${escapeHtml(phone)}</a>` : escapeHtml(phone)}`);
-    if(deliveryDays) meta.push(`📦 ${escapeHtml(deliveryDays)}`);
-    if(leadTime) meta.push(`⏱️ ${escapeHtml(leadTime)} j`);
-    if(minOrder) meta.push(`💶 ${escapeHtml(minOrder)}`);
+    const tr = document.createElement('tr');
+    tr.dataset.key = it.key;
+    tr.draggable = !!canEdit;
 
-    row.innerHTML = `
-      <div class="dir-item-main">
-        <div class="dir-item-title">${escapeHtml(it.label || 'Fournisseur')}</div>
-        <div class="dir-item-value">${commercial ? escapeHtml(commercial) : (phone ? (href ? `<a href="${href}" class="dir-link">${escapeHtml(phone)}</a>` : escapeHtml(phone)) : '—')}</div>
-        ${meta.length ? `<div class="dir-item-note">${meta.join(' • ')}</div>` : ''}
-      </div>
-      ${canEdit ? `
-        <div class="dir-actions">
-          <button class="icon-btn" title="Modifier" onclick="openDirModal('supplier','${it.key}')">✏️</button>
-          <button class="icon-btn danger" title="Supprimer" onclick="deleteDirItem('supplier','${it.key}')">🗑️</button>
-        </div>
-      ` : ''}
+    tr.innerHTML = `
+      <td class="col-drag">${canEdit ? '<span class="drag-handle" title="Déplacer">☰</span>' : ''}</td>
+      <td><div class="dir-strong">${escapeHtml(it.label || '')}</div></td>
+      <td>${commercial ? escapeHtml(commercial) : '<span class="muted">—</span>'}</td>
+      <td>${phone ? (href ? `<a class="dir-link" href="${href}">${escapeHtml(phone)}</a>` : escapeHtml(phone)) : '<span class="muted">—</span>'}</td>
+      <td>${deliveryDays ? escapeHtml(deliveryDays) : '<span class="muted">—</span>'}</td>
+      <td>${orderBefore ? escapeHtml(orderBefore) : '<span class="muted">—</span>'}</td>
+      <td>${leadTime ? escapeHtml(leadTime) + ' j' : '<span class="muted">—</span>'}</td>
+      <td>${minOrder ? '€ ' + escapeHtml(minOrder.replace('€','').trim()) : '<span class="muted">—</span>'}</td>
+      <td class="col-actions">
+        ${canEdit ? `
+          <button class="dir-mini-btn" onclick="moveSupplierRow('${it.key}', -1)" title="Monter">↑</button>
+          <button class="dir-mini-btn" onclick="moveSupplierRow('${it.key}', 1)" title="Descendre">↓</button>
+          <button class="dir-mini-btn" onclick="openDirModal('supplier','${it.key}')" title="Modifier">✏️</button>
+          <button class="dir-mini-btn danger" onclick="deleteDirItem('supplier','${it.key}')" title="Supprimer">🗑️</button>
+        ` : `<button class="dir-mini-btn" onclick="openDirModal('supplier','${it.key}')" title="Voir">👁️</button>`}
+      </td>
     `;
-    root.appendChild(row);
+    tbody.appendChild(tr);
   });
-}
 
-function renderSites(){
+  wrap.appendChild(table);
+  root.appendChild(wrap);
+
+  if(canEdit){
+    initSupplierDnD(table);
+  }
+}function renderSites(){
   const root = document.getElementById('sitesGrid');
   if(!root) return;
   const items = Object.entries(sitesData || {}).map(([k,v]) => ({ key:k, ...(v||{}) }));
@@ -400,27 +448,47 @@ function openDirModal(type, key){
         <div class="dir-label">Fournisseur</div>
         <input id="dirLabel" type="text" placeholder="Ex : Métro" value="${escapeAttr(item.label || '')}">
       </div>
+
       <div class="input-group">
         <div class="dir-label">Nom du commercial</div>
         <input id="dirCommercial" type="text" placeholder="Ex : Paul" value="${escapeAttr(item.commercial || '')}">
       </div>
+
       <div class="input-group">
         <div class="dir-label">Numéro</div>
         <input id="dirPhone" type="text" placeholder="Ex : 06 00 00 00 00" value="${escapeAttr(item.phone || '')}">
       </div>
+
       <div class="input-group">
         <div class="dir-label">Jours de livraisons</div>
-        <input id="dirDeliveryDays" type="text" placeholder="Ex : Lun / Mer / Ven" value="${escapeAttr(item.deliveryDays || '')}">
+        <div class="weekday-grid" id="dirWeekdays">
+          <label class="weekday-chip"><input type="checkbox" name="dirDeliveryDay" value="Lun">Lun</label>
+          <label class="weekday-chip"><input type="checkbox" name="dirDeliveryDay" value="Mar">Mar</label>
+          <label class="weekday-chip"><input type="checkbox" name="dirDeliveryDay" value="Mer">Mer</label>
+          <label class="weekday-chip"><input type="checkbox" name="dirDeliveryDay" value="Jeu">Jeu</label>
+          <label class="weekday-chip"><input type="checkbox" name="dirDeliveryDay" value="Ven">Ven</label>
+          <label class="weekday-chip"><input type="checkbox" name="dirDeliveryDay" value="Sam">Sam</label>
+          <label class="weekday-chip"><input type="checkbox" name="dirDeliveryDay" value="Dim">Dim</label>
+        </div>
+        <div class="dir-tip">Coche les jours (plus rapide qu’un texte libre).</div>
       </div>
+
       <div class="input-group">
-        <div class="dir-label">Délai commande → livraison (jours)</div>
+        <div class="dir-label">🕒 Commander avant (heure limite)</div>
+        <input id="dirOrderBefore" type="time" value="${escapeAttr(item.orderBefore || '')}">
+      </div>
+
+      <div class="input-group">
+        <div class="dir-label">⏳ Délai commande → livraison (jours)</div>
         <input id="dirLeadTime" type="text" placeholder="Ex : 1" value="${escapeAttr(item.leadTime || '')}">
       </div>
+
       <div class="input-group">
-        <div class="dir-label">Minimum de commande</div>
-        <input id="dirMinOrder" type="text" placeholder="Ex : 150€" value="${escapeAttr(item.minOrder || '')}">
+        <div class="dir-label">€ Minimum de commande</div>
+        <input id="dirMinOrder" type="text" placeholder="Ex : 150" value="${escapeAttr(item.minOrder || '')}">
       </div>
     `;
+    try{ initSupplierWeekdays(item.deliveryDays); }catch(e){}
   } else {
     title.textContent = key ? '✏️ Modifier site' : '＋ Ajouter site';
     form.innerHTML = `
@@ -500,10 +568,28 @@ function saveDirItem(){
   } else if(editingType === 'supplier'){
     const commercial = (document.getElementById('dirCommercial')?.value || '').trim();
     const phone = (document.getElementById('dirPhone')?.value || '').trim();
-    const deliveryDays = (document.getElementById('dirDeliveryDays')?.value || '').trim();
+    const orderBefore = (document.getElementById('dirOrderBefore')?.value || '').trim();
     const leadTime = (document.getElementById('dirLeadTime')?.value || '').trim();
     const minOrder = (document.getElementById('dirMinOrder')?.value || '').trim();
-    const payload = { label, commercial, phone, deliveryDays, leadTime, minOrder };
+
+    // Jours de livraisons (checkboxes)
+    let deliveryDays = "";
+    const checked = Array.from(document.querySelectorAll('input[name="dirDeliveryDay"]:checked')).map(x => x.value);
+    if(checked.length) deliveryDays = checked.join(' / ');
+    else deliveryDays = (document.getElementById('dirDeliveryDays')?.value || '').trim(); // fallback (anciennes versions)
+
+    const payload = { label, commercial, phone, deliveryDays, orderBefore, leadTime, minOrder };
+
+    // Conserver l'ordre si existant; sinon ajouter à la fin
+    try{
+      const existing = (suppliersData && editingKey) ? (suppliersData[editingKey] || {}) : {};
+      if(editingKey && typeof existing.order === 'number') payload.order = existing.order;
+      if(!editingKey){
+        const maxOrder = Math.max(0, ...Object.values(suppliersData || {}).map(s => Number((s||{}).order) || 0));
+        payload.order = maxOrder + 10;
+      }
+    }catch(e){}
+
     const ref = editingKey ? db.ref('directory/suppliers/' + editingKey) : db.ref('directory/suppliers').push();
     ref.set(payload).then(() => {
       showToast('✅ Fournisseur enregistré');
@@ -593,3 +679,109 @@ async function toSmallDataURL(file, maxW, maxH, quality){
       if(!window.__swReloaded){ window.__swReloaded = true; window.location.reload(); }
     });
   }
+
+
+function normalizeDayToken(t){
+  const s = String(t||'').toLowerCase().trim();
+  const map = {
+    'lundi':'Lun','lun':'Lun',
+    'mardi':'Mar','mar':'Mar',
+    'mercredi':'Mer','mer':'Mer',
+    'jeudi':'Jeu','jeu':'Jeu',
+    'vendredi':'Ven','ven':'Ven',
+    'samedi':'Sam','sam':'Sam',
+    'dimanche':'Dim','dim':'Dim'
+  };
+  if(map[s]) return map[s];
+  // Also accept tokens like "Lun." or "Lundi,"
+  const key = s.replace(/[^a-z]/g,'');
+  return map[key] || null;
+}
+
+function initSupplierWeekdays(deliveryDays){
+  const box = document.getElementById('dirWeekdays');
+  if(!box) return;
+  const set = new Set();
+  if(Array.isArray(deliveryDays)) {
+    deliveryDays.forEach(d => { const n = normalizeDayToken(d); if(n) set.add(n); });
+  } else {
+    String(deliveryDays||'').split(/[\s,;/|]+/).forEach(tok=>{
+      const n = normalizeDayToken(tok);
+      if(n) set.add(n);
+    });
+  }
+  Array.from(box.querySelectorAll('input[name="dirDeliveryDay"]')).forEach(cb=>{
+    cb.checked = set.has(cb.value);
+  });
+}
+
+function persistSupplierOrderFromDOM(tbody){
+  const keys = Array.from(tbody.querySelectorAll('tr')).map(tr => tr.dataset.key).filter(Boolean);
+  if(!keys.length) return;
+
+  // Update local cache + Firebase (order = index*10)
+  const updates = {};
+  keys.forEach((k, i) => {
+    const ord = (i+1) * 10;
+    if(suppliersData && suppliersData[k]) suppliersData[k].order = ord;
+    updates[`directory/suppliers/${k}/order`] = ord;
+  });
+  db.ref().update(updates).then(()=>showToast('✅ Ordre des fournisseurs enregistré')).catch(()=>{});
+}
+
+function initSupplierDnD(table){
+  const tbody = table.querySelector('tbody');
+  if(!tbody) return;
+  let dragKey = null;
+
+  tbody.addEventListener('dragstart', (e) => {
+    const tr = e.target.closest('tr');
+    if(!tr) return;
+    dragKey = tr.dataset.key;
+    tr.classList.add('is-dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    try{ e.dataTransfer.setData('text/plain', dragKey || ''); }catch(err){}
+  });
+
+  tbody.addEventListener('dragend', (e) => {
+    const tr = e.target.closest('tr');
+    if(tr) tr.classList.remove('is-dragging');
+    dragKey = null;
+  });
+
+  tbody.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    const tr = e.target.closest('tr');
+    if(!tr || tr.dataset.key === dragKey) return;
+
+    const dragging = tbody.querySelector('tr.is-dragging');
+    if(!dragging) return;
+    const rect = tr.getBoundingClientRect();
+    const before = (e.clientY - rect.top) < (rect.height / 2);
+    tbody.insertBefore(dragging, before ? tr : tr.nextSibling);
+  });
+
+  tbody.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const dragging = tbody.querySelector('tr.is-dragging');
+    if(dragging) dragging.classList.remove('is-dragging');
+    persistSupplierOrderFromDOM(tbody);
+  });
+}
+
+function moveSupplierRow(key, dir){
+  try{
+    const tbody = document.querySelector('#suppliersList .suppliers-table tbody');
+    if(!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const idx = rows.findIndex(r => r.dataset.key === key);
+    if(idx < 0) return;
+    const newIdx = idx + dir;
+    if(newIdx < 0 || newIdx >= rows.length) return;
+    const row = rows[idx];
+    const refNode = (dir > 0) ? rows[newIdx].nextSibling : rows[newIdx];
+    tbody.insertBefore(row, refNode);
+    persistSupplierOrderFromDOM(tbody);
+  }catch(e){}
+}
+window.moveSupplierRow = moveSupplierRow;

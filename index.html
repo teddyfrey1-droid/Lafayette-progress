@@ -58,6 +58,19 @@
               <div style="text-align:center; color:#999;">Chargement...</div>
           </div>
       </div>
+  <div id="historyModal" class="modal-overlay" style="display:none;">
+      <div class="modal-box">
+          <div class="modal-title">
+             <span>🕒 Mon historique</span>
+             <button style="border:none; background:none; font-size:24px; font-weight:900; cursor:pointer;" onclick="document.getElementById('historyModal').style.display='none'">×</button>
+          </div>
+          <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">Résumé mensuel (primes débloquées + % objectifs validés)</div>
+          <div id="historyModalList" style="display:flex; flex-direction:column; gap:10px;">
+              <div style="text-align:center; color:#999;">Chargement...</div>
+          </div>
+      </div>
+  </div>
+
   </div>
 
   <!-- Archive mensuelle (Super Admin/Admin) : trace dans le temps par équipier -->
@@ -153,7 +166,12 @@
       <nav class="global-menu-links">
         <a class="global-menu-link menu-dashboard" href="index.html#dashboard" onclick="toggleGlobalMenu(false)"><span class="menu-dashboard-label">📊 Dashboard</span></a>
         <button class="global-menu-link" type="button" onclick="openUpdatesModalFromMenu()">
-          <span>📰 News</span>
+          <span>📰 Nouveautés</span>
+          <span style="opacity:.55; font-weight:900;">›</span>
+        </button>
+
+        <button class="global-menu-link" type="button" onclick="openHistoryModalFromMenu()">
+          <span>🕒 Mon historique</span>
           <span style="opacity:.55; font-weight:900;">›</span>
         </button>
         <div class="global-menu-sep" aria-hidden="true"></div>
@@ -249,14 +267,8 @@
         </div>
       </section>
 
-      <!-- Historique simple (perso) -->
-      <section class="history-panel" id="historyPanel" aria-label="Historique mensuel" style="display:none;">
-        <div class="history-header">
-          <div class="history-title">🕒 Mon historique</div>
-          <div class="history-subtitle">Primes & objectifs (mensuel)</div>
-        </div>
-        <div class="history-list" id="historyList"></div>
-      </section>
+      
+
 
 
       <div class="focus-pill" id="focusPill" aria-label="Focus du jour">
@@ -320,7 +332,7 @@
       <button id="btnTabObjs" onclick="switchTab('objs')" class="btn-tab">🎯 Pilotage</button>
       <button id="btnTabNotifs" onclick="switchTab('notifs')" class="btn-tab" style="display:none;">🔔 Notifications</button>
       <button id="btnTabLogs" onclick="switchTab('logs')" class="btn-tab" style="display:none;">🕒 Historique</button>
-      <button id="btnTabFeedbacks" onclick="switchTab('feedbacks')" class="btn-tab" style="display:none;">💬 Avis & News</button>
+      <button id="btnTabFeedbacks" onclick="switchTab('feedbacks')" class="btn-tab" style="display:none;">💬 Avis & Nouveautés</button>
     </div>
 
     <div id="tab-team">
