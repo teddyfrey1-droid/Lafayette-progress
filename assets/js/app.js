@@ -96,7 +96,7 @@
       if(btn){ btn.disabled = true; btn.style.opacity = .7; }
 
       try{
-        const data = await _callSendPush({ title, body, link: link || '/index.html#dashboard', audience, targetUid: targetUid || null, targetUid });
+        const data = await _callSendPush({ title, body, link: link || '/index.html#dashboard', audience, targetUid: targetUid || null });
         showToast(`✅ Notification envoyée (${data && data.sent != null ? data.sent : 'OK'})`);
         // log RTDB (historique)
         try{
@@ -1073,7 +1073,17 @@ function renderMenuSitesPreview(){
           newLogRef.set({ user: currentUser.name, action: "Connexion", type: "session", startTime: Date.now(), lastSeen: Date.now() });
           setInterval(() => { newLogRef.update({ lastSeen: Date.now() }); }, 60000);
           updateUI();
+        
+        }, err => {
+          console.error("RTDB /users read error:", err);
+          // Fallback minimal profile so UI doesn't stay stuck
+          currentUser = currentUser || { name: (user && user.email) ? user.email : "Utilisateur", hours:35, role:'staff', email: (user && user.email) ? user.email : null, status:'active' };
+          currentUser.uid = user && user.uid ? user.uid : (currentUser.uid || null);
+          currentUser.email = user && user.email ? user.email : (currentUser.email || null);
+          try{ showToast("⛔ Accès refusé à /users (rules Firebase)."); }catch(e){}
+          try{ updateUI(); }catch(e){}
         });
+
         loadData();
         renderNativeCalendar();
       } else {
@@ -1400,61 +1410,65 @@ db.ref('feedbacks').on('value', s => {
         }
     }
 
+
     function updateUI() {
-      if(!currentUser) return;
-      document.getElementById("userName").textContent = currentUser.name;
-      document.getElementById("userHours").textContent = (currentUser.hours || 35) + "h";
-      
-      const isSuperUser = isSuperAdmin();
-      const isAdmin = isAdminUser();
+      try{
+        if(!currentUser) return;
 
-      document.getElementById("btnAdmin").style.display = isAdmin ? 'block' : 'none';
-      // Bind monthly history (lightweight)
-      renderUserHistory();
+        const elName = document.getElementById("userName");
+        if(elName) elName.textContent = currentUser.name || "Utilisateur";
 
-      
-      // SHOW TAB BUTTONS ONLY FOR SUPER ADMIN
-      document.getElementById("btnTabLogs").style.display = isSuperUser ? 'block' : 'none';
-      document.getElementById("btnTabFeedbacks").style.display = isSuperUser ? 'block' : 'none';
+        const elHours = document.getElementById("userHours");
+        if(elHours) elHours.textContent = (currentUser.hours || 35) + "h";
 
-      // Important: logs/feedbacks may have loaded before currentUser was available.
-      // So we render here as soon as we know we are Super Admin.
-      if(isSuperUser){
-        try{ renderLogs(allLogs || {}); }catch(e){}
-        try{ renderFeedbacks(allFeedbacks || {}); }catch(e){}
+        const roleEl = document.getElementById("userRole");
+        if(roleEl) roleEl.textContent = (currentUser.role === 'admin') ? 'ADMIN' : 'MEMBRE';
+
+        // Admin only parts (button + tab)
+        const isAdmin = (currentUser.role === 'admin');
+        const btnAdmin = document.getElementById("btnAdmin");
+        if(btnAdmin) btnAdmin.style.display = isAdmin ? 'block' : 'none';
+
+        const btnLogs = document.getElementById("btnTabLogs");
+        if(btnLogs) btnLogs.style.display = isAdmin ? 'block' : 'none';
+
+        const btnFeedbacks = document.getElementById("btnTabFeedbacks");
+        if(btnFeedbacks) btnFeedbacks.style.display = isAdmin ? 'block' : 'none';
+
+        const btnNotifs = document.getElementById("btnTabNotifs");
+        if(btnNotifs) btnNotifs.style.display = isAdmin ? 'block' : 'none';
+
+        if(isAdmin){
+          try{ startFcmTokensListenerIfAdmin(); }catch(e){ console.error(e); }
+          try{ renderNotifTargetUsers(); }catch(e){ console.error(e); }
+          try{ renderPushAudit(); }catch(e){ console.error(e); }
+        }
+        try{ window.HeikoPush && HeikoPush.refreshUI && HeikoPush.refreshUI(); }catch(e){}
+
+        // Keep original advanced UI updates (admin panels, simulator, history)
+        try{ renderUserHistory(); }catch(e){ console.error(e); }
+
+        const globalBudgetInput = document.getElementById("simGlobalBudget");
+        const saveBudgetBtn = document.getElementById("btnSaveGlobalBudget");
+        const simCAInput = document.getElementById('simMonthlyCA');
+        const saveCAButton = document.getElementById('btnSaveMonthlyCA');
+        if(globalBudgetInput) globalBudgetInput.value = (globalSettings && globalSettings.budget != null) ? globalSettings.budget : 0;
+        if(simCAInput) simCAInput.value = (globalSettings && globalSettings.monthlyCA != null) ? globalSettings.monthlyCA : 0;
+        if(saveBudgetBtn) saveBudgetBtn.style.display = isAdmin ? 'inline-block' : 'none';
+        if(saveCAButton) saveCAButton.style.display = isAdmin ? 'inline-block' : 'none';
+
+        if(isAdmin) {
+          try{ renderAdminObjs(); }catch(e){ console.error(e); }
+          try{ renderSimulator(); }catch(e){ console.error(e); }
+        }
+
+        try{ renderDashboard(); }catch(e){ console.error(e); }
+      }catch(e){
+        console.error(e);
+        try{ showToast("⚠️ Erreur UI : " + (e && e.message ? e.message : String(e))); }catch(_){}
       }
-
-
-      // Notifications tab: Admin + Super Admin
-      const btnNotifs = document.getElementById("btnTabNotifs");
-      if(btnNotifs) btnNotifs.style.display = isAdmin ? 'block' : 'none';
-
-      if(isAdmin){
-        try{ startFcmTokensListenerIfAdmin(); }catch(e){}
-        try{ renderNotifTargetUsers(); }catch(e){}
-        try{ renderPushAudit(); }catch(e){}
-      }
-      try{ window.HeikoPush && HeikoPush.refreshUI && HeikoPush.refreshUI(); }catch(e){}
-
-      const globalBudgetInput = document.getElementById("simGlobalBudget");
-      const saveBudgetBtn = document.getElementById("btnSaveGlobalBudget");
-      const simCAInput = document.getElementById('simMonthlyCA');
-      const superAdminBlock = document.getElementById('superAdminBudget');
-      
-      // Pilotage & simulation: Admin + Super Admin (requested)
-      const pilotageAllowed = isAdmin;
-      if(superAdminBlock) superAdminBlock.style.display = pilotageAllowed ? 'block' : 'none';
-      if(globalBudgetInput) globalBudgetInput.disabled = !pilotageAllowed;
-      if(saveBudgetBtn) saveBudgetBtn.style.display = pilotageAllowed ? 'inline-block' : 'none';
-      if(simCAInput) simCAInput.disabled = !pilotageAllowed;
-      
-      if(isAdmin) {
-          renderAdminObjs();
-          renderSimulator();
-      }
-
-      renderDashboard();
     }
+
 
     // --- UPDATES LOGIC (CREATE, EDIT, DELETE) ---
     function saveUpdate() {
@@ -2013,6 +2027,7 @@ function createSecondaryCarousel(objs, primOk, ratio){
 function renderDashboard() {
       if(!currentUser) return;
       const container = document.getElementById("cardsContainer");
+      if(!container) return;
       container.innerHTML = "";
       const ratio = (currentUser.hours || 35) / BASE_HOURS;
       let totalMyGain = 0;
