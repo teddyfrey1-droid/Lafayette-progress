@@ -51,7 +51,16 @@ function _readEnvSmtp() {
   const secureRaw = process.env.SMTP_SECURE ? String(process.env.SMTP_SECURE).trim() : "";
   const port = portRaw ? Number(portRaw) : 0;
   const secure = secureRaw ? ["1","true","yes","y","on"].includes(secureRaw.toLowerCase()) : (port === 465);
-  return { host, port, user, pass, from, secure };
+  // Gmail SMTP tends to reject a FROM address that doesn't match the authenticated account.
+// If user is a gmail account, force the email part of FROM to be the SMTP user.
+if (user && String(user).toLowerCase().endsWith("@gmail.com")) {
+  const u = String(user).trim();
+  if (!from || !String(from).includes(u)) {
+    from = u;
+  }
+}
+
+return { host, port, user, pass, from, secure };
 }
 
 function _readFunctionsConfigSmtp() {
@@ -211,6 +220,25 @@ async function resolveManyEmails(uids, usersCache) {
 }
 
 
+async function normalizeUidOrEmail(id) {
+  const raw = String(id || "").trim();
+  if (!raw) return { uid: "", email: "" };
+
+  // If input looks like an email, try to resolve to an Auth user.
+  if (raw.includes("@")) {
+    try {
+      const ur = await admin.auth().getUserByEmail(raw);
+      return { uid: ur && ur.uid ? String(ur.uid).trim() : "", email: ur && ur.email ? String(ur.email).trim() : String(raw).trim() };
+    } catch (e) {
+      return { uid: "", email: "", error: String(e && e.message ? e.message : e) };
+    }
+  }
+
+  return { uid: raw, email: "" };
+}
+
+
+
 /**
  * Envoi EMAIL vers 1 utilisateur (par uid) — réservé admin/superadmin
  * Entrée: { uid, subject, body, link? }
@@ -218,10 +246,17 @@ async function resolveManyEmails(uids, usersCache) {
 exports.sendEmailToUser = functions.region(REGION).https.onCall(async (data, context) => {
   await assertAdmin(context);
 
-  const uid = data && data.uid ? String(data.uid).trim() : "";
-  if (!uid) {
-    throw new functions.https.HttpsError("invalid-argument", "uid required");
-  }
+  const inputId = data && data.uid ? String(data.uid).trim() : "";
+if (!inputId) {
+  throw new functions.https.HttpsError("invalid-argument", "uid required");
+}
+
+const norm = await normalizeUidOrEmail(inputId);
+const uid = norm.uid;
+if (!uid) {
+  // if user typed an email but it's not an Auth user
+  return { ok: false, reason: "NO_USER", error: norm.error || "User not found" };
+}
 
   const subject = safeSubject(data && data.subject ? data.subject : "Message");
   const body = data && data.body ? String(data.body) : "";
@@ -230,6 +265,7 @@ exports.sendEmailToUser = functions.region(REGION).https.onCall(async (data, con
   const userSnap = await admin.database().ref(`users/${uid}`).get();
   const user = userSnap.exists() ? (userSnap.val() || {}) : {};
   let to = user.email ? String(user.email).trim() : "";
+  if (!to && norm && norm.email) { to = String(norm.email).trim(); }
   if (!to) {
     to = await resolveUserEmail(uid);
   }
@@ -261,12 +297,26 @@ exports.sendEmailToUsers = functions.region(REGION).https.onCall(async (data, co
   await assertAdmin(context);
 
   const uidsRaw = data && data.uids ? data.uids : [];
-  const uids = Array.isArray(uidsRaw)
-    ? uidsRaw.map((u) => String(u || "").trim()).filter(Boolean)
-    : [];
-  if (!uids.length) {
-    throw new functions.https.HttpsError("invalid-argument", "uids required");
+const inputs = Array.isArray(uidsRaw)
+  ? uidsRaw.map((u) => String(u || "").trim()).filter(Boolean)
+  : [];
+if (!inputs.length) {
+  throw new functions.https.HttpsError("invalid-argument", "uids required");
+}
+
+// Normalize (uids or emails) -> uids
+const normList = [];
+const inputToUid = {};
+for (const id of inputs) {
+  const n = await normalizeUidOrEmail(id);
+  if (n && n.uid) {
+    normList.push(n.uid);
+    inputToUid[id] = n.uid;
+  } else {
+    inputToUid[id] = "";
   }
+}
+const uids = Array.from(new Set(normList)); // dedupe
 
   const subject = safeSubject(data && data.subject ? data.subject : "Message");
   const body = data && data.body ? String(data.body) : "";
@@ -284,7 +334,16 @@ exports.sendEmailToUsers = functions.region(REGION).https.onCall(async (data, co
   const emailMap = await resolveManyEmails(uids, users);
 
   const results = [];
-  for (const uid of uids) {
+// Handle inputs that couldn't be resolved to an Auth user (typed emails not found, etc.)
+for (const id of inputs) {
+  const u = inputToUid[id];
+  if (!u) {
+    results.push({ uid: id, ok: false, reason: "NO_USER" });
+  }
+}
+
+for (const uid of uids) {
+
     const to = emailMap[uid] ? String(emailMap[uid]).trim() : "";
     if (!to) {
       results.push({ uid, ok: false, reason: "NO_EMAIL" });

@@ -36,8 +36,19 @@
       return list;
     }
 
+
+    async function _ensureFreshAuth(){
+      try{
+        if(firebase.auth && firebase.auth().currentUser){
+          await firebase.auth().currentUser.getIdToken(true);
+        }
+      }catch(e){}
+    }
+
+
     async function _callSendEmailToUser(data){
       if(!firebase.functions) throw new Error("Firebase Functions SDK manquant");
+      await _ensureFreshAuth();
       const configured = await _getFunctionsRegion();
       const regions = _getFunctionsRegionsToTry(configured);
       let lastErr = null;
@@ -66,21 +77,23 @@
 
     async function _callSendEmailToUsers(data){
       if(!firebase.functions) throw new Error("Firebase Functions SDK manquant");
-      const region = (document.getElementById('functionsRegion') && document.getElementById('functionsRegion').value) ? String(document.getElementById('functionsRegion').value).trim() : '';
-      const regions = _getFunctionsRegionsToTry(region || (await _getSavedFunctionsRegion()));
+      await _ensureFreshAuth();
+      const configured = await _getFunctionsRegion();
+      const regions = _getFunctionsRegionsToTry(configured);
       let lastErr = null;
+
       for(const r of regions){
         try{
-          const fn = r ? firebase.functions(r).httpsCallable('sendEmailToUsers') : firebase.functions().httpsCallable('sendEmailToUsers');
+          const fns = r ? firebase.app().functions(r) : firebase.functions();
+          const fn = fns.httpsCallable('sendEmailToUsers');
           const res = await fn(data);
-          // on mémorise la région qui marche
-          try{ if(r){ localStorage.setItem('heiko_functions_region', r); } }catch(e){}
+          try{ localStorage.setItem('heiko_functions_region', r); }catch(e){}
+          _functionsRegionCache = r;
           return res && res.data ? res.data : res;
         }catch(err){
           lastErr = err;
-          const code = String((err && err.code) ? err.code : '');
-          const msg = String((err && err.message) ? err.message : err);
-          // si la function n'existe pas dans cette région, on essaye la suivante
+          const msg = (err && err.message) ? String(err.message) : '';
+          const code = (err && err.code) ? String(err.code) : '';
           if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
           break;
         }
@@ -90,6 +103,7 @@
 
 async function _callGetSmtpConfigStatus(){
   if(!firebase.functions) throw new Error("Firebase Functions SDK manquant");
+  await _ensureFreshAuth();
   const configured = await _getFunctionsRegion();
   const regions = _getFunctionsRegionsToTry(configured);
   let lastErr = null;
@@ -112,6 +126,7 @@ async function _callGetSmtpConfigStatus(){
 
 async function _callSetSmtpConfig(data){
   if(!firebase.functions) throw new Error("Firebase Functions SDK manquant");
+  await _ensureFreshAuth();
   const configured = await _getFunctionsRegion();
   const regions = _getFunctionsRegionsToTry(configured);
   let lastErr = null;
@@ -134,6 +149,7 @@ async function _callSetSmtpConfig(data){
 
 async function _callTestSmtp(data){
   if(!firebase.functions) throw new Error("Firebase Functions SDK manquant");
+  await _ensureFreshAuth();
   const configured = await _getFunctionsRegion();
   const regions = _getFunctionsRegionsToTry(configured);
   let lastErr = null;
@@ -183,7 +199,7 @@ async function _callTestSmtp(data){
             const r = await _callSendEmailToUser({ uid, subject, body, link: link || '' });
             results.push({ uid, ...(r||{}) });
           }catch(err){
-            results.push({ uid, ok:false, reason:'CALL_FAILED', error: String(err && err.message ? err.message : err) });
+            results.push({ uid, ok:false, reason:'CALL_FAILED', errorCode: (err && err.code) ? String(err.code) : '', error: String(err && err.message ? err.message : err) });
           }
         }
         return { ok: true, results };
