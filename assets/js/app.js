@@ -12,7 +12,7 @@
     const auth = firebase.auth();
     const db = firebase.database();
 
-    // --- Cloud Functions helper (pour envoyer des notifications) ---
+    // --- Cloud Functions helper (envoi d'emails admin) ---
     function _uniq(arr){ return [...new Set(arr.filter(Boolean))]; }
 
     async function _getFunctionsRegion(){
@@ -36,7 +36,7 @@
       return list;
     }
 
-    async function _callSendPush(data){
+    async function _callSendEmailToUser(data){
       if(!firebase.functions) throw new Error("Firebase Functions SDK manquant");
       const configured = await _getFunctionsRegion();
       const regions = _getFunctionsRegionsToTry(configured);
@@ -45,7 +45,7 @@
       for(const r of regions){
         try{
           const fns = r ? firebase.app().functions(r) : firebase.functions();
-          const fn = fns.httpsCallable('sendPush'); // new callable
+          const fn = fns.httpsCallable('sendEmailToUser');
           const res = await fn(data);
           try{ localStorage.setItem('heiko_functions_region', r); }catch(e){}
           _functionsRegionCache = r;
@@ -60,62 +60,64 @@
           break;
         }
       }
-      throw lastErr || new Error("Échec d’appel sendPush");
+      throw lastErr || new Error("Échec d’appel sendEmailToUser");
     }
 
-    function _notifCfg(){
-      const d = { autoOnUpdate:false, autoOnObjChange:false, autoOnPilotage:false, autoAudience:'all' };
-      const s = (globalSettings && globalSettings.notifications) ? globalSettings.notifications : {};
-      return { ...d, ...s };
-    }
-
-    async function sendAdminNotification(){
+    async function sendEmailToSelectedUser(){
       if(!isAdminUser()) return;
-      const titleEl = document.getElementById('notifTitle');
-      const bodyEl = document.getElementById('notifBody');
-      const linkEl = document.getElementById('notifLink');
-      const audEl = document.getElementById('notifAudience');
-      if(!titleEl || !bodyEl || !audEl) return;
+      const recEl = document.getElementById('emailRecipient');
+      const subjEl = document.getElementById('emailSubject');
+      const bodyEl = document.getElementById('emailBody');
+      const linkEl = document.getElementById('emailLink');
+      if(!recEl || !subjEl || !bodyEl) return;
 
-      const title = String(titleEl.value||'').trim();
-      const body = String(bodyEl.value||'').trim();
-      const link = linkEl ? String(linkEl.value||'').trim() : '';
-      const audience = audEl ? String(audEl.value||'all') : 'all';
+      const uid = String(recEl.value || '').trim();
+      const subject = String(subjEl.value || '').trim();
+      const body = String(bodyEl.value || '').trim();
+      const link = linkEl ? String(linkEl.value || '').trim() : '';
 
-      const emailFallback = !!(document.getElementById('notifEmailFallback') && document.getElementById('notifEmailFallback').checked);
+      if(!uid){ showToast('Choisis un destinataire.'); return; }
+      if(!subject || !body){ showToast('Sujet + message requis.'); return; }
 
-      if(!title || !body){
-        showToast("Titre + message requis.");
-        return;
-      }
-
-      const btn = document.getElementById('btnSendNotif');
+      const btn = document.getElementById('btnSendEmail');
       if(btn){ btn.disabled = true; btn.style.opacity = .7; }
 
       try{
-        const data = await _callSendPush({ title, body, link: link || '/index.html#dashboard', audience, emailFallback });
-        showToast(`✅ Push: ${data && data.sent != null ? data.sent : 'OK'}${(data && data.emailSent != null) ? (' | Email: ' + data.emailSent) : ''}`);
-        // log RTDB (historique)
+        const data = await _callSendEmailToUser({ uid, subject, body, link: link || '' });
+        const ok = (data && (data.ok === true || data.success === true));
+        if(ok){
+          showToast('✅ Email envoyé');
+        } else {
+          const reason = data && (data.reason || data.error || data.message) ? String(data.reason || data.error || data.message) : 'Non envoyé';
+          showToast('⚠️ ' + reason);
+        }
+
+        // historique
         try{
           await db.ref('notifications/sent').push({
-            title, body, link: link || '/index.html#dashboard', audience,
-            emailFallback,
+            type: 'email',
+            toUid: uid,
+            subject,
+            body,
+            link: link || '',
             by: (currentUser && currentUser.name) ? currentUser.name : 'Admin',
             uid: (currentUser && currentUser.uid) ? currentUser.uid : null,
             at: Date.now(),
             result: data || null
           });
         }catch(e){}
+
         // clear
-        titleEl.value = '';
+        subjEl.value = '';
         bodyEl.value = '';
       }catch(err){
         console.error(err);
-        showToast("Erreur envoi notif (Functions).");
+        showToast('Erreur envoi email (Functions).');
       }finally{
         if(btn){ btn.disabled = false; btn.style.opacity = 1; }
       }
     }
+    window.sendEmailToSelectedUser = sendEmailToSelectedUser;
 
     async function saveFunctionsRegion(){
       if(!isAdminUser()) return;
@@ -147,33 +149,9 @@
       }
     }
 
-    async function saveNotifSettings(){
-      if(!isAdminUser()) return;
-      const s = {
-        autoOnUpdate: !!document.getElementById('autoNotifOnUpdate')?.checked,
-        autoOnObjChange: !!document.getElementById('autoNotifOnObjChange')?.checked,
-        autoOnPilotage: !!document.getElementById('autoNotifOnPilotage')?.checked,
-        autoAudience: String(document.getElementById('autoNotifAudience')?.value || 'all')
-      };
-      try{
-        await db.ref('settings/notifications').set(s);
-        showToast("✅ Réglages notif enregistrés");
-      }catch(e){
-        showToast("Erreur réglages notif.");
-      }
-    }
-
     function renderNotifPanel(){
+      // Onglet "📧 Emails" (admin) : région Functions + destinataires.
       if(!isAdminUser()) return;
-      const cfg = _notifCfg();
-      const cb1 = document.getElementById('autoNotifOnUpdate');
-      const cb2 = document.getElementById('autoNotifOnObjChange');
-      const cb3 = document.getElementById('autoNotifOnPilotage');
-      const aud = document.getElementById('autoNotifAudience');
-      if(cb1) cb1.checked = !!cfg.autoOnUpdate;
-      if(cb2) cb2.checked = !!cfg.autoOnObjChange;
-      if(cb3) cb3.checked = !!cfg.autoOnPilotage;
-      if(aud) aud.value = cfg.autoAudience || 'all';
 
       // region input
       const rEl = document.getElementById('functionsRegion');
@@ -181,15 +159,42 @@
         _getFunctionsRegion().then(r => { if(r && !rEl.value) rEl.value = r; });
       }
 
-      // vapid key (publique)
-      const vEl = document.getElementById('vapidKey');
-      if(vEl){
-        db.ref('config/vapidKey').get().then(s => {
-          const k = s.exists() ? String(s.val()||'').trim() : '';
-          if(k && !vEl.value) vEl.value = k;
-        }).catch(()=>{});
-      }
+      // recipients
+      try{ renderEmailRecipients(); }catch(e){}
     }
+
+    function renderEmailRecipients(){
+      if(!isAdminUser()) return;
+      const sel = document.getElementById('emailRecipient');
+      if(!sel) return;
+      const prev = String(sel.value || '');
+
+      const rows = Object.keys(allUsers || {}).map(uid => {
+        const u = allUsers[uid] || {};
+        const email = (u.email || '').toString().trim();
+        const name = (u.name || email || uid).toString().trim();
+        return { uid, name, email };
+      }).filter(r => !!r.email);
+
+      rows.sort((a,b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
+
+      sel.innerHTML = `<option value="">— Choisir un membre —</option>` + rows.map(r => {
+        const label = `${r.name} — ${r.email}`;
+        return `<option value="${r.uid}">${label}</option>`;
+      }).join('');
+
+      if(prev && rows.some(r => r.uid === prev)) sel.value = prev;
+    }
+
+    function openEmailTo(uid){
+      if(!isAdminUser()) return;
+      try{ switchTab('notifs'); }catch(e){}
+      try{ renderEmailRecipients(); }catch(e){}
+      const sel = document.getElementById('emailRecipient');
+      if(sel) sel.value = uid;
+      try{ document.getElementById('emailSubject')?.focus(); }catch(e){}
+    }
+    window.openEmailTo = openEmailTo;
 
     function renderNotifHistory(){
       if(!isAdminUser()) return;
@@ -199,7 +204,7 @@
       Object.keys(allNotifsSent || {}).forEach(k => arr.push({id:k, ...(allNotifsSent[k]||{})}));
       arr.sort((a,b) => (b.at||0) - (a.at||0));
       if(arr.length === 0){
-        box.innerHTML = "<div style='color:#999;font-style:italic;'>Aucune notification envoyée.</div>";
+        box.innerHTML = "<div style='color:#999;font-style:italic;'>Aucun email envoyé.</div>";
         return;
       }
       box.innerHTML = "";
@@ -208,45 +213,46 @@
         const div = document.createElement('div');
         div.className = 'update-card';
         div.style.marginBottom = '10px';
-        const aud = n.audience ? String(n.audience) : 'all';
+        const isEmail = (n.type === 'email') || (n.subject != null);
         const who = n.by ? String(n.by) : '';
-        div.innerHTML = `
-          <div class="update-header">
-            <span style="font-weight:900; font-size:11px;">${d} • ${aud.toUpperCase()}</span>
-            <span style="font-size:11px; color:var(--text-muted);">${who}</span>
-          </div>
-          <div style="font-weight:900;">${escapeHtml(n.title||'')}</div>
-          <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">${escapeHtml(n.body||'')}</div>
-        `;
+        if(isEmail){
+          const uid = n.toUid || '';
+          const u = (uid && allUsers) ? allUsers[uid] : null;
+          const toName = u ? (u.name || u.email || uid) : uid;
+          const toEmail = u ? (u.email || '') : '';
+          const subj = n.subject || '';
+          const body = n.body || '';
+          const link = n.link || '';
+          const ok = (n.result && typeof n.result.ok === 'boolean') ? n.result.ok : null;
+          const badge = ok === true ? '✅' : (ok === false ? '⚠️' : '📧');
+          div.innerHTML = `
+            <div class="update-header">
+              <span style="font-weight:900; font-size:11px;">${badge} ${d} • ${escapeHtml(toName||'')}</span>
+              <span style="font-size:11px; color:var(--text-muted);">${escapeHtml(toEmail||'')} ${who ? '• '+escapeHtml(who):''}</span>
+            </div>
+            <div style="font-weight:900;">${escapeHtml(subj)}</div>
+            <div style="font-size:12px; color:var(--text-muted); margin-top:4px; white-space:pre-wrap;">${escapeHtml(body)}</div>
+            ${link ? `<div style="margin-top:6px;"><a href="${escapeHtml(link)}" target="_blank" rel="noopener" style="font-size:12px;">🔗 Lien</a></div>` : ''}
+          `;
+        } else {
+          const aud = n.audience ? String(n.audience) : 'all';
+          div.innerHTML = `
+            <div class="update-header">
+              <span style="font-weight:900; font-size:11px;">🔔 ${d} • ${aud.toUpperCase()}</span>
+              <span style="font-size:11px; color:var(--text-muted);">${escapeHtml(who)}</span>
+            </div>
+            <div style="font-weight:900;">${escapeHtml(n.title||'')}</div>
+            <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">${escapeHtml(n.body||'')}</div>
+          `;
+        }
         box.appendChild(div);
       });
     }
 
     async function _maybeAutoNotify(kind, payload){
-      // kind: 'update' | 'objective' | 'pilotage'
-      if(!isAdminUser()) return;
-      const cfg = _notifCfg();
-      const ok = (kind==='update' && cfg.autoOnUpdate) || (kind==='objective' && cfg.autoOnObjChange) || (kind==='pilotage' && cfg.autoOnPilotage);
-      if(!ok) return;
-      const audience = cfg.autoAudience || 'all';
-
-      try{
-        const data = await _callSendPush({ ...payload, audience });
-        try{
-          await db.ref('notifications/sent').push({
-            ...payload,
-            audience,
-            by: (currentUser && currentUser.name) ? currentUser.name : 'Admin',
-            uid: (currentUser && currentUser.uid) ? currentUser.uid : null,
-            at: Date.now(),
-            autoKind: kind,
-            result: data || null
-          });
-        }catch(e){}
-      }catch(e){
-        // pas bloquant
-        console.error(e);
-      }
+      // Notifications push désactivées pour l’instant.
+      // On garde les appels (update / objectif / pilotage) sans effet pour éviter de casser le code.
+      return;
     }
 
 
@@ -321,218 +327,14 @@ let _objProgUnsub = null;
 
     // --- PWA: service worker + bouton d'installation (si disponible) ---
     (function initPWA(){
-      // Service worker
+      // Service worker (push désactivées pour l’instant)
       if('serviceWorker' in navigator){
         window.addEventListener('load', () => {
-          // Pour Firebase Cloud Messaging, il est préférable d'avoir un SW nommé
-          // firebase-messaging-sw.js à la racine. Ici, il importe sw.js.
-          navigator.serviceWorker
-            .register('firebase-messaging-sw.js')
-            .catch(() => navigator.serviceWorker.register('sw.js').catch(() => {}));
-      // --- PUSH NOTIFICATIONS (Firebase Cloud Messaging / Safari iOS PWA) ---
-      // Requiert :
-      // - PWA ajoutée à l’écran d’accueil (iOS/iPadOS)
-      // - VAPID public key (Firebase Console > Cloud Messaging > Web Push certificates)
-      // Option : tu peux aussi stocker la clé dans RTDB : /config/vapidKey
-      let _messaging = null;
-      let _swRegForPush = null;
-
-      async function _getVapidKey(){
-        try{
-          const snap = await db.ref('config/vapidKey').get();
-          const k = snap.exists() ? String(snap.val()||'').trim() : '';
-          return k;
-        }catch(e){ return ''; }
-      }
-
-      function _isStandalonePWA(){
-        return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (window.navigator && window.navigator.standalone === true);
-      }
-
-      function _isIOS(){
-        const ua = navigator.userAgent || '';
-        // iPhone / iPad (y compris iPadOS qui se présente parfois comme Mac)
-        const iOS = /iPad|iPhone|iPod/.test(ua);
-        const iPadOS = (ua.includes('Mac') && 'ontouchend' in document);
-        return iOS || iPadOS;
-      }
-
-      function _supportsPush(){
-        if(!('Notification' in window) || !('serviceWorker' in navigator)) return false;
-        // Push nécessite un contexte sécurisé (https ou localhost)
-        if(!(window.isSecureContext || location.hostname === 'localhost')) return false;
-        if(typeof firebase === 'undefined' || !firebase.messaging) return false;
-        // Certains navigateurs exposent isSupported()
-        try{
-          if(typeof firebase.messaging.isSupported === 'function'){
-            return !!firebase.messaging.isSupported();
-          }
-        }catch(e){}
-        return true;
-      }
-
-      async function _setupPushUI(){
-        const btn = document.getElementById('enablePushBtn');
-        const bell = document.getElementById('pushBellBtn');
-        const banner = document.getElementById('pushBanner');
-        const bannerDesc = document.getElementById('pushBannerDesc');
-        const bannerBtn = document.getElementById('pushBannerBtn');
-
-        // Helpers globaux (pour les onclick HTML)
-        window.enablePushNow = async () => {
-          try{
-            if(typeof window.__doEnablePush === 'function') return await window.__doEnablePush();
-            if(btn && typeof btn.click === 'function') return btn.click();
-          }catch(e){}
-          try{ showToast("Notifications indisponibles."); }catch(e){ try{ alert("Notifications indisponibles."); }catch(_){} }
-        };
-        window.dismissPushBanner = () => {
-          try{ localStorage.setItem('heiko_push_banner_dismissed', '1'); }catch(e){}
-          if(banner) banner.style.display = 'none';
-        };
-
-        function setBellEnabled(enabled){
-          if(!bell) return;
-          if(enabled) bell.classList.add('enabled');
-          else bell.classList.remove('enabled');
-        }
-
-        if(!btn && !bell && !banner) return;
-
-        if(!_supportsPush()){
-          if(btn) btn.style.display = 'none';
-          if(bell) bell.style.display = 'none';
-          if(banner) banner.style.display = 'none';
-          return;
-        }
-
-        try{
-          _swRegForPush = await navigator.serviceWorker.ready;
-        }catch(e){ _swRegForPush = null; }
-
-        // Messaging instance (FCM)
-        try{ _messaging = firebase.messaging(); }catch(e){ _messaging = null; }
-
-        const canShow = !!(_swRegForPush && currentUser && currentUser.uid && _messaging);
-        if(btn) btn.style.display = canShow ? 'block' : 'none';
-        if(bell) bell.style.display = canShow ? 'inline-flex' : 'none';
-
-        // Statut (permission + token présent)
-        let hasToken = false;
-        if(canShow){
-          try{
-            const ts = await db.ref('fcmTokens/' + currentUser.uid).limitToLast(1).get();
-            hasToken = ts.exists();
-          }catch(e){ hasToken = false; }
-        }
-        const perm = (typeof Notification !== 'undefined') ? Notification.permission : 'default';
-        const isEnabled = (perm === 'granted' && hasToken);
-        setBellEnabled(isEnabled);
-
-        // Bannière d’aide (si pas encore activé)
-        let dismissed = false;
-        try{ dismissed = localStorage.getItem('heiko_push_banner_dismissed') === '1'; }catch(e){ dismissed = false; }
-
-        if(banner){
-          if(!dismissed && canShow && !isEnabled){
-            banner.style.display = 'flex';
-
-            // iOS/iPadOS : nécessite l'installation (PWA)
-            if(_isIOS() && !_isStandalonePWA()){
-              if(bannerDesc) bannerDesc.textContent = "Sur iPhone/iPad : ajoute d’abord l’app à l’écran d’accueil, puis active 🔔.";
-              if(bannerBtn) bannerBtn.style.display = 'none';
-            } else {
-              if(bannerDesc) bannerDesc.textContent = "Active les notifications pour recevoir les messages importants.";
-              if(bannerBtn) bannerBtn.style.display = 'inline-block';
-            }
-          } else {
-            banner.style.display = 'none';
-          }
-        }
-
-        // Flux d’activation (doit être déclenché par un clic utilisateur)
-        const doEnable = async () => {
-          if(!currentUser || !currentUser.uid){
-            showToast("Connecte-toi pour activer les notifications.");
-            return;
-          }
-          // Sur iOS/iPadOS, les notifications web push exigent une PWA ajoutée à l’écran d’accueil.
-          if(_isIOS() && !_isStandalonePWA()){
-            showToast("Sur iPhone/iPad : ajoute l’app à l’écran d’accueil pour recevoir des notifications.");
-            return;
-          }
-          if(!_swRegForPush){
-            showToast("Service Worker non prêt. Recharge la page.");
-            return;
-          }
-
-          let perm2 = "default";
-          try{ perm2 = await Notification.requestPermission(); }catch(e){ perm2 = "denied"; }
-          if(perm2 !== "granted"){
-            // option : ne pas re-spammer si refus
-            try{ localStorage.setItem('heiko_push_banner_dismissed', '1'); }catch(e){}
-            try{ await db.ref('users/' + currentUser.uid).update({ pushEnabled: false, pushEnabledAt: null }); }catch(e){}
-            showToast("Notifications refusées.");
-            if(banner) banner.style.display = 'none';
-            setBellEnabled(false);
-            return;
-          }
-
-          const vapidKey = (await _getVapidKey()) || "";
-          if(!vapidKey){
-            showToast("Clé VAPID manquante (config/vapidKey).");
-            return;
-          }
-
-          try{
-            const token = await _messaging.getToken({
-              vapidKey,
-              serviceWorkerRegistration: _swRegForPush
-            });
-
-            if(!token){
-              showToast("Impossible d’obtenir le token de notification.");
-              return;
-            }
-
-            // Sauvegarde dans RTDB (token par device)
-            await db.ref('fcmTokens/' + currentUser.uid).push({
-              token,
-              createdAt: Date.now(),
-              ua: navigator.userAgent
-            });
-
-            // Marqueur simple côté user (utile pour fallback email)
-            try{ await db.ref('users/' + currentUser.uid).update({ pushEnabled: true, pushEnabledAt: Date.now() }); }catch(e){}
-
-            showToast("Notifications activées ✅");
-            if(banner) banner.style.display = 'none';
-            setBellEnabled(true);
-          }catch(err){
-            console.error(err);
-            showToast("Erreur notifications. Vérifie la clé VAPID et la config Firebase.");
-          }
-        };
-
-        if(btn) btn.onclick = doEnable;
-        if(bell) bell.onclick = doEnable;
-        if(bannerBtn) bannerBtn.onclick = doEnable;
-        window.__doEnablePush = doEnable;
-
-        // Foreground messages (quand l’app est ouverte)
-        try{
-          _messaging.onMessage((payload) => {
-            const title = payload?.notification?.title || "Heiko";
-            const body = payload?.notification?.body || "";
-            showToast(body ? (title + " — " + body) : title);
-          });
-        }catch(e){}
-      }
-
+          navigator.serviceWorker.register('sw.js').catch(() => {});
         });
       }
 
-      // Install prompt (Chrome/Edge/Android)
+      // Install prompt
       let deferredPrompt = null;
       window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
@@ -545,9 +347,7 @@ let _objProgUnsub = null;
               btn.disabled = true;
               deferredPrompt.prompt();
               await deferredPrompt.userChoice;
-            } catch(_){
-              // ignore
-            }
+            }catch(_){ }
             deferredPrompt = null;
             btn.style.display = 'none';
             btn.disabled = false;
@@ -1129,6 +929,7 @@ function showToast(message) {
       db.ref('users').on('value', s => { 
         allUsers = s.val() || {}; 
         if(isAdminUser()) { renderAdminUsers(); }
+        if(isAdminUser()) { try{ renderEmailRecipients(); }catch(e){} }
         if(isAdminUser()) { renderSimulator(); }
       });
       db.ref('settings').on('value', s => { 
@@ -1401,7 +1202,11 @@ function showToast(message) {
             totalPotential35h += maxObjPrize;
             let objTotalCost = 0;
             let totalUserRatio = 0;
-            Object.values(allUsers).forEach(u => { totalUserRatio += (u.hours/BASE_HOURS); });
+            Object.values(allUsers).forEach(u => {
+              if(u && u.email && String(u.email).toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return;
+              if(u && u.primeEligible === false) return;
+              totalUserRatio += ((u.hours || 35) / BASE_HOURS);
+            });
             objTotalCost = maxObjPrize * totalUserRatio;
             const div = document.createElement("div"); div.className = "cockpit-obj-row";
             let slidersHtml = "";
@@ -1453,7 +1258,11 @@ function updateSim() {
        const simCA = simCAEl ? (parseFloat(simCAEl.value) || 0) : 0;
        if(simCAEl) localStorage.setItem('heiko_sim_monthly_ca', simCAEl.value || '');
        let totalUserRatio = 0;
-       Object.values(allUsers).forEach(u => { totalUserRatio += (u.hours/BASE_HOURS); });
+       Object.values(allUsers).forEach(u => {
+         if(u && u.email && String(u.email).toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return;
+         if(u && u.primeEligible === false) return;
+         totalUserRatio += ((u.hours || 35) / BASE_HOURS);
+       });
        let maxLiability = 0;
        let totalPotential35h = 0;
        Object.keys(simObjs).forEach(k => {
@@ -1795,7 +1604,8 @@ function renderDashboard() {
       if(!currentUser) return;
       const container = document.getElementById("cardsContainer");
       container.innerHTML = "";
-      const ratio = (currentUser.hours || 35) / BASE_HOURS;
+      const eligible = (currentUser.primeEligible !== false) && !(currentUser.email && String(currentUser.email).toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
+      const ratio = eligible ? ((currentUser.hours || 35) / BASE_HOURS) : 0;
       let totalMyGain = 0;
       let totalPotential = 0;
       
@@ -1855,7 +1665,17 @@ function renderDashboard() {
       const d = new Date();
       const gainText = totalMyGain.toFixed(2) + "€";
       const myGainEl = document.getElementById("myTotalGain");
-      if(myGainEl) myGainEl.textContent = gainText;
+      if(myGainEl) myGainEl.textContent = eligible ? gainText : '—';
+
+      // libellé du cercle + KPI
+      try{
+        const labelEl = document.getElementById('globalScoreLabel') || document.querySelector('.global-score-label');
+        if(labelEl) labelEl.textContent = eligible ? 'MES PRIMES DÉBLOQUÉES' : 'HORS PRIMES';
+      }catch(e){}
+      try{
+        const kpiEl = document.getElementById('kpiMyGain');
+        if(kpiEl) kpiEl.textContent = eligible ? gainText : '—';
+      }catch(e){}
 
       // Monthly history (per user): primes débloquées + % objectifs validés (sur objectifs visibles)
       try{
@@ -1877,14 +1697,27 @@ function renderDashboard() {
 
 
       // UI: résumé (aujourd’hui + prochain palier)
-      updateGainToday(totalMyGain);
-      computeNextMilestone(ratio, primOk);
+      if(eligible){
+        updateGainToday(totalMyGain);
+        computeNextMilestone(ratio, primOk);
+      } else {
+        const gt = document.getElementById('gainToday'); if(gt) gt.textContent = '';
+        const nm = document.getElementById('nextMilestone'); if(nm) nm.textContent = '';
+      }
       updateMonthCountdown();
 
       // UI: primes en attente (potentiel - acquis)
       const pending = Math.max(0, totalPotential - totalMyGain);
       const pendingEl = document.getElementById('pendingGain');
-      if(pendingEl) pendingEl.textContent = `⏳ ${pending.toFixed(2)}€ en attente`;
+      if(pendingEl){
+        if(eligible){
+          pendingEl.style.display = '';
+          pendingEl.textContent = `⏳ ${pending.toFixed(2)}€ en attente`;
+        } else {
+          pendingEl.style.display = 'none';
+          pendingEl.textContent = '';
+        }
+      }
 
       // Phase 1: Trajectoire + micro feedback journalier (sous le cercle)
       renderTrajectoryIndicator();
@@ -1894,6 +1727,9 @@ function renderDashboard() {
       const microEl = document.getElementById('microMotiv');
       if(microEl){
         let msg = "";
+        if(!eligible){
+          msg = "Compte hors primes.";
+        } else
         if(!prims.length){
           msg = "📝 Publie les objectifs pour activer les primes.";
         } else if(!primOk){
@@ -2317,7 +2153,7 @@ const el = document.createElement("div");
         };
 
         sec.auth().createUserWithEmailAndPassword(email, "Temp1234!").then(c => { 
-            db.ref('users/'+c.user.uid).set({ name: document.getElementById("nuName").value, hours: parseFloat(document.getElementById("nuHours").value)||35, role: document.getElementById("nuAdmin").checked?'admin':'staff', email: email, status: 'pending' }); 
+            db.ref('users/'+c.user.uid).set({ name: document.getElementById("nuName").value, hours: parseFloat(document.getElementById("nuHours").value)||35, role: document.getElementById("nuAdmin").checked?'admin':'staff', email: email, status: 'pending', primeEligible: true }); 
             sec.auth().sendPasswordResetEmail(email, actionCodeSettings); 
             sec.delete(); 
             showToast("✅ Membre invité !"); 
@@ -2353,6 +2189,7 @@ const el = document.createElement("div");
         Object.keys(allUsers).forEach(k => { 
             const u = allUsers[k]; 
             if(u.email && u.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return; 
+            const isEligible = (u.primeEligible !== false);
             const userRatio = (u.hours || 35) / BASE_HOURS; 
             let userBonus = 0; 
             
@@ -2368,6 +2205,7 @@ const el = document.createElement("div");
                  }
             }); } 
             
+            if(isEligible){
             Object.values(allObjs).forEach(o => { if(!o.published) return; 
                 const pct = getPct(o.current, o.target, o.isInverse); 
                 const isLocked = !o.isPrimary && !primOk; 
@@ -2387,7 +2225,8 @@ const el = document.createElement("div");
                 } 
                 if(!isLocked) userBonus += (g * userRatio); 
             }); 
-            totalToPay += userBonus; 
+            }
+            if(isEligible) totalToPay += userBonus; 
             
             const div = document.createElement("div"); div.className = "user-item"; 
             const statusClass = (u.status === 'active') ? 'active' : 'pending';
@@ -2405,11 +2244,15 @@ const el = document.createElement("div");
                     </div>
                     <div class="user-email-sub">${u.email}</div>
                     <div class="user-meta">${u.hours}h</div>
+                    <label class="check-label" style="margin-top:6px; font-size:11px; opacity:.95;">
+                      <input type="checkbox" ${isEligible?'checked':''} onchange="setUserPrimeEligible('${k}', this.checked)"> 💶 Compte dans les primes
+                    </label>
                 </div>
                 <div class="user-actions">
-                    <div class="user-gain">${userBonus.toFixed(2)}€</div>
+                    <div class="user-gain">${(isEligible ? userBonus.toFixed(2) + '€' : '—')}</div>
                     <div class="btn-group">
                       <button onclick="openTeamArchive('${k}')" class="action-btn" title="Archive mensuelle">📄</button>
+                      <button onclick="openEmailTo('${k}')" class="action-btn" title="Envoyer un email">📧</button>
                       <button onclick="resendInvite('${u.email}')" class="action-btn" title="Renvoyer Invitation">📩</button>
                       <button onclick="editUser('${k}')" class="action-btn" title="Modifier">✏️</button>
                       <button onclick="deleteUser('${k}')" class="action-btn delete" title="Supprimer">🗑️</button>
@@ -2419,6 +2262,18 @@ const el = document.createElement("div");
         }); 
         const totalRow = document.createElement("div"); totalRow.className = "total-row"; totalRow.innerHTML = `<span>TOTAL</span><span>${totalToPay.toFixed(2)} €</span>`; d.appendChild(totalRow); 
     }
+
+    function setUserPrimeEligible(uid, isEligible){
+      if(!isAdminUser()) return;
+      const val = !!isEligible;
+      db.ref('users/' + uid + '/primeEligible').set(val).then(() => {
+        try{ logAction('Équipe', `PrimeEligible ${uid} -> ${val}`); }catch(e){}
+        try{ showToast(val ? '✅ Compte inclus dans les primes' : '🚫 Compte exclu des primes'); }catch(e){}
+      }).catch(() => {
+        try{ showToast('Erreur mise à jour.'); }catch(e){}
+      });
+    }
+    window.setUserPrimeEligible = setUserPrimeEligible;
 
     // --- Archive mensuelle par équipier (Admin/Super Admin) ---
     function openTeamArchive(uid){
@@ -2430,6 +2285,7 @@ const el = document.createElement("div");
 
       // bonus calculé à date (reprend le calcul de la liste)
       try{
+        const isEligible = (u.primeEligible !== false);
         const userRatio = (u.hours || 35) / BASE_HOURS;
         let userBonus = 0;
 
@@ -2446,7 +2302,7 @@ const el = document.createElement("div");
           });
         }
 
-        Object.values(allObjs).forEach(o => {
+        if(isEligible) Object.values(allObjs).forEach(o => {
           if(!o.published) return;
           const pct = getPct(o.current, o.target, o.isInverse);
           const isLocked = !o.isPrimary && !primOk;
@@ -2466,7 +2322,7 @@ const el = document.createElement("div");
           }
           if(!isLocked) userBonus += (g * userRatio);
         });
-        _archiveUserComputedBonus = userBonus;
+        _archiveUserComputedBonus = isEligible ? userBonus : 0;
       }catch(e){ _archiveUserComputedBonus = 0; }
 
       const nameEl = document.getElementById('teamArchiveName');
@@ -3053,7 +2909,11 @@ const el = document.createElement("div");
     window.saveGuardrailMaxPct = saveGuardrailMaxPct;
     function checkBudget() {
        const budget = globalSettings.budget || 0; let maxLiability = 0; let totalUserRatio = 0;
-       Object.values(allUsers).forEach(u => { if(!u.email || u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) totalUserRatio += (u.hours/BASE_HOURS); });
+       Object.values(allUsers).forEach(u => {
+         if(u && u.email && String(u.email).toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return;
+         if(u && u.primeEligible === false) return;
+         totalUserRatio += ((u.hours || 35) / BASE_HOURS);
+       });
        Object.values(allObjs).forEach(o => { if(!o.published) return; let maxP = 0; if(o.paliers) o.paliers.forEach(p => maxP += parse(p.prize)); maxLiability += (maxP * totalUserRatio); });
        const pct = (maxLiability / budget) * 100; const bar = document.getElementById("simGauge"); bar.style.width = Math.min(pct, 100) + "%";
        if(maxLiability > budget) { bar.classList.add("danger"); document.getElementById("simUsed").style.color = "#ef4444"; } 

@@ -23,7 +23,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
+  <!-- firebase-messaging-compat retiré (notifications push désactivées pour l’instant) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 
   <link rel="stylesheet" href="assets/css/styles.css">
@@ -152,23 +152,12 @@
           <span class="logout-text">Déconnexion</span>
         </button>
 
-        <button class="icon-btn push-bell" id="pushBellBtn" onclick="enablePushNow()" style="display:none;" aria-label="Notifications">
-          🔔<span class="push-dot" id="pushBellDot" aria-hidden="true"></span>
-        </button>
+        <!-- Notifications push désactivées pour l’instant -->
               <button class="icon-btn" id="globalMenuBtn" onclick="toggleGlobalMenu()">☰</button>
       </div>
     </div>
 
-    <div id="pushBanner" class="push-banner" style="display:none;">
-      <div class="push-banner-text">
-        <div class="push-banner-title">🔔 Notifications</div>
-        <div class="push-banner-desc" id="pushBannerDesc">Active les notifications pour recevoir les messages importants.</div>
-      </div>
-      <div class="push-banner-actions">
-        <button class="btn" id="pushBannerBtn" onclick="enablePushNow()">Activer</button>
-        <button class="icon-btn" type="button" onclick="dismissPushBanner()" aria-label="Fermer">×</button>
-      </div>
-    </div>
+    <!-- Bandeau push supprimé (push désactivées) -->
 
     <!-- Global menu (all users) -->
     <div class="global-menu-backdrop" id="globalMenuBackdrop" onclick="toggleGlobalMenu(false)"></div>
@@ -229,7 +218,6 @@
       </nav>
       <div class="global-menu-foot">
         <button id="installAppBtn" class="btn" style="width:100%; margin-top:10px; display:none;">⬇️ Installer l’app</button>
-        <button id="enablePushBtn" class="btn" style="width:100%; margin-top:10px; display:none;">🔔 Activer les notifications</button>
       </div>
     </aside>
 
@@ -242,7 +230,7 @@
         <div class="global-score-container" id="scoreCircle">
           <div class="money-rain" id="moneyRain"></div>
           <div class="global-score-value" id="myTotalGain">0€</div>
-          <div class="global-score-label">MES PRIMES<br>DÉBLOQUÉES</div>
+          <div class="global-score-label" id="globalScoreLabel">MES PRIMES<br>DÉBLOQUÉES</div>
           <div class="global-score-pills">
             <div class="global-score-pill" id="pendingGain">⏳ 0€ en attente</div>
           </div>
@@ -344,7 +332,7 @@
     <div class="tab-nav">
       <button id="btnTabTeam" onclick="switchTab('team')" class="btn-tab active">👥 Équipe</button>
       <button id="btnTabObjs" onclick="switchTab('objs')" class="btn-tab">🎯 Pilotage</button>
-      <button id="btnTabNotifs" onclick="switchTab('notifs')" class="btn-tab" style="display:none;">🔔 Notifications</button>
+      <button id="btnTabNotifs" onclick="switchTab('notifs')" class="btn-tab" style="display:none;">📧 Emails</button>
       <button id="btnTabLogs" onclick="switchTab('logs')" class="btn-tab" style="display:none;">🕒 Historique</button>
       <button id="btnTabFeedbacks" onclick="switchTab('feedbacks')" class="btn-tab" style="display:none;">💬 Avis & Nouveautés</button>
     </div>
@@ -405,69 +393,34 @@
     
     <div id="tab-notifs" style="display:none;">
       <div class="admin-section" style="border-left:4px solid var(--primary);">
-        <h3 class="section-header-large">🔔 Notifications</h3>
+        <h3 class="section-header-large">📧 Envoyer un email (1 personne)</h3>
         <div style="font-size:11px; color:var(--text-muted); margin-bottom:12px;">
-          Envoie une notification push (uniquement pour ceux qui ont installé l’app + activé 🔔).
+          Sélectionne un membre et envoie-lui un message. Les notifications push sont désactivées.
         </div>
 
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-          <select id="notifAudience">
-            <option value="all">Tout le monde</option>
-            <option value="team">Équipe (hors admins)</option>
-            <option value="admins">Admins uniquement</option>
-          </select>
-          <input id="notifLink" type="text" placeholder="Lien (ex: /index.html#dashboard)">
+          <select id="emailRecipient"></select>
+          <input id="emailLink" type="text" placeholder="Lien (optionnel) ex: /index.html#dashboard">
         </div>
 
-        <label class="check-label" style="margin-top:10px; display:inline-flex; align-items:center; gap:8px;">
-          <input type="checkbox" id="notifEmailFallback">
-          <span>📧 Envoyer aussi par email si l’utilisateur n’a pas activé les notifications</span>
-        </label>
-        <div style="font-size:11px; color:var(--text-muted); margin-top:6px;">
-          L’envoi email nécessite une configuration SMTP côté Cloud Functions (sinon ça n’envoie rien, mais ça ne bug pas).
-        </div>
-
-        <input id=\"notifTitle\" type="text" placeholder="Titre (ex: Nouveau palier ✅)">
-        <textarea id="notifBody" class="fb-input" style="height:90px;" placeholder="Message..."></textarea>
+        <input id="emailSubject" type="text" placeholder="Sujet (ex: Info planning)" style="margin-top:10px;">
+        <textarea id="emailBody" class="fb-input" style="height:110px;" placeholder="Message..."></textarea>
 
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-          <button class="btn" id="btnSendNotif" onclick="sendAdminNotification()">📨 Envoyer</button>
+          <button class="btn" id="btnSendEmail" onclick="sendEmailToSelectedUser()">📨 Envoyer l’email</button>
           <div style="font-size:11px; color:var(--text-muted);">
             Région Functions (optionnel) :
             <input id="functionsRegion" type="text" placeholder="us-central1 / europe-west1" style="width:140px; margin-left:6px; padding:8px 10px; border-radius:10px; border:1px solid rgba(148,163,184,.25); background:rgba(15,23,42,.04); color:var(--text-main);">
           </div>
           <button class="btn" onclick="saveFunctionsRegion()" style="background:rgba(59,130,246,.14); color:var(--primary);">💾</button>
-
-          <div style="font-size:11px; color:var(--text-muted);">
-            Clé VAPID (publique) :
-            <input id="vapidKey" type="text" placeholder="VAPID public key" style="width:220px; margin-left:6px; padding:8px 10px; border-radius:10px; border:1px solid rgba(148,163,184,.25); background:rgba(15,23,42,.04); color:var(--text-main);">
-          </div>
-          <button class="btn" onclick="saveVapidKey()" style="background:rgba(34,197,94,.14); color:var(--accent);">💾</button>
+        </div>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:8px;">
+          ⚙️ L’envoi email nécessite une configuration SMTP côté Cloud Functions. Sinon, ça n’envoie rien (mais ça ne bug pas).
         </div>
       </div>
 
       <div class="admin-section">
-        <h3 class="section-header-large">⚙️ Automatisations</h3>
-        <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">
-          Active ce que tu veux. Ça n’affecte pas les calculs : ça envoie juste un push.
-        </div>
-        <div class="options-row" style="gap:14px; flex-wrap:wrap;">
-          <label class="check-label"><input type="checkbox" id="autoNotifOnUpdate"> Quand je publie/modifie une nouveauté</label>
-          <label class="check-label"><input type="checkbox" id="autoNotifOnObjChange"> Quand je modifie un objectif</label>
-          <label class="check-label"><input type="checkbox" id="autoNotifOnPilotage"> Quand je clique “📡 PUBLIER” (pilotage)</label>
-        </div>
-        <div style="display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap;">
-          <select id="autoNotifAudience">
-            <option value="all">Audience auto : tout le monde</option>
-            <option value="team">Audience auto : équipe</option>
-            <option value="admins">Audience auto : admins</option>
-          </select>
-          <button class="btn" onclick="saveNotifSettings()">💾 Enregistrer</button>
-        </div>
-      </div>
-
-      <div class="admin-section">
-        <h3 class="section-header-large">📜 Historique</h3>
+        <h3 class="section-header-large">📜 Historique emails</h3>
         <div id="notifHistory" class="logs-wrapper" style="max-height:240px;"></div>
       </div>
     </div>

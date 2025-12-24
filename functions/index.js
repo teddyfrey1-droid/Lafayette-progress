@@ -4,6 +4,12 @@ const nodemailer = require("nodemailer");
 
 admin.initializeApp();
 
+// Super admin (doit correspondre au front)
+const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
+
+// Région par défaut (doit correspondre au front). Changeable côté front si vous déployez ailleurs.
+const REGION = "europe-west1";
+
 /**
  * Envoie une notification (FCM) à des tokens stockés dans RTDB: /fcmTokens/{uid}/{pushId}
  * Sécurité: réservé aux utilisateurs role = 'admin' ou 'superadmin' (dans /users/{uid}/role)
@@ -27,11 +33,14 @@ async function assertAdmin(context) {
   const roleSnap = await admin.database().ref(`users/${uid}/role`).get();
   const role = roleSnap.exists() ? String(roleSnap.val()) : "";
 
-  if (role !== "admin" && role !== "superadmin") {
+  const authEmail = context && context.auth && context.auth.token && context.auth.token.email ? String(context.auth.token.email).toLowerCase() : "";
+  const isSuperByEmail = authEmail && authEmail === SUPER_ADMIN_EMAIL.toLowerCase();
+
+  if (role !== "admin" && role !== "superadmin" && !isSuperByEmail) {
     throw new functions.https.HttpsError("permission-denied", "Admin only");
   }
 
-  return { uid, role };
+  return { uid, role: role || (isSuperByEmail ? "superadmin" : "") };
 }
 
 function normalizeAudience(aud) {
@@ -271,7 +280,7 @@ async function sendNotification({ title, body, link, audience, emailFallback }) 
 /**
  * Callable utilisé par le front: sendPush
  */
-exports.sendPush = functions.https.onCall(async (data, context) => {
+exports.sendPush = functions.region(REGION).https.onCall(async (data, context) => {
   await assertAdmin(context);
 
   const title = (data && data.title) ? String(data.title) : "Heiko";
@@ -284,11 +293,60 @@ exports.sendPush = functions.https.onCall(async (data, context) => {
 });
 
 // Compat: ancien nom (ou usage direct)
-exports.sendPushToAll = functions.https.onCall(async (data, context) => {
+exports.sendPushToAll = functions.region(REGION).https.onCall(async (data, context) => {
   await assertAdmin(context);
   const title = (data && data.title) ? String(data.title) : "Heiko";
   const body = (data && data.body) ? String(data.body) : "";
   const link = (data && data.link) ? String(data.link) : "/index.html#dashboard";
   const emailFallback = !!(data && data.emailFallback);
   return await sendNotification({ title, body, link, audience: "all", emailFallback });
+});
+
+/**
+ * Callable utilisé par le front: sendEmailToUser
+ * Envoie un email à un utilisateur précis (uid) en utilisant l'email stocké dans RTDB /users/{uid}/email.
+ */
+exports.sendEmailToUser = functions.region(REGION).https.onCall(async (data, context) => {
+  await assertAdmin(context);
+
+  const uid = data && data.uid ? String(data.uid).trim() : "";
+  if (!uid) {
+    throw new functions.https.HttpsError("invalid-argument", "uid required");
+  }
+
+  const subject = data && data.subject ? String(data.subject) : "Message";
+  const body = data && data.body ? String(data.body) : "";
+  const link = data && data.link ? String(data.link) : "";
+
+  const userSnap = await admin.database().ref(`users/${uid}`).get();
+  const user = userSnap.exists() ? (userSnap.val() || {}) : {};
+  const to = user.email ? String(user.email).trim() : "";
+
+  if (!isValidEmail(to)) {
+    throw new functions.https.HttpsError("not-found", "recipient email not found");
+  }
+
+  const transport = getTransport();
+  if (!transport) {
+    return { ok: false, reason: "Email not configured" };
+  }
+
+  const cfg = getEmailConfig();
+  const from = cfg.from;
+
+  const safeSubject = subject.slice(0, 200);
+  const text = `${body}${link ? `\n\nLien: ${link}` : ""}`.trim();
+
+  try {
+    const info = await transport.sendMail({
+      from,
+      to,
+      subject: safeSubject,
+      text,
+    });
+
+    return { ok: true, to, messageId: info && info.messageId ? info.messageId : null };
+  } catch (e) {
+    return { ok: false, reason: "SEND_FAILED", error: String(e && e.message ? e.message : e) };
+  }
 });
