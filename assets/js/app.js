@@ -15,6 +15,31 @@
     // --- Cloud Functions helper (envoi d'emails admin) ---
     function _uniq(arr){ return [...new Set(arr.filter(Boolean))]; }
 
+
+function _fnNormalizeCode(code){
+  const c = String(code || '').trim();
+  return c.startsWith('functions/') ? c.slice('functions/'.length) : c;
+}
+
+function _shouldTryNextRegion(err){
+  const code = _fnNormalizeCode(err && err.code ? err.code : '');
+  const msg = String(err && err.message ? err.message : '').toLowerCase();
+
+  // Errors we should NOT retry across regions (these are genuine functional errors)
+  const fatal = ['permission-denied','unauthenticated','invalid-argument','failed-precondition'];
+  if (fatal.some(k => code.includes(k))) return false;
+
+  // Retryable / "maybe wrong region" errors
+  const retryable = ['not-found','internal','unavailable','deadline-exceeded','unknown','cancelled','resource-exhausted'];
+  if (retryable.some(k => code.includes(k))) return true;
+
+  // Fallback on message heuristics
+  if (msg.includes('not found') || msg.includes('internal') || msg.includes('deadline') || msg.includes('unavailable')) return true;
+
+  return false;
+}
+
+
     async function _getFunctionsRegion(){
       if(_functionsRegionCache) return _functionsRegionCache;
       try{
@@ -65,9 +90,8 @@
           lastErr = err;
           const msg = (err && err.message) ? String(err.message) : '';
           const code = (err && err.code) ? String(err.code) : '';
-          // si la fonction n’existe pas dans cette région, on essaye la suivante
-          if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
-          // sinon on stoppe
+          // On essaie la prochaine région si l’erreur peut venir d’une mauvaise région / d’un souci transient
+          if(_shouldTryNextRegion(err)) continue;
           break;
         }
       }
@@ -94,7 +118,7 @@
           lastErr = err;
           const msg = (err && err.message) ? String(err.message) : '';
           const code = (err && err.code) ? String(err.code) : '';
-          if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
+          if(_shouldTryNextRegion(err)) continue;
           break;
         }
       }
@@ -117,8 +141,8 @@ async function _callGetSmtpConfigStatus(){
       lastErr = err;
       const code = String((err && err.code) ? err.code : '');
       const msg = String((err && err.message) ? err.message : err);
-      if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
-      break;
+      if(_shouldTryNextRegion(err)) continue;
+          break;
     }
   }
   throw lastErr || new Error("Échec d’appel getSmtpConfigStatus");
@@ -140,8 +164,8 @@ async function _callSetSmtpConfig(data){
       lastErr = err;
       const code = String((err && err.code) ? err.code : '');
       const msg = String((err && err.message) ? err.message : err);
-      if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
-      break;
+      if(_shouldTryNextRegion(err)) continue;
+          break;
     }
   }
   throw lastErr || new Error("Échec d’appel setSmtpConfig");
@@ -163,8 +187,8 @@ async function _callTestSmtp(data){
       lastErr = err;
       const code = String((err && err.code) ? err.code : '');
       const msg = String((err && err.message) ? err.message : err);
-      if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
-      break;
+      if(_shouldTryNextRegion(err)) continue;
+          break;
     }
   }
   throw lastErr || new Error("Échec d’appel testSmtp");
