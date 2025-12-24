@@ -188,16 +188,35 @@ async function getTransportOrThrow() {
 
 
 function safeSubject(s) {
-  const str = String(s || "Message").trim();
+  const str = String(s || "Message").replace(/(\r\n|\r|\n)+/g, " ").trim();
   if (!str) return "Message";
   return str.length > 140 ? str.slice(0, 140) : str;
 }
-
 function buildText(body, link) {
   const b = String(body || "").trim();
   const l = String(link || "").trim();
   return `${b}${l ? `\n\nLien: ${l}` : ""}`.trim();
 }
+
+function isValidEmail(email) {
+  const e = String(email || "").trim();
+  if (!e) return false;
+  // simple & robust enough for SMTP "to"
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+}
+
+function formatSendError(e) {
+  const msg = String(e && e.message ? e.message : e);
+  const out = { message: msg };
+  try {
+    if (e && e.code) out.code = String(e.code);
+    if (e && e.responseCode) out.responseCode = e.responseCode;
+    if (e && e.response) out.response = String(e.response);
+    if (e && e.command) out.command = String(e.command);
+  } catch (_) {}
+  return out;
+}
+
 
 async function resolveUserEmail(uid) {
   const u = String(uid || "").trim();
@@ -318,6 +337,7 @@ if (!uid) {
     to = await resolveUserEmail(uid);
   }
   if (!to) return { ok: false, reason: "NO_EMAIL" };
+  if (!isValidEmail(to)) return { ok: false, reason: "INVALID_EMAIL", to };
 
   const { cfg, transport } = await getTransportOrThrow();
   if (!transport || !cfg) return { ok: false, reason: "EMAIL_NOT_CONFIGURED" };
@@ -333,7 +353,7 @@ if (!uid) {
     });
     return { ok: true, to, messageId: info && info.messageId ? info.messageId : null };
   } catch (e) {
-    return { ok: false, reason: "SEND_FAILED", error: String(e && e.message ? e.message : e) };
+    return { ok: false, reason: "SEND_FAILED", error: String(e && e.message ? e.message : e), smtp: formatSendError(e) };
   }
 
   } catch (e) {
@@ -353,13 +373,35 @@ exports.sendEmailToUsers = functions.region(REGION).https.onCall(async (data, co
   try {
   await assertAdmin(context);
 
+  const recipientsRaw = data && Array.isArray(data.recipients) ? data.recipients : null;
   const uidsRaw = data && data.uids ? data.uids : [];
-const inputs = Array.isArray(uidsRaw)
-  ? uidsRaw.map((u) => String(u || "").trim()).filter(Boolean)
-  : [];
-if (!inputs.length) {
-  throw new functions.https.HttpsError("invalid-argument", "uids required");
-}
+
+  const emailHints = {};
+  const inputs = [];
+
+  if (recipientsRaw) {
+    for (const r of recipientsRaw) {
+      if (!r) continue;
+      const uid = r.uid ? String(r.uid).trim() : "";
+      const email = r.email ? String(r.email).trim() : "";
+      if (uid) {
+        inputs.push(uid);
+        if (isValidEmail(email)) emailHints[uid] = email;
+      } else if (isValidEmail(email)) {
+        // allow passing only an email
+        inputs.push(email);
+      }
+    }
+  } else if (Array.isArray(uidsRaw)) {
+    for (const u of uidsRaw) {
+      const s = String(u || "").trim();
+      if (s) inputs.push(s);
+    }
+  }
+
+  if (!inputs.length) {
+    throw new functions.https.HttpsError("invalid-argument", "recipients or uids required");
+  }
 
 // Normalize (uids or emails) -> uids
 const normList = [];
@@ -388,9 +430,10 @@ const uids = Array.from(new Set(normList)); // dedupe
   const usersSnap = await admin.database().ref("users").get();
   const users = usersSnap.exists() ? (usersSnap.val() || {}) : {};
 
-  const emailMap = await resolveManyEmails(uids, users);
+  const resolvedMap = await resolveManyEmails(uids, users);
+  const emailMap = { ...(resolvedMap || {}), ...(emailHints || {}) };
 
-  const results = [];
+const results = [];
 // Handle inputs that couldn't be resolved to an Auth user (typed emails not found, etc.)
 for (const id of inputs) {
   const u = inputToUid[id];
@@ -403,11 +446,17 @@ for (const uid of uids) {
 
     const to = emailMap[uid] ? String(emailMap[uid]).trim() : "";
     if (!to) {
-      results.push({ uid, ok: false, reason: "NO_EMAIL" });
+      results.push({ uid, ok: false, reason: "NO_EMAIL", hintEmail: (emailHints && emailHints[uid]) ? String(emailHints[uid]).trim() : "" });
       continue;
     }
 
-    try {
+    
+    if (!isValidEmail(to)) {
+      results.push({ uid, ok: false, to, reason: "INVALID_EMAIL" });
+      continue;
+    }
+
+try {
       const info = await transport.sendMail({
         from: cfg.from,
         to,
@@ -416,7 +465,7 @@ for (const uid of uids) {
       });
       results.push({ uid, ok: true, to, messageId: info && info.messageId ? info.messageId : null });
     } catch (e) {
-      results.push({ uid, ok: false, to, reason: "SEND_FAILED", error: String(e && e.message ? e.message : e) });
+      results.push({ uid, ok: false, to, reason: "SEND_FAILED", error: String(e && e.message ? e.message : e), smtp: formatSendError(e) });
     }
   }
 
@@ -524,7 +573,7 @@ exports.testSmtp = functions.region(REGION).https.onCall(async (data, context) =
     });
     return { ok: true, to, messageId: info && info.messageId ? info.messageId : null };
   } catch (e) {
-    return { ok: false, reason: "SEND_FAILED", error: String(e && e.message ? e.message : e) };
+    return { ok: false, reason: "SEND_FAILED", error: String(e && e.message ? e.message : e), smtp: formatSendError(e) };
   }
 
   } catch (e) {

@@ -210,7 +210,12 @@ async function _callTestSmtp(data){
       try{
         let data = null;
         try{
-          data = await _callSendEmailToUsers({ uids, subject, body, link: link || '' });
+          const recipients = uids.map(uid => {
+          const u = (typeof allUsers !== 'undefined' && allUsers && allUsers[uid]) ? (allUsers[uid] || {}) : {};
+          const em = (u && u.email) ? String(u.email).trim() : '';
+          return { uid, email: em };
+        });
+          data = await _callSendEmailToUsers({ recipients, uids, subject, body, link: link || '' });
           // Si la function multi n'existe pas (ou renvoie EMAIL_NOT_CONFIGURED), on laisse data tel quel
         }catch(e){
           // fallback mono
@@ -223,7 +228,19 @@ async function _callTestSmtp(data){
 
         if(results.length){
           if(failCount === 0) showToast(`✅ Email(s) envoyé(s) (${okCount})`);
-          else showToast(`⚠️ Email(s) envoyés: ${okCount} • échecs: ${failCount}`);
+          else {
+            let extra = '';
+            try{
+              const firstFail = (results || []).find(r => r && r.ok === false);
+              if(firstFail){
+                const r = String(firstFail.reason || 'ECHEC');
+                const e = firstFail.error ? String(firstFail.error) : (firstFail.smtp && firstFail.smtp.message ? String(firstFail.smtp.message) : '');
+                extra = ` • ${r}${e ? ' — ' + e : ''}`;
+                if(extra.length > 180) extra = extra.slice(0, 180) + '…';
+              }
+            }catch(e){}
+            showToast(`⚠️ Email(s) envoyés: ${okCount} • échecs: ${failCount}${extra}`);
+          }
         } else {
           const reason = data && (data.reason || data.error || data.message) ? String(data.reason || data.error || data.message) : 'Non envoyé';
           showToast('⚠️ ' + reason);
