@@ -143,6 +143,74 @@ function buildText(body, link) {
   return `${b}${l ? `\n\nLien: ${l}` : ""}`.trim();
 }
 
+async function resolveUserEmail(uid) {
+  const u = String(uid || "").trim();
+  if (!u) return "";
+  // 1) RTDB
+  try {
+    const snap = await admin.database().ref(`users/${u}/email`).get();
+    if (snap.exists() && snap.val()) {
+      const e = String(snap.val()).trim();
+      if (e) return e;
+    }
+  } catch (e) {}
+
+  // 2) Firebase Auth
+  try {
+    const rec = await admin.auth().getUser(u);
+    const e = rec && rec.email ? String(rec.email).trim() : "";
+    if (e) {
+      // Cache best-effort into RTDB
+      try { await admin.database().ref(`users/${u}/email`).set(e); } catch (e2) {}
+      return e;
+    }
+  } catch (e) {}
+
+  return "";
+}
+
+async function resolveManyEmails(uids, usersCache) {
+  const map = {};
+  const missing = [];
+
+  const list = Array.isArray(uids) ? uids : [];
+  for (const uid of list) {
+    const u = String(uid || "").trim();
+    if (!u) continue;
+    const cached = usersCache && usersCache[u] && usersCache[u].email ? String(usersCache[u].email).trim() : "";
+    if (cached) map[u] = cached;
+    else missing.push(u);
+  }
+
+  if (!missing.length) return map;
+
+  // Batch lookup in Auth for missing emails
+  try {
+    const res = await admin.auth().getUsers(missing.map((uid) => ({ uid })));
+    const updates = {};
+    for (const userRecord of (res.users || [])) {
+      if (userRecord && userRecord.uid && userRecord.email) {
+        const u = String(userRecord.uid).trim();
+        const e = String(userRecord.email).trim();
+        if (u && e) {
+          map[u] = e;
+          updates[`users/${u}/email`] = e;
+          if (usersCache) usersCache[u] = { ...(usersCache[u] || {}), email: e };
+        }
+      }
+    }
+    // Best-effort cache write (ignore errors)
+    if (Object.keys(updates).length) {
+      try { await admin.database().ref().update(updates); } catch (e3) {}
+    }
+  } catch (e) {
+    // ignore, map will just not contain these uids
+  }
+
+  return map;
+}
+
+
 /**
  * Envoi EMAIL vers 1 utilisateur (par uid) — réservé admin/superadmin
  * Entrée: { uid, subject, body, link? }
@@ -161,7 +229,10 @@ exports.sendEmailToUser = functions.region(REGION).https.onCall(async (data, con
 
   const userSnap = await admin.database().ref(`users/${uid}`).get();
   const user = userSnap.exists() ? (userSnap.val() || {}) : {};
-  const to = user.email ? String(user.email).trim() : "";
+  let to = user.email ? String(user.email).trim() : "";
+  if (!to) {
+    to = await resolveUserEmail(uid);
+  }
   if (!to) return { ok: false, reason: "NO_EMAIL" };
 
   const { cfg, transport } = await getTransportOrThrow();
@@ -210,10 +281,11 @@ exports.sendEmailToUsers = functions.region(REGION).https.onCall(async (data, co
   const usersSnap = await admin.database().ref("users").get();
   const users = usersSnap.exists() ? (usersSnap.val() || {}) : {};
 
+  const emailMap = await resolveManyEmails(uids, users);
+
   const results = [];
   for (const uid of uids) {
-    const u = users[uid] || {};
-    const to = u.email ? String(u.email).trim() : "";
+    const to = emailMap[uid] ? String(emailMap[uid]).trim() : "";
     if (!to) {
       results.push({ uid, ok: false, reason: "NO_EMAIL" });
       continue;
