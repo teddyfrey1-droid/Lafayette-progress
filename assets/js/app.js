@@ -32,7 +32,7 @@
 
     function _getFunctionsRegionsToTry(region){
       // On essaye d’abord la région configurée, puis des valeurs fréquentes
-      const list = _uniq([region, 'europe-west1', 'us-central1']);
+      const list = _uniq([region, 'us-central1', 'europe-west1']);
       return list;
     }
 
@@ -87,6 +87,74 @@
       }
       throw lastErr || new Error("Échec d’appel sendEmailToUsers");
     }
+
+async function _callGetSmtpConfigStatus(){
+  if(!firebase.functions) throw new Error("Firebase Functions SDK manquant");
+  const configured = await _getFunctionsRegion();
+  const regions = _getFunctionsRegionsToTry(configured);
+  let lastErr = null;
+  for(const r of regions){
+    try{
+      const fn = (r && firebase.app().functions) ? firebase.app().functions(r).httpsCallable('getSmtpConfigStatus') : firebase.functions().httpsCallable('getSmtpConfigStatus');
+      const res = await fn({});
+      try{ if(r){ localStorage.setItem('heiko_functions_region', r); } }catch(e){}
+      return res && res.data ? res.data : res;
+    }catch(err){
+      lastErr = err;
+      const code = String((err && err.code) ? err.code : '');
+      const msg = String((err && err.message) ? err.message : err);
+      if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
+      break;
+    }
+  }
+  throw lastErr || new Error("Échec d’appel getSmtpConfigStatus");
+}
+
+async function _callSetSmtpConfig(data){
+  if(!firebase.functions) throw new Error("Firebase Functions SDK manquant");
+  const configured = await _getFunctionsRegion();
+  const regions = _getFunctionsRegionsToTry(configured);
+  let lastErr = null;
+  for(const r of regions){
+    try{
+      const fn = (r && firebase.app().functions) ? firebase.app().functions(r).httpsCallable('setSmtpConfig') : firebase.functions().httpsCallable('setSmtpConfig');
+      const res = await fn(data);
+      try{ if(r){ localStorage.setItem('heiko_functions_region', r); } }catch(e){}
+      return res && res.data ? res.data : res;
+    }catch(err){
+      lastErr = err;
+      const code = String((err && err.code) ? err.code : '');
+      const msg = String((err && err.message) ? err.message : err);
+      if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
+      break;
+    }
+  }
+  throw lastErr || new Error("Échec d’appel setSmtpConfig");
+}
+
+async function _callTestSmtp(data){
+  if(!firebase.functions) throw new Error("Firebase Functions SDK manquant");
+  const configured = await _getFunctionsRegion();
+  const regions = _getFunctionsRegionsToTry(configured);
+  let lastErr = null;
+  for(const r of regions){
+    try{
+      const fn = (r && firebase.app().functions) ? firebase.app().functions(r).httpsCallable('testSmtp') : firebase.functions().httpsCallable('testSmtp');
+      const res = await fn(data || {});
+      try{ if(r){ localStorage.setItem('heiko_functions_region', r); } }catch(e){}
+      return res && res.data ? res.data : res;
+    }catch(err){
+      lastErr = err;
+      const code = String((err && err.code) ? err.code : '');
+      const msg = String((err && err.message) ? err.message : err);
+      if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
+      break;
+    }
+  }
+  throw lastErr || new Error("Échec d’appel testSmtp");
+}
+
+
 
 
     async function sendEmailToSelectedUser(){
@@ -214,9 +282,89 @@
       // recipients
       try{ renderEmailRecipients(); }catch(e){}
       try{ updateEmailSelectedCount(); }catch(e){}
+      try{ refreshSmtpStatus(); }catch(e){}
     }
 
-    function renderEmailRecipients(){
+    
+
+async function refreshSmtpStatus(){
+  if(!isAdminUser()) return;
+  const statusEl = document.getElementById('smtpStatus');
+  if(statusEl) statusEl.textContent = "Vérification SMTP...";
+  try{
+    const data = await _callGetSmtpConfigStatus();
+    if(!statusEl) return;
+    if(data && data.configured){
+      const host = data.host ? String(data.host) : '';
+      const port = data.port ? String(data.port) : '';
+      const from = data.from ? String(data.from) : '';
+      statusEl.textContent = `✅ SMTP configuré (${host}:${port}) • From: ${from}`;
+    } else {
+      const missing = (data && Array.isArray(data.missing)) ? data.missing.join(', ') : 'incomplet';
+      statusEl.textContent = `⚠️ SMTP non configuré (${missing})`;
+    }
+  }catch(e){
+    if(statusEl) statusEl.textContent = "⚠️ Impossible de vérifier le SMTP (Functions).";
+  }
+}
+window.refreshSmtpStatus = refreshSmtpStatus;
+
+async function saveSmtpConfig(){
+  if(!isAdminUser()) return;
+  const host = (document.getElementById('smtpHost')||{}).value || '';
+  const port = (document.getElementById('smtpPort')||{}).value || '';
+  const user = (document.getElementById('smtpUser')||{}).value || '';
+  const pass = (document.getElementById('smtpPass')||{}).value || '';
+  const from = (document.getElementById('smtpFrom')||{}).value || '';
+  const secure = (document.getElementById('smtpSecure')||{}).checked || false;
+
+  const data = {
+    host: String(host).trim(),
+    port: Number(String(port).trim() || 0),
+    user: String(user).trim(),
+    pass: String(pass),
+    from: String(from).trim(),
+    secure: !!secure
+  };
+  if(!data.host || !data.port || !data.user || !data.pass || !data.from){
+    showToast("Remplis host, port, user, pass, from.");
+    return;
+  }
+  try{
+    const res = await _callSetSmtpConfig(data);
+    if(res && res.ok){
+      showToast("✅ SMTP sauvegardé.");
+      // vider le pass visuellement (réduit les risques)
+      try{ const p = document.getElementById('smtpPass'); if(p) p.value = ''; }catch(e){}
+      await refreshSmtpStatus();
+    } else {
+      showToast("⚠️ SMTP non sauvegardé.");
+    }
+  }catch(e){
+    const msg = (e && e.message) ? e.message : String(e);
+    showToast("Erreur SMTP: " + msg);
+  }
+}
+window.saveSmtpConfig = saveSmtpConfig;
+
+async function testSmtp(){
+  if(!isAdminUser()) return;
+  try{
+    const res = await _callTestSmtp({});
+    if(res && res.ok){
+      showToast("✅ Email test envoyé.");
+    } else {
+      const err = res && (res.error || res.reason) ? String(res.error || res.reason) : "Échec test";
+      showToast("⚠️ " + err);
+    }
+  }catch(e){
+    const msg = (e && e.message) ? e.message : String(e);
+    showToast("Erreur test SMTP: " + msg);
+  }
+}
+window.testSmtp = testSmtp;
+
+function renderEmailRecipients(){
       if(!isAdminUser()) return;
       const sel = document.getElementById('emailRecipient');
       if(!sel) return;

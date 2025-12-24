@@ -425,8 +425,37 @@
           <button class="btn" onclick="saveFunctionsRegion()" style="background:rgba(59,130,246,.14); color:var(--primary);">💾</button>
         </div>
         <div style="font-size:11px; color:var(--text-muted); margin-top:8px;">
-          ⚙️ L’envoi email nécessite une configuration SMTP côté Cloud Functions. Sinon, ça n’envoie rien (mais ça ne bug pas).
+          ⚙️ L’envoi email nécessite une configuration SMTP. Configure-la juste en dessous puis fais un test.
         </div>
+
+
+<div class="admin-section" style="border-left:4px solid rgba(59,130,246,.35);">
+  <h3 class="section-header-large">⚙️ Configuration SMTP (obligatoire)</h3>
+  <div id="smtpStatus" style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">
+    Vérification SMTP...
+  </div>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+    <input id="smtpHost" type="text" placeholder="SMTP host (ex: smtp.brevo.com)">
+    <input id="smtpPort" type="number" placeholder="Port (587 ou 465)">
+    <input id="smtpUser" type="text" placeholder="SMTP user">
+    <input id="smtpPass" type="password" placeholder="SMTP pass (secret)">
+    <input id="smtpFrom" type="text" placeholder="From (ex: Heiko <no-reply@domaine.fr>)">
+    <div style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid rgba(148,163,184,.25); border-radius:10px; background:rgba(15,23,42,.04);">
+      <input id="smtpSecure" type="checkbox">
+      <label style="font-size:12px;">SSL (souvent port 465)</label>
+    </div>
+  </div>
+
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px;">
+    <button class="btn" onclick="saveSmtpConfig()">💾 Sauvegarder SMTP</button>
+    <button class="btn" onclick="testSmtp()">🧪 Tester (m’envoyer un email)</button>
+  </div>
+
+  <div style="font-size:11px; color:var(--text-muted); margin-top:8px;">
+    ⚠️ Le mot de passe SMTP est une information sensible. Idéalement, utilise un compte SMTP dédié.
+  </div>
+</div>
       </div>
 
       <div class="admin-section">
