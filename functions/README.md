@@ -1,35 +1,50 @@
-# Push notifications (FCM) — Quick setup
+# Email (Cloud Functions) — Quick setup
 
-## 1) VAPID key (obligatoire)
-Firebase Console → Cloud Messaging → Web Push certificates → génère la clé (VAPID public key)
+Ce projet a **désactivé** les notifications push pour le moment.
+Les messages aux équipes passent donc **uniquement par email** via Cloud Functions.
 
-Puis, mets-la dans la Realtime Database :
-/config/vapidKey = "<TA_CLE_VAPID_PUBLIC>"
+## 1) Pré-requis SMTP
 
-## 2) Déployer la function (optionnel)
-Ce dossier contient une callable function `sendPushToAll` (admin/superadmin).
+Il te faut des identifiants SMTP (fournisseur mail / domaine / service SMTP) :
+- host
+- port
+- user
+- pass
+- from (adresse expéditeur)
 
-- firebase init functions
-- firebase deploy --only functions
+⚠️ Sans ça, la Function renverra `EMAIL_NOT_CONFIGURED`.
 
-## 3) Côté front
-Dans le menu du dashboard, bouton 🔔 "Activer les notifications".
-⚠️ Sur iPhone/iPad, l’app doit être "Ajouter à l’écran d’accueil" pour recevoir les push.
+## 2) Configurer la Function (2 options supportées par le code)
 
+### Option A — Firebase Functions config (CLI)
 
-## 4) Email fallback (optionnel)
-Dans l’onglet Admin → 🔔 Notifications, tu peux cocher “📧 Envoyer aussi par email…”.
+Exemple (à adapter) :
 
-⚠️ Pour que l’email fonctionne, il faut configurer un SMTP côté Cloud Functions.
+```bash
+firebase functions:config:set   smtp.host="SMTP_HOST"   smtp.port="587"   smtp.user="SMTP_USER"   smtp.pass="SMTP_PASS"   mail.from="Heiko Lafayette <no-reply@ton-domaine.fr>"
+```
 
-### Option A — variables d’environnement (recommandé)
+### Option B — Variables d’environnement (process.env)
+
+Le code lit aussi :
+
 - SMTP_HOST
-- SMTP_PORT (ex: 465 ou 587)
+- SMTP_PORT
 - SMTP_USER
 - SMTP_PASS
-- MAIL_FROM (ex: "Heiko Lafayette <no-reply@ton-domaine.fr>")
+- MAIL_FROM
 
-### Option B — firebase functions config
-Exemple :
-- firebase functions:config:set smtp.host="..." smtp.port="587" smtp.user="..." smtp.pass="..." mail.from="..."
-- firebase deploy --only functions
+## 3) Déployer
+
+```bash
+firebase deploy --only functions
+```
+
+## 4) Utilisation côté app
+
+Dans le panneau Manager > onglet **📧 Emails** :
+- Sélectionne 1 ou plusieurs destinataires
+- Renseigne sujet + message (+ lien optionnel)
+- Clique **Envoyer**
+
+Le log est stocké dans RTDB : `notifications/sent`.

@@ -63,6 +63,32 @@
       throw lastErr || new Error("Échec d’appel sendEmailToUser");
     }
 
+
+    async function _callSendEmailToUsers(data){
+      if(!firebase.functions) throw new Error("Firebase Functions SDK manquant");
+      const region = (document.getElementById('functionsRegion') && document.getElementById('functionsRegion').value) ? String(document.getElementById('functionsRegion').value).trim() : '';
+      const regions = _getFunctionsRegionsToTry(region || (await _getSavedFunctionsRegion()));
+      let lastErr = null;
+      for(const r of regions){
+        try{
+          const fn = r ? firebase.functions(r).httpsCallable('sendEmailToUsers') : firebase.functions().httpsCallable('sendEmailToUsers');
+          const res = await fn(data);
+          // on mémorise la région qui marche
+          try{ if(r){ localStorage.setItem('heiko_functions_region', r); } }catch(e){}
+          return res && res.data ? res.data : res;
+        }catch(err){
+          lastErr = err;
+          const code = String((err && err.code) ? err.code : '');
+          const msg = String((err && err.message) ? err.message : err);
+          // si la function n'existe pas dans cette région, on essaye la suivante
+          if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
+          break;
+        }
+      }
+      throw lastErr || new Error("Échec d’appel sendEmailToUsers");
+    }
+
+
     async function sendEmailToSelectedUser(){
       if(!isAdminUser()) return;
       const recEl = document.getElementById('emailRecipient');
@@ -71,22 +97,47 @@
       const linkEl = document.getElementById('emailLink');
       if(!recEl || !subjEl || !bodyEl) return;
 
-      const uid = String(recEl.value || '').trim();
+      const uids = Array.from(recEl.selectedOptions || []).map(o => String(o.value||'').trim()).filter(Boolean);
       const subject = String(subjEl.value || '').trim();
       const body = String(bodyEl.value || '').trim();
       const link = linkEl ? String(linkEl.value || '').trim() : '';
 
-      if(!uid){ showToast('Choisis un destinataire.'); return; }
+      if(!uids.length){ showToast('Choisis au moins un destinataire.'); return; }
       if(!subject || !body){ showToast('Sujet + message requis.'); return; }
 
       const btn = document.getElementById('btnSendEmail');
       if(btn){ btn.disabled = true; btn.style.opacity = .7; }
 
+      async function fallbackOneByOne(){
+        const results = [];
+        for(const uid of uids){
+          try{
+            const r = await _callSendEmailToUser({ uid, subject, body, link: link || '' });
+            results.push({ uid, ...(r||{}) });
+          }catch(err){
+            results.push({ uid, ok:false, reason:'CALL_FAILED', error: String(err && err.message ? err.message : err) });
+          }
+        }
+        return { ok: true, results };
+      }
+
       try{
-        const data = await _callSendEmailToUser({ uid, subject, body, link: link || '' });
-        const ok = (data && (data.ok === true || data.success === true));
-        if(ok){
-          showToast('✅ Email envoyé');
+        let data = null;
+        try{
+          data = await _callSendEmailToUsers({ uids, subject, body, link: link || '' });
+          // Si la function multi n'existe pas (ou renvoie EMAIL_NOT_CONFIGURED), on laisse data tel quel
+        }catch(e){
+          // fallback mono
+          data = await fallbackOneByOne();
+        }
+
+        const results = (data && Array.isArray(data.results)) ? data.results : [];
+        const okCount = results.filter(r => r && r.ok === true).length;
+        const failCount = results.length - okCount;
+
+        if(results.length){
+          if(failCount === 0) showToast(`✅ Email(s) envoyé(s) (${okCount})`);
+          else showToast(`⚠️ Email(s) envoyés: ${okCount} • échecs: ${failCount}`);
         } else {
           const reason = data && (data.reason || data.error || data.message) ? String(data.reason || data.error || data.message) : 'Non envoyé';
           showToast('⚠️ ' + reason);
@@ -96,7 +147,7 @@
         try{
           await db.ref('notifications/sent').push({
             type: 'email',
-            toUid: uid,
+            toUids: uids,
             subject,
             body,
             link: link || '',
@@ -107,14 +158,15 @@
           });
         }catch(e){}
 
-        // clear
         subjEl.value = '';
         bodyEl.value = '';
       }catch(err){
         console.error(err);
-        showToast('Erreur envoi email (Functions).');
+        const msg = (err && err.message) ? err.message : 'Erreur envoi email (Functions).';
+        showToast('Erreur: ' + msg);
       }finally{
         if(btn){ btn.disabled = false; btn.style.opacity = 1; }
+        try{ updateEmailSelectedCount(); }catch(e){}
       }
     }
     window.sendEmailToSelectedUser = sendEmailToSelectedUser;
@@ -161,29 +213,64 @@
 
       // recipients
       try{ renderEmailRecipients(); }catch(e){}
+      try{ updateEmailSelectedCount(); }catch(e){}
     }
 
     function renderEmailRecipients(){
       if(!isAdminUser()) return;
       const sel = document.getElementById('emailRecipient');
       if(!sel) return;
-      const prev = String(sel.value || '');
+
+      const searchEl = document.getElementById('emailSearch');
+      const prevSelected = new Set(Array.from(sel.selectedOptions||[]).map(o => String(o.value||'').trim()).filter(Boolean));
 
       const rows = Object.keys(allUsers || {}).map(uid => {
         const u = allUsers[uid] || {};
         const email = (u.email || '').toString().trim();
         const name = (u.name || email || uid).toString().trim();
-        return { uid, name, email };
+        const role = (u.role || '').toString().trim();
+        return { uid, name, email, role };
       }).filter(r => !!r.email);
 
       rows.sort((a,b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
 
-      sel.innerHTML = `<option value="">— Choisir un membre —</option>` + rows.map(r => {
-        const label = `${r.name} — ${r.email}`;
-        return `<option value="${r.uid}">${label}</option>`;
-      }).join('');
+      window.__emailRecipientRows = rows;
 
-      if(prev && rows.some(r => r.uid === prev)) sel.value = prev;
+      function render(filterText){
+        const f = (filterText || '').toLowerCase().trim();
+        const selected = new Set(prevSelected);
+
+        const filtered = rows.filter(r => {
+          if(!f) return true;
+          const hay = (`${r.name} ${r.email} ${r.role}`).toLowerCase();
+          return hay.includes(f);
+        });
+
+        // garder visibles les sélectionnés même si hors filtre
+        const map = new Map();
+        rows.forEach(r => { if(selected.has(r.uid)) map.set(r.uid, r); });
+        filtered.forEach(r => map.set(r.uid, r));
+        const toRender = Array.from(map.values());
+
+        sel.innerHTML = toRender.map(r => {
+          const label = `${r.name}${r.role ? ' ('+r.role.toUpperCase()+')' : ''} — ${r.email}`;
+          const isSel = selected.has(r.uid) ? ' selected' : '';
+          return `<option value="${r.uid}"${isSel}>${label}</option>`;
+        }).join('');
+
+        updateEmailSelectedCount();
+      }
+
+      render(searchEl ? String(searchEl.value||'') : '');
+
+      if(searchEl && !searchEl.__bound){
+        searchEl.__bound = true;
+        searchEl.addEventListener('input', () => render(String(searchEl.value||'')));
+      }
+      if(!sel.__bound){
+        sel.__bound = true;
+        sel.addEventListener('change', () => updateEmailSelectedCount());
+      }
     }
 
     function openEmailTo(uid){
@@ -191,10 +278,42 @@
       try{ switchTab('notifs'); }catch(e){}
       try{ renderEmailRecipients(); }catch(e){}
       const sel = document.getElementById('emailRecipient');
-      if(sel) sel.value = uid;
+      const uidStr = String(uid||'').trim();
+      if(sel && uidStr){
+        Array.from(sel.options||[]).forEach(o => {
+          if(String(o.value||'') === uidStr) o.selected = true;
+        });
+      }
+      try{ updateEmailSelectedCount(); }catch(e){}
       try{ document.getElementById('emailSubject')?.focus(); }catch(e){}
     }
-    window.openEmailTo = openEmailTo;
+    
+
+    function updateEmailSelectedCount(){
+      const sel = document.getElementById('emailRecipient');
+      const out = document.getElementById('emailSelectedCount');
+      if(!sel || !out) return;
+      const n = Array.from(sel.selectedOptions||[]).length;
+      out.textContent = `${n} sélectionné${n>1?'s':''}`;
+    }
+    window.updateEmailSelectedCount = updateEmailSelectedCount;
+
+    function selectAllEmailRecipients(){
+      const sel = document.getElementById('emailRecipient');
+      if(!sel) return;
+      Array.from(sel.options||[]).forEach(o => { o.selected = true; });
+      updateEmailSelectedCount();
+    }
+    window.selectAllEmailRecipients = selectAllEmailRecipients;
+
+    function clearEmailRecipients(){
+      const sel = document.getElementById('emailRecipient');
+      if(!sel) return;
+      Array.from(sel.options||[]).forEach(o => { o.selected = false; });
+      updateEmailSelectedCount();
+    }
+    window.clearEmailRecipients = clearEmailRecipients;
+window.openEmailTo = openEmailTo;
 
     function renderNotifHistory(){
       if(!isAdminUser()) return;
@@ -216,34 +335,44 @@
         const isEmail = (n.type === 'email') || (n.subject != null);
         const who = n.by ? String(n.by) : '';
         if(isEmail){
-          const uid = n.toUid || '';
-          const u = (uid && allUsers) ? allUsers[uid] : null;
-          const toName = u ? (u.name || u.email || uid) : uid;
-          const toEmail = u ? (u.email || '') : '';
+          const uids = Array.isArray(n.toUids) ? n.toUids : (n.toUid ? [n.toUid] : []);
+          const recs = (uids || []).map(uid => {
+            const u = (uid && allUsers) ? allUsers[uid] : null;
+            return u ? (u.name || u.email || uid) : uid;
+          }).filter(Boolean);
+          const recDisplay = (() => {
+            if(!recs.length) return '—';
+            if(recs.length <= 3) return recs.join(', ');
+            return recs.slice(0,3).join(', ') + ` +${recs.length-3}`;
+          })();
+
           const subj = n.subject || '';
           const body = n.body || '';
           const link = n.link || '';
-          const ok = (n.result && typeof n.result.ok === 'boolean') ? n.result.ok : null;
-          const badge = ok === true ? '✅' : (ok === false ? '⚠️' : '📧');
+          const status = (n.result && n.result.reason) ? String(n.result.reason) : '';
+          const results = (n.result && Array.isArray(n.result.results)) ? n.result.results : [];
+          const okCount = results.filter(r => r && r.ok === true).length;
+          const failCount = results.length ? (results.length - okCount) : 0;
+
           div.innerHTML = `
-            <div class="update-header">
-              <span style="font-weight:900; font-size:11px;">${badge} ${d} • ${escapeHtml(toName||'')}</span>
-              <span style="font-size:11px; color:var(--text-muted);">${escapeHtml(toEmail||'')} ${who ? '• '+escapeHtml(who):''}</span>
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+              <div>
+                <div style="font-weight:700;">📧 Email</div>
+                <div style="font-size:12px; color:var(--text-muted);">À: ${recDisplay}</div>
+                <div style="font-size:12px; color:var(--text-muted);">Par: ${who || '—'} • ${d}</div>
+              </div>
+              <div style="font-size:12px; color:var(--text-muted); text-align:right;">
+                ${results.length ? `${okCount} OK • ${failCount} KO` : (status ? status : '')}
+              </div>
             </div>
-            <div style="font-weight:900;">${escapeHtml(subj)}</div>
-            <div style="font-size:12px; color:var(--text-muted); margin-top:4px; white-space:pre-wrap;">${escapeHtml(body)}</div>
-            ${link ? `<div style="margin-top:6px;"><a href="${escapeHtml(link)}" target="_blank" rel="noopener" style="font-size:12px;">🔗 Lien</a></div>` : ''}
+            <div style="margin-top:8px;">
+              <div style="font-weight:600;">${escapeHtml(subj)}</div>
+              <div style="font-size:12px; color:var(--text-muted); margin-top:4px; white-space:pre-wrap;">${escapeHtml(body)}</div>
+              ${link ? `<div style="margin-top:6px; font-size:12px;"><a href="${escapeHtml(link)}" target="_blank">${escapeHtml(link)}</a></div>` : ``}
+            </div>
           `;
         } else {
-          const aud = n.audience ? String(n.audience) : 'all';
-          div.innerHTML = `
-            <div class="update-header">
-              <span style="font-weight:900; font-size:11px;">🔔 ${d} • ${aud.toUpperCase()}</span>
-              <span style="font-size:11px; color:var(--text-muted);">${escapeHtml(who)}</span>
-            </div>
-            <div style="font-weight:900;">${escapeHtml(n.title||'')}</div>
-            <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">${escapeHtml(n.body||'')}</div>
-          `;
+          div.innerHTML = `<div>${escapeHtml(JSON.stringify(n))}</div>`;
         }
         box.appendChild(div);
       });
@@ -2185,94 +2314,148 @@ const el = document.createElement("div");
     }
 
     function renderAdminUsers() { 
-        const d = document.getElementById("usersList"); d.innerHTML = ""; let totalToPay = 0; 
-        Object.keys(allUsers).forEach(k => { 
-            const u = allUsers[k]; 
-            if(u.email && u.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return; 
-            const isEligible = (u.primeEligible !== false);
-            const userRatio = (u.hours || 35) / BASE_HOURS; 
-            let userBonus = 0; 
-            
-            const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); let primOk = true; 
-            if(prims.length > 0) { primOk = prims.every(o => { 
-                 let threshold = 100;
-                 if(o.isFixed) threshold = 100;
-                 else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold;
-                 if(o.isNumeric) return parseFloat(o.current) >= threshold;
-                 else {
-                     const pct = getPct(o.current, o.target, o.isInverse); 
-                     return pct >= threshold;
-                 }
-            }); } 
-            
-            if(isEligible){
-            Object.values(allObjs).forEach(o => { if(!o.published) return; 
-                const pct = getPct(o.current, o.target, o.isInverse); 
-                const isLocked = !o.isPrimary && !primOk; 
-                let g = 0; 
-                if(o.isFixed) { 
-                    let win = false;
-                    if(o.isNumeric) win = parseFloat(o.current) >= o.target;
-                    else win = pct >= 100;
-                    if(win && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); 
-                } else { 
-                    if(o.paliers) o.paliers.forEach(p => { 
-                        let unlocked = false;
-                        if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold;
-                        else unlocked = pct >= p.threshold;
-                        if(unlocked) g += parse(p.prize); 
-                    }); 
-                } 
-                if(!isLocked) userBonus += (g * userRatio); 
-            }); 
-            }
-            if(isEligible) totalToPay += userBonus; 
-            
-            const div = document.createElement("div"); div.className = "user-item"; 
-            const statusClass = (u.status === 'active') ? 'active' : 'pending';
-            const statusLabel = (u.status === 'active') ? 'ACTIF' : 'EN ATTENTE';
-            let adminBadge = ""; if(u.role === 'admin') adminBadge = `<span class="admin-tag">ADMIN</span>`;
+        const d = document.getElementById("usersList");
+        if(!d) return;
+        d.innerHTML = "";
+        let totalToPay = 0;
 
-            div.innerHTML = `
+        const entries = Object.keys(allUsers || {}).map(uid => ({ uid, u: (allUsers[uid] || {}) }))
+          .filter(e => !(e.u.email && String(e.u.email).toLowerCase() === String(SUPER_ADMIN_EMAIL||'').toLowerCase()));
+
+        const eligibleEntries = [];
+        const ineligibleEntries = [];
+        entries.forEach(e => {
+          const isEligible = (e.u.primeEligible !== false);
+          (isEligible ? eligibleEntries : ineligibleEntries).push(e);
+        });
+
+        const nameSort = (a,b) => {
+          const an = (a.u.name || a.u.email || a.uid || '').toString();
+          const bn = (b.u.name || b.u.email || b.uid || '').toString();
+          return an.localeCompare(bn, 'fr', { sensitivity: 'base' });
+        };
+        eligibleEntries.sort(nameSort);
+        ineligibleEntries.sort(nameSort);
+
+        function computeUserBonus(u){
+          const userRatio = (u.hours || 35) / BASE_HOURS; 
+          let userBonus = 0;
+
+          const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); 
+          let primOk = true; 
+          if(prims.length > 0) { 
+            primOk = prims.every(o => { 
+              let threshold = 100;
+              if(o.isFixed) threshold = 100;
+              else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold;
+              if(o.isNumeric) return parseFloat(o.current) >= threshold;
+              const pct = getPct(o.current, o.target, o.isInverse); 
+              return pct >= threshold;
+            }); 
+          } 
+
+          Object.values(allObjs).forEach(o => { 
+            if(!o.published) return; 
+            const pct = getPct(o.current, o.target, o.isInverse); 
+            const isLocked = !o.isPrimary && !primOk; 
+            let g = 0; 
+            if(o.isFixed) { 
+              let win = false;
+              if(o.isNumeric) win = parseFloat(o.current) >= o.target;
+              else win = pct >= 100;
+              if(win && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); 
+            } else { 
+              if(o.paliers) o.paliers.forEach(p => { 
+                let unlocked = false;
+                if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold;
+                else unlocked = pct >= p.threshold;
+                if(unlocked) g += parse(p.prize); 
+              }); 
+            } 
+            if(!isLocked) userBonus += (g * userRatio); 
+          }); 
+
+          return userBonus;
+        }
+
+        function renderUser(uid, u, isEligible){
+          const userBonus = isEligible ? computeUserBonus(u) : 0;
+          if(isEligible) totalToPay += userBonus;
+
+          const div = document.createElement("div"); 
+          div.className = "user-item"; 
+          const statusClass = (u.status === 'active') ? 'active' : 'pending';
+          const statusLabel = (u.status === 'active') ? 'ACTIF' : 'EN ATTENTE';
+          let adminBadge = ""; if(u.role === 'admin') adminBadge = `<span class="admin-tag">ADMIN</span>`;
+          const checked = isEligible ? 'checked' : '';
+          const gain = isEligible ? userBonus.toFixed(2) + '€' : '—';
+
+          div.innerHTML = `
                 <div class="user-info">
                     <div class="user-header">
-                        <span class="user-name">${u.name} ${adminBadge}</span>
+                        <span class="user-name">${u.name || ''} ${adminBadge}</span>
                         <div style="display:flex; align-items:center;">
                             <span class="status-dot ${statusClass}"></span>
                             <span class="status-text">${statusLabel}</span>
                         </div>
                     </div>
-                    <div class="user-email-sub">${u.email}</div>
-                    <div class="user-meta">${u.hours}h</div>
+                    <div class="user-email-sub">${u.email || ''}</div>
+                    <div class="user-meta">${u.hours || 35}h</div>
                     <label class="check-label" style="margin-top:6px; font-size:11px; opacity:.95;">
-                      <input type="checkbox" ${isEligible?'checked':''} onchange="setUserPrimeEligible('${k}', this.checked)"> 💶 Compte dans les primes
+                      <input type="checkbox" ${checked} onchange="setUserPrimeEligible('${uid}', this.checked)"> 💶 Compte dans les primes
                     </label>
                 </div>
                 <div class="user-actions">
-                    <div class="user-gain">${(isEligible ? userBonus.toFixed(2) + '€' : '—')}</div>
+                    <div class="user-gain">${gain}</div>
                     <div class="btn-group">
-                      <button onclick="openTeamArchive('${k}')" class="action-btn" title="Archive mensuelle">📄</button>
-                      <button onclick="openEmailTo('${k}')" class="action-btn" title="Envoyer un email">📧</button>
-                      <button onclick="resendInvite('${u.email}')" class="action-btn" title="Renvoyer Invitation">📩</button>
-                      <button onclick="editUser('${k}')" class="action-btn" title="Modifier">✏️</button>
-                      <button onclick="deleteUser('${k}')" class="action-btn delete" title="Supprimer">🗑️</button>
+                      <button onclick="openTeamArchive('${uid}')" class="action-btn" title="Archive mensuelle">📄</button>
+                      <button onclick="openEmailTo('${uid}')" class="action-btn" title="Ajouter aux destinataires email">📧</button>
+                      <button onclick="resendInvite('${u.email || ''}')" class="action-btn" title="Renvoyer Invitation">📩</button>
+                      <button onclick="editUser('${uid}')" class="action-btn" title="Modifier">✏️</button>
+                      <button onclick="deleteUser('${uid}')" class="action-btn delete" title="Supprimer">🗑️</button>
                     </div>
                 </div>`; 
-            d.appendChild(div); 
-        }); 
-        const totalRow = document.createElement("div"); totalRow.className = "total-row"; totalRow.innerHTML = `<span>TOTAL</span><span>${totalToPay.toFixed(2)} €</span>`; d.appendChild(totalRow); 
+          d.appendChild(div); 
+        }
+
+        eligibleEntries.forEach(e => renderUser(e.uid, e.u, true));
+
+        const totalRow = document.createElement("div"); 
+        totalRow.className = "total-row";
+        totalRow.innerHTML = `<span>Total à payer</span><span>${totalToPay.toFixed(2)} €</span>`;
+        d.appendChild(totalRow);
+
+        if(ineligibleEntries.length){
+          const sep = document.createElement("div");
+          sep.className = "users-sep";
+          sep.textContent = "Non comptés dans les primes";
+          d.appendChild(sep);
+          ineligibleEntries.forEach(e => renderUser(e.uid, e.u, false));
+        }
     }
 
     function setUserPrimeEligible(uid, isEligible){
       if(!isAdminUser()) return;
       const val = !!isEligible;
+      const prev = (allUsers && allUsers[uid]) ? (allUsers[uid].primeEligible !== false) : true;
+
+      try{
+        if(allUsers && allUsers[uid]) allUsers[uid].primeEligible = val;
+        renderAdminUsers();
+      }catch(e){}
+
       db.ref('users/' + uid + '/primeEligible').set(val).then(() => {
         try{ logAction('Équipe', `PrimeEligible ${uid} -> ${val}`); }catch(e){}
         try{ showToast(val ? '✅ Compte inclus dans les primes' : '🚫 Compte exclu des primes'); }catch(e){}
       }).catch(() => {
+        try{
+          if(allUsers && allUsers[uid]) allUsers[uid].primeEligible = prev;
+          renderAdminUsers();
+        }catch(e){}
         try{ showToast('Erreur mise à jour.'); }catch(e){}
       });
     }
+    window.setUserPrimeEligible = setUserPrimeEligible;
     window.setUserPrimeEligible = setUserPrimeEligible;
 
     // --- Archive mensuelle par équipier (Admin/Super Admin) ---

@@ -393,15 +393,25 @@
     
     <div id="tab-notifs" style="display:none;">
       <div class="admin-section" style="border-left:4px solid var(--primary);">
-        <h3 class="section-header-large">📧 Envoyer un email (1 personne)</h3>
+        <h3 class="section-header-large">📧 Envoyer un email (1 ou plusieurs personnes)</h3>
         <div style="font-size:11px; color:var(--text-muted); margin-bottom:12px;">
-          Sélectionne un membre et envoie-lui un message. Les notifications push sont désactivées.
+          Sélectionne un ou plusieurs membres et envoie-leur un message. Les notifications push sont désactivées.
         </div>
 
+        
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-          <select id="emailRecipient"></select>
+          <div>
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+              <input id="emailSearch" type="text" placeholder="Rechercher un membre..." style="flex:1; padding:10px 12px; border-radius:12px; border:1px solid rgba(148,163,184,.25); background:rgba(15,23,42,.35); color:var(--text); outline:none;">
+              <button class="btn" style="padding:8px 10px; font-size:12px;" onclick="selectAllEmailRecipients()">Tout</button>
+              <button class="btn" style="padding:8px 10px; font-size:12px;" onclick="clearEmailRecipients()">Aucun</button>
+            </div>
+            <select id="emailRecipient" multiple size="8" style="width:100%; padding:10px 12px; border-radius:12px; border:1px solid rgba(148,163,184,.25); background:rgba(15,23,42,.35); color:var(--text); outline:none;"></select>
+            <div id="emailSelectedCount" style="font-size:11px; color:var(--text-muted); margin-top:6px;">0 sélectionné</div>
+          </div>
           <input id="emailLink" type="text" placeholder="Lien (optionnel) ex: /index.html#dashboard">
         </div>
+
 
         <input id="emailSubject" type="text" placeholder="Sujet (ex: Info planning)" style="margin-top:10px;">
         <textarea id="emailBody" class="fb-input" style="height:110px;" placeholder="Message..."></textarea>

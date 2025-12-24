@@ -2048,3 +2048,14 @@ body.dark-mode .weekday-chip{
 .push-banner-actions{ display:flex; align-items:center; gap:10px; }
 .push-banner-actions .btn{ width:auto; padding:10px 14px; font-size:12px; }
 .push-banner-actions .icon-btn{ width:38px; height:38px; border-radius:12px; }
+
+
+/* Admin - séparation des utilisateurs non éligibles primes */
+.users-sep{
+  margin: 12px 0 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: .9;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
