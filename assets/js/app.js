@@ -15,31 +15,6 @@
     // --- Cloud Functions helper (envoi d'emails admin) ---
     function _uniq(arr){ return [...new Set(arr.filter(Boolean))]; }
 
-
-function _fnNormalizeCode(code){
-  const c = String(code || '').trim();
-  return c.startsWith('functions/') ? c.slice('functions/'.length) : c;
-}
-
-function _shouldTryNextRegion(err){
-  const code = _fnNormalizeCode(err && err.code ? err.code : '');
-  const msg = String(err && err.message ? err.message : '').toLowerCase();
-
-  // Errors we should NOT retry across regions (these are genuine functional errors)
-  const fatal = ['permission-denied','unauthenticated','invalid-argument','failed-precondition'];
-  if (fatal.some(k => code.includes(k))) return false;
-
-  // Retryable / "maybe wrong region" errors
-  const retryable = ['not-found','internal','unavailable','deadline-exceeded','unknown','cancelled','resource-exhausted'];
-  if (retryable.some(k => code.includes(k))) return true;
-
-  // Fallback on message heuristics
-  if (msg.includes('not found') || msg.includes('internal') || msg.includes('deadline') || msg.includes('unavailable')) return true;
-
-  return false;
-}
-
-
     async function _getFunctionsRegion(){
       if(_functionsRegionCache) return _functionsRegionCache;
       try{
@@ -90,8 +65,12 @@ function _shouldTryNextRegion(err){
           lastErr = err;
           const msg = (err && err.message) ? String(err.message) : '';
           const code = (err && err.code) ? String(err.code) : '';
-          // On essaie la prochaine région si l’erreur peut venir d’une mauvaise région / d’un souci transient
-          if(_shouldTryNextRegion(err)) continue;
+                    // si la fonction n’existe pas dans cette région, on essaye la suivante
+          if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
+          // erreurs transitoires (internal/unavailable/etc.) => on essaye une autre région
+          const transient = code.includes('internal') || code.includes('unavailable') || code.includes('deadline-exceeded') || code.includes('unknown');
+          if(transient) continue;
+          // sinon on stoppe
           break;
         }
       }
@@ -118,8 +97,10 @@ function _shouldTryNextRegion(err){
           lastErr = err;
           const msg = (err && err.message) ? String(err.message) : '';
           const code = (err && err.code) ? String(err.code) : '';
-          if(_shouldTryNextRegion(err)) continue;
-          break;
+          if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
+      const transient = code.includes('internal') || code.includes('unavailable') || code.includes('deadline-exceeded') || code.includes('unknown');
+      if(transient) continue;
+      break;
         }
       }
       throw lastErr || new Error("Échec d’appel sendEmailToUsers");
@@ -141,8 +122,10 @@ async function _callGetSmtpConfigStatus(){
       lastErr = err;
       const code = String((err && err.code) ? err.code : '');
       const msg = String((err && err.message) ? err.message : err);
-      if(_shouldTryNextRegion(err)) continue;
-          break;
+      if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
+      const transient = code.includes('internal') || code.includes('unavailable') || code.includes('deadline-exceeded') || code.includes('unknown');
+      if(transient) continue;
+      break;
     }
   }
   throw lastErr || new Error("Échec d’appel getSmtpConfigStatus");
@@ -164,8 +147,10 @@ async function _callSetSmtpConfig(data){
       lastErr = err;
       const code = String((err && err.code) ? err.code : '');
       const msg = String((err && err.message) ? err.message : err);
-      if(_shouldTryNextRegion(err)) continue;
-          break;
+      if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
+      const transient = code.includes('internal') || code.includes('unavailable') || code.includes('deadline-exceeded') || code.includes('unknown');
+      if(transient) continue;
+      break;
     }
   }
   throw lastErr || new Error("Échec d’appel setSmtpConfig");
@@ -187,8 +172,10 @@ async function _callTestSmtp(data){
       lastErr = err;
       const code = String((err && err.code) ? err.code : '');
       const msg = String((err && err.message) ? err.message : err);
-      if(_shouldTryNextRegion(err)) continue;
-          break;
+      if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
+      const transient = code.includes('internal') || code.includes('unavailable') || code.includes('deadline-exceeded') || code.includes('unknown');
+      if(transient) continue;
+      break;
     }
   }
   throw lastErr || new Error("Échec d’appel testSmtp");
@@ -220,14 +207,10 @@ async function _callTestSmtp(data){
         const results = [];
         for(const uid of uids){
           try{
-            const u = (typeof allUsers !== 'undefined' && allUsers && allUsers[uid]) ? (allUsers[uid] || {}) : {};
-            const email = (u && u.email) ? String(u.email).trim() : '';
-            const r = await _callSendEmailToUser({ uid, email, subject, body, link: link || '' });
+            const r = await _callSendEmailToUser({ uid, subject, body, link: link || '' });
             results.push({ uid, ...(r||{}) });
           }catch(err){
-            let _errMsg = String(err && err.message ? err.message : err);
-            try{ if(err && err.details){ const d = (typeof err.details==='string') ? err.details : (err.details.error || err.details.reason || JSON.stringify(err.details)); if(d) _errMsg += ' • ' + String(d); } }catch(e){}
-            results.push({ uid, ok:false, reason:'CALL_FAILED', errorCode: (err && err.code) ? String(err.code) : '', error: _errMsg });
+            results.push({ uid, ok:false, reason:'CALL_FAILED', errorCode: (err && err.code) ? String(err.code) : '', error: String(err && err.message ? err.message : err) });
           }
         }
         return { ok: true, results };
@@ -236,12 +219,7 @@ async function _callTestSmtp(data){
       try{
         let data = null;
         try{
-          const recipients = uids.map(uid => {
-          const u = (typeof allUsers !== 'undefined' && allUsers && allUsers[uid]) ? (allUsers[uid] || {}) : {};
-          const em = (u && u.email) ? String(u.email).trim() : '';
-          return { uid, email: em };
-        });
-          data = await _callSendEmailToUsers({ recipients, uids, subject, body, link: link || '' });
+          data = await _callSendEmailToUsers({ uids, subject, body, link: link || '' });
           // Si la function multi n'existe pas (ou renvoie EMAIL_NOT_CONFIGURED), on laisse data tel quel
         }catch(e){
           // fallback mono
@@ -255,17 +233,12 @@ async function _callTestSmtp(data){
         if(results.length){
           if(failCount === 0) showToast(`✅ Email(s) envoyé(s) (${okCount})`);
           else {
-            let extra = '';
-            try{
-              const firstFail = (results || []).find(r => r && r.ok === false);
-              if(firstFail){
-                const r = String(firstFail.reason || 'ECHEC');
-                const e = firstFail.error ? String(firstFail.error) : (firstFail.smtp && firstFail.smtp.message ? String(firstFail.smtp.message) : '');
-                extra = ` • ${r}${e ? ' — ' + e : ''}`;
-                if(extra.length > 180) extra = extra.slice(0, 180) + '…';
-              }
-            }catch(e){}
-            showToast(`⚠️ Email(s) envoyés: ${okCount} • échecs: ${failCount}${extra}`);
+            const firstFail = results.find(r => r && r.ok !== true) || null;
+            const extra = firstFail ? (firstFail.reason ? String(firstFail.reason) : '') : '';
+            const extra2 = firstFail ? (firstFail.errorCode ? String(firstFail.errorCode) : '') : '';
+            const extra3 = firstFail ? (firstFail.detail ? String(firstFail.detail) : '') : '';
+            const suffix = (extra || extra2 || extra3) ? (` • ${extra}${extra2 ? (' — ' + extra2) : ''}${extra3 ? (' — ' + extra3) : ''}`) : '';
+            showToast(`⚠️ Email(s) envoyés: ${okCount} • échecs: ${failCount}${suffix}`);
           }
         } else {
           const reason = data && (data.reason || data.error || data.message) ? String(data.reason || data.error || data.message) : 'Non envoyé';
@@ -291,13 +264,7 @@ async function _callTestSmtp(data){
         bodyEl.value = '';
       }catch(err){
         console.error(err);
-        let msg = (err && err.message) ? String(err.message) : 'Erreur envoi email (Functions).';
-        try{
-          if(err && err.details){
-            const d = (typeof err.details === 'string') ? err.details : (err.details.error || err.details.reason || JSON.stringify(err.details));
-            if(d) msg += ' • ' + String(d);
-          }
-        }catch(e){}
+        const msg = (err && err.message) ? err.message : 'Erreur envoi email (Functions).';
         showToast('Erreur: ' + msg);
       }finally{
         if(btn){ btn.disabled = false; btn.style.opacity = 1; }
