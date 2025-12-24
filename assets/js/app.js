@@ -199,7 +199,9 @@ async function _callTestSmtp(data){
             const r = await _callSendEmailToUser({ uid, subject, body, link: link || '' });
             results.push({ uid, ...(r||{}) });
           }catch(err){
-            results.push({ uid, ok:false, reason:'CALL_FAILED', errorCode: (err && err.code) ? String(err.code) : '', error: String(err && err.message ? err.message : err) });
+            let _errMsg = String(err && err.message ? err.message : err);
+            try{ if(err && err.details){ const d = (typeof err.details==='string') ? err.details : (err.details.error || err.details.reason || JSON.stringify(err.details)); if(d) _errMsg += ' • ' + String(d); } }catch(e){}
+            results.push({ uid, ok:false, reason:'CALL_FAILED', errorCode: (err && err.code) ? String(err.code) : '', error: _errMsg });
           }
         }
         return { ok: true, results };
@@ -246,7 +248,13 @@ async function _callTestSmtp(data){
         bodyEl.value = '';
       }catch(err){
         console.error(err);
-        const msg = (err && err.message) ? err.message : 'Erreur envoi email (Functions).';
+        let msg = (err && err.message) ? String(err.message) : 'Erreur envoi email (Functions).';
+        try{
+          if(err && err.details){
+            const d = (typeof err.details === 'string') ? err.details : (err.details.error || err.details.reason || JSON.stringify(err.details));
+            if(d) msg += ' • ' + String(d);
+          }
+        }catch(e){}
         showToast('Erreur: ' + msg);
       }finally{
         if(btn){ btn.disabled = false; btn.style.opacity = 1; }

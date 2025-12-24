@@ -47,7 +47,7 @@ function _readEnvSmtp() {
   const portRaw = process.env.SMTP_PORT ? String(process.env.SMTP_PORT).trim() : "";
   const user = process.env.SMTP_USER ? String(process.env.SMTP_USER).trim() : "";
   const pass = process.env.SMTP_PASS ? String(process.env.SMTP_PASS) : "";
-  const from = process.env.MAIL_FROM ? String(process.env.MAIL_FROM).trim() : "";
+  let from = process.env.MAIL_FROM ? String(process.env.MAIL_FROM).trim() : "";
   const secureRaw = process.env.SMTP_SECURE ? String(process.env.SMTP_SECURE).trim() : "";
   const port = portRaw ? Number(portRaw) : 0;
   const secure = secureRaw ? ["1","true","yes","y","on"].includes(secureRaw.toLowerCase()) : (port === 465);
@@ -60,7 +60,7 @@ if (user && String(user).toLowerCase().endsWith("@gmail.com")) {
   }
 }
 
-return { host, port, user, pass, from, secure };
+return _normalizeSmtpCfg({ host, port, user, pass, from, secure });
 }
 
 function _readFunctionsConfigSmtp() {
@@ -78,7 +78,7 @@ function _readFunctionsConfigSmtp() {
   const from = mailCfg.from ? String(mailCfg.from).trim() : "";
   const secure = smtpCfg.secure !== undefined ? !!smtpCfg.secure : (port === 465);
 
-  return { host, port, user, pass, from, secure };
+  return _normalizeSmtpCfg({ host, port, user, pass, from, secure });
 }
 
 function _validateSmtp(cfg) {
@@ -91,13 +91,60 @@ function _validateSmtp(cfg) {
   return missing;
 }
 
+function _normalizeFromForGmail(user, from) {
+  const u = String(user || "").trim();
+  let f = String(from || "").trim();
+  if (!u || !u.toLowerCase().endsWith("@gmail.com")) return f;
+
+  // If no FROM specified, default to the authenticated Gmail address.
+  if (!f) return u;
+
+  // If it's like "Name <email@...>", keep the name but force the email part to match the SMTP user.
+  const m = f.match(/^(.*)<([^>]+)>(.*)$/);
+  if (m) {
+    const name = String(m[1] || "").trim();
+    const emailInFrom = String(m[2] || "").trim();
+    if (emailInFrom.toLowerCase() !== u.toLowerCase()) {
+      return name ? `${name} <${u}>` : u;
+    }
+    return f;
+  }
+
+  // If FROM is a plain email and differs, force it to match the authenticated Gmail address.
+  if (f.includes("@") && f.toLowerCase() !== u.toLowerCase()) {
+    return u;
+  }
+
+  // If FROM is a name only, append the authenticated Gmail address.
+  if (!f.includes("@")) {
+    return `${f} <${u}>`;
+  }
+
+  return f;
+}
+
+function _normalizeSmtpCfg(cfg) {
+  if (!cfg) return cfg;
+  const out = {
+    host: cfg.host ? String(cfg.host).trim() : "",
+    port: cfg.port ? Number(cfg.port) : 0,
+    user: cfg.user ? String(cfg.user).trim() : "",
+    pass: cfg.pass ? String(cfg.pass) : "",
+    from: cfg.from ? String(cfg.from).trim() : "",
+    secure: cfg.secure !== undefined ? !!cfg.secure : (Number(cfg.port) === 465),
+  };
+  out.from = _normalizeFromForGmail(out.user, out.from);
+  return out;
+}
+
+
 async function loadSmtpConfig() {
   // Priorité: env > functions.config() > RTDB
   const envCfg = _readEnvSmtp();
-  if (_validateSmtp(envCfg).length === 0) return envCfg;
+  if (_validateSmtp(envCfg).length === 0) return _normalizeSmtpCfg(envCfg);
 
   const fcCfg = _readFunctionsConfigSmtp();
-  if (_validateSmtp(fcCfg).length === 0) return fcCfg;
+  if (_validateSmtp(fcCfg).length === 0) return _normalizeSmtpCfg(fcCfg);
 
   try {
     const snap = await admin.database().ref(SMTP_CONFIG_PATH).get();
@@ -109,7 +156,7 @@ async function loadSmtpConfig() {
     const pass = v.pass ? String(v.pass) : "";
     const from = v.from ? String(v.from).trim() : "";
     const secure = v.secure !== undefined ? !!v.secure : (port === 465);
-    return { host, port, user, pass, from, secure };
+    return _normalizeSmtpCfg({ host, port, user, pass, from, secure });
   } catch (e) {
     return null;
   }
@@ -244,6 +291,7 @@ async function normalizeUidOrEmail(id) {
  * Entrée: { uid, subject, body, link? }
  */
 exports.sendEmailToUser = functions.region(REGION).https.onCall(async (data, context) => {
+  try {
   await assertAdmin(context);
 
   const inputId = data && data.uid ? String(data.uid).trim() : "";
@@ -287,6 +335,14 @@ if (!uid) {
   } catch (e) {
     return { ok: false, reason: "SEND_FAILED", error: String(e && e.message ? e.message : e) };
   }
+
+  } catch (e) {
+    // Preserve explicit HttpsError codes; only wrap unexpected errors.
+    if (e instanceof functions.https.HttpsError) throw e;
+    const msg = String(e && e.message ? e.message : e);
+    functions.logger.error("sendEmailToUser: unexpected error", { error: msg });
+    throw new functions.https.HttpsError("internal", "INTERNAL", { error: msg });
+  }
 });
 
 /**
@@ -294,6 +350,7 @@ if (!uid) {
  * Entrée: { uids: string[], subject, body, link? }
  */
 exports.sendEmailToUsers = functions.region(REGION).https.onCall(async (data, context) => {
+  try {
   await assertAdmin(context);
 
   const uidsRaw = data && data.uids ? data.uids : [];
@@ -364,6 +421,14 @@ for (const uid of uids) {
   }
 
   return { ok: true, results };
+
+  } catch (e) {
+    // Preserve explicit HttpsError codes; only wrap unexpected errors.
+    if (e instanceof functions.https.HttpsError) throw e;
+    const msg = String(e && e.message ? e.message : e);
+    functions.logger.error("sendEmailToUsers: unexpected error", { error: msg });
+    throw new functions.https.HttpsError("internal", "INTERNAL", { error: msg });
+  }
 });
 
 
@@ -372,6 +437,7 @@ for (const uid of uids) {
  * Retour: { configured: boolean, missing?: string[], host?, port?, user?, from?, secure? }
  */
 exports.getSmtpConfigStatus = functions.region(REGION).https.onCall(async (data, context) => {
+  try {
   await assertAdmin(context);
   const cfg = await loadSmtpConfig();
   const missing = _validateSmtp(cfg || {});
@@ -386,6 +452,14 @@ exports.getSmtpConfigStatus = functions.region(REGION).https.onCall(async (data,
     from: cfg.from,
     secure: !!cfg.secure
   };
+
+  } catch (e) {
+    // Preserve explicit HttpsError codes; only wrap unexpected errors.
+    if (e instanceof functions.https.HttpsError) throw e;
+    const msg = String(e && e.message ? e.message : e);
+    functions.logger.error("getSmtpConfigStatus: unexpected error", { error: msg });
+    throw new functions.https.HttpsError("internal", "INTERNAL", { error: msg });
+  }
 });
 
 /**
@@ -393,6 +467,7 @@ exports.getSmtpConfigStatus = functions.region(REGION).https.onCall(async (data,
  * Entrée: { host, port, user, pass, from, secure? }
  */
 exports.setSmtpConfig = functions.region(REGION).https.onCall(async (data, context) => {
+  try {
   await assertAdmin(context);
 
   const host = data && data.host ? String(data.host).trim() : "";
@@ -410,6 +485,14 @@ exports.setSmtpConfig = functions.region(REGION).https.onCall(async (data, conte
 
   await admin.database().ref(SMTP_CONFIG_PATH).set(cfg);
   return { ok: true };
+
+  } catch (e) {
+    // Preserve explicit HttpsError codes; only wrap unexpected errors.
+    if (e instanceof functions.https.HttpsError) throw e;
+    const msg = String(e && e.message ? e.message : e);
+    functions.logger.error("setSmtpConfig: unexpected error", { error: msg });
+    throw new functions.https.HttpsError("internal", "INTERNAL", { error: msg });
+  }
 });
 
 /**
@@ -417,6 +500,7 @@ exports.setSmtpConfig = functions.region(REGION).https.onCall(async (data, conte
  * Entrée: { to? }
  */
 exports.testSmtp = functions.region(REGION).https.onCall(async (data, context) => {
+  try {
   await assertAdmin(context);
 
   let to = data && data.to ? String(data.to).trim() : "";
@@ -441,5 +525,13 @@ exports.testSmtp = functions.region(REGION).https.onCall(async (data, context) =
     return { ok: true, to, messageId: info && info.messageId ? info.messageId : null };
   } catch (e) {
     return { ok: false, reason: "SEND_FAILED", error: String(e && e.message ? e.message : e) };
+  }
+
+  } catch (e) {
+    // Preserve explicit HttpsError codes; only wrap unexpected errors.
+    if (e instanceof functions.https.HttpsError) throw e;
+    const msg = String(e && e.message ? e.message : e);
+    functions.logger.error("testSmtp: unexpected error", { error: msg });
+    throw new functions.https.HttpsError("internal", "INTERNAL", { error: msg });
   }
 });
