@@ -82,6 +82,8 @@
       const link = linkEl ? String(linkEl.value||'').trim() : '';
       const audience = audEl ? String(audEl.value||'all') : 'all';
 
+      const emailFallback = !!(document.getElementById('notifEmailFallback') && document.getElementById('notifEmailFallback').checked);
+
       if(!title || !body){
         showToast("Titre + message requis.");
         return;
@@ -91,12 +93,13 @@
       if(btn){ btn.disabled = true; btn.style.opacity = .7; }
 
       try{
-        const data = await _callSendPush({ title, body, link: link || '/index.html#dashboard', audience });
-        showToast(`✅ Notification envoyée (${data && data.sent != null ? data.sent : 'OK'})`);
+        const data = await _callSendPush({ title, body, link: link || '/index.html#dashboard', audience, emailFallback });
+        showToast(`✅ Push: ${data && data.sent != null ? data.sent : 'OK'}${(data && data.emailSent != null) ? (' | Email: ' + data.emailSent) : ''}`);
         // log RTDB (historique)
         try{
           await db.ref('notifications/sent').push({
             title, body, link: link || '/index.html#dashboard', audience,
+            emailFallback,
             by: (currentUser && currentUser.name) ? currentUser.name : 'Admin',
             uid: (currentUser && currentUser.uid) ? currentUser.uid : null,
             at: Date.now(),
@@ -370,10 +373,36 @@ let _objProgUnsub = null;
 
       async function _setupPushUI(){
         const btn = document.getElementById('enablePushBtn');
-        if(!btn) return;
+        const bell = document.getElementById('pushBellBtn');
+        const banner = document.getElementById('pushBanner');
+        const bannerDesc = document.getElementById('pushBannerDesc');
+        const bannerBtn = document.getElementById('pushBannerBtn');
+
+        // Helpers globaux (pour les onclick HTML)
+        window.enablePushNow = async () => {
+          try{
+            if(typeof window.__doEnablePush === 'function') return await window.__doEnablePush();
+            if(btn && typeof btn.click === 'function') return btn.click();
+          }catch(e){}
+          try{ showToast("Notifications indisponibles."); }catch(e){ try{ alert("Notifications indisponibles."); }catch(_){} }
+        };
+        window.dismissPushBanner = () => {
+          try{ localStorage.setItem('heiko_push_banner_dismissed', '1'); }catch(e){}
+          if(banner) banner.style.display = 'none';
+        };
+
+        function setBellEnabled(enabled){
+          if(!bell) return;
+          if(enabled) bell.classList.add('enabled');
+          else bell.classList.remove('enabled');
+        }
+
+        if(!btn && !bell && !banner) return;
 
         if(!_supportsPush()){
-          btn.style.display = 'none';
+          if(btn) btn.style.display = 'none';
+          if(bell) bell.style.display = 'none';
+          if(banner) banner.style.display = 'none';
           return;
         }
 
@@ -384,10 +413,45 @@ let _objProgUnsub = null;
         // Messaging instance (FCM)
         try{ _messaging = firebase.messaging(); }catch(e){ _messaging = null; }
 
-        // Affiche le bouton uniquement si on a un user connecté (uid) et un SW prêt
-        btn.style.display = (_swRegForPush && currentUser && currentUser.uid && _messaging) ? 'block' : 'none';
+        const canShow = !!(_swRegForPush && currentUser && currentUser.uid && _messaging);
+        if(btn) btn.style.display = canShow ? 'block' : 'none';
+        if(bell) bell.style.display = canShow ? 'inline-flex' : 'none';
 
-        btn.onclick = async () => {
+        // Statut (permission + token présent)
+        let hasToken = false;
+        if(canShow){
+          try{
+            const ts = await db.ref('fcmTokens/' + currentUser.uid).limitToLast(1).get();
+            hasToken = ts.exists();
+          }catch(e){ hasToken = false; }
+        }
+        const perm = (typeof Notification !== 'undefined') ? Notification.permission : 'default';
+        const isEnabled = (perm === 'granted' && hasToken);
+        setBellEnabled(isEnabled);
+
+        // Bannière d’aide (si pas encore activé)
+        let dismissed = false;
+        try{ dismissed = localStorage.getItem('heiko_push_banner_dismissed') === '1'; }catch(e){ dismissed = false; }
+
+        if(banner){
+          if(!dismissed && canShow && !isEnabled){
+            banner.style.display = 'flex';
+
+            // iOS/iPadOS : nécessite l'installation (PWA)
+            if(_isIOS() && !_isStandalonePWA()){
+              if(bannerDesc) bannerDesc.textContent = "Sur iPhone/iPad : ajoute d’abord l’app à l’écran d’accueil, puis active 🔔.";
+              if(bannerBtn) bannerBtn.style.display = 'none';
+            } else {
+              if(bannerDesc) bannerDesc.textContent = "Active les notifications pour recevoir les messages importants.";
+              if(bannerBtn) bannerBtn.style.display = 'inline-block';
+            }
+          } else {
+            banner.style.display = 'none';
+          }
+        }
+
+        // Flux d’activation (doit être déclenché par un clic utilisateur)
+        const doEnable = async () => {
           if(!currentUser || !currentUser.uid){
             showToast("Connecte-toi pour activer les notifications.");
             return;
@@ -402,11 +466,15 @@ let _objProgUnsub = null;
             return;
           }
 
-          // Demande d’autorisation (doit venir d’un clic)
-          let perm = "default";
-          try{ perm = await Notification.requestPermission(); }catch(e){ perm = "denied"; }
-          if(perm !== "granted"){
+          let perm2 = "default";
+          try{ perm2 = await Notification.requestPermission(); }catch(e){ perm2 = "denied"; }
+          if(perm2 !== "granted"){
+            // option : ne pas re-spammer si refus
+            try{ localStorage.setItem('heiko_push_banner_dismissed', '1'); }catch(e){}
+            try{ await db.ref('users/' + currentUser.uid).update({ pushEnabled: false, pushEnabledAt: null }); }catch(e){}
             showToast("Notifications refusées.");
+            if(banner) banner.style.display = 'none';
+            setBellEnabled(false);
             return;
           }
 
@@ -427,19 +495,29 @@ let _objProgUnsub = null;
               return;
             }
 
-            // Sauvegarde dans RTDB
+            // Sauvegarde dans RTDB (token par device)
             await db.ref('fcmTokens/' + currentUser.uid).push({
               token,
               createdAt: Date.now(),
               ua: navigator.userAgent
             });
 
+            // Marqueur simple côté user (utile pour fallback email)
+            try{ await db.ref('users/' + currentUser.uid).update({ pushEnabled: true, pushEnabledAt: Date.now() }); }catch(e){}
+
             showToast("Notifications activées ✅");
+            if(banner) banner.style.display = 'none';
+            setBellEnabled(true);
           }catch(err){
             console.error(err);
             showToast("Erreur notifications. Vérifie la clé VAPID et la config Firebase.");
           }
         };
+
+        if(btn) btn.onclick = doEnable;
+        if(bell) bell.onclick = doEnable;
+        if(bannerBtn) bannerBtn.onclick = doEnable;
+        window.__doEnablePush = doEnable;
 
         // Foreground messages (quand l’app est ouverte)
         try{
@@ -777,15 +855,22 @@ function renderMenuSitesPreview(){
              const def = { name: "Utilisateur", hours:35, role:'staff', email: user.email, status: 'pending' };
              db.ref('users/'+user.uid).set(def);
              currentUser = def;
-             try{ _setupPushUI(); }catch(e){}
           } else { 
              currentUser = val;
-             try{ _setupPushUI(); }catch(e){} 
+             if(!currentUser.email && user.email){
+               try{ db.ref('users/'+user.uid).update({ email: user.email }); }catch(e){}
+             }
              if(currentUser.status !== 'active') {
                  db.ref('users/'+user.uid).update({ status: 'active', lastLogin: Date.now() });
              }
           }
-          currentUser.uid = user.uid; currentUser.email = user.email;
+
+          // IMPORTANT: uid/email doivent être définis avant _setupPushUI() sinon le bouton 🔔 reste caché
+          currentUser.uid = user.uid;
+          currentUser.email = user.email;
+
+          try{ _setupPushUI(); }catch(e){}
+
           const newLogRef = db.ref("logs").push();
           newLogRef.set({ user: currentUser.name, action: "Connexion", type: "session", startTime: Date.now(), lastSeen: Date.now() });
           setInterval(() => { newLogRef.update({ lastSeen: Date.now() }); }, 60000);

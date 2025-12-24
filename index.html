@@ -151,10 +151,24 @@
           <span class="logout-icon" aria-hidden="true">🚪</span>
           <span class="logout-text">Déconnexion</span>
         </button>
+
+        <button class="icon-btn push-bell" id="pushBellBtn" onclick="enablePushNow()" style="display:none;" aria-label="Notifications">
+          🔔<span class="push-dot" id="pushBellDot" aria-hidden="true"></span>
+        </button>
               <button class="icon-btn" id="globalMenuBtn" onclick="toggleGlobalMenu()">☰</button>
       </div>
     </div>
 
+    <div id="pushBanner" class="push-banner" style="display:none;">
+      <div class="push-banner-text">
+        <div class="push-banner-title">🔔 Notifications</div>
+        <div class="push-banner-desc" id="pushBannerDesc">Active les notifications pour recevoir les messages importants.</div>
+      </div>
+      <div class="push-banner-actions">
+        <button class="btn" id="pushBannerBtn" onclick="enablePushNow()">Activer</button>
+        <button class="icon-btn" type="button" onclick="dismissPushBanner()" aria-label="Fermer">×</button>
+      </div>
+    </div>
 
     <!-- Global menu (all users) -->
     <div class="global-menu-backdrop" id="globalMenuBackdrop" onclick="toggleGlobalMenu(false)"></div>
@@ -405,7 +419,15 @@
           <input id="notifLink" type="text" placeholder="Lien (ex: /index.html#dashboard)">
         </div>
 
-        <input id="notifTitle" type="text" placeholder="Titre (ex: Nouveau palier ✅)">
+        <label class="check-label" style="margin-top:10px; display:inline-flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="notifEmailFallback">
+          <span>📧 Envoyer aussi par email si l’utilisateur n’a pas activé les notifications</span>
+        </label>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:6px;">
+          L’envoi email nécessite une configuration SMTP côté Cloud Functions (sinon ça n’envoie rien, mais ça ne bug pas).
+        </div>
+
+        <input id=\"notifTitle\" type="text" placeholder="Titre (ex: Nouveau palier ✅)">
         <textarea id="notifBody" class="fb-input" style="height:90px;" placeholder="Message..."></textarea>
 
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
