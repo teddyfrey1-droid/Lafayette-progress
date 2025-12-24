@@ -47,7 +47,7 @@ function _readEnvSmtp() {
   const portRaw = process.env.SMTP_PORT ? String(process.env.SMTP_PORT).trim() : "";
   const user = process.env.SMTP_USER ? String(process.env.SMTP_USER).trim() : "";
   const pass = process.env.SMTP_PASS ? String(process.env.SMTP_PASS) : "";
-  let from = process.env.MAIL_FROM ? String(process.env.MAIL_FROM).trim() : "";
+  const from = process.env.MAIL_FROM ? String(process.env.MAIL_FROM).trim() : "";
   const secureRaw = process.env.SMTP_SECURE ? String(process.env.SMTP_SECURE).trim() : "";
   const port = portRaw ? Number(portRaw) : 0;
   const secure = secureRaw ? ["1","true","yes","y","on"].includes(secureRaw.toLowerCase()) : (port === 465);
@@ -263,10 +263,26 @@ if (!uid) {
   const body = data && data.body ? String(data.body) : "";
   const link = data && data.link ? String(data.link) : "";
 
-  const userSnap = await admin.database().ref(`users/${uid}`).get();
-  const user = userSnap.exists() ? (userSnap.val() || {}) : {};
-  let to = user.email ? String(user.email).trim() : "";
+  // IMPORTANT: ne jamais lire tout `users/{uid}` (peut être énorme).
+  // On privilégie l'email fourni par le front, puis `users/{uid}/email`, puis Auth.
+  let to = "";
+  const emailFromClient = (data && data.email) ? String(data.email).trim() : "";
+  if (emailFromClient && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailFromClient)) {
+    to = emailFromClient;
+  }
+
   if (!to && norm && norm.email) { to = String(norm.email).trim(); }
+
+  if (!to) {
+    try {
+      const emailSnap = await admin.database().ref(`users/${uid}/email`).get();
+      if (emailSnap.exists() && emailSnap.val()) {
+        const e = String(emailSnap.val()).trim();
+        if (e) to = e;
+      }
+    } catch (e) {}
+  }
+
   if (!to) {
     to = await resolveUserEmail(uid);
   }
@@ -286,16 +302,22 @@ if (!uid) {
     });
     return { ok: true, to, messageId: info && info.messageId ? info.messageId : null };
   } catch (e) {
-    return { ok: false, reason: "SEND_FAILED", error: String(e && e.message ? e.message : e) };
+    return { ok: false, reason: "SEND_FAILED", error: String(e && e.message ? e.message : e), errorCode: (e && e.code) ? String(e.code) : "", detail: (e && (e.responseCode || e.command)) ? (`${e.responseCode||""} ${e.command||""}`).trim() : "" };
   }
+
   } catch (err) {
     console.error("sendEmailToUser fatal", err);
-    if (err && typeof err === 'object' && err.code && err.message) {
+    // Si c'est déjà une HttpsError, on la relance telle quelle
+    if (err && typeof err === "object" && err.code && err.message) {
       throw err;
     }
     const msg = String((err && err.message) ? err.message : err);
-    const stack = String((err && err.stack) ? err.stack : '');
-    throw new functions.https.HttpsError('internal', 'INTERNAL', { tag: "sendEmailToUser", message: msg, stack: stack.slice(0, 2000) });
+    const stack = String((err && err.stack) ? err.stack : "");
+    throw new functions.https.HttpsError("internal", "INTERNAL", {
+      fn: "sendEmailToUser",
+      message: msg,
+      stack: stack.slice(0, 2000)
+    });
   }
 });
 
@@ -338,15 +360,50 @@ const uids = Array.from(new Set(normList)); // dedupe
 
   const text = buildText(body, link);
 
-  // Lookup emails per-uid (avoid loading full /users tree which can be large)
+  // IMPORTANT: ne jamais lire tout `/users` (peut être énorme).
+  // Option: le front peut envoyer `recipients: [{uid,email}]` pour éviter tout lookup.
   const emailMap = {};
-  for (const uid of uids) {
-    try {
-      const e = await resolveUserEmail(uid);
-      if (e) emailMap[uid] = e;
-    } catch (e2) {
-      // ignore
+  const recipients = (data && Array.isArray(data.recipients)) ? data.recipients : [];
+  for (const r of recipients) {
+    const ru = r && r.uid ? String(r.uid).trim() : "";
+    const reml = r && r.email ? String(r.email).trim() : "";
+    if (ru && reml && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(reml)) {
+      emailMap[ru] = reml;
     }
+  }
+
+  const missing = [];
+  for (const uid of uids) {
+    if (emailMap[uid]) continue;
+    try {
+      const snap = await admin.database().ref(`users/${uid}/email`).get();
+      if (snap.exists() && snap.val()) {
+        const e = String(snap.val()).trim();
+        if (e) { emailMap[uid] = e; continue; }
+      }
+    } catch (e2) {}
+    missing.push(uid);
+  }
+
+  // Batch lookup in Auth for remaining missing emails (best effort)
+  if (missing.length) {
+    try {
+      const res = await admin.auth().getUsers(missing.map((u) => ({ uid: u })));
+      const updates = {};
+      for (const userRecord of (res.users || [])) {
+        if (userRecord && userRecord.uid && userRecord.email) {
+          const u = String(userRecord.uid).trim();
+          const e = String(userRecord.email).trim();
+          if (u && e) {
+            emailMap[u] = e;
+            updates[`users/${u}/email`] = e;
+          }
+        }
+      }
+      if (Object.keys(updates).length) {
+        try { await admin.database().ref().update(updates); } catch (e3) {}
+      }
+    } catch (e) {}
   }
 
   const results = [];
@@ -375,19 +432,25 @@ for (const uid of uids) {
       });
       results.push({ uid, ok: true, to, messageId: info && info.messageId ? info.messageId : null });
     } catch (e) {
-      results.push({ uid, ok: false, to, reason: "SEND_FAILED", error: String(e && e.message ? e.message : e) });
+      results.push({ uid, ok: false, to, reason: "SEND_FAILED", error: String(e && e.message ? e.message : e), errorCode: (e && e.code) ? String(e.code) : "", detail: (e && (e.responseCode || e.command)) ? (`${e.responseCode||""} ${e.command||""}`).trim() : "" });
     }
   }
 
   return { ok: true, results };
+
   } catch (err) {
     console.error("sendEmailToUsers fatal", err);
-    if (err && typeof err === 'object' && err.code && err.message) {
+    // Si c'est déjà une HttpsError, on la relance telle quelle
+    if (err && typeof err === "object" && err.code && err.message) {
       throw err;
     }
     const msg = String((err && err.message) ? err.message : err);
-    const stack = String((err && err.stack) ? err.stack : '');
-    throw new functions.https.HttpsError('internal', 'INTERNAL', { tag: "sendEmailToUsers", message: msg, stack: stack.slice(0, 2000) });
+    const stack = String((err && err.stack) ? err.stack : "");
+    throw new functions.https.HttpsError("internal", "INTERNAL", {
+      fn: "sendEmailToUsers",
+      message: msg,
+      stack: stack.slice(0, 2000)
+    });
   }
 });
 
@@ -465,6 +528,6 @@ exports.testSmtp = functions.region(REGION).https.onCall(async (data, context) =
     });
     return { ok: true, to, messageId: info && info.messageId ? info.messageId : null };
   } catch (e) {
-    return { ok: false, reason: "SEND_FAILED", error: String(e && e.message ? e.message : e) };
+    return { ok: false, reason: "SEND_FAILED", error: String(e && e.message ? e.message : e), errorCode: (e && e.code) ? String(e.code) : "", detail: (e && (e.responseCode || e.command)) ? (`${e.responseCode||""} ${e.command||""}`).trim() : "" };
   }
 });

@@ -65,11 +65,8 @@
           lastErr = err;
           const msg = (err && err.message) ? String(err.message) : '';
           const code = (err && err.code) ? String(err.code) : '';
-                    // si la fonction n’existe pas dans cette région, on essaye la suivante
+          // si la fonction n’existe pas dans cette région, on essaye la suivante
           if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
-          // erreurs transitoires (internal/unavailable/etc.) => on essaye une autre région
-          const transient = code.includes('internal') || code.includes('unavailable') || code.includes('deadline-exceeded') || code.includes('unknown');
-          if(transient) continue;
           // sinon on stoppe
           break;
         }
@@ -98,9 +95,7 @@
           const msg = (err && err.message) ? String(err.message) : '';
           const code = (err && err.code) ? String(err.code) : '';
           if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
-      const transient = code.includes('internal') || code.includes('unavailable') || code.includes('deadline-exceeded') || code.includes('unknown');
-      if(transient) continue;
-      break;
+          break;
         }
       }
       throw lastErr || new Error("Échec d’appel sendEmailToUsers");
@@ -123,8 +118,6 @@ async function _callGetSmtpConfigStatus(){
       const code = String((err && err.code) ? err.code : '');
       const msg = String((err && err.message) ? err.message : err);
       if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
-      const transient = code.includes('internal') || code.includes('unavailable') || code.includes('deadline-exceeded') || code.includes('unknown');
-      if(transient) continue;
       break;
     }
   }
@@ -148,8 +141,6 @@ async function _callSetSmtpConfig(data){
       const code = String((err && err.code) ? err.code : '');
       const msg = String((err && err.message) ? err.message : err);
       if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
-      const transient = code.includes('internal') || code.includes('unavailable') || code.includes('deadline-exceeded') || code.includes('unknown');
-      if(transient) continue;
       break;
     }
   }
@@ -173,8 +164,6 @@ async function _callTestSmtp(data){
       const code = String((err && err.code) ? err.code : '');
       const msg = String((err && err.message) ? err.message : err);
       if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
-      const transient = code.includes('internal') || code.includes('unavailable') || code.includes('deadline-exceeded') || code.includes('unknown');
-      if(transient) continue;
       break;
     }
   }
@@ -193,6 +182,12 @@ async function _callTestSmtp(data){
       if(!recEl || !subjEl || !bodyEl) return;
 
       const uids = Array.from(recEl.selectedOptions || []).map(o => String(o.value||'').trim()).filter(Boolean);
+      // si on a la map allUsers en mémoire, on envoie aussi les emails pour éviter les lookups côté Functions
+      const recipients = (typeof allUsers === 'object' && allUsers) ? uids.map(uid => {
+        const u = allUsers[uid] || null;
+        const email = (u && u.email) ? String(u.email).trim() : '';
+        return { uid, email };
+      }) : [];
       const subject = String(subjEl.value || '').trim();
       const body = String(bodyEl.value || '').trim();
       const link = linkEl ? String(linkEl.value || '').trim() : '';
@@ -207,10 +202,11 @@ async function _callTestSmtp(data){
         const results = [];
         for(const uid of uids){
           try{
-            const r = await _callSendEmailToUser({ uid, subject, body, link: link || '' });
+            const email = (typeof allUsers === 'object' && allUsers && allUsers[uid] && allUsers[uid].email) ? String(allUsers[uid].email).trim() : '';
+            const r = await _callSendEmailToUser({ uid, email, subject, body, link: link || '' });
             results.push({ uid, ...(r||{}) });
           }catch(err){
-            results.push({ uid, ok:false, reason:'CALL_FAILED', errorCode: (err && err.code) ? String(err.code) : '', error: String(err && err.message ? err.message : err) });
+            results.push({ uid, ok:false, reason:'CALL_FAILED', errorCode: (err && err.code) ? String(err.code) : '', detail: (err && err.details) ? JSON.stringify(err.details) : '', error: String(err && err.message ? err.message : err) });
           }
         }
         return { ok: true, results };
@@ -219,7 +215,7 @@ async function _callTestSmtp(data){
       try{
         let data = null;
         try{
-          data = await _callSendEmailToUsers({ uids, subject, body, link: link || '' });
+          data = await _callSendEmailToUsers({ uids, recipients, subject, body, link: link || '' });
           // Si la function multi n'existe pas (ou renvoie EMAIL_NOT_CONFIGURED), on laisse data tel quel
         }catch(e){
           // fallback mono
@@ -232,14 +228,7 @@ async function _callTestSmtp(data){
 
         if(results.length){
           if(failCount === 0) showToast(`✅ Email(s) envoyé(s) (${okCount})`);
-          else {
-            const firstFail = results.find(r => r && r.ok !== true) || null;
-            const extra = firstFail ? (firstFail.reason ? String(firstFail.reason) : '') : '';
-            const extra2 = firstFail ? (firstFail.errorCode ? String(firstFail.errorCode) : '') : '';
-            const extra3 = firstFail ? (firstFail.detail ? String(firstFail.detail) : '') : '';
-            const suffix = (extra || extra2 || extra3) ? (` • ${extra}${extra2 ? (' — ' + extra2) : ''}${extra3 ? (' — ' + extra3) : ''}`) : '';
-            showToast(`⚠️ Email(s) envoyés: ${okCount} • échecs: ${failCount}${suffix}`);
-          }
+          else showToast(`⚠️ Email(s) envoyés: ${okCount} • échecs: ${failCount}`);
         } else {
           const reason = data && (data.reason || data.error || data.message) ? String(data.reason || data.error || data.message) : 'Non envoyé';
           showToast('⚠️ ' + reason);
