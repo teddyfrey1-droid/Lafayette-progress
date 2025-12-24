@@ -196,7 +196,9 @@ async function _callTestSmtp(data){
         const results = [];
         for(const uid of uids){
           try{
-            const r = await _callSendEmailToUser({ uid, subject, body, link: link || '' });
+            const u = (typeof allUsers !== 'undefined' && allUsers && allUsers[uid]) ? (allUsers[uid] || {}) : {};
+            const email = (u && u.email) ? String(u.email).trim() : '';
+            const r = await _callSendEmailToUser({ uid, email, subject, body, link: link || '' });
             results.push({ uid, ...(r||{}) });
           }catch(err){
             let _errMsg = String(err && err.message ? err.message : err);

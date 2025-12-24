@@ -329,10 +329,26 @@ if (!uid) {
   const body = data && data.body ? String(data.body) : "";
   const link = data && data.link ? String(data.link) : "";
 
-  const userSnap = await admin.database().ref(`users/${uid}`).get();
-  const user = userSnap.exists() ? (userSnap.val() || {}) : {};
-  let to = user.email ? String(user.email).trim() : "";
-  if (!to && norm && norm.email) { to = String(norm.email).trim(); }
+  const directEmail = data && data.email ? String(data.email).trim() : "";
+  let to = isValidEmail(directEmail) ? directEmail : "";
+
+  // Fallback: try RTDB user record (if present)
+  if (!to) {
+    const userSnap = await admin.database().ref(`users/${uid}`).get();
+    const user = userSnap.exists() ? (userSnap.val() || {}) : {};
+    const dbEmail = user && user.email ? String(user.email).trim() : "";
+    if (isValidEmail(dbEmail)) to = dbEmail;
+  }
+
+  // Fallback: if caller passed an email as input and we resolved uid, keep that email as hint.
+  if (!to && norm && norm.email && isValidEmail(norm.email)) { to = String(norm.email).trim(); }
+
+  // Last resort: resolve via /users/{uid}/email then Auth (with cache)
+  if (!to) {
+    const resolved = await resolveUserEmail(uid);
+    if (isValidEmail(resolved)) to = resolved;
+  }
+
   if (!to) {
     to = await resolveUserEmail(uid);
   }
@@ -426,12 +442,20 @@ const uids = Array.from(new Set(normList)); // dedupe
 
   const text = buildText(body, link);
 
-  // On charge tous les users en 1 lecture pour éviter N requêtes
-  const usersSnap = await admin.database().ref("users").get();
-  const users = usersSnap.exists() ? (usersSnap.val() || {}) : {};
+  // Prefer emails coming from the client (UI already has them).
+  // If some are missing, then resolve from RTDB/Auth.
+  let emailMap = { ...(emailHints || {}) };
 
-  const resolvedMap = await resolveManyEmails(uids, users);
-  const emailMap = { ...(resolvedMap || {}), ...(emailHints || {}) };
+  const needResolve = Array.isArray(uids) && uids.some((uid) => !isValidEmail(emailMap[String(uid || '').trim()]));
+  if (needResolve) {
+    // On charge tous les users en 1 lecture pour éviter N requêtes
+    const usersSnap = await admin.database().ref("users").get();
+    const users = usersSnap.exists() ? (usersSnap.val() || {}) : {};
+
+    const resolvedMap = await resolveManyEmails(uids, users);
+    emailMap = { ...(resolvedMap || {}), ...(emailMap || {}) };
+  }
+
 
 const results = [];
 // Handle inputs that couldn't be resolved to an Auth user (typed emails not found, etc.)
