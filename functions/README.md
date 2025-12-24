@@ -2,6 +2,14 @@
 
 Cette version **n’utilise plus les notifications push** : les messages partent **par email**.
 
+## Pré-requis Node.js
+
+Les Cloud Functions de ce projet sont configurées pour un runtime **Node.js 20** (voir `functions/package.json`).
+
+Si tu installes les dépendances en local avec une autre version de Node, `npm` peut afficher un warning (EBADENGINE).
+
+
+
 ## 1) Déployer les Cloud Functions
 
 Depuis la racine du projet (là où se trouve `firebase.json`) :
