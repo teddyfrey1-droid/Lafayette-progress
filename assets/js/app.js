@@ -130,6 +130,20 @@
       }
     }
 
+    async function saveVapidKey(){
+      if(!isAdminUser()) return;
+      const el = document.getElementById('vapidKey');
+      if(!el) return;
+      const k = String(el.value||'').trim();
+      if(!k){ showToast("Clé VAPID vide."); return; }
+      try{
+        await db.ref('config/vapidKey').set(k);
+        showToast("✅ Clé VAPID enregistrée");
+      }catch(e){
+        showToast("Erreur sauvegarde VAPID.");
+      }
+    }
+
     async function saveNotifSettings(){
       if(!isAdminUser()) return;
       const s = {
@@ -162,6 +176,15 @@
       const rEl = document.getElementById('functionsRegion');
       if(rEl){
         _getFunctionsRegion().then(r => { if(r && !rEl.value) rEl.value = r; });
+      }
+
+      // vapid key (publique)
+      const vEl = document.getElementById('vapidKey');
+      if(vEl){
+        db.ref('config/vapidKey').get().then(s => {
+          const k = s.exists() ? String(s.val()||'').trim() : '';
+          if(k && !vEl.value) vEl.value = k;
+        }).catch(()=>{});
       }
     }
 
@@ -298,7 +321,11 @@ let _objProgUnsub = null;
       // Service worker
       if('serviceWorker' in navigator){
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('sw.js').catch(() => {});
+          // Pour Firebase Cloud Messaging, il est préférable d'avoir un SW nommé
+          // firebase-messaging-sw.js à la racine. Ici, il importe sw.js.
+          navigator.serviceWorker
+            .register('firebase-messaging-sw.js')
+            .catch(() => navigator.serviceWorker.register('sw.js').catch(() => {}));
       // --- PUSH NOTIFICATIONS (Firebase Cloud Messaging / Safari iOS PWA) ---
       // Requiert :
       // - PWA ajoutée à l’écran d’accueil (iOS/iPadOS)
@@ -319,8 +346,26 @@ let _objProgUnsub = null;
         return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (window.navigator && window.navigator.standalone === true);
       }
 
+      function _isIOS(){
+        const ua = navigator.userAgent || '';
+        // iPhone / iPad (y compris iPadOS qui se présente parfois comme Mac)
+        const iOS = /iPad|iPhone|iPod/.test(ua);
+        const iPadOS = (ua.includes('Mac') && 'ontouchend' in document);
+        return iOS || iPadOS;
+      }
+
       function _supportsPush(){
-        return ('Notification' in window) && ('serviceWorker' in navigator) && (typeof firebase !== 'undefined') && (firebase.messaging);
+        if(!('Notification' in window) || !('serviceWorker' in navigator)) return false;
+        // Push nécessite un contexte sécurisé (https ou localhost)
+        if(!(window.isSecureContext || location.hostname === 'localhost')) return false;
+        if(typeof firebase === 'undefined' || !firebase.messaging) return false;
+        // Certains navigateurs exposent isSupported()
+        try{
+          if(typeof firebase.messaging.isSupported === 'function'){
+            return !!firebase.messaging.isSupported();
+          }
+        }catch(e){}
+        return true;
       }
 
       async function _setupPushUI(){
@@ -347,8 +392,9 @@ let _objProgUnsub = null;
             showToast("Connecte-toi pour activer les notifications.");
             return;
           }
-          if(!_isStandalonePWA()){
-            showToast("Installe l’app (Ajouter à l’écran d’accueil) pour recevoir des notifications.");
+          // Sur iOS/iPadOS, les notifications web push exigent une PWA ajoutée à l’écran d’accueil.
+          if(_isIOS() && !_isStandalonePWA()){
+            showToast("Sur iPhone/iPad : ajoute l’app à l’écran d’accueil pour recevoir des notifications.");
             return;
           }
           if(!_swRegForPush){

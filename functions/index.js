@@ -12,7 +12,7 @@ admin.initializeApp();
  *  - body (string)
  *  - link (string, optionnel) ex: "/index.html#dashboard"
  */
-exports.sendPushToAll = functions.https.onCall(async (data, context) => {
+async function assertAdmin(context) {
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "Auth required");
   }
@@ -25,25 +25,53 @@ exports.sendPushToAll = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("permission-denied", "Admin only");
   }
 
-  const title = (data && data.title) ? String(data.title) : "Heiko";
-  const body = (data && data.body) ? String(data.body) : "";
-  const link = (data && data.link) ? String(data.link) : "/index.html#dashboard";
+  return { uid, role };
+}
 
-  // Récupère tous les tokens
-  const root = await admin.database().ref("fcmTokens").get();
-  const all = root.exists() ? root.val() : {};
-  const tokens = [];
+function normalizeAudience(aud) {
+  const v = String(aud || "all").trim().toLowerCase();
+  if (v === "admins") return "admins";
+  if (v === "team") return "team";
+  return "all";
+}
 
-  Object.keys(all || {}).forEach(u => {
-    const userTokens = all[u] || {};
-    Object.keys(userTokens).forEach(k => {
+function isAdminRole(role) {
+  const r = String(role || "").toLowerCase();
+  return r === "admin" || r === "superadmin";
+}
+
+async function collectTokensByAudience(audience) {
+  // tokens: /fcmTokens/{uid}/{pushId} = { token, ... }
+  const [tokensSnap, usersSnap] = await Promise.all([
+    admin.database().ref("fcmTokens").get(),
+    admin.database().ref("users").get(),
+  ]);
+
+  const allTokens = tokensSnap.exists() ? (tokensSnap.val() || {}) : {};
+  const users = usersSnap.exists() ? (usersSnap.val() || {}) : {};
+
+  const out = [];
+  Object.keys(allTokens || {}).forEach((uid) => {
+    const role = users && users[uid] ? users[uid].role : "";
+    const admin = isAdminRole(role);
+
+    if (audience === "admins" && !admin) return;
+    if (audience === "team" && admin) return;
+
+    const userTokens = allTokens[uid] || {};
+    Object.keys(userTokens).forEach((k) => {
       const t = userTokens[k] && userTokens[k].token;
-      if (t && typeof t === "string") tokens.push(t);
+      if (t && typeof t === "string") out.push(t);
     });
   });
 
+  return out;
+}
+
+async function sendMulticast({ title, body, link, audience }) {
+  const tokens = await collectTokensByAudience(audience);
   if (!tokens.length) {
-    return { ok: false, sent: 0, reason: "No tokens" };
+    return { ok: false, sent: 0, failed: 0, total: 0, reason: "No tokens" };
   }
 
   // Envoi par batch (FCM limite 500 tokens / multicast)
@@ -57,20 +85,41 @@ exports.sendPushToAll = functions.https.onCall(async (data, context) => {
     const message = {
       tokens: chunk,
       notification: { title, body },
+      data: { link: String(link || "/index.html#dashboard") },
       webpush: {
-        fcmOptions: { link }
-      }
+        fcmOptions: { link: String(link || "/index.html#dashboard") },
+      },
     };
 
     const res = await admin.messaging().sendEachForMulticast(message);
     sent += res.successCount;
     failed += res.failureCount;
-
-    // Optionnel: nettoyage tokens invalides (désactivé pour éviter toute suppression involontaire)
-    // res.responses.forEach((r, idx) => {
-    //   if (!r.success) console.log("FCM error", r.error && r.error.code, chunk[idx]);
-    // });
   }
 
-  return { ok: true, sent, failed, total: tokens.length };
+  return { ok: true, sent, failed, total: tokens.length, audience };
+}
+
+/**
+ * Callable utilisé par le front: sendPush
+ * - title (string)
+ * - body (string)
+ * - link (string)
+ * - audience (all|team|admins)
+ */
+exports.sendPush = functions.https.onCall(async (data, context) => {
+  await assertAdmin(context);
+  const title = (data && data.title) ? String(data.title) : "Heiko";
+  const body = (data && data.body) ? String(data.body) : "";
+  const link = (data && data.link) ? String(data.link) : "/index.html#dashboard";
+  const audience = normalizeAudience(data && data.audience);
+  return await sendMulticast({ title, body, link, audience });
+});
+
+// Compat: ancien nom (ou usage direct)
+exports.sendPushToAll = functions.https.onCall(async (data, context) => {
+  await assertAdmin(context);
+  const title = (data && data.title) ? String(data.title) : "Heiko";
+  const body = (data && data.body) ? String(data.body) : "";
+  const link = (data && data.link) ? String(data.link) : "/index.html#dashboard";
+  return await sendMulticast({ title, body, link, audience: "all" });
 });
