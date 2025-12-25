@@ -47,7 +47,7 @@ function _readEnvSmtp() {
   const portRaw = process.env.SMTP_PORT ? String(process.env.SMTP_PORT).trim() : "";
   const user = process.env.SMTP_USER ? String(process.env.SMTP_USER).trim() : "";
   const pass = process.env.SMTP_PASS ? String(process.env.SMTP_PASS) : "";
-  const from = process.env.MAIL_FROM ? String(process.env.MAIL_FROM).trim() : "";
+  let from = process.env.MAIL_FROM ? String(process.env.MAIL_FROM).trim() : "";
   const secureRaw = process.env.SMTP_SECURE ? String(process.env.SMTP_SECURE).trim() : "";
   const port = portRaw ? Number(portRaw) : 0;
   const secure = secureRaw ? ["1","true","yes","y","on"].includes(secureRaw.toLowerCase()) : (port === 465);
@@ -247,6 +247,8 @@ exports.sendEmailToUser = functions.region(REGION).https.onCall(async (data, con
   try {
   await assertAdmin(context);
 
+  console.log("sendEmailToUser called", { callerUid: context.auth.uid, target: (data&&data.uid)?String(data.uid):"" });
+
   const inputId = data && data.uid ? String(data.uid).trim() : "";
 if (!inputId) {
   throw new functions.https.HttpsError("invalid-argument", "uid required");
@@ -308,7 +310,7 @@ if (!uid) {
   } catch (err) {
     console.error("sendEmailToUser fatal", err);
     // Si c'est déjà une HttpsError, on la relance telle quelle
-    if (err && typeof err === "object" && err.code && err.message) {
+    if (err instanceof functions.https.HttpsError) {
       throw err;
     }
     const msg = String((err && err.message) ? err.message : err);
@@ -328,6 +330,8 @@ if (!uid) {
 exports.sendEmailToUsers = functions.region(REGION).https.onCall(async (data, context) => {
   try {
   await assertAdmin(context);
+
+  console.log("sendEmailToUsers called", { callerUid: context.auth.uid, uidsLen: Array.isArray(data && data.uids) ? data.uids.length : 0 });
 
   const uidsRaw = data && data.uids ? data.uids : [];
 const inputs = Array.isArray(uidsRaw)
@@ -441,7 +445,7 @@ for (const uid of uids) {
   } catch (err) {
     console.error("sendEmailToUsers fatal", err);
     // Si c'est déjà une HttpsError, on la relance telle quelle
-    if (err && typeof err === "object" && err.code && err.message) {
+    if (err instanceof functions.https.HttpsError) {
       throw err;
     }
     const msg = String((err && err.message) ? err.message : err);
