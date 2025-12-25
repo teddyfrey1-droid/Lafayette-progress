@@ -10,6 +10,9 @@ const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
 // Région par défaut (doit correspondre au front)
 const REGION = "us-central1";
 
+// DEBUG email
+const EMAIL_DEBUG_VERSION = "email-debug-v10";
+
 // SMTP configuré dans RTDB (évite la CLI)
 const SMTP_CONFIG_PATH = "configPrivate/smtp";
 
@@ -51,17 +54,16 @@ function _readEnvSmtp() {
   const secureRaw = process.env.SMTP_SECURE ? String(process.env.SMTP_SECURE).trim() : "";
   const port = portRaw ? Number(portRaw) : 0;
   const secure = secureRaw ? ["1","true","yes","y","on"].includes(secureRaw.toLowerCase()) : (port === 465);
-  
   // Gmail SMTP tends to reject a FROM address that doesn't match the authenticated account.
-  // If user is a gmail account, force the email part of FROM to be the SMTP user.
-  if (user && String(user).toLowerCase().endsWith("@gmail.com")) {
-    const u = String(user).trim();
-    if (!from || !String(from).includes(u)) {
-      from = u;
-    }
+// If user is a gmail account, force the email part of FROM to be the SMTP user.
+if (user && String(user).toLowerCase().endsWith("@gmail.com")) {
+  const u = String(user).trim();
+  if (!from || !String(from).includes(u)) {
+    from = u;
   }
+}
 
-  return { host, port, user, pass, from, secure };
+return { host, port, user, pass, from, secure };
 }
 
 function _readFunctionsConfigSmtp() {
@@ -108,26 +110,16 @@ async function loadSmtpConfig() {
     const port = v.port ? Number(v.port) : 0;
     const user = v.user ? String(v.user).trim() : "";
     const pass = v.pass ? String(v.pass) : "";
-    let from = v.from ? String(v.from).trim() : "";
+    const from = v.from ? String(v.from).trim() : "";
     const secure = v.secure !== undefined ? !!v.secure : (port === 465);
-    
-    // CORRECTION CRITIQUE : Si Gmail, forcer le FROM à correspondre au user
-    if (user && String(user).toLowerCase().endsWith("@gmail.com")) {
-      const u = String(user).trim();
-      if (!from || !String(from).includes(u)) {
-        from = u;
-      }
-    }
-    
     return { host, port, user, pass, from, secure };
   } catch (e) {
-    console.error("Error loading SMTP config from RTDB:", e);
     return null;
   }
 }
 
 function makeTransport(cfg) {
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     host: cfg.host,
     port: cfg.port,
     secure: !!cfg.secure,
@@ -150,6 +142,7 @@ async function getTransportOrThrow() {
   return { cfg, transport };
 }
 
+
 function safeSubject(s) {
   const str = String(s || "Message").trim();
   if (!str) return "Message";
@@ -165,56 +158,48 @@ function buildText(body, link) {
 async function resolveUserEmail(uid) {
   const u = String(uid || "").trim();
   if (!u) return "";
-  
-  console.log(`Resolving email for uid: ${u}`);
-  
   // 1) RTDB
   try {
     const snap = await admin.database().ref(`users/${u}/email`).get();
     if (snap.exists() && snap.val()) {
       const e = String(snap.val()).trim();
-      if (e) {
-        console.log(`Email found in RTDB: ${e}`);
-        return e;
-      }
+      if (e) return e;
     }
-  } catch (e) {
-    console.error(`Error reading email from RTDB for ${u}:`, e);
-  }
+  } catch (e) {}
 
   // 2) Firebase Auth
   try {
     const rec = await admin.auth().getUser(u);
     const e = rec && rec.email ? String(rec.email).trim() : "";
     if (e) {
-      console.log(`Email found in Auth: ${e}`);
       // Cache best-effort into RTDB
-      try { 
-        await admin.database().ref(`users/${u}/email`).set(e); 
-        console.log(`Cached email in RTDB for ${u}`);
-      } catch (e2) {
-        console.error(`Error caching email in RTDB for ${u}:`, e2);
-      }
+      try { await admin.database().ref(`users/${u}/email`).set(e); } catch (e2) {}
       return e;
     }
-  } catch (e) {
-    console.error(`Error reading email from Auth for ${u}:`, e);
-  }
+  } catch (e) {}
 
-  console.log(`No email found for uid: ${u}`);
   return "";
 }
 
-async function resolveManyEmails(uids) {
+async function resolveManyEmails(uids, usersCache) {
   const map = {};
-  
-  console.log(`Resolving emails for ${uids.length} users`);
-  
-  // Batch lookup in Auth
+  const missing = [];
+
+  const list = Array.isArray(uids) ? uids : [];
+  for (const uid of list) {
+    const u = String(uid || "").trim();
+    if (!u) continue;
+    const cached = usersCache && usersCache[u] && usersCache[u].email ? String(usersCache[u].email).trim() : "";
+    if (cached) map[u] = cached;
+    else missing.push(u);
+  }
+
+  if (!missing.length) return map;
+
+  // Batch lookup in Auth for missing emails
   try {
-    const res = await admin.auth().getUsers(uids.map((uid) => ({ uid })));
+    const res = await admin.auth().getUsers(missing.map((uid) => ({ uid })));
     const updates = {};
-    
     for (const userRecord of (res.users || [])) {
       if (userRecord && userRecord.uid && userRecord.email) {
         const u = String(userRecord.uid).trim();
@@ -222,26 +207,21 @@ async function resolveManyEmails(uids) {
         if (u && e) {
           map[u] = e;
           updates[`users/${u}/email`] = e;
-          console.log(`Resolved email for ${u}: ${e}`);
+          if (usersCache) usersCache[u] = { ...(usersCache[u] || {}), email: e };
         }
       }
     }
-    
     // Best-effort cache write (ignore errors)
     if (Object.keys(updates).length) {
-      try { 
-        await admin.database().ref().update(updates); 
-        console.log(`Cached ${Object.keys(updates).length} emails in RTDB`);
-      } catch (e3) {
-        console.error("Error caching emails in RTDB:", e3);
-      }
+      try { await admin.database().ref().update(updates); } catch (e3) {}
     }
   } catch (e) {
-    console.error("Error in batch email resolution:", e);
+    // ignore, map will just not contain these uids
   }
 
   return map;
 }
+
 
 async function normalizeUidOrEmail(id) {
   const raw = String(id || "").trim();
@@ -251,12 +231,8 @@ async function normalizeUidOrEmail(id) {
   if (raw.includes("@")) {
     try {
       const ur = await admin.auth().getUserByEmail(raw);
-      return { 
-        uid: ur && ur.uid ? String(ur.uid).trim() : "", 
-        email: ur && ur.email ? String(ur.email).trim() : String(raw).trim() 
-      };
+      return { uid: ur && ur.uid ? String(ur.uid).trim() : "", email: ur && ur.email ? String(ur.email).trim() : String(raw).trim() };
     } catch (e) {
-      console.error(`Error resolving email ${raw} to uid:`, e);
       return { uid: "", email: "", error: String(e && e.message ? e.message : e) };
     }
   }
@@ -264,18 +240,21 @@ async function normalizeUidOrEmail(id) {
   return { uid: raw, email: "" };
 }
 
+
+
 /**
  * Envoi EMAIL vers 1 utilisateur (par uid) — réservé admin/superadmin
- * Entrée: { uid, subject, body, link?, email? }
+ * Entrée: { uid, subject, body, link? }
  */
 exports.sendEmailToUser = functions.region(REGION).https.onCall(async (data, context) => {
+  const VERSION = "email-debug-v10";
+  console.log(`[sendEmailToUser ${VERSION}] call`, {
+    hasAuth: !!(context && context.auth),
+    authUid: context && context.auth ? context.auth.uid : null,
+  });
+
   try {
     await assertAdmin(context);
-
-    console.log("sendEmailToUser called", { 
-      callerUid: context.auth.uid, 
-      target: (data&&data.uid)?String(data.uid):"" 
-    });
 
     const inputId = data && data.uid ? String(data.uid).trim() : "";
     if (!inputId) {
@@ -286,45 +265,40 @@ exports.sendEmailToUser = functions.region(REGION).https.onCall(async (data, con
     const uid = norm.uid;
     if (!uid) {
       // if user typed an email but it's not an Auth user
-      console.error("No uid found for input:", inputId);
-      return { ok: false, reason: "NO_USER", error: norm.error || "User not found" };
+      return { ok: false, version: VERSION, reason: "NO_USER", error: norm.error || "User not found" };
     }
 
     const subject = safeSubject(data && data.subject ? data.subject : "Message");
     const body = data && data.body ? String(data.body) : "";
     const link = data && data.link ? String(data.link) : "";
 
-    // PRIORITÉ: email fourni par le client > email résolu
     let to = "";
-    const emailFromClient = (data && data.email) ? String(data.email).trim() : "";
-    if (emailFromClient && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailFromClient)) {
-      to = emailFromClient;
-      console.log(`Using email from client: ${to}`);
+    // 1) RTDB (léger) : users/{uid}/email
+    try {
+      const emailSnap = await admin.database().ref(`users/${uid}/email`).get();
+      if (emailSnap.exists()) {
+        to = String(emailSnap.val() || "").trim();
+      }
+    } catch (e) {
+      // ignore
     }
 
-    if (!to && norm && norm.email) { 
-      to = String(norm.email).trim(); 
-      console.log(`Using email from normalized input: ${to}`);
+    // 2) email fourni par normalizeUidOrEmail (si input était un email)
+    if (!to && norm && norm.email) {
+      to = String(norm.email).trim();
     }
 
+    // 3) Auth (source de vérité)
     if (!to) {
       to = await resolveUserEmail(uid);
     }
-    
-    if (!to) {
-      console.error(`No email found for uid: ${uid}`);
-      return { ok: false, reason: "NO_EMAIL" };
-    }
+
+    if (!to) return { ok: false, version: VERSION, reason: "NO_EMAIL" };
 
     const { cfg, transport } = await getTransportOrThrow();
-    if (!transport || !cfg) {
-      console.error("Email transport not configured");
-      return { ok: false, reason: "EMAIL_NOT_CONFIGURED" };
-    }
+    if (!transport || !cfg) return { ok: false, version: VERSION, reason: "EMAIL_NOT_CONFIGURED" };
 
     const text = buildText(body, link);
-
-    console.log(`Sending email to ${to} with subject: ${subject}`);
 
     try {
       const info = await transport.sendMail({
@@ -333,71 +307,54 @@ exports.sendEmailToUser = functions.region(REGION).https.onCall(async (data, con
         subject,
         text,
       });
-      console.log(`Email sent successfully to ${to}:`, info.messageId);
-      return { ok: true, to, messageId: info && info.messageId ? info.messageId : null };
+      return { ok: true, version: VERSION, to, messageId: info && info.messageId ? info.messageId : null };
     } catch (e) {
-      console.error(`Failed to send email to ${to}:`, e);
-      return { 
-        ok: false, 
-        reason: "SEND_FAILED", 
-        error: String(e && e.message ? e.message : e), 
-        errorCode: (e && e.code) ? String(e.code) : "", 
-        detail: (e && (e.responseCode || e.command)) ? (`${e.responseCode||""} ${e.command||""}`).trim() : "" 
-      };
+      console.error(`[sendEmailToUser ${VERSION}] sendMail failed`, e);
+      return { ok: false, version: VERSION, reason: "SEND_FAILED", error: String(e && e.message ? e.message : e) };
     }
-
   } catch (err) {
-    console.error("sendEmailToUser fatal error:", err);
-    // Si c'est déjà une HttpsError, on la relance telle quelle
-    if (err instanceof functions.https.HttpsError) {
-      throw err;
-    }
-    const msg = String((err && err.message) ? err.message : err);
-    const stack = String((err && err.stack) ? err.stack : "");
-    throw new functions.https.HttpsError("internal", "INTERNAL", {
-      fn: "sendEmailToUser",
-      message: msg,
-      stack: stack.slice(0, 2000)
+    console.error(`[sendEmailToUser ${VERSION}] crashed`, err);
+    if (err instanceof functions.https.HttpsError) throw err;
+    throw new functions.https.HttpsError("internal", "sendEmailToUser crashed", {
+      version: VERSION,
+      message: err && err.message ? String(err.message) : String(err),
+      stack: err && err.stack ? String(err.stack) : null,
     });
   }
 });
 
-/**
- * Envoi EMAIL vers plusieurs utilisateurs (uids[]) — réservé admin/superadmin
- * Entrée: { uids: string[], subject, body, link?, recipients?: [{uid, email}] }
- */
 exports.sendEmailToUsers = functions.region(REGION).https.onCall(async (data, context) => {
+  const VERSION = "email-debug-v10";
+  console.log(`[sendEmailToUsers ${VERSION}] call`, {
+    hasAuth: !!(context && context.auth),
+    authUid: context && context.auth ? context.auth.uid : null,
+    uidsCount: data && Array.isArray(data.uids) ? data.uids.length : null,
+  });
+
   try {
     await assertAdmin(context);
-
-    console.log("sendEmailToUsers called", { 
-      callerUid: context.auth.uid, 
-      uidsLen: Array.isArray(data && data.uids) ? data.uids.length : 0 
-    });
 
     const uidsRaw = data && data.uids ? data.uids : [];
     const inputs = Array.isArray(uidsRaw)
       ? uidsRaw.map((u) => String(u || "").trim()).filter(Boolean)
       : [];
-    
+
     if (!inputs.length) {
       throw new functions.https.HttpsError("invalid-argument", "uids required");
     }
 
-    // Normalize (uids or emails) -> uids
+    // Normalise (uid ou email tapé)
     const normList = [];
     const inputToUid = {};
-    
     for (const id of inputs) {
       const n = await normalizeUidOrEmail(id);
       if (n && n.uid) {
-        normList.push(n.uid);
-        inputToUid[id] = n.uid;
+        normList.push(String(n.uid));
+        inputToUid[id] = String(n.uid);
       } else {
         inputToUid[id] = "";
       }
     }
-    
     const uids = Array.from(new Set(normList)); // dedupe
 
     const subject = safeSubject(data && data.subject ? data.subject : "Message");
@@ -405,37 +362,13 @@ exports.sendEmailToUsers = functions.region(REGION).https.onCall(async (data, co
     const link = data && data.link ? String(data.link) : "";
 
     const { cfg, transport } = await getTransportOrThrow();
-    if (!transport || !cfg) {
-      console.error("Email transport not configured");
-      return { ok: false, reason: "EMAIL_NOT_CONFIGURED", results: [] };
-    }
+    if (!transport || !cfg) return { ok: false, version: VERSION, reason: "EMAIL_NOT_CONFIGURED", results: [] };
 
     const text = buildText(body, link);
 
-    // Construire emailMap depuis recipients (priorité) puis résolution batch
-    const emailMap = {};
-    const recipients = (data && Array.isArray(data.recipients)) ? data.recipients : [];
-    
-    for (const r of recipients) {
-      const ru = r && r.uid ? String(r.uid).trim() : "";
-      const reml = r && r.email ? String(r.email).trim() : "";
-      if (ru && reml && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(reml)) {
-        emailMap[ru] = reml;
-        console.log(`Using email from recipients for ${ru}: ${reml}`);
-      }
-    }
-
-    // Résoudre les emails manquants en batch
-    const missing = uids.filter(uid => !emailMap[uid]);
-    if (missing.length) {
-      console.log(`Resolving ${missing.length} missing emails`);
-      const resolved = await resolveManyEmails(missing);
-      Object.assign(emailMap, resolved);
-    }
-
     const results = [];
-    
-    // Handle inputs that couldn't be resolved to an Auth user
+
+    // inputs non résolus (emails inconnus, etc.)
     for (const id of inputs) {
       const u = inputToUid[id];
       if (!u) {
@@ -443,17 +376,35 @@ exports.sendEmailToUsers = functions.region(REGION).https.onCall(async (data, co
       }
     }
 
-    // Envoyer les emails
     for (const uid of uids) {
-      const to = emailMap[uid] ? String(emailMap[uid]).trim() : "";
-      
+      let to = "";
+
+      // 1) RTDB (léger) : users/{uid}/email
+      try {
+        const emailSnap = await admin.database().ref(`users/${uid}/email`).get();
+        if (emailSnap.exists()) {
+          to = String(emailSnap.val() || "").trim();
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      // 2) Auth (source de vérité) — fallback
       if (!to) {
-        console.error(`No email found for uid: ${uid}`);
+        try {
+          const user = await admin.auth().getUser(uid);
+          if (user && user.email) {
+            to = String(user.email).trim();
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      if (!to) {
         results.push({ uid, ok: false, reason: "NO_EMAIL" });
         continue;
       }
-
-      console.log(`Sending email to ${to} for uid ${uid}`);
 
       try {
         const info = await transport.sendMail({
@@ -462,49 +413,25 @@ exports.sendEmailToUsers = functions.region(REGION).https.onCall(async (data, co
           subject,
           text,
         });
-        console.log(`Email sent successfully to ${to} (uid: ${uid}):`, info.messageId);
-        results.push({ 
-          uid, 
-          ok: true, 
-          to, 
-          messageId: info && info.messageId ? info.messageId : null 
-        });
+        results.push({ uid, ok: true, to, messageId: info && info.messageId ? info.messageId : null });
       } catch (e) {
-        console.error(`Failed to send email to ${to} (uid: ${uid}):`, e);
-        results.push({ 
-          uid, 
-          ok: false, 
-          to, 
-          reason: "SEND_FAILED", 
-          error: String(e && e.message ? e.message : e), 
-          errorCode: (e && e.code) ? String(e.code) : "", 
-          detail: (e && (e.responseCode || e.command)) ? (`${e.responseCode||""} ${e.command||""}`).trim() : "" 
-        });
+        console.error(`[sendEmailToUsers ${VERSION}] sendMail failed`, { uid, to }, e);
+        results.push({ uid, ok: false, to, reason: "SEND_FAILED", error: String(e && e.message ? e.message : e) });
       }
     }
 
-    console.log(`Batch email results: ${results.filter(r => r.ok).length}/${results.length} successful`);
-    return { ok: true, results };
-
+    return { ok: true, version: VERSION, results };
   } catch (err) {
-    console.error("sendEmailToUsers fatal error:", err);
-    if (err instanceof functions.https.HttpsError) {
-      throw err;
-    }
-    const msg = String((err && err.message) ? err.message : err);
-    const stack = String((err && err.stack) ? err.stack : "");
-    throw new functions.https.HttpsError("internal", "INTERNAL", {
-      fn: "sendEmailToUsers",
-      message: msg,
-      stack: stack.slice(0, 2000)
+    console.error(`[sendEmailToUsers ${VERSION}] crashed`, err);
+    if (err instanceof functions.https.HttpsError) throw err;
+    throw new functions.https.HttpsError("internal", "sendEmailToUsers crashed", {
+      version: VERSION,
+      message: err && err.message ? String(err.message) : String(err),
+      stack: err && err.stack ? String(err.stack) : null,
     });
   }
 });
 
-/**
- * Lecture statut SMTP (sans renvoyer le mot de passe)
- * Retour: { configured: boolean, missing?: string[], host?, port?, user?, from?, secure? }
- */
 exports.getSmtpConfigStatus = functions.region(REGION).https.onCall(async (data, context) => {
   await assertAdmin(context);
   const cfg = await loadSmtpConfig();
@@ -533,17 +460,8 @@ exports.setSmtpConfig = functions.region(REGION).https.onCall(async (data, conte
   const port = data && data.port ? Number(data.port) : 0;
   const user = data && data.user ? String(data.user).trim() : "";
   const pass = data && data.pass ? String(data.pass) : "";
-  let from = data && data.from ? String(data.from).trim() : "";
+  const from = data && data.from ? String(data.from).trim() : "";
   const secure = data && data.secure !== undefined ? !!data.secure : (port === 465);
-
-  // CORRECTION CRITIQUE : Si Gmail, forcer le FROM à correspondre au user
-  if (user && String(user).toLowerCase().endsWith("@gmail.com")) {
-    const u = String(user).trim();
-    if (!from || !String(from).includes(u)) {
-      from = u;
-      console.log(`Gmail detected, forcing FROM to: ${from}`);
-    }
-  }
 
   const cfg = { host, port, user, pass, from, secure, updatedAt: Date.now() };
   const missing = _validateSmtp(cfg);
@@ -552,7 +470,6 @@ exports.setSmtpConfig = functions.region(REGION).https.onCall(async (data, conte
   }
 
   await admin.database().ref(SMTP_CONFIG_PATH).set(cfg);
-  console.log("SMTP config saved successfully");
   return { ok: true };
 });
 
@@ -568,19 +485,13 @@ exports.testSmtp = functions.region(REGION).https.onCall(async (data, context) =
     try {
       const userRecord = await admin.auth().getUser(context.auth.uid);
       to = userRecord && userRecord.email ? String(userRecord.email) : "";
-    } catch (e) {
-      console.error("Error getting caller email:", e);
-    }
+    } catch (e) {}
   }
-  
   if (!to) {
     throw new functions.https.HttpsError("invalid-argument", "to required");
   }
 
   const { cfg, transport } = await getTransportOrThrow();
-  
-  console.log(`Testing SMTP by sending email to ${to}`);
-  
   try {
     const info = await transport.sendMail({
       from: cfg.from,
@@ -588,16 +499,8 @@ exports.testSmtp = functions.region(REGION).https.onCall(async (data, context) =
       subject: "Test SMTP — Heiko Lafayette Progress",
       text: "Si tu reçois cet email, la configuration SMTP fonctionne.",
     });
-    console.log(`Test email sent successfully to ${to}:`, info.messageId);
     return { ok: true, to, messageId: info && info.messageId ? info.messageId : null };
   } catch (e) {
-    console.error(`Failed to send test email to ${to}:`, e);
-    return { 
-      ok: false, 
-      reason: "SEND_FAILED", 
-      error: String(e && e.message ? e.message : e), 
-      errorCode: (e && e.code) ? String(e.code) : "", 
-      detail: (e && (e.responseCode || e.command)) ? (`${e.responseCode||""} ${e.command||""}`).trim() : "" 
-    };
+    return { ok: false, reason: "SEND_FAILED", error: String(e && e.message ? e.message : e), errorCode: (e && e.code) ? String(e.code) : "", detail: (e && (e.responseCode || e.command)) ? (`${e.responseCode||""} ${e.command||""}`).trim() : "" };
   }
 });

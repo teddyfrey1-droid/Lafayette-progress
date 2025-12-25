@@ -227,8 +227,13 @@ async function _callTestSmtp(data){
         const failCount = results.length - okCount;
 
         if(results.length){
-          if(failCount === 0) showToast(`✅ Email(s) envoyé(s) (${okCount})`);
-          else showToast(`⚠️ Email(s) envoyés: ${okCount} • échecs: ${failCount}`);
+          if(failCount === 0) {
+              showToast(`✅ Email(s) envoyé(s) (${okCount})`);
+            } else {
+              const firstFail = results.find(r => !(r && r.ok === true));
+              const extra = firstFail ? ` • ${(firstFail.reason||'FAIL')}${firstFail.errorCode ? (' — '+firstFail.errorCode) : ''}${firstFail.detail ? (' — '+firstFail.detail) : ''}` : '';
+              showToast(`⚠️ Email(s) envoyés: ${okCount} • échecs: ${failCount}${extra}`);
+            }
         } else {
           const reason = data && (data.reason || data.error || data.message) ? String(data.reason || data.error || data.message) : 'Non envoyé';
           showToast('⚠️ ' + reason);
