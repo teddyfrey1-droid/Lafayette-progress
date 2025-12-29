@@ -2059,3 +2059,33 @@ body.dark-mode .weekday-chip{
   text-transform: uppercase;
   letter-spacing: .08em;
 }
+
+
+/* MAIL SYSTEM */
+.mail-label{font-size:11px; font-weight:900; color:#334155; text-transform:uppercase; letter-spacing:0.06em; display:block; margin-bottom:6px;}
+.mail-hint{font-size:12px; color:#64748b; line-height:1.35;}
+.mail-selected-count{margin-top:8px; font-size:12px; font-weight:800; color:#475569;}
+
+.mail-settings-row{display:grid; grid-template-columns:1fr 1fr auto; gap:12px; align-items:end;}
+.mail-settings-field input{margin-bottom:0;}
+.mail-settings-actions .btn{height:42px; padding:10px 14px;}
+
+.mail-quick-groups{display:flex; flex-wrap:wrap; gap:8px;}
+.mail-chip{border:1px solid rgba(15,23,42,0.12); background:rgba(148,163,184,0.18); color:#0f172a; padding:8px 12px; border-radius:999px; cursor:pointer; font-size:12px; font-weight:900; user-select:none;}
+.mail-chip.active{background:rgba(59,130,246,0.18); border-color:rgba(59,130,246,0.45);} 
+
+.mail-users-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:10px;}
+.mail-user-card{border:2px solid rgba(15,23,42,0.08); background:rgba(255,255,255,0.75); border-radius:14px; padding:12px; display:flex; gap:10px; align-items:center; cursor:pointer; transition:transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;}
+.mail-user-card:hover{transform:translateY(-1px);} 
+.mail-user-card.selected{border-color:rgba(16,185,129,0.7); background:rgba(16,185,129,0.08);} 
+.mail-user-check{width:18px; height:18px; border-radius:6px; border:2px solid rgba(71,85,105,0.6); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+.mail-user-card.selected .mail-user-check{border-color:rgba(16,185,129,1); background:rgba(16,185,129,1);} 
+.mail-user-name{font-size:13px; font-weight:900; color:#0f172a; line-height:1.2;}
+.mail-user-email{font-size:12px; font-weight:700; color:#64748b; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+
+.mail-actions{display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap;}
+
+@media (max-width: 720px){
+  .mail-settings-row{grid-template-columns:1fr;}
+  .mail-settings-actions .btn{width:100%;}
+}

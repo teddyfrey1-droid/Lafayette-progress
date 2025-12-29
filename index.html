@@ -330,6 +330,7 @@
     
     <div class="tab-nav">
       <button id="btnTabTeam" onclick="switchTab('team')" class="btn-tab active">👥 Équipe</button>
+      <button id="btnTabEmails" onclick="switchTab('emails')" class="btn-tab" style="display:none;">📧 Mail</button>
       <button id="btnTabObjs" onclick="switchTab('objs')" class="btn-tab">🎯 Pilotage</button>
       <button id="btnTabLogs" onclick="switchTab('logs')" class="btn-tab" style="display:none;">🕒 Historique</button>
       <button id="btnTabFeedbacks" onclick="switchTab('feedbacks')" class="btn-tab" style="display:none;">💬 Avis & Nouveautés</button>
@@ -349,6 +350,74 @@
       <div class="admin-section">
         <h3 class="section-header-large">Effectif & Primes</h3>
         <div id="usersList"></div>
+      </div>
+    
+
+    </div>
+
+    <div id="tab-emails" style="display:none;">
+      <div class="admin-section">
+        <h3 class="section-header-large">📧 Envoyer un email</h3>
+
+        <div class="mail-settings-row">
+          <div class="mail-settings-field">
+            <label class="mail-label">Région Firebase Functions (optionnel)</label>
+            <input type="text" id="mailFunctionsRegion" placeholder="Ex: us-central1 ou europe-west1">
+            <div class="mail-hint">Si ton Cloud Function est déployée dans une région spécifique, renseigne-la ici. Sinon laisse vide.</div>
+          </div>
+          <div class="mail-settings-field">
+            <label class="mail-label">Nom affiché (optionnel)</label>
+            <input type="text" id="mailFromName" placeholder="Ex: Heiko La Fayette">
+            <div class="mail-hint">Utilisé uniquement si ta function le supporte.</div>
+          </div>
+          <div class="mail-settings-actions">
+            <button class="btn" onclick="saveMailSettings()">💾 Enregistrer</button>
+          </div>
+        </div>
+
+        <div style="margin-top:18px;">
+          <div class="mail-label" style="margin-bottom:8px;">Groupes rapides</div>
+          <div id="mailQuickGroups" class="mail-quick-groups"></div>
+        </div>
+
+        <div style="margin-top:18px;">
+          <div class="mail-label" style="margin-bottom:8px;">Destinataires</div>
+          <div id="mailUsersGrid" class="mail-users-grid"></div>
+          <div id="mailSelectedCount" class="mail-selected-count">0 destinataire(s) sélectionné(s)</div>
+        </div>
+
+        <div style="margin-top:18px;">
+          <label class="mail-label">Sujet</label>
+          <input type="text" id="mailSubject" placeholder="Ex : Planning de la semaine">
+
+          <label class="mail-label" style="margin-top:10px;">Message</label>
+          <textarea id="mailMessage" rows="8" placeholder="Écris ton message… (HTML accepté)"></textarea>
+
+          <div class="mail-actions">
+            <button class="btn" onclick="sendManualEmail()">📤 Envoyer</button>
+            <button class="btn" onclick="clearMailSelection()" style="background:#e2e8f0; color:#475569; border:1px solid #cbd5e1;">↩️ Réinitialiser</button>
+          </div>
+          <div class="mail-hint" style="margin-top:10px;">
+            Pour l'envoi réel, il faut déployer une Cloud Function. Le dossier <code>functions/</code> est inclus dans ce projet.
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-section">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <h3 class="section-header-large" style="margin:0;">👥 Groupes mail</h3>
+          <button class="btn" onclick="openMailGroupModal()" style="width:auto;">➕ Nouveau groupe</button>
+        </div>
+        <div id="mailGroupsList" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="admin-section" style="border-left:4px solid #f59e0b;">
+        <h3 class="section-header-large" style="color:#b45309;">⚡ Automatisation (préparé)</h3>
+        <div class="mail-hint">
+          Le système est prêt pour des envois automatiques (ex: quand le planning change) via une Function trigger.
+
+          Le schéma du planning n'est pas défini dans ce projet, donc le trigger est fourni en modèle dans <code>functions/index.js</code> (à adapter à ta structure).
+        </div>
       </div>
     </div>
 
@@ -533,6 +602,38 @@
     <button class="btn" onclick="document.getElementById('editObjPanel').classList.remove('active')" style="background:white; color:#666; border:1px solid #ccc; margin-top:10px;">Annuler</button>
   </div>
 
+  
+
+  <!-- Modal: création/édition groupe mail -->
+  <div id="mailGroupModal" class="modal-overlay" style="display:none; z-index: 4000;">
+    <div class="modal-box" style="max-width:520px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;">
+        <div>
+          <div id="mailGroupModalTitle" style="font-weight:950; font-size:18px;">📧 Groupe Mail</div>
+          <div class="mail-hint">Créer / modifier un groupe de destinataires.</div>
+        </div>
+        <button class="icon-btn" onclick="closeMailGroupModal()" aria-label="Fermer">✕</button>
+      </div>
+
+      <input type="hidden" id="mailGroupId">
+
+      <label class="mail-label">Nom du groupe</label>
+      <input type="text" id="mailGroupName" placeholder="Ex: Équipe du soir">
+
+      <label class="mail-label" style="margin-top:10px;">Couleur</label>
+      <input type="color" id="mailGroupColor" value="#3b82f6" class="mail-color-input">
+
+      <label class="mail-label" style="margin-top:12px;">Membres</label>
+      <div id="mailGroupMembers" class="mail-members-list"></div>
+
+      <div style="display:flex; gap:10px; margin-top:14px;">
+        <button class="btn" id="mailGroupSaveBtn" onclick="saveMailGroup()" style="flex:1;">💾 Enregistrer</button>
+        <button class="btn" onclick="closeMailGroupModal()" style="background:#e2e8f0; color:#475569; border:1px solid #cbd5e1;">Annuler</button>
+      </div>
+    </div>
+  </div>
+
   <script src="assets/js/app.js"></script>
+  <script src="assets/js/email.js"></script>
 </body>
 </html>

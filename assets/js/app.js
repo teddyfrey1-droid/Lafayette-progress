@@ -681,7 +681,9 @@ function showToast(message) {
       });
       db.ref('users').on('value', s => { 
         allUsers = s.val() || {}; 
-        if(isAdminUser()) { renderAdminUsers(); }        if(isAdminUser()) { renderSimulator(); }
+        if(isAdminUser()) { renderAdminUsers(); }
+        if(isAdminUser()) { renderSimulator(); }
+        try{ if(window.renderMailUI) window.renderMailUI(); }catch(e){}
       });
       db.ref('settings').on('value', s => { 
         globalSettings = s.val() || { budget: 0 }; 
@@ -690,7 +692,9 @@ function showToast(message) {
         }
         // Defaults notifications
         if(!globalSettings.notifications) globalSettings.notifications = { autoOnUpdate:false, autoOnObjChange:false, autoOnPilotage:false, autoAudience:'all' };
-        if(globalSettings.notifications.autoAudience == null) globalSettings.notifications.autoAudience = 'all';        if(isAdminUser()) { renderSimulator(); }
+        if(globalSettings.notifications.autoAudience == null) globalSettings.notifications.autoAudience = 'all';
+        if(isAdminUser()) { renderSimulator(); }
+        try{ if(window.renderMailUI) window.renderMailUI(); }catch(e){}
       });
 
       // Aperçu "Sites utiles" sur le dashboard
@@ -755,6 +759,8 @@ function showToast(message) {
       // SHOW TAB BUTTONS ONLY FOR SUPER ADMIN
       document.getElementById("btnTabLogs").style.display = isSuperUser ? 'block' : 'none';
       document.getElementById("btnTabFeedbacks").style.display = isSuperUser ? 'block' : 'none';
+      const btnEmails = document.getElementById("btnTabEmails");
+      if(btnEmails) btnEmails.style.display = isAdmin ? 'block' : 'none';
       const globalBudgetInput = document.getElementById("simGlobalBudget");
       const saveBudgetBtn = document.getElementById("btnSaveGlobalBudget");
       const simCAInput = document.getElementById('simMonthlyCA');
@@ -1701,11 +1707,15 @@ const el = document.createElement("div");
        if(t === 'objs') document.getElementById('btnTabObjs').classList.add('active');
        if(t === 'logs') document.getElementById('btnTabLogs').classList.add('active');
        if(t === 'feedbacks') document.getElementById('btnTabFeedbacks').classList.add('active');
+       if(t === 'emails') { const b = document.getElementById('btnTabEmails'); if(b) b.classList.add('active'); }
        
        document.getElementById('tab-team').style.display = t==='team'?'block':'none';
        document.getElementById('tab-objs').style.display = t==='objs'?'block':'none';
        document.getElementById('tab-logs').style.display = t==='logs'?'block':'none';
        document.getElementById('tab-feedbacks').style.display = t==='feedbacks'?'block':'none';
+       const emailsTab = document.getElementById('tab-emails');
+       if(emailsTab) emailsTab.style.display = t==='emails'?'block':'none';
+       if(t==='emails'){ try{ if(window.renderMailUI) window.renderMailUI(); }catch(e){} }
     }
     function toggleCreateInputs() { document.getElementById("createTiersBlock").style.display = document.getElementById("noFixed").checked ? 'none' : 'block'; }
     function toggleEditInputs() { document.getElementById("editTiersBlock").style.display = document.getElementById("eoFixed").checked ? 'none' : 'block'; }
