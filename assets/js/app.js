@@ -12,548 +12,6 @@
     const auth = firebase.auth();
     const db = firebase.database();
 
-    // --- Cloud Functions helper (envoi d'emails admin) ---
-    function _uniq(arr){ return [...new Set(arr.filter(Boolean))]; }
-
-    async function _getFunctionsRegion(){
-      if(_functionsRegionCache) return _functionsRegionCache;
-      try{
-        const snap = await db.ref('config/functionsRegion').get();
-        const r = snap.exists() ? String(snap.val()||'').trim() : '';
-        if(r){ _functionsRegionCache = r; return r; }
-      }catch(e){}
-      // fallback: last known in localStorage
-      try{
-        const r2 = localStorage.getItem('heiko_functions_region');
-        if(r2){ _functionsRegionCache = r2; return r2; }
-      }catch(e){}
-      return '';
-    }
-
-    function _getFunctionsRegionsToTry(region){
-      // On essaye d’abord la région configurée, puis des valeurs fréquentes
-      const list = _uniq([region, 'us-central1', 'europe-west1']);
-      return list;
-    }
-
-
-    async function _ensureFreshAuth(){
-      try{
-        if(firebase.auth && firebase.auth().currentUser){
-          await firebase.auth().currentUser.getIdToken(true);
-        }
-      }catch(e){}
-    }
-
-
-    async function _callSendEmailToUser(data){
-      if(!firebase.functions) throw new Error("Firebase Functions SDK manquant");
-      await _ensureFreshAuth();
-      const configured = await _getFunctionsRegion();
-      const regions = _getFunctionsRegionsToTry(configured);
-      let lastErr = null;
-
-      for(const r of regions){
-        try{
-          const fns = r ? firebase.app().functions(r) : firebase.functions();
-          const fn = fns.httpsCallable('sendEmailToUser');
-          const res = await fn(data);
-          try{ localStorage.setItem('heiko_functions_region', r); }catch(e){}
-          _functionsRegionCache = r;
-          return res && res.data ? res.data : res;
-        }catch(err){
-          lastErr = err;
-          const msg = (err && err.message) ? String(err.message) : '';
-          const code = (err && err.code) ? String(err.code) : '';
-          // si la fonction n’existe pas dans cette région, on essaye la suivante
-          if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
-          // sinon on stoppe
-          break;
-        }
-      }
-      throw lastErr || new Error("Échec d’appel sendEmailToUser");
-    }
-
-
-    async function _callSendEmailToUsers(data){
-      if(!firebase.functions) throw new Error("Firebase Functions SDK manquant");
-      await _ensureFreshAuth();
-      const configured = await _getFunctionsRegion();
-      const regions = _getFunctionsRegionsToTry(configured);
-      let lastErr = null;
-
-      for(const r of regions){
-        try{
-          const fns = r ? firebase.app().functions(r) : firebase.functions();
-          const fn = fns.httpsCallable('sendEmailToUsers');
-          const res = await fn(data);
-          try{ localStorage.setItem('heiko_functions_region', r); }catch(e){}
-          _functionsRegionCache = r;
-          return res && res.data ? res.data : res;
-        }catch(err){
-          lastErr = err;
-          const msg = (err && err.message) ? String(err.message) : '';
-          const code = (err && err.code) ? String(err.code) : '';
-          if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
-          break;
-        }
-      }
-      throw lastErr || new Error("Échec d’appel sendEmailToUsers");
-    }
-
-async function _callGetSmtpConfigStatus(){
-  if(!firebase.functions) throw new Error("Firebase Functions SDK manquant");
-  await _ensureFreshAuth();
-  const configured = await _getFunctionsRegion();
-  const regions = _getFunctionsRegionsToTry(configured);
-  let lastErr = null;
-  for(const r of regions){
-    try{
-      const fn = (r && firebase.app().functions) ? firebase.app().functions(r).httpsCallable('getSmtpConfigStatus') : firebase.functions().httpsCallable('getSmtpConfigStatus');
-      const res = await fn({});
-      try{ if(r){ localStorage.setItem('heiko_functions_region', r); } }catch(e){}
-      return res && res.data ? res.data : res;
-    }catch(err){
-      lastErr = err;
-      const code = String((err && err.code) ? err.code : '');
-      const msg = String((err && err.message) ? err.message : err);
-      if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
-      break;
-    }
-  }
-  throw lastErr || new Error("Échec d’appel getSmtpConfigStatus");
-}
-
-async function _callSetSmtpConfig(data){
-  if(!firebase.functions) throw new Error("Firebase Functions SDK manquant");
-  await _ensureFreshAuth();
-  const configured = await _getFunctionsRegion();
-  const regions = _getFunctionsRegionsToTry(configured);
-  let lastErr = null;
-  for(const r of regions){
-    try{
-      const fn = (r && firebase.app().functions) ? firebase.app().functions(r).httpsCallable('setSmtpConfig') : firebase.functions().httpsCallable('setSmtpConfig');
-      const res = await fn(data);
-      try{ if(r){ localStorage.setItem('heiko_functions_region', r); } }catch(e){}
-      return res && res.data ? res.data : res;
-    }catch(err){
-      lastErr = err;
-      const code = String((err && err.code) ? err.code : '');
-      const msg = String((err && err.message) ? err.message : err);
-      if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
-      break;
-    }
-  }
-  throw lastErr || new Error("Échec d’appel setSmtpConfig");
-}
-
-async function _callTestSmtp(data){
-  if(!firebase.functions) throw new Error("Firebase Functions SDK manquant");
-  await _ensureFreshAuth();
-  const configured = await _getFunctionsRegion();
-  const regions = _getFunctionsRegionsToTry(configured);
-  let lastErr = null;
-  for(const r of regions){
-    try{
-      const fn = (r && firebase.app().functions) ? firebase.app().functions(r).httpsCallable('testSmtp') : firebase.functions().httpsCallable('testSmtp');
-      const res = await fn(data || {});
-      try{ if(r){ localStorage.setItem('heiko_functions_region', r); } }catch(e){}
-      return res && res.data ? res.data : res;
-    }catch(err){
-      lastErr = err;
-      const code = String((err && err.code) ? err.code : '');
-      const msg = String((err && err.message) ? err.message : err);
-      if(code.includes('not-found') || msg.toLowerCase().includes('not found')) continue;
-      break;
-    }
-  }
-  throw lastErr || new Error("Échec d’appel testSmtp");
-}
-
-
-
-
-    async function sendEmailToSelectedUser(){
-      if(!isAdminUser()) return;
-      const recEl = document.getElementById('emailRecipient');
-      const subjEl = document.getElementById('emailSubject');
-      const bodyEl = document.getElementById('emailBody');
-      const linkEl = document.getElementById('emailLink');
-      if(!recEl || !subjEl || !bodyEl) return;
-
-      const uids = Array.from(recEl.selectedOptions || []).map(o => String(o.value||'').trim()).filter(Boolean);
-      // si on a la map allUsers en mémoire, on envoie aussi les emails pour éviter les lookups côté Functions
-      const recipients = (typeof allUsers === 'object' && allUsers) ? uids.map(uid => {
-        const u = allUsers[uid] || null;
-        const email = (u && u.email) ? String(u.email).trim() : '';
-        return { uid, email };
-      }) : [];
-      const subject = String(subjEl.value || '').trim();
-      const body = String(bodyEl.value || '').trim();
-      const link = linkEl ? String(linkEl.value || '').trim() : '';
-
-      if(!uids.length){ showToast('Choisis au moins un destinataire.'); return; }
-      if(!subject || !body){ showToast('Sujet + message requis.'); return; }
-
-      const btn = document.getElementById('btnSendEmail');
-      if(btn){ btn.disabled = true; btn.style.opacity = .7; }
-
-      async function fallbackOneByOne(){
-        const results = [];
-        for(const uid of uids){
-          try{
-            const email = (typeof allUsers === 'object' && allUsers && allUsers[uid] && allUsers[uid].email) ? String(allUsers[uid].email).trim() : '';
-            const r = await _callSendEmailToUser({ uid, email, subject, body, link: link || '' });
-            results.push({ uid, ...(r||{}) });
-          }catch(err){
-            results.push({ uid, ok:false, reason:'CALL_FAILED', errorCode: (err && err.code) ? String(err.code) : '', detail: (err && err.details) ? JSON.stringify(err.details) : '', error: String(err && err.message ? err.message : err) });
-          }
-        }
-        return { ok: true, results };
-      }
-
-      try{
-        let data = null;
-        try{
-          data = await _callSendEmailToUsers({ uids, recipients, subject, body, link: link || '' });
-          // Si la function multi n'existe pas (ou renvoie EMAIL_NOT_CONFIGURED), on laisse data tel quel
-        }catch(e){
-          // fallback mono
-          data = await fallbackOneByOne();
-        }
-
-        const results = (data && Array.isArray(data.results)) ? data.results : [];
-        const okCount = results.filter(r => r && r.ok === true).length;
-        const failCount = results.length - okCount;
-
-        if(results.length){
-          if(failCount === 0) {
-              showToast(`✅ Email(s) envoyé(s) (${okCount})`);
-            } else {
-              const firstFail = results.find(r => !(r && r.ok === true));
-              const extra = firstFail ? ` • ${(firstFail.reason||'FAIL')}${firstFail.errorCode ? (' — '+firstFail.errorCode) : ''}${firstFail.detail ? (' — '+firstFail.detail) : ''}` : '';
-              showToast(`⚠️ Email(s) envoyés: ${okCount} • échecs: ${failCount}${extra}`);
-            }
-        } else {
-          const reason = data && (data.reason || data.error || data.message) ? String(data.reason || data.error || data.message) : 'Non envoyé';
-          showToast('⚠️ ' + reason);
-        }
-
-        // historique
-        try{
-          await db.ref('notifications/sent').push({
-            type: 'email',
-            toUids: uids,
-            subject,
-            body,
-            link: link || '',
-            by: (currentUser && currentUser.name) ? currentUser.name : 'Admin',
-            uid: (currentUser && currentUser.uid) ? currentUser.uid : null,
-            at: Date.now(),
-            result: data || null
-          });
-        }catch(e){}
-
-        subjEl.value = '';
-        bodyEl.value = '';
-      }catch(err){
-        console.error(err);
-        const msg = (err && err.message) ? err.message : 'Erreur envoi email (Functions).';
-        showToast('Erreur: ' + msg);
-      }finally{
-        if(btn){ btn.disabled = false; btn.style.opacity = 1; }
-        try{ updateEmailSelectedCount(); }catch(e){}
-      }
-    }
-    window.sendEmailToSelectedUser = sendEmailToSelectedUser;
-
-    async function saveFunctionsRegion(){
-      if(!isAdminUser()) return;
-      const el = document.getElementById('functionsRegion');
-      if(!el) return;
-      const r = String(el.value||'').trim();
-      if(!r){ showToast("Région vide."); return; }
-      try{
-        await db.ref('config/functionsRegion').set(r);
-        _functionsRegionCache = r;
-        try{ localStorage.setItem('heiko_functions_region', r); }catch(e){}
-        showToast("✅ Région Functions enregistrée");
-      }catch(e){
-        showToast("Erreur sauvegarde région.");
-      }
-    }
-
-    async function saveVapidKey(){
-      if(!isAdminUser()) return;
-      const el = document.getElementById('vapidKey');
-      if(!el) return;
-      const k = String(el.value||'').trim();
-      if(!k){ showToast("Clé VAPID vide."); return; }
-      try{
-        await db.ref('config/vapidKey').set(k);
-        showToast("✅ Clé VAPID enregistrée");
-      }catch(e){
-        showToast("Erreur sauvegarde VAPID.");
-      }
-    }
-
-    function renderNotifPanel(){
-      // Onglet "📧 Emails" (admin) : région Functions + destinataires.
-      if(!isAdminUser()) return;
-
-      // region input
-      const rEl = document.getElementById('functionsRegion');
-      if(rEl){
-        _getFunctionsRegion().then(r => { if(r && !rEl.value) rEl.value = r; });
-      }
-
-      // recipients
-      try{ renderEmailRecipients(); }catch(e){}
-      try{ updateEmailSelectedCount(); }catch(e){}
-      try{ refreshSmtpStatus(); }catch(e){}
-    }
-
-    
-
-async function refreshSmtpStatus(){
-  if(!isAdminUser()) return;
-  const statusEl = document.getElementById('smtpStatus');
-  if(statusEl) statusEl.textContent = "Vérification SMTP...";
-  try{
-    const data = await _callGetSmtpConfigStatus();
-    if(!statusEl) return;
-    if(data && data.configured){
-      const host = data.host ? String(data.host) : '';
-      const port = data.port ? String(data.port) : '';
-      const from = data.from ? String(data.from) : '';
-      statusEl.textContent = `✅ SMTP configuré (${host}:${port}) • From: ${from}`;
-    } else {
-      const missing = (data && Array.isArray(data.missing)) ? data.missing.join(', ') : 'incomplet';
-      statusEl.textContent = `⚠️ SMTP non configuré (${missing})`;
-    }
-  }catch(e){
-    if(statusEl) statusEl.textContent = "⚠️ Impossible de vérifier le SMTP (Functions).";
-  }
-}
-window.refreshSmtpStatus = refreshSmtpStatus;
-
-async function saveSmtpConfig(){
-  if(!isAdminUser()) return;
-  const host = (document.getElementById('smtpHost')||{}).value || '';
-  const port = (document.getElementById('smtpPort')||{}).value || '';
-  const user = (document.getElementById('smtpUser')||{}).value || '';
-  const pass = (document.getElementById('smtpPass')||{}).value || '';
-  const from = (document.getElementById('smtpFrom')||{}).value || '';
-  const secure = (document.getElementById('smtpSecure')||{}).checked || false;
-
-  const data = {
-    host: String(host).trim(),
-    port: Number(String(port).trim() || 0),
-    user: String(user).trim(),
-    pass: String(pass),
-    from: String(from).trim(),
-    secure: !!secure
-  };
-  if(!data.host || !data.port || !data.user || !data.pass || !data.from){
-    showToast("Remplis host, port, user, pass, from.");
-    return;
-  }
-  try{
-    const res = await _callSetSmtpConfig(data);
-    if(res && res.ok){
-      showToast("✅ SMTP sauvegardé.");
-      // vider le pass visuellement (réduit les risques)
-      try{ const p = document.getElementById('smtpPass'); if(p) p.value = ''; }catch(e){}
-      await refreshSmtpStatus();
-    } else {
-      showToast("⚠️ SMTP non sauvegardé.");
-    }
-  }catch(e){
-    const msg = (e && e.message) ? e.message : String(e);
-    showToast("Erreur SMTP: " + msg);
-  }
-}
-window.saveSmtpConfig = saveSmtpConfig;
-
-async function testSmtp(){
-  if(!isAdminUser()) return;
-  try{
-    const res = await _callTestSmtp({});
-    if(res && res.ok){
-      showToast("✅ Email test envoyé.");
-    } else {
-      const err = res && (res.error || res.reason) ? String(res.error || res.reason) : "Échec test";
-      showToast("⚠️ " + err);
-    }
-  }catch(e){
-    const msg = (e && e.message) ? e.message : String(e);
-    showToast("Erreur test SMTP: " + msg);
-  }
-}
-window.testSmtp = testSmtp;
-
-function renderEmailRecipients(){
-      if(!isAdminUser()) return;
-      const sel = document.getElementById('emailRecipient');
-      if(!sel) return;
-
-      const searchEl = document.getElementById('emailSearch');
-      const prevSelected = new Set(Array.from(sel.selectedOptions||[]).map(o => String(o.value||'').trim()).filter(Boolean));
-
-      const rows = Object.keys(allUsers || {}).map(uid => {
-        const u = allUsers[uid] || {};
-        const email = (u.email || '').toString().trim();
-        const name = (u.name || email || uid).toString().trim();
-        const role = (u.role || '').toString().trim();
-        return { uid, name, email, role };
-      }).filter(r => !!r.email);
-
-      rows.sort((a,b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
-
-      window.__emailRecipientRows = rows;
-
-      function render(filterText){
-        const f = (filterText || '').toLowerCase().trim();
-        const selected = new Set(prevSelected);
-
-        const filtered = rows.filter(r => {
-          if(!f) return true;
-          const hay = (`${r.name} ${r.email} ${r.role}`).toLowerCase();
-          return hay.includes(f);
-        });
-
-        // garder visibles les sélectionnés même si hors filtre
-        const map = new Map();
-        rows.forEach(r => { if(selected.has(r.uid)) map.set(r.uid, r); });
-        filtered.forEach(r => map.set(r.uid, r));
-        const toRender = Array.from(map.values());
-
-        sel.innerHTML = toRender.map(r => {
-          const label = `${r.name}${r.role ? ' ('+r.role.toUpperCase()+')' : ''} — ${r.email}`;
-          const isSel = selected.has(r.uid) ? ' selected' : '';
-          return `<option value="${r.uid}"${isSel}>${label}</option>`;
-        }).join('');
-
-        updateEmailSelectedCount();
-      }
-
-      render(searchEl ? String(searchEl.value||'') : '');
-
-      if(searchEl && !searchEl.__bound){
-        searchEl.__bound = true;
-        searchEl.addEventListener('input', () => render(String(searchEl.value||'')));
-      }
-      if(!sel.__bound){
-        sel.__bound = true;
-        sel.addEventListener('change', () => updateEmailSelectedCount());
-      }
-    }
-
-    function openEmailTo(uid){
-      if(!isAdminUser()) return;
-      try{ switchTab('notifs'); }catch(e){}
-      try{ renderEmailRecipients(); }catch(e){}
-      const sel = document.getElementById('emailRecipient');
-      const uidStr = String(uid||'').trim();
-      if(sel && uidStr){
-        Array.from(sel.options||[]).forEach(o => {
-          if(String(o.value||'') === uidStr) o.selected = true;
-        });
-      }
-      try{ updateEmailSelectedCount(); }catch(e){}
-      try{ document.getElementById('emailSubject')?.focus(); }catch(e){}
-    }
-    
-
-    function updateEmailSelectedCount(){
-      const sel = document.getElementById('emailRecipient');
-      const out = document.getElementById('emailSelectedCount');
-      if(!sel || !out) return;
-      const n = Array.from(sel.selectedOptions||[]).length;
-      out.textContent = `${n} sélectionné${n>1?'s':''}`;
-    }
-    window.updateEmailSelectedCount = updateEmailSelectedCount;
-
-    function selectAllEmailRecipients(){
-      const sel = document.getElementById('emailRecipient');
-      if(!sel) return;
-      Array.from(sel.options||[]).forEach(o => { o.selected = true; });
-      updateEmailSelectedCount();
-    }
-    window.selectAllEmailRecipients = selectAllEmailRecipients;
-
-    function clearEmailRecipients(){
-      const sel = document.getElementById('emailRecipient');
-      if(!sel) return;
-      Array.from(sel.options||[]).forEach(o => { o.selected = false; });
-      updateEmailSelectedCount();
-    }
-    window.clearEmailRecipients = clearEmailRecipients;
-window.openEmailTo = openEmailTo;
-
-    function renderNotifHistory(){
-      if(!isAdminUser()) return;
-      const box = document.getElementById('notifHistory');
-      if(!box) return;
-      const arr = [];
-      Object.keys(allNotifsSent || {}).forEach(k => arr.push({id:k, ...(allNotifsSent[k]||{})}));
-      arr.sort((a,b) => (b.at||0) - (a.at||0));
-      if(arr.length === 0){
-        box.innerHTML = "<div style='color:#999;font-style:italic;'>Aucun email envoyé.</div>";
-        return;
-      }
-      box.innerHTML = "";
-      arr.slice(0, 50).forEach(n => {
-        const d = n.at ? new Date(n.at).toLocaleString('fr-FR') : '';
-        const div = document.createElement('div');
-        div.className = 'update-card';
-        div.style.marginBottom = '10px';
-        const isEmail = (n.type === 'email') || (n.subject != null);
-        const who = n.by ? String(n.by) : '';
-        if(isEmail){
-          const uids = Array.isArray(n.toUids) ? n.toUids : (n.toUid ? [n.toUid] : []);
-          const recs = (uids || []).map(uid => {
-            const u = (uid && allUsers) ? allUsers[uid] : null;
-            return u ? (u.name || u.email || uid) : uid;
-          }).filter(Boolean);
-          const recDisplay = (() => {
-            if(!recs.length) return '—';
-            if(recs.length <= 3) return recs.join(', ');
-            return recs.slice(0,3).join(', ') + ` +${recs.length-3}`;
-          })();
-
-          const subj = n.subject || '';
-          const body = n.body || '';
-          const link = n.link || '';
-          const status = (n.result && n.result.reason) ? String(n.result.reason) : '';
-          const results = (n.result && Array.isArray(n.result.results)) ? n.result.results : [];
-          const okCount = results.filter(r => r && r.ok === true).length;
-          const failCount = results.length ? (results.length - okCount) : 0;
-
-          div.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-              <div>
-                <div style="font-weight:700;">📧 Email</div>
-                <div style="font-size:12px; color:var(--text-muted);">À: ${recDisplay}</div>
-                <div style="font-size:12px; color:var(--text-muted);">Par: ${who || '—'} • ${d}</div>
-              </div>
-              <div style="font-size:12px; color:var(--text-muted); text-align:right;">
-                ${results.length ? `${okCount} OK • ${failCount} KO` : (status ? status : '')}
-              </div>
-            </div>
-            <div style="margin-top:8px;">
-              <div style="font-weight:600;">${escapeHtml(subj)}</div>
-              <div style="font-size:12px; color:var(--text-muted); margin-top:4px; white-space:pre-wrap;">${escapeHtml(body)}</div>
-              ${link ? `<div style="margin-top:6px; font-size:12px;"><a href="${escapeHtml(link)}" target="_blank">${escapeHtml(link)}</a></div>` : ``}
-            </div>
-          `;
-        } else {
-          div.innerHTML = `<div>${escapeHtml(JSON.stringify(n))}</div>`;
-        }
-        box.appendChild(div);
-      });
-    }
-
     async function _maybeAutoNotify(kind, payload){
       // Notifications push désactivées pour l’instant.
       // On garde les appels (update / objectif / pilotage) sans effet pour éviter de casser le code.
@@ -567,8 +25,6 @@ window.openEmailTo = openEmailTo;
     let allLogs = {};
     let allFeedbacks = {};
     let allUpdates = {};
-    let allNotifsSent = {};
-    let _functionsRegionCache = null;
     let globalSettings = { budget: 0 };
     const BASE_HOURS = 35;
     const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
@@ -952,8 +408,6 @@ function renderMenuSitesPreview(){
         document.getElementById("loginOverlay").style.display = "none";
         document.getElementById("appContent").style.display = "block";
         const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('mode') === 'resetPassword') { /* Handled */ }
-
         db.ref('users/' + user.uid).on('value', snap => {
           const val = snap.val();
           if(!val) {
@@ -1015,12 +469,6 @@ function renderMenuSitesPreview(){
     }
 
     function logout() { auth.signOut(); location.reload(); }
-    window.resetPassword = () => {
-      let email = document.getElementById("loginEmail").value.trim();
-      if (!email) email = prompt("Email pour réinitialisation :");
-      if(email) auth.sendPasswordResetEmail(email).then(() => alert("Email envoyé !")).catch(e => alert(e.message));
-    };
-
     function logAction(action, detail) {
         db.ref("logs").push({ user: currentUser ? currentUser.name : "Inconnu", action: action, detail: detail || "", type: "action", time: Date.now() });
     }
@@ -1233,9 +681,7 @@ function showToast(message) {
       });
       db.ref('users').on('value', s => { 
         allUsers = s.val() || {}; 
-        if(isAdminUser()) { renderAdminUsers(); }
-        if(isAdminUser()) { try{ renderEmailRecipients(); }catch(e){} }
-        if(isAdminUser()) { renderSimulator(); }
+        if(isAdminUser()) { renderAdminUsers(); }        if(isAdminUser()) { renderSimulator(); }
       });
       db.ref('settings').on('value', s => { 
         globalSettings = s.val() || { budget: 0 }; 
@@ -1244,9 +690,7 @@ function showToast(message) {
         }
         // Defaults notifications
         if(!globalSettings.notifications) globalSettings.notifications = { autoOnUpdate:false, autoOnObjChange:false, autoOnPilotage:false, autoAudience:'all' };
-        if(globalSettings.notifications.autoAudience == null) globalSettings.notifications.autoAudience = 'all';
-        if(isAdminUser()) { try{ renderNotifPanel(); }catch(e){} }
-        if(isAdminUser()) { renderSimulator(); }
+        if(globalSettings.notifications.autoAudience == null) globalSettings.notifications.autoAudience = 'all';        if(isAdminUser()) { renderSimulator(); }
       });
 
       // Aperçu "Sites utiles" sur le dashboard
@@ -1265,13 +709,6 @@ function showToast(message) {
 
       db.ref('logs').limitToLast(2000).on('value', s => { allLogs = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderLogs(allLogs); });
       db.ref('feedbacks').on('value', s => { allFeedbacks = s.val() || {}; if(currentUser && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) renderFeedbacks(allFeedbacks); });
-
-      // LOAD NOTIFICATIONS (Admin)
-      db.ref('notifications/sent').limitToLast(200).on('value', s => {
-        allNotifsSent = s.val() || {};
-        if(isAdminUser()) { try{ renderNotifHistory(); }catch(e){} }
-      });
-
       // LOAD UPDATES & CHECK ALERT
       db.ref('updates').on('value', s => { 
           allUpdates = s.val() || {}; 
@@ -1318,11 +755,6 @@ function showToast(message) {
       // SHOW TAB BUTTONS ONLY FOR SUPER ADMIN
       document.getElementById("btnTabLogs").style.display = isSuperUser ? 'block' : 'none';
       document.getElementById("btnTabFeedbacks").style.display = isSuperUser ? 'block' : 'none';
-
-      // Notifications tab: Admin + Super Admin
-      const btnNotifs = document.getElementById("btnTabNotifs");
-      if(btnNotifs) btnNotifs.style.display = isAdmin ? 'block' : 'none';
-
       const globalBudgetInput = document.getElementById("simGlobalBudget");
       const saveBudgetBtn = document.getElementById("btnSaveGlobalBudget");
       const simCAInput = document.getElementById('simMonthlyCA');
@@ -2269,14 +1701,11 @@ const el = document.createElement("div");
        if(t === 'objs') document.getElementById('btnTabObjs').classList.add('active');
        if(t === 'logs') document.getElementById('btnTabLogs').classList.add('active');
        if(t === 'feedbacks') document.getElementById('btnTabFeedbacks').classList.add('active');
-       if(t === 'notifs') document.getElementById('btnTabNotifs').classList.add('active');
        
        document.getElementById('tab-team').style.display = t==='team'?'block':'none';
        document.getElementById('tab-objs').style.display = t==='objs'?'block':'none';
        document.getElementById('tab-logs').style.display = t==='logs'?'block':'none';
        document.getElementById('tab-feedbacks').style.display = t==='feedbacks'?'block':'none';
-       const tn = document.getElementById('tab-notifs'); if(tn) tn.style.display = t==='notifs'?'block':'none';
-       if(t==='notifs') { try{ renderNotifPanel(); renderNotifHistory(); }catch(e){} }
     }
     function toggleCreateInputs() { document.getElementById("createTiersBlock").style.display = document.getElementById("noFixed").checked ? 'none' : 'block'; }
     function toggleEditInputs() { document.getElementById("editTiersBlock").style.display = document.getElementById("eoFixed").checked ? 'none' : 'block'; }
@@ -2447,47 +1876,47 @@ const el = document.createElement("div");
 
     function deleteObj(id) { if(confirm("🗑️ Supprimer ?")) { db.ref("objectives/"+id).remove().then(() => showToast("🗑️ Supprimé")); logAction("Suppression", `Objectif ${id}`); } }
     function togglePub(id, v) { db.ref("objectives/"+id+"/published").set(v); logAction("Publication", `Objectif ${id}: ${v}`); }
-    
     function createUser() { 
-        const email = document.getElementById("nuEmail").value; 
-        const sec = firebase.initializeApp(firebaseConfig, "Sec"); 
-        
-        var actionCodeSettings = {
-          url: 'https://lafayette-progress.onrender.com', // REDIRECT URL
-          handleCodeInApp: false
-        };
+        const email = (document.getElementById("nuEmail") || {}).value || "";
+        const name = (document.getElementById("nuName") || {}).value || "";
+        const hours = parseFloat((document.getElementById("nuHours") || {}).value) || 35;
+        const isAdmin = !!((document.getElementById("nuAdmin") || {}).checked);
 
-        sec.auth().createUserWithEmailAndPassword(email, "Temp1234!").then(c => { 
-            db.ref('users/'+c.user.uid).set({ name: document.getElementById("nuName").value, hours: parseFloat(document.getElementById("nuHours").value)||35, role: document.getElementById("nuAdmin").checked?'admin':'staff', email: email, status: 'pending', primeEligible: true }); 
-            sec.auth().sendPasswordResetEmail(email, actionCodeSettings); 
+        const cleanEmail = String(email).trim();
+        if(!cleanEmail){
+          showToast("⚠️ Email requis.");
+          return;
+        }
+
+        // Création de compte SANS envoi d'email (fonctionnalité email désactivée).
+        // Mot de passe temporaire à communiquer manuellement.
+        const TEMP_PASSWORD = "Temp1234!";
+
+        const sec = firebase.initializeApp(firebaseConfig, "Sec"); 
+
+        sec.auth().createUserWithEmailAndPassword(cleanEmail, TEMP_PASSWORD).then(c => { 
+            db.ref('users/'+c.user.uid).set({ 
+              name: String(name).trim() || "Utilisateur", 
+              hours: hours, 
+              role: isAdmin ? 'admin' : 'staff', 
+              email: cleanEmail, 
+              status: 'active', 
+              primeEligible: true 
+            }); 
             sec.delete(); 
-            showToast("✅ Membre invité !"); 
+            showToast("✅ Membre créé (mot de passe temporaire : " + TEMP_PASSWORD + ")"); 
         }).catch(e => { 
-            if(e.code === 'auth/email-already-in-use') {
-                if(confirm("⚠️ Ce membre existe déjà ! Voulez-vous lui Renvoyer l'email d'invitation ?")) {
-                    sec.auth().sendPasswordResetEmail(email, actionCodeSettings).then(() => {
-                        showToast("📩 Invitation renvoyée !");
-                        sec.delete();
-                    });
-                } else {
-                    sec.delete();
-                }
+            // Si l'utilisateur existe déjà, on ne renvoie plus d'email.
+            if(e && e.code === 'auth/email-already-in-use') {
+                showToast("⚠️ Ce membre existe déjà.");
+                sec.delete();
             } else {
-                alert(e.message); 
+                alert(e && e.message ? e.message : String(e)); 
                 sec.delete();
             }
         }); 
     }
 
-    function resendInvite(email) { 
-        var actionCodeSettings = {
-          url: 'https://lafayette-progress.onrender.com',
-          handleCodeInApp: false
-        };
-        if(confirm("Renvoyer le mail d'activation à " + email + " ?")) {
-            auth.sendPasswordResetEmail(email, actionCodeSettings).then(() => showToast("📩 Envoyé !")).catch(e => alert(e.message)); 
-        }
-    }
 
     function renderAdminUsers() { 
         const d = document.getElementById("usersList");
@@ -2585,8 +2014,6 @@ const el = document.createElement("div");
                     <div class="user-gain">${gain}</div>
                     <div class="btn-group">
                       <button onclick="openTeamArchive('${uid}')" class="action-btn" title="Archive mensuelle">📄</button>
-                      <button onclick="openEmailTo('${uid}')" class="action-btn" title="Ajouter aux destinataires email">📧</button>
-                      <button onclick="resendInvite('${u.email || ''}')" class="action-btn" title="Renvoyer Invitation">📩</button>
                       <button onclick="editUser('${uid}')" class="action-btn" title="Modifier">✏️</button>
                       <button onclick="deleteUser('${uid}')" class="action-btn delete" title="Supprimer">🗑️</button>
                     </div>

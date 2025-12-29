@@ -106,12 +106,6 @@ function togglePass(){
   x.type = (x.type === "password") ? "text" : "password";
 }
 function logout(){ auth.signOut(); location.href = "index.html"; }
-window.resetPassword = () => {
-  let email = document.getElementById("loginEmail").value.trim();
-  if (!email) email = prompt("Email pour réinitialisation :");
-  if(email) auth.sendPasswordResetEmail(email).then(() => alert("Email envoyé !")).catch(e => alert(e.message));
-};
-
 function showToast(message){
   const toast = document.getElementById("toast");
   toast.textContent = message;
