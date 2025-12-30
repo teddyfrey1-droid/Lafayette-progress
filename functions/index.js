@@ -9,21 +9,70 @@ const nodemailer = require('nodemailer');
 admin.initializeApp();
 
 // ═══════════════════════════════════════════════════════════════════════
-// CONFIGURATION EMAIL (Mailgun)
+// CONFIGURATION EMAIL (GMAIL)
 // ═══════════════════════════════════════════════════════════════════════
 
 const transporter = nodemailer.createTransport({
-  host: 'smtp.mailgun.org',
-  port: 587,
-  secure: false,
+  service: 'gmail',
   auth: {
-    user: 'postmaster@sandbox123.mailgun.org', // ← REMPLACE avec ton user Mailgun
-    pass: 'ton-mot-de-passe-mailgun'           // ← REMPLACE avec ton pass Mailgun
+    user: 'lafayetteheiko@gmail.com',  // ← TON EMAIL GMAIL
+    pass: 'eanysmkipkvvcwgu'  // ← MOT DE PASSE APPLICATION (pas ton mdp Gmail normal)
   }
 });
 
+// Pour créer un mot de passe d'application Gmail :
+// 1. Va sur https://myaccount.google.com/security
+// 2. Active la validation en 2 étapes
+// 3. Va dans "Mots de passe des applications"
+// 4. Crée un mot de passe pour "Mail"
+// 5. Copie le mot de passe généré ici
+
 // ═══════════════════════════════════════════════════════════════════════
-// FONCTION 1 : ENVOYER UN EMAIL À PLUSIEURS UTILISATEURS
+// FONCTION : ENVOI BULK EMAIL (pour l'onglet Diffusion)
+// ═══════════════════════════════════════════════════════════════════════
+
+exports.sendBulkEmail = functions.https.onCall(async (data, context) => {
+  // Sécurité : Vérifier que l'utilisateur est authentifié
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Non authentifié');
+  }
+
+  const { recipients, subject, html, fromName } = data;
+
+  if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'recipients requis');
+  }
+
+  if (!subject || !html) {
+    throw new functions.https.HttpsError('invalid-argument', 'subject et html requis');
+  }
+
+  const results = { sent: 0, failed: 0, errors: [] };
+
+  // Envoyer à chaque destinataire
+  for (const email of recipients) {
+    try {
+      await transporter.sendMail({
+        from: fromName ? `"${fromName}" <lafayetteheiko@gmail.com>` : '"Heiko Lafayette" <lafayetteheiko@gmail.com>',
+        to: email,
+        subject: subject,
+        html: html
+      });
+
+      results.sent++;
+      console.log(`✅ Email envoyé à: ${email}`);
+    } catch (error) {
+      results.failed++;
+      results.errors.push({ email, error: error.message });
+      console.error(`❌ Erreur envoi à ${email}:`, error.message);
+    }
+  }
+
+  return results;
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// FONCTION : ENVOYER UN EMAIL À PLUSIEURS UTILISATEURS
 // ═══════════════════════════════════════════════════════════════════════
 
 exports.sendEmailToUsers = functions.https.onCall(async (data, context) => {
@@ -57,7 +106,7 @@ exports.sendEmailToUsers = functions.https.onCall(async (data, context) => {
       }
 
       await transporter.sendMail({
-        from: '"Heiko Lafayette" <noreply@heiko.com>',
+        from: '"Heiko Lafayette" <lafayetteheiko@gmail.com>',
         to: user.email,
         subject: subject,
         text: text || '',
@@ -75,11 +124,11 @@ exports.sendEmailToUsers = functions.https.onCall(async (data, context) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// FONCTION 2 : ENVOYER UNE NOTIFICATION PUSH À PLUSIEURS UTILISATEURS
+// FONCTION : ENVOYER UNE NOTIFICATION PUSH À PLUSIEURS UTILISATEURS
 // ═══════════════════════════════════════════════════════════════════════
 
 exports.sendPushToUsers = functions.https.onCall(async (data, context) => {
-  // Sécurité : Vérifier que l'utilisateur est authentifié et admin
+  // Sécurité : Vérifier que l'utilisateur est authentifié
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Non authentifié');
   }
@@ -145,115 +194,4 @@ exports.sendPushToUsers = functions.https.onCall(async (data, context) => {
 
       // Logger les tokens invalides pour nettoyage
       if (response.failureCount > 0) {
-        response.responses.forEach((resp, idx) => {
-          if (!resp.success) {
-            console.error(`Token invalide: ${tokens[idx]}`);
-            // Optionnel : supprimer le token invalide de Firebase
-            // await db.ref(`users/${userIds[idx]}/pushToken`).remove();
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Erreur envoi push:', error);
-      results.errors.push({ error: error.message });
-    }
-  }
-
-  return {
-    sent: results.sent,
-    failed: results.failed,
-    noToken: results.noToken,
-    usersWithoutToken: usersWithoutToken,
-    errors: results.errors
-  };
-});
-
-// ═══════════════════════════════════════════════════════════════════════
-// FONCTION 3 : ENVOYER UN EMAIL À UN GROUPE
-// ═══════════════════════════════════════════════════════════════════════
-
-exports.sendEmailToGroup = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Non authentifié');
-  }
-
-  const { groupId, subject, html, text } = data;
-
-  if (!groupId || !subject || !html) {
-    throw new functions.https.HttpsError('invalid-argument', 'Paramètres manquants');
-  }
-
-  const db = admin.database();
-
-  // Récupérer le groupe
-  const groupSnap = await db.ref(`mailGroups/${groupId}`).once('value');
-  const group = groupSnap.val();
-
-  if (!group || !group.members || group.members.length === 0) {
-    throw new functions.https.HttpsError('not-found', 'Groupe vide ou introuvable');
-  }
-
-  // Envoyer à tous les membres du groupe
-  const results = { sent: 0, failed: 0, errors: [] };
-
-  for (const uid of group.members) {
-    try {
-      const userSnap = await db.ref(`users/${uid}`).once('value');
-      const user = userSnap.val();
-
-      if (!user || !user.email) {
-        results.failed++;
-        continue;
-      }
-
-      await transporter.sendMail({
-        from: '"Heiko Lafayette" <noreply@heiko.com>',
-        to: user.email,
-        subject: subject,
-        text: text || '',
-        html: html
-      });
-
-      results.sent++;
-    } catch (error) {
-      results.failed++;
-      results.errors.push({ uid, error: error.message });
-    }
-  }
-
-  return results;
-});
-
-// ═══════════════════════════════════════════════════════════════════════
-// FONCTION 4 : TESTER LA CONFIGURATION EMAIL
-// ═══════════════════════════════════════════════════════════════════════
-
-exports.testEmail = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Non authentifié');
-  }
-
-  const { to } = data;
-
-  if (!to) {
-    throw new functions.https.HttpsError('invalid-argument', 'Email destinataire requis');
-  }
-
-  try {
-    await transporter.sendMail({
-      from: '"Heiko Lafayette" <noreply@heiko.com>',
-      to: to,
-      subject: '🧪 Test Email - Heiko Lafayette',
-      html: '<h2>✅ Configuration email OK !</h2><p>Si tu reçois ce message, tout fonctionne.</p>'
-    });
-
-    return { success: true, message: 'Email envoyé avec succès' };
-  } catch (error) {
-    console.error('Erreur test email:', error);
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
-
-// ═══════════════════════════════════════════════════════════════════════
-// FIN DU FICHIER
-// ═══════════════════════════════════════════════════════════════════════
+        response.responses.forEach((resp,
