@@ -22,7 +22,7 @@ async function setupPushNotifications() {
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
       const token = await messaging.getToken({
-        vapidKey: 'VOTRE_VAPID_KEY_ICI' // À remplacer par ta clé VAPID
+        vapidKey: 'BHItjKUG0Dz7jagVmfULxS7B_qQcT0DM7O_11fKdERKFzxP3QiWisJoD3agcV22VYFhtpVw-9YuUzrRmCZIawyo' // À remplacer par ta clé VAPID
       });
 
       if (token) {
