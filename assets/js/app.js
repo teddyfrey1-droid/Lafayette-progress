@@ -131,35 +131,7 @@ let _objProgUnsub = null;
     }
   });
 }
-
-      // Install prompt
-      let deferredPrompt = null;
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        const btn = document.getElementById('installAppBtn');
-        if(btn){
-          btn.style.display = 'block';
-          btn.onclick = async () => {
-            try{
-              btn.disabled = true;
-              deferredPrompt.prompt();
-              await deferredPrompt.userChoice;
-            }catch(_){ }
-            deferredPrompt = null;
-            btn.style.display = 'none';
-            btn.disabled = false;
-          };
-        }
-      });
-      window.addEventListener('appinstalled', () => {
-        const btn = document.getElementById('installAppBtn');
-        if(btn) btn.style.display = 'none';
-        deferredPrompt = null;
-      });
-    })();
-
-    
+ 
     // GLOBAL MENU (all users)
     function toggleGlobalMenu(force) {
         const menu = document.getElementById("globalMenu");
