@@ -1,494 +1,543 @@
 /*
-  Mail system (manual + group) for Lafayette-progress
-  - Frontend writes/reads:
-    - settings/functionsRegion (optional)
-    - settings/mailFromName (optional)
-    - mailGroups/{groupId} { name, color, userIds, createdAt, updatedAt, createdBy, updatedBy }
-  - Frontend calls Cloud Function:
-    - sendBulkEmail (callable)
 
-  Note: This file assumes app.js has already loaded and defines:
-    db, firebase, allUsers, globalSettings, currentUser, isAdminUser, showToast, logAction
+Mail system (manual + group) for Lafayette-progress
+
+- Frontend writes/reads:
+  - settings/functionsRegion (optional)
+  - settings/mailFromName (optional)
+  - mailGroups/{groupId} { name, color, userIds, createdAt, updatedAt, createdBy, updatedBy }
+
+- Frontend calls Cloud Function:
+  - sendBulkEmail (callable)
+
+Note: This file assumes app.js has already loaded and defines:
+  db, firebase, allUsers, globalSettings, currentUser, isAdminUser, showToast, logAction
+
 */
 
 (function(){
-  'use strict';
+'use strict';
 
-  // -------------------------
-  // State
-  // -------------------------
-  let mailGroups = {}; // {id: {name,color,userIds}}
-  let selectedUserIds = new Set();
-  let activeGroupId = null;
-  let editingGroupId = null;
-  let modalSelected = new Set();
+// -------------------------
+// State
+// -------------------------
+let mailGroups = {}; // {id: {name,color,userIds}}
+let selectedUserIds = new Set();
+let activeGroupId = null;
+let editingGroupId = null;
+let modalSelected = new Set();
 
-  // -------------------------
-  // Utils
-  // -------------------------
-  function safeGet(id){ return document.getElementById(id); }
+// -------------------------
+// Utils
+// -------------------------
+function safeGet(id){ return document.getElementById(id); }
 
-  function escapeHtml(str){
-    return String(str ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function escapeHtml(str){
+  return String(str ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+function getUsersArray(){
+  try{
+    const raw = (typeof allUsers !== 'undefined' && allUsers) ? allUsers : {};
+    return Object.keys(raw).map(uid => ({ uid, ...(raw[uid]||{}) }));
+  } catch(e){
+    return [];
+  }
+}
+
+function isAdmin(){
+  try{ return typeof isAdminUser === 'function' ? !!isAdminUser() : false; }
+  catch(e){ return false; }
+}
+
+function getFunctionsRegion(){
+  try{
+    const fromSettings = (typeof globalSettings !== 'undefined' && globalSettings && globalSettings.functionsRegion) ? String(globalSettings.functionsRegion).trim() : '';
+    if(fromSettings) return fromSettings;
+  } catch(e){}
+  const input = safeGet('mailFunctionsRegion');
+  if(input && input.value && input.value.trim()) return input.value.trim();
+  return ''; // default region
+}
+
+function setSelectedCount(){
+  const el = safeGet('mailSelectedCount');
+  if(!el) return;
+  el.textContent = `${selectedUserIds.size} destinataire(s) sélectionné(s)`;
+}
+
+function normalizeMessageToHtml(text){
+  const s = String(text ?? '');
+  const hasTag = /<\w+[^>]*>/.test(s);
+  if(hasTag) return s;
+  return escapeHtml(s).replace(/\n/g, '<br>');
+}
+
+// -------------------------
+// Data listeners
+// -------------------------
+function attachMailGroupsListener(){
+  if(typeof db === 'undefined' || !db) return;
+  db.ref('mailGroups').on('value', (snap) => {
+    mailGroups = snap.val() || {};
+    try{ renderMailUI(); } catch(e){ console.error(e); }
+  });
+}
+
+// -------------------------
+// Rendering
+// -------------------------
+function renderQuickGroups(){
+  const wrap = safeGet('mailQuickGroups');
+  if(!wrap) return;
+  const groupsArr = Object.keys(mailGroups).map(id => ({ id, ...(mailGroups[id]||{}) }));
+  groupsArr.sort((a,b)=> String(a.name||'').localeCompare(String(b.name||'')));
+
+  if(groupsArr.length === 0){
+    wrap.innerHTML = '<div style="color:#94a3b8;font-size:12px;font-style:italic;">Aucun groupe pour l\'instant. Crée-en un dans "Groupes mail".</div>';
+    return;
   }
 
-  function getUsersArray(){
-    try{
-      const raw = (typeof allUsers !== 'undefined' && allUsers) ? allUsers : {};
-      return Object.keys(raw).map(uid => ({ uid, ...(raw[uid]||{}) }));
-    } catch(e){
-      return [];
+  wrap.innerHTML = '';
+  groupsArr.forEach(g => {
+    const btn = document.createElement('button');
+    btn.className = 'mail-group-chip';
+    btn.style.cssText = `background:${g.color||'#3b82f6'}20;border:1px solid ${g.color||'#3b82f6'};color:${g.color||'#3b82f6'};`;
+    btn.textContent = g.name || 'Sans nom';
+
+    if(activeGroupId === g.id){
+      btn.style.background = g.color||'#3b82f6';
+      btn.style.color = '#fff';
+      btn.style.fontWeight = '700';
     }
+
+    btn.onclick = () => {
+      if(activeGroupId === g.id){
+        activeGroupId = null;
+        selectedUserIds.clear();
+      } else {
+        activeGroupId = g.id;
+        selectedUserIds = new Set(g.userIds || []);
+      }
+      renderMailUI();
+    };
+
+    wrap.appendChild(btn);
+  });
+}
+
+function renderUsersGrid(){
+  const grid = safeGet('mailUsersGrid');
+  if(!grid) return;
+
+  const users = getUsersArray();
+  users.sort((a,b)=> String(a.name||'').localeCompare(String(b.name||'')));
+
+  grid.innerHTML = '';
+
+  if(users.length === 0){
+    grid.innerHTML = '<div style="color:#94a3b8;font-size:12px;font-style:italic;">Aucun utilisateur.</div>';
+    return;
   }
 
-  function isAdmin(){
-    try{ return typeof isAdminUser === 'function' ? !!isAdminUser() : false; }
-    catch(e){ return false; }
+  users.forEach(u => {
+    const div = document.createElement('div');
+    div.className = 'mail-user-card';
+
+    const checked = selectedUserIds.has(u.uid);
+
+    // Afficher le statut des notifications
+    const pushEnabled = u.pushEnabled === true;
+    const notifBadge = pushEnabled ? 
+      '<span style="font-size:10px;background:#22c55e;color:#fff;padding:2px 6px;border-radius:4px;margin-left:4px;">📱 Push</span>' :
+      '<span style="font-size:10px;background:#8b5cf6;color:#fff;padding:2px 6px;border-radius:4px;margin-left:4px;">📧 Email</span>';
+
+    div.innerHTML = `
+      <input type="checkbox" 
+             ${checked ? 'checked' : ''}
+             onchange="window.toggleUserSelection('${u.uid}')"
+             style="width:18px;height:18px;cursor:pointer;">
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:13px;color:var(--text-main);">
+          ${escapeHtml(u.name || 'Utilisateur')}
+          ${notifBadge}
+        </div>
+        <div style="font-size:11px;color:#94a3b8;">${escapeHtml(u.email || '')}</div>
+      </div>
+    `;
+
+    grid.appendChild(div);
+  });
+}
+
+function renderMailUI(){
+  if(!isAdmin()) return;
+  renderQuickGroups();
+  renderUsersGrid();
+  renderMailGroupsList();
+  setSelectedCount();
+}
+
+// -------------------------
+// User selection
+// -------------------------
+window.toggleUserSelection = function(uid){
+  if(selectedUserIds.has(uid)){
+    selectedUserIds.delete(uid);
+  } else {
+    selectedUserIds.add(uid);
+  }
+  activeGroupId = null;
+  renderMailUI();
+};
+
+window.clearMailSelection = function(){
+  selectedUserIds.clear();
+  activeGroupId = null;
+  renderMailUI();
+};
+
+// -------------------------
+// Send Email
+// -------------------------
+window.sendManualEmail = async function(){
+  if(!isAdmin()){
+    alert('Accès réservé aux admins');
+    return;
   }
 
-  function getFunctionsRegion(){
+  const subject = (safeGet('mailSubject')?.value || '').trim();
+  const message = (safeGet('mailMessage')?.value || '').trim();
+
+  if(!subject || !message){
+    alert('Sujet et message obligatoires');
+    return;
+  }
+
+  if(selectedUserIds.size === 0){
+    alert('Sélectionne au moins un destinataire');
+    return;
+  }
+
+  const recipientUids = Array.from(selectedUserIds);
+
+  // Séparer les utilisateurs selon leur statut de notifications
+  const users = getUsersArray();
+  const pushUsers = [];
+  const emailUsers = [];
+
+  recipientUids.forEach(uid => {
+    const user = users.find(u => u.uid === uid);
+    if(!user) return;
+
+    if(user.pushEnabled === true){
+      pushUsers.push(user);
+    } else {
+      emailUsers.push(user);
+    }
+  });
+
+  console.log('📊 Répartition des destinataires:');
+  console.log(`📱 Push: ${pushUsers.length} utilisateurs`);
+  console.log(`📧 Email: ${emailUsers.length} utilisateurs`);
+
+  if(!confirm(`Envoyer à ${recipientUids.length} personne(s) ?\n\n📱 Push: ${pushUsers.length}\n📧 Email: ${emailUsers.length}`)){
+    return;
+  }
+
+  try {
+    // Vérifier les paramètres de notification dans globalSettings
+    const notifSettings = (globalSettings && globalSettings.notifications) || {};
+
+    // Pour un email manuel, on respecte les préférences utilisateur
+    // Push pour ceux qui ont activé, email pour les autres
+
+    // 1. Envoyer les notifications push
+    if(pushUsers.length > 0){
+      console.log('📱 Envoi des notifications push...');
+      const pushPromises = pushUsers.map(user => {
+        if(user.pushToken){
+          return db.ref('notifications').push({
+            userId: user.uid,
+            title: subject,
+            body: message.substring(0, 150) + (message.length > 150 ? '...' : ''),
+            type: 'manual_email',
+            timestamp: Date.now(),
+            read: false
+          });
+        }
+        return Promise.resolve();
+      });
+      await Promise.all(pushPromises);
+    }
+
+    // 2. Envoyer les emails (pour ceux sans push)
+    if(emailUsers.length > 0){
+      console.log('📧 Envoi des emails...');
+      const region = getFunctionsRegion();
+      const fromName = (safeGet('mailFromName')?.value || '').trim() || 'Team Lafayette';
+
+      const funcRef = region 
+        ? firebase.app().functions(region)
+        : firebase.functions();
+
+      const sendBulkEmail = funcRef.httpsCallable('sendBulkEmail');
+
+      const payload = {
+        recipientUids: emailUsers.map(u => u.uid),
+        subject: subject,
+        htmlBody: normalizeMessageToHtml(message),
+        fromName: fromName
+      };
+
+      await sendBulkEmail(payload);
+    }
+
+    // Log l'action
     try{
-      const fromSettings = (typeof globalSettings !== 'undefined' && globalSettings && globalSettings.functionsRegion) ? String(globalSettings.functionsRegion).trim() : '';
-      if(fromSettings) return fromSettings;
+      if(typeof logAction === 'function'){
+        logAction('Email envoyé', `${recipientUids.length} destinataire(s) - ${pushUsers.length} push, ${emailUsers.length} emails`);
+      }
     } catch(e){}
 
-    const input = safeGet('mailFunctionsRegion');
-    if(input && input.value && input.value.trim()) return input.value.trim();
-    return ''; // default region
-  }
-
-  function setSelectedCount(){
-    const el = safeGet('mailSelectedCount');
-    if(!el) return;
-    el.textContent = `${selectedUserIds.size} destinataire(s) sélectionné(s)`;
-  }
-
-  function normalizeMessageToHtml(text){
-    // Allow HTML if user typed tags; otherwise simple newline to <br>
-    const s = String(text ?? '');
-    const hasTag = /<\w+[^>]*>/.test(s);
-    if(hasTag) return s;
-    return escapeHtml(s).replace(/\n/g, '<br>');
-  }
-
-  // -------------------------
-  // Data listeners
-  // -------------------------
-  function attachMailGroupsListener(){
-    if(typeof db === 'undefined' || !db) return;
-
-    db.ref('mailGroups').on('value', (snap) => {
-      mailGroups = snap.val() || {};
-      try{ renderMailUI(); } catch(e){ console.error(e); }
-    });
-  }
-
-  // -------------------------
-  // Rendering
-  // -------------------------
-  function renderQuickGroups(){
-    const wrap = safeGet('mailQuickGroups');
-    if(!wrap) return;
-
-    const groupsArr = Object.keys(mailGroups).map(id => ({ id, ...(mailGroups[id]||{}) }));
-    groupsArr.sort((a,b)=> String(a.name||'').localeCompare(String(b.name||'')));
-
-    if(groupsArr.length === 0){
-      wrap.innerHTML = `<div class="mail-hint">Aucun groupe pour l'instant. Crée-en un dans “Groupes mail”.</div>`;
-      return;
-    }
-
-    wrap.innerHTML = groupsArr.map(g => {
-      const n = Array.isArray(g.userIds) ? g.userIds.length : 0;
-      const active = activeGroupId === g.id;
-      return `<div class="mail-chip ${active?'active':''}" onclick="selectMailGroup('${escapeHtml(g.id)}')" title="Sélectionner ce groupe">
-        👥 ${escapeHtml(g.name || 'Groupe')} (${n})
-      </div>`;
-    }).join('');
-  }
-
-  function renderUsersGrid(){
-    const grid = safeGet('mailUsersGrid');
-    if(!grid) return;
-
-    const users = getUsersArray()
-      .filter(u => (u.email || '').trim().length > 3)
-      .sort((a,b)=> String(a.name||'').localeCompare(String(b.name||'')));
-
-    if(users.length === 0){
-      grid.innerHTML = `<div class="mail-hint">Aucun utilisateur avec email trouvé.</div>`;
-      return;
-    }
-
-    grid.innerHTML = users.map(u => {
-      const selected = selectedUserIds.has(u.uid);
-      return `<div class="mail-user-card ${selected?'selected':''}" onclick="toggleMailRecipient('${escapeHtml(u.uid)}')" title="Cliquer pour sélectionner">
-        <div class="mail-user-check">${selected ? '✓' : ''}</div>
-        <div style="min-width:0; flex:1;">
-          <div class="mail-user-name">${escapeHtml(u.name || 'Sans nom')}</div>
-          <div class="mail-user-email">${escapeHtml(u.email || '')}</div>
-        </div>
-      </div>`;
-    }).join('');
-
-    setSelectedCount();
-  }
-
-  function renderGroupsList(){
-    const list = safeGet('mailGroupsList');
-    if(!list) return;
-
-    const groupsArr = Object.keys(mailGroups).map(id => ({ id, ...(mailGroups[id]||{}) }));
-    groupsArr.sort((a,b)=> String(a.name||'').localeCompare(String(b.name||'')));
-
-    if(groupsArr.length === 0){
-      list.innerHTML = `<div class="mail-hint">Aucun groupe. Clique sur “Nouveau groupe”.</div>`;
-      return;
-    }
-
-    const usersById = {};
-    getUsersArray().forEach(u => { usersById[u.uid] = u; });
-
-    list.innerHTML = groupsArr.map(g => {
-      const ids = Array.isArray(g.userIds) ? g.userIds : [];
-      const names = ids.map(id => usersById[id]?.name).filter(Boolean).slice(0,10);
-      const more = ids.length > names.length ? ` +${ids.length - names.length}` : '';
-      const color = g.color || '#3b82f6';
-      return `
-        <div class="user-item" style="border-left:4px solid ${escapeHtml(color)};">
-          <div class="user-info">
-            <div class="user-header" style="gap:10px;">
-              <span class="user-name">${escapeHtml(g.name || 'Groupe')}</span>
-              <span class="pub-state on" style="background:rgba(15,23,42,0.06); color:#0f172a; border:1px solid rgba(15,23,42,0.1);">${ids.length} membre(s)</span>
-            </div>
-            <div class="user-meta" style="white-space:normal;">${escapeHtml(names.join(', '))}${escapeHtml(more)}</div>
-          </div>
-          <div class="user-actions">
-            <div class="btn-group">
-              <button onclick="openMailGroupModal('${escapeHtml(g.id)}')" class="action-btn" title="Modifier">✏️</button>
-              <button onclick="deleteMailGroup('${escapeHtml(g.id)}')" class="action-btn delete" title="Supprimer">🗑️</button>
-            </div>
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  function syncSettingsInputs(){
-    const reg = safeGet('mailFunctionsRegion');
-    const fromName = safeGet('mailFromName');
-
-    if(reg){
-      const v = (typeof globalSettings !== 'undefined' && globalSettings && globalSettings.functionsRegion) ? String(globalSettings.functionsRegion) : '';
-      if(reg.value !== v) reg.value = v;
-    }
-    if(fromName){
-      const v = (typeof globalSettings !== 'undefined' && globalSettings && globalSettings.mailFromName) ? String(globalSettings.mailFromName) : '';
-      if(fromName.value !== v) fromName.value = v;
-    }
-  }
-
-  function renderMailUI(){
-    if(!isAdmin()) return;
-
-    // If tab not in DOM, nothing to do
-    if(!safeGet('tab-emails')) return;
-
-    syncSettingsInputs();
-    renderQuickGroups();
-    renderUsersGrid();
-    renderGroupsList();
-  }
-
-  function renderGroupModalMembers(){
-    const members = safeGet('mailGroupMembers');
-    if(!members) return;
-
-    const users = getUsersArray()
-      .filter(u => (u.email || '').trim().length > 3)
-      .sort((a,b)=> String(a.name||'').localeCompare(String(b.name||'')));
-
-    if(users.length === 0){
-      members.innerHTML = `<div class="mail-hint">Aucun utilisateur avec email.</div>`;
-      return;
-    }
-
-    members.innerHTML = users.map(u => {
-      const checked = modalSelected.has(u.uid);
-      return `<div class="mail-user-card ${checked?'selected':''}" onclick="toggleMailGroupMember('${escapeHtml(u.uid)}')">
-        <div class="mail-user-check">${checked ? '✓' : ''}</div>
-        <div style="min-width:0; flex:1;">
-          <div class="mail-user-name">${escapeHtml(u.name || 'Sans nom')}</div>
-          <div class="mail-user-email">${escapeHtml(u.email || '')}</div>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-
-  // -------------------------
-  // Public actions (attached to window)
-  // -------------------------
-  function toggleMailRecipient(uid){
-    activeGroupId = null;
-    if(selectedUserIds.has(uid)) selectedUserIds.delete(uid);
-    else selectedUserIds.add(uid);
-    renderUsersGrid();
-    renderQuickGroups();
-  }
-
-  function selectMailGroup(groupId){
-    const g = mailGroups[groupId];
-    if(!g || !Array.isArray(g.userIds)) return;
-
-    activeGroupId = groupId;
-    selectedUserIds = new Set(g.userIds);
-    renderUsersGrid();
-    renderQuickGroups();
-  }
-
-  function clearMailSelection(){
-    activeGroupId = null;
-    selectedUserIds = new Set();
-    renderUsersGrid();
-    renderQuickGroups();
-  }
-
-  async function saveMailSettings(){
-    if(!isAdmin()) return;
-    if(typeof db === 'undefined' || !db) return;
-
-    const reg = safeGet('mailFunctionsRegion');
-    const fromName = safeGet('mailFromName');
-
-    const regionVal = (reg?.value || '').trim();
-    const fromNameVal = (fromName?.value || '').trim();
-
-    const updates = {};
-    updates['settings/functionsRegion'] = regionVal || null;
-    updates['settings/mailFromName'] = fromNameVal || null;
-
-    try{
-      await db.ref().update(updates);
-      showToast('✅ Réglages mail enregistrés');
-      try{ logAction('Mail - Réglages', regionVal ? `region=${regionVal}` : 'region=default'); }catch(e){}
-    } catch(e){
-      console.error(e);
-      alert("Erreur : impossible d'enregistrer les réglages. Vérifie tes règles Firebase.");
-    }
-  }
-
-  async function sendManualEmail(){
-    if(!isAdmin()) return;
-    if(typeof firebase === 'undefined' || !firebase) return;
-
-    const subject = (safeGet('mailSubject')?.value || '').trim();
-    const message = (safeGet('mailMessage')?.value || '').trim();
-
-    if(selectedUserIds.size === 0){ alert('⚠️ Sélectionne au moins un destinataire'); return; }
-    if(!subject){ alert('⚠️ Le sujet est obligatoire'); return; }
-    if(!message){ alert('⚠️ Le message est obligatoire'); return; }
-
-    const usersById = {};
-    getUsersArray().forEach(u => { usersById[u.uid] = u; });
-
-    const recipientEmails = Array.from(selectedUserIds)
-      .map(uid => (usersById[uid]?.email || '').trim())
-      .filter(e => e.length > 3);
-
-    // de-duplicate
-    const uniq = Array.from(new Set(recipientEmails));
-
-    if(uniq.length === 0){
-      alert('⚠️ Aucun email valide dans la sélection');
-      return;
-    }
-
-    // safety cap (adjust if needed)
-    const MAX = 80;
-    if(uniq.length > MAX){
-      const ok = confirm(`Tu as sélectionné ${uniq.length} emails. Limite de sécurité: ${MAX}. Envoyer quand même les ${MAX} premiers ?`);
-      if(!ok) return;
-      uniq.splice(MAX);
-    }
-
-    const region = getFunctionsRegion();
-    const fromName = (safeGet('mailFromName')?.value || '').trim();
-
-    const payload = {
-      recipients: uniq,
-      subject,
-      html: normalizeMessageToHtml(message),
-      fromName: fromName || null,
-      // optional: record selected ids
-      meta: {
-        selectedUserIds: Array.from(selectedUserIds),
-        groupId: activeGroupId || null,
-        source: 'admin-ui'
-      }
-    };
-
-    try{
-      showToast('📨 Envoi en cours…');
-
-      // If region is empty, use default
-      const functions = region ? firebase.app().functions(region) : firebase.app().functions();
-      const call = functions.httpsCallable('sendBulkEmail');
-      const res = await call(payload);
-
-      const sent = res?.data?.sent ?? uniq.length;
-      showToast(`✅ Email envoyé (${sent})`);
-
-      // Reset
-      safeGet('mailSubject').value = '';
-      safeGet('mailMessage').value = '';
-      clearMailSelection();
-
-      try{ logAction('Mail - Envoi', `${sent} destinataire(s)`); }catch(e){}
-    } catch(e){
-      console.error(e);
-      const msg = (e?.message || '').toLowerCase();
-      if(msg.includes('not-found') || msg.includes('functions') || msg.includes('unavailable')){
-        alert("La Cloud Function 'sendBulkEmail' n'est pas accessible.\n\nÀ faire: déployer le dossier functions/ sur Firebase (voir README) et vérifier la région.");
-      } else {
-        alert("Erreur lors de l'envoi. Vérifie les logs Firebase Functions.");
-      }
-    }
-  }
-
-  function openMailGroupModal(groupId){
-    if(!isAdmin()) return;
-
-    const overlay = safeGet('mailGroupModal');
-    const title = safeGet('mailGroupModalTitle');
-    const name = safeGet('mailGroupName');
-    const members = safeGet('mailGroupMembers');
-
-    if(!overlay || !title || !name || !members) return;
-
-    editingGroupId = null;
-    modalSelected = new Set();
-
-    if(groupId && mailGroups[groupId]){
-      editingGroupId = groupId;
-      title.textContent = 'Modifier le groupe';
-      name.value = mailGroups[groupId].name || '';
-      const ids = Array.isArray(mailGroups[groupId].userIds) ? mailGroups[groupId].userIds : [];
-      modalSelected = new Set(ids);
-
-      // select color
-      const color = mailGroups[groupId].color || '#3b82f6';
-      const colorInput = safeGet('mailGroupColor');
-      if(colorInput) colorInput.value = color;
+    if(typeof showToast === 'function'){
+      showToast(\`✅ Envoyé ! 📱 \${pushUsers.length} push, 📧 \${emailUsers.length} emails\`);
     } else {
-      title.textContent = 'Nouveau groupe';
-      name.value = '';
-      const colorInput = safeGet('mailGroupColor');
-      if(colorInput) colorInput.value = '#3b82f6';
+      alert(\`✅ Envoyé ! 📱 \${pushUsers.length} push, 📧 \${emailUsers.length} emails\`);
     }
 
-    renderGroupModalMembers();
+    // Reset
+    safeGet('mailSubject').value = '';
+    safeGet('mailMessage').value = '';
+    window.clearMailSelection();
 
-    overlay.style.display = 'flex';
+  } catch(err){
+    console.error('Erreur envoi:', err);
+    alert('Erreur lors de l\'envoi: ' + (err.message || err));
+  }
+};
+
+// -------------------------
+// Settings
+// -------------------------
+window.saveMailSettings = function(){
+  if(!isAdmin()) return;
+
+  const region = (safeGet('mailFunctionsRegion')?.value || '').trim();
+  const fromName = (safeGet('mailFromName')?.value || '').trim();
+
+  const updates = {};
+  if(region) updates['settings/functionsRegion'] = region;
+  if(fromName) updates['settings/mailFromName'] = fromName;
+
+  if(Object.keys(updates).length === 0){
+    if(typeof showToast === 'function') showToast('Rien à sauvegarder');
+    return;
   }
 
-  function closeMailGroupModal(){
-    const overlay = safeGet('mailGroupModal');
-    if(overlay) overlay.style.display = 'none';
-    editingGroupId = null;
-    modalSelected = new Set();
-  }
-
-  function toggleMailGroupMember(uid){
-    if(modalSelected.has(uid)) modalSelected.delete(uid);
-    else modalSelected.add(uid);
-    renderGroupModalMembers();
-  }
-
-  async function saveMailGroup(){
-    if(!isAdmin()) return;
-    if(typeof db === 'undefined' || !db) return;
-
-    const nameEl = safeGet('mailGroupName');
-    const colorEl = safeGet('mailGroupColor');
-    const name = (nameEl?.value || '').trim();
-    const color = (colorEl?.value || '#3b82f6').trim();
-
-    if(name.length < 2){ alert('⚠️ Le nom du groupe est obligatoire'); return; }
-    if(modalSelected.size === 0){ alert('⚠️ Sélectionne au moins un membre'); return; }
-
-    const now = Date.now();
-    const uid = (typeof currentUser !== 'undefined' && currentUser && currentUser.uid) ? currentUser.uid : null;
-
-    const id = editingGroupId || ('g' + now);
-
-    // preserve createdAt if existing
-    const existing = mailGroups[id] || {};
-    const payload = {
-      name,
-      color,
-      userIds: Array.from(modalSelected),
-      updatedAt: now,
-      updatedBy: uid,
-      createdAt: existing.createdAt || now,
-      createdBy: existing.createdBy || uid
-    };
-
-    try{
-      await db.ref('mailGroups/' + id).set(payload);
-      showToast(editingGroupId ? '✅ Groupe mis à jour' : '✅ Groupe créé');
-      try{ logAction('Mail - Groupe', `${editingGroupId ? 'Update' : 'Create'}: ${name}`); }catch(e){}
-      closeMailGroupModal();
-    } catch(e){
+  db.ref().update(updates)
+    .then(() => {
+      if(typeof showToast === 'function'){
+        showToast('✅ Paramètres sauvegardés');
+      }
+    })
+    .catch(e => {
       console.error(e);
-      alert('Erreur : impossible de sauvegarder ce groupe.');
-    }
-  }
-
-  async function deleteMailGroup(groupId){
-    if(!isAdmin()) return;
-    if(typeof db === 'undefined' || !db) return;
-
-    const g = mailGroups[groupId];
-    const label = g?.name || groupId;
-    if(!confirm(`Supprimer le groupe “${label}” ?`)) return;
-
-    try{
-      await db.ref('mailGroups/' + groupId).remove();
-      showToast('🗑️ Groupe supprimé');
-      try{ logAction('Mail - Groupe', `Delete: ${label}`); }catch(e){}
-      if(activeGroupId === groupId){ clearMailSelection(); }
-    } catch(e){
-      console.error(e);
-      alert('Erreur : suppression impossible.');
-    }
-  }
-
-  // -------------------------
-  // Expose to window (for onclick attributes)
-  // -------------------------
-  window.renderMailUI = renderMailUI;
-  window.toggleMailRecipient = toggleMailRecipient;
-  window.selectMailGroup = selectMailGroup;
-  window.clearMailSelection = clearMailSelection;
-  window.sendManualEmail = sendManualEmail;
-  window.saveMailSettings = saveMailSettings;
-  window.openMailGroupModal = openMailGroupModal;
-  window.closeMailGroupModal = closeMailGroupModal;
-  window.toggleMailGroupMember = toggleMailGroupMember;
-  window.saveMailGroup = saveMailGroup;
-  window.deleteMailGroup = deleteMailGroup;
-
-  // -------------------------
-  // Init
-  // -------------------------
-  function init(){
-    try{ attachMailGroupsListener(); }catch(e){ console.error(e); }
-    // Keep UI updated
-    document.addEventListener('DOMContentLoaded', () => {
-      try{ renderMailUI(); }catch(e){ console.error(e); }
+      alert('Erreur: ' + e.message);
     });
+};
+
+// -------------------------
+// Mail Groups CRUD
+// -------------------------
+function renderMailGroupsList(){
+  const list = safeGet('mailGroupsList');
+  if(!list) return;
+
+  const groupsArr = Object.keys(mailGroups).map(id => ({ id, ...(mailGroups[id]||{}) }));
+  groupsArr.sort((a,b)=> String(a.name||'').localeCompare(String(b.name||'')));
+
+  if(groupsArr.length === 0){
+    list.innerHTML = '<div style="color:#94a3b8;font-size:12px;font-style:italic;">Aucun groupe. Crée-en un avec le bouton ci-dessus.</div>';
+    return;
   }
 
-  init();
+  list.innerHTML = '';
+
+  groupsArr.forEach(g => {
+    const div = document.createElement('div');
+    div.className = 'mail-group-item';
+    div.style.cssText = `border-left:4px solid ${g.color||'#3b82f6'};`;
+
+    const userCount = (g.userIds || []).length;
+
+    div.innerHTML = `
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:14px;color:var(--text-main);">
+          ${escapeHtml(g.name || 'Sans nom')}
+        </div>
+        <div style="font-size:12px;color:#94a3b8;margin-top:2px;">
+          ${userCount} membre(s)
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="window.editMailGroup('${g.id}')" 
+                style="background:none;border:none;cursor:pointer;font-size:16px;">
+          ✏️
+        </button>
+        <button onclick="window.deleteMailGroup('${g.id}')" 
+                style="background:none;border:none;cursor:pointer;font-size:16px;">
+          🗑️
+        </button>
+      </div>
+    `;
+
+    list.appendChild(div);
+  });
+}
+
+window.openMailGroupModal = function(){
+  editingGroupId = null;
+  safeGet('mailGroupId').value = '';
+  safeGet('mailGroupName').value = '';
+  safeGet('mailGroupColor').value = '#3b82f6';
+  modalSelected = new Set();
+  renderMailGroupMembers();
+  safeGet('mailGroupModalTitle').textContent = 'Nouveau groupe';
+  safeGet('mailGroupModal').style.display = 'flex';
+};
+
+window.editMailGroup = function(groupId){
+  const g = mailGroups[groupId];
+  if(!g) return;
+
+  editingGroupId = groupId;
+  safeGet('mailGroupId').value = groupId;
+  safeGet('mailGroupName').value = g.name || '';
+  safeGet('mailGroupColor').value = g.color || '#3b82f6';
+  modalSelected = new Set(g.userIds || []);
+  renderMailGroupMembers();
+  safeGet('mailGroupModalTitle').textContent = 'Modifier le groupe';
+  safeGet('mailGroupModal').style.display = 'flex';
+};
+
+window.closeMailGroupModal = function(){
+  safeGet('mailGroupModal').style.display = 'none';
+  editingGroupId = null;
+  modalSelected.clear();
+};
+
+function renderMailGroupMembers(){
+  const list = safeGet('mailGroupMembers');
+  if(!list) return;
+
+  const users = getUsersArray();
+  users.sort((a,b)=> String(a.name||'').localeCompare(String(b.name||'')));
+
+  list.innerHTML = '';
+
+  users.forEach(u => {
+    const div = document.createElement('div');
+    div.className = 'mail-member-item';
+
+    const checked = modalSelected.has(u.uid);
+
+    div.innerHTML = `
+      <input type="checkbox" 
+             ${checked ? 'checked' : ''}
+             onchange="window.toggleModalMember('${u.uid}')"
+             style="width:18px;height:18px;cursor:pointer;">
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:13px;">${escapeHtml(u.name || 'Utilisateur')}</div>
+        <div style="font-size:11px;color:#94a3b8;">${escapeHtml(u.email || '')}</div>
+      </div>
+    `;
+
+    list.appendChild(div);
+  });
+}
+
+window.toggleModalMember = function(uid){
+  if(modalSelected.has(uid)){
+    modalSelected.delete(uid);
+  } else {
+    modalSelected.add(uid);
+  }
+  renderMailGroupMembers();
+};
+
+window.saveMailGroup = function(){
+  if(!isAdmin()) return;
+
+  const name = (safeGet('mailGroupName')?.value || '').trim();
+  const color = safeGet('mailGroupColor')?.value || '#3b82f6';
+
+  if(!name){
+    alert('Nom du groupe obligatoire');
+    return;
+  }
+
+  const userIds = Array.from(modalSelected);
+
+  const data = {
+    name: name,
+    color: color,
+    userIds: userIds,
+    updatedAt: Date.now(),
+    updatedBy: (currentUser && currentUser.name) || 'Admin'
+  };
+
+  if(editingGroupId){
+    // Update
+    db.ref(\`mailGroups/\${editingGroupId}\`).update(data)
+      .then(() => {
+        if(typeof showToast === 'function') showToast('✅ Groupe modifié');
+        window.closeMailGroupModal();
+      })
+      .catch(e => alert('Erreur: ' + e.message));
+  } else {
+    // Create
+    data.createdAt = Date.now();
+    data.createdBy = (currentUser && currentUser.name) || 'Admin';
+
+    db.ref('mailGroups').push(data)
+      .then(() => {
+        if(typeof showToast === 'function') showToast('✅ Groupe créé');
+        window.closeMailGroupModal();
+      })
+      .catch(e => alert('Erreur: ' + e.message));
+  }
+};
+
+window.deleteMailGroup = function(groupId){
+  if(!confirm('Supprimer ce groupe ?')) return;
+
+  db.ref(\`mailGroups/\${groupId}\`).remove()
+    .then(() => {
+      if(typeof showToast === 'function') showToast('🗑️ Groupe supprimé');
+    })
+    .catch(e => alert('Erreur: ' + e.message));
+};
+
+// -------------------------
+// Init
+// -------------------------
+window.addEventListener('DOMContentLoaded', () => {
+  attachMailGroupsListener();
+
+  // Populate settings from globalSettings if available
+  try{
+    if(globalSettings && globalSettings.functionsRegion){
+      const inp = safeGet('mailFunctionsRegion');
+      if(inp) inp.value = globalSettings.functionsRegion;
+    }
+    if(globalSettings && globalSettings.mailFromName){
+      const inp = safeGet('mailFromName');
+      if(inp) inp.value = globalSettings.mailFromName;
+    }
+  } catch(e){}
+
+  renderMailUI();
+});
+
 })();
