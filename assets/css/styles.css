@@ -2360,3 +2360,308 @@ body.dark-mode .weekday-chip{
     height: 36px;
   }
 }
+
+
+/* ========================================
+   ADMIN PUSH PANEL STYLES
+   ======================================== */
+
+.push-setting-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  transition: all 0.2s ease;
+}
+
+.push-setting-item:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.push-setting-label {
+  flex: 1;
+}
+
+/* Override pour les user-item dans le panneau push */
+#pushUsersList .user-item {
+  margin-bottom: 12px;
+  padding: 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+#pushUsersList .user-item:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* ========================================
+   BANNIÈRE PREMIUM EN HAUT - GLASS MORPHISM
+   ======================================== */
+
+.push-invite-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+
+  /* Glass morphism background */
+  background: linear-gradient(135deg, 
+    rgba(59, 130, 246, 0.95) 0%, 
+    rgba(37, 99, 235, 0.98) 100%);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+
+  /* Bordure subtile en bas */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+
+  /* Ombres vers le bas */
+  box-shadow: 
+    0 10px 40px rgba(0, 0, 0, 0.25),
+    0 4px 12px rgba(0, 0, 0, 0.15),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+
+  padding: 20px 20px 24px;
+  z-index: 9999;
+
+  /* Animation slide-down depuis le haut */
+  transform: translateY(-100%);
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.push-invite-banner.show {
+  transform: translateY(0);
+}
+
+/* Container central */
+.push-invite-banner .push-invite-content {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Icône cloche PLUS GROSSE et animée */
+.push-invite-icon {
+  font-size: 48px;
+  flex-shrink: 0;
+  animation: bellFloat 3s ease-in-out infinite;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
+}
+
+@keyframes bellFloat {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-4px) rotate(-5deg);
+  }
+  50% {
+    transform: translateY(0) rotate(0deg);
+  }
+  75% {
+    transform: translateY(-4px) rotate(5deg);
+  }
+}
+
+/* Texte */
+.push-invite-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.push-invite-title {
+  font-size: 18px;
+  font-weight: 900;
+  margin-bottom: 6px;
+  letter-spacing: -0.02em;
+  color: white;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  line-height: 1.2;
+}
+
+.push-invite-desc {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  line-height: 1.4;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Boutons */
+.push-invite-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.push-invite-btn {
+  padding: 14px 28px;
+  font-size: 15px;
+  font-weight: 900;
+  border-radius: 14px;
+
+  /* Bouton blanc éclatant */
+  background: white;
+  color: #2563eb;
+
+  border: none;
+  cursor: pointer;
+
+  /* Ombres multiples pour effet 3D */
+  box-shadow: 
+    0 4px 14px rgba(0, 0, 0, 0.25),
+    0 2px 6px rgba(0, 0, 0, 0.15),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.1);
+
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.push-invite-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 
+    0 8px 20px rgba(0, 0, 0, 0.3),
+    0 4px 10px rgba(0, 0, 0, 0.2),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.1);
+}
+
+.push-invite-btn:active {
+  transform: translateY(-1px);
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.2),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.1);
+}
+
+.push-invite-close {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+
+  /* Glass button */
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
+}
+
+.push-invite-close:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(1.05);
+}
+
+.push-invite-close:active {
+  transform: scale(0.95);
+}
+
+/* Bouton cloche dans top-bar */
+.push-bell {
+  position: relative;
+  font-size: 20px;
+  transition: transform 0.2s ease;
+}
+
+.push-bell:hover {
+  transform: scale(1.1);
+}
+
+/* Point vert quand activé */
+.push-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+  display: none;
+}
+
+.push-bell.enabled .push-dot {
+  display: block;
+  animation: pulseDot 2s ease infinite;
+}
+
+@keyframes pulseDot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.2);
+  }
+}
+
+/* Responsive mobile */
+@media (max-width: 600px) {
+  .push-invite-banner {
+    padding: 16px 16px 20px;
+  }
+
+  .push-invite-banner .push-invite-content {
+    gap: 14px;
+  }
+
+  .push-invite-icon {
+    font-size: 42px;
+  }
+
+  .push-invite-title {
+    font-size: 16px;
+  }
+
+  .push-invite-desc {
+    font-size: 13px;
+  }
+
+  .push-invite-actions {
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+  }
+
+  .push-invite-btn {
+    width: 100%;
+    padding: 14px 20px;
+  }
+
+  .push-invite-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 36px;
+    height: 36px;
+  }
+
+  .push-setting-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .push-setting-item .switch {
+    align-self: flex-end;
+  }
+}
