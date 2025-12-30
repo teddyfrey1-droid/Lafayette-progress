@@ -696,12 +696,15 @@ function showToast(message) {
              }
           } catch(e) { console.error(e); }
       });
-      db.ref('users').on('value', s => { 
-        allUsers = s.val() || {}; 
-        if(isAdminUser()) { renderAdminUsers(); }
-        if(isAdminUser()) { renderSimulator(); }
-        try{ if(window.renderMailUI) window.renderMailUI(); }catch(e){}
-      });
+      db.ref('users').on('value', s => {
+  allUsers = s.val();
+  if(isAdminUser()) renderAdminUsers();
+  if(isAdminUser()) renderSimulator();
+  try{ if(window.renderMailUI) window.renderMailUI(); }catch(e){}
+  // ✅ Rafraîchir l'UI push après chargement des users
+  try{ setupPushUI(); }catch(e){}
+});
+
       db.ref('settings').on('value', s => { 
         globalSettings = s.val() || { budget: 0 }; 
         if(globalSettings.guardrailMaxPctOfCA == null) {
