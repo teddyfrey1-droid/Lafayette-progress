@@ -1,206 +1,221 @@
 /**
- * Cloud Functions - Email sender for Lafayette-progress
- *
- * Exports:
- *  - sendBulkEmail (callable)
- *
- * Required environment / params:
- *  - SMTP_HOST (string) or SMTP_SERVICE (string)
- *  - SMTP_PORT (int, default 587)
- *  - SMTP_USER (secret)
- *  - SMTP_PASS (secret)
- *  - MAIL_FROM_EMAIL (string) e.g. "heiko@lafayette.fr"
- *  - MAIL_FROM_NAME_DEFAULT (string, optional) e.g. "Heiko La Fayette"
+ * notifications.js
+ * Push Notifications for Lafayette Progress
+ * Browser-compatible version (no require)
  */
 
-const admin = require('firebase-admin');
-admin.initializeApp();
+(function() {
+  'use strict';
 
-const nodemailer = require('nodemailer');
+  // Firebase Messaging instance (already loaded via script tags in HTML)
+  let messaging = null;
 
-// Firebase Functions v2
-const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const { logger } = require('firebase-functions');
-const { defineSecret, defineString, defineInt } = require('firebase-functions/params');
+  /**
+   * Initialize Firebase Messaging
+   */
+  function initMessaging() {
+    try {
+      if (!firebase || !firebase.messaging) {
+        console.warn('Firebase Messaging not available');
+        return false;
+      }
 
-// Optional: load local .env when running via emulator
-try {
-  require('dotenv').config();
-} catch (_) {}
+      if (!firebase.messaging.isSupported()) {
+        console.warn('Push notifications not supported in this browser');
+        return false;
+      }
 
-// Params (can come from .env for local dev, or from Firebase CLI prompts)
-const SMTP_HOST = defineString('SMTP_HOST', { default: '' });
-const SMTP_SERVICE = defineString('SMTP_SERVICE', { default: '' });
-const SMTP_PORT = defineInt('SMTP_PORT', { default: 587 });
+      messaging = firebase.messaging();
 
-// Use Secret Manager-backed params for credentials
-const SMTP_USER = defineSecret('SMTP_USER');
-const SMTP_PASS = defineSecret('SMTP_PASS');
+      // Handle foreground messages
+      messaging.onMessage((payload) => {
+        console.log('Message reçu (foreground):', payload);
 
-const MAIL_FROM_EMAIL = defineString('MAIL_FROM_EMAIL', { default: '' });
-const MAIL_FROM_NAME_DEFAULT = defineString('MAIL_FROM_NAME_DEFAULT', { default: 'Lafayette-progress' });
+        const { title, body } = payload.notification || {};
 
-function isProbablyEmail(value) {
-  return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-}
+        // Show toast notification
+        if (typeof showToast === 'function') {
+          showToast(title || 'Nouvelle notification');
+        }
 
-function stripHtmlToText(html) {
-  if (typeof html !== 'string') return '';
-  return html
-    .replace(/<\s*br\s*\/?>/gi, '\n')
-    .replace(/<\/?p\s*>/gi, '\n')
-    .replace(/<[^>]*>/g, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
-async function assertIsAdmin(uid) {
-  const snap = await admin.database().ref(`users/${uid}`).once('value');
-  const u = snap.val();
-  const role = (u && u.role) ? String(u.role).toLowerCase() : '';
-  if (role !== 'admin' && role !== 'superadmin') {
-    throw new HttpsError('permission-denied', 'Admin only.');
-  }
-  return u;
-}
-
-function buildTransporter() {
-  const service = SMTP_SERVICE.value();
-  const host = SMTP_HOST.value();
-  const port = Number(SMTP_PORT.value());
-
-  const auth = {
-    user: SMTP_USER.value(),
-    pass: SMTP_PASS.value(),
-  };
-
-  if (service) {
-    return nodemailer.createTransport({ service, auth });
-  }
-
-  if (!host) {
-    throw new HttpsError(
-      'failed-precondition',
-      'Missing SMTP_HOST or SMTP_SERVICE configuration.'
-    );
-  }
-
-  const secure = port === 465;
-  return nodemailer.createTransport({ host, port, secure, auth });
-}
-
-function buildFromHeader(fromName, fromEmail) {
-  const name = (fromName && String(fromName).trim()) || MAIL_FROM_NAME_DEFAULT.value();
-  const email = (fromEmail && String(fromEmail).trim()) || MAIL_FROM_EMAIL.value();
-  if (!isProbablyEmail(email)) {
-    throw new HttpsError('failed-precondition', 'MAIL_FROM_EMAIL is missing or invalid.');
-  }
-  return `${name} <${email}>`;
-}
-
-exports.sendBulkEmail = onCall(
-  {
-    // Default region (frontend can set settings/functionsRegion accordingly)
-    region: 'us-central1',
-    secrets: [SMTP_USER, SMTP_PASS],
-    cors: true,
-    timeoutSeconds: 120,
-    memory: '256MiB',
-  },
-  async (request) => {
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'You must be signed in.');
-    }
-
-    const actor = await assertIsAdmin(request.auth.uid);
-
-    const data = request.data || {};
-    const recipients = Array.isArray(data.recipients) ? data.recipients : [];
-    const subject = typeof data.subject === 'string' ? data.subject.trim() : '';
-    const html = typeof data.html === 'string' ? data.html.trim() : '';
-
-    const fromName = typeof data.fromName === 'string' ? data.fromName.trim() : '';
-    const replyTo = typeof data.replyTo === 'string' ? data.replyTo.trim() : '';
-
-    const cleanRecipients = [...new Set(recipients.map(String).map(s => s.trim()))]
-      .filter(isProbablyEmail);
-
-    if (cleanRecipients.length === 0) {
-      throw new HttpsError('invalid-argument', 'At least one recipient email is required.');
-    }
-    if (cleanRecipients.length > 50) {
-      throw new HttpsError('invalid-argument', 'Max 50 recipients per request.');
-    }
-    if (!subject) {
-      throw new HttpsError('invalid-argument', 'Subject is required.');
-    }
-    if (!html) {
-      throw new HttpsError('invalid-argument', 'Message is required.');
-    }
-
-    const transporter = buildTransporter();
-    const from = buildFromHeader(fromName, null);
-
-    const messageText = stripHtmlToText(html);
-
-    // Log (without storing full email body)
-    const logRef = admin.database().ref('mailLogs').push();
-    await logRef.set({
-      createdAt: Date.now(),
-      actorUid: request.auth.uid,
-      actorEmail: actor && actor.email ? String(actor.email) : null,
-      subject,
-      recipientsCount: cleanRecipients.length,
-    });
-
-    let sent = 0;
-    for (const to of cleanRecipients) {
-      await transporter.sendMail({
-        from,
-        to,
-        subject,
-        html,
-        text: messageText,
-        replyTo: isProbablyEmail(replyTo) ? replyTo : undefined,
+        // Show browser notification if permission granted
+        if (Notification.permission === 'granted') {
+          new Notification(title || 'Notification', {
+            body: body || '',
+            icon: '/icon-192.jpg',
+            badge: '/icon-192.jpg'
+          });
+        }
       });
-      sent += 1;
+
+      return true;
+    } catch (e) {
+      console.error('Erreur init messaging:', e);
+      return false;
+    }
+  }
+
+  /**
+   * Request notification permission and get token
+   */
+  async function enablePushNotifications() {
+    try {
+      // Check if messaging is initialized
+      if (!messaging && !initMessaging()) {
+        throw new Error('Firebase Messaging non disponible');
+      }
+
+      // Request permission
+      const permission = await Notification.requestPermission();
+
+      if (permission !== 'granted') {
+        throw new Error('Permission refusée');
+      }
+
+      // Get FCM token
+      const token = await messaging.getToken({
+        vapidKey: 'BNw8cNne01234567890abcdefghijklmnopqrstuvwxyz' // Replace with your actual VAPID key
+      });
+
+      if (!token) {
+        throw new Error('Impossible d'obtenir le token');
+      }
+
+      // Save token to Firebase for this user
+      if (typeof currentUser !== 'undefined' && currentUser && currentUser.uid) {
+        if (typeof db !== 'undefined' && db) {
+          await db.ref(`users/${currentUser.uid}/fcmToken`).set(token);
+          await db.ref(`users/${currentUser.uid}/notificationsEnabled`).set(true);
+        }
+      }
+
+      console.log('Push notifications activées:', token);
+      return { success: true, token };
+
+    } catch (e) {
+      console.error('Erreur activation notifications:', e);
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Disable push notifications
+   */
+  async function disablePushNotifications() {
+    try {
+      if (!messaging) {
+        return { success: true };
+      }
+
+      // Delete token
+      await messaging.deleteToken();
+
+      // Update Firebase
+      if (typeof currentUser !== 'undefined' && currentUser && currentUser.uid) {
+        if (typeof db !== 'undefined' && db) {
+          await db.ref(`users/${currentUser.uid}/fcmToken`).remove();
+          await db.ref(`users/${currentUser.uid}/notificationsEnabled`).set(false);
+        }
+      }
+
+      console.log('Push notifications désactivées');
+      return { success: true };
+
+    } catch (e) {
+      console.error('Erreur désactivation notifications:', e);
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Setup Push Notifications UI
+   */
+  function setupPushUI() {
+    // Initialize messaging
+    initMessaging();
+
+    const bellBtn = document.getElementById('pushBellBtn');
+    const banner = document.getElementById('pushBanner');
+    const bannerActivate = document.getElementById('pushBannerActivate');
+    const bannerDismiss = document.getElementById('pushBannerDismiss');
+
+    if (!bellBtn) {
+      console.warn('Push bell button not found');
+      return;
     }
 
-    logger.info('Bulk email sent', {
-      actorUid: request.auth.uid,
-      recipientsCount: cleanRecipients.length,
-      subject,
+    // Check current state
+    const updateUI = () => {
+      const enabled = currentUser?.notificationsEnabled === true;
+
+      if (enabled) {
+        bellBtn.classList.add('enabled');
+        if (banner) banner.style.display = 'none';
+      } else {
+        bellBtn.classList.remove('enabled');
+        // Show banner only if permission not already denied
+        if (banner && Notification.permission !== 'denied') {
+          banner.style.display = 'flex';
+        }
+      }
+    };
+
+    // Bell button click
+    bellBtn.addEventListener('click', async () => {
+      const enabled = currentUser?.notificationsEnabled === true;
+
+      if (enabled) {
+        // Disable
+        const result = await disablePushNotifications();
+        if (result.success) {
+          if (typeof showToast === 'function') {
+            showToast('Notifications désactivées');
+          }
+          updateUI();
+        }
+      } else {
+        // Enable
+        const result = await enablePushNotifications();
+        if (result.success) {
+          if (typeof showToast === 'function') {
+            showToast('Notifications activées ! 🔔');
+          }
+          updateUI();
+        } else {
+          alert('Impossible d\'activer les notifications : ' + (result.error || 'Erreur inconnue'));
+        }
+      }
     });
 
-    return { success: true, sent };
+    // Banner activate button
+    if (bannerActivate) {
+      bannerActivate.addEventListener('click', async () => {
+        const result = await enablePushNotifications();
+        if (result.success) {
+          if (typeof showToast === 'function') {
+            showToast('Notifications activées ! 🔔');
+          }
+          updateUI();
+        } else {
+          alert('Impossible d\'activer les notifications : ' + (result.error || 'Erreur inconnue'));
+        }
+      });
+    }
+
+    // Banner dismiss button
+    if (bannerDismiss) {
+      bannerDismiss.addEventListener('click', () => {
+        if (banner) banner.style.display = 'none';
+      });
+    }
+
+    // Initial UI update
+    updateUI();
   }
-);
 
+  // Expose to global scope
+  window.setupPushUI = setupPushUI;
+  window.enablePushNotifications = enablePushNotifications;
+  window.disablePushNotifications = disablePushNotifications;
 
-/**
- * Example (disabled): automatic email when a planning item is created.
- *
- * IMPORTANT: you must adapt the RTDB path + schema to your planning structure.
- *
- * // const { onValueCreated } = require('firebase-functions/v2/database');
- * // exports.onPlanningCreated = onValueCreated(
- * //   { ref: '/planning/{eventId}', region: 'us-central1', secrets: [SMTP_USER, SMTP_PASS] },
- * //   async (event) => {
- * //     const planning = event.data.val();
- * //     const userId = planning && planning.userId;
- * //     if (!userId) return;
- * //
- * //     const userSnap = await admin.database().ref(`users/${userId}`).once('value');
- * //     const user = userSnap.val();
- * //     if (!user || !user.email) return;
- * //
- * //     const transporter = buildTransporter();
- * //     await transporter.sendMail({
- * //       from: buildFromHeader(null, null),
- * //       to: String(user.email),
- * //       subject: 'Nouveau planning',
- * //       text: 'Tu as été ajouté au planning.',
- * //     });
- * //   }
- * // );
- */
+})();
