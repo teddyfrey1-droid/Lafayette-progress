@@ -1,196 +1,176 @@
-// ====================================
-// SYSTÈME DE NOTIFICATIONS PUSH
-// ====================================
+// ========================================
+// PUSH NOTIFICATIONS SETUP
+// ========================================
 
-// Vérifie si les notifications sont supportées
-function isNotificationSupported() {
-  return 'Notification' in window && 'serviceWorker' in navigator;
+let currentFCMToken = null;
+
+async function setupPushNotifications() {
+  if (!('Notification' in window)) {
+    console.log('Push notifications not supported');
+    return;
+  }
+
+  if (!firebase.messaging || !firebase.messaging.isSupported || !firebase.messaging.isSupported()) {
+    console.log('FCM not supported');
+    return;
+  }
+
+  try {
+    const messaging = firebase.messaging();
+
+    // Demander la permission et obtenir le token
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      const token = await messaging.getToken({
+        vapidKey: 'VOTRE_VAPID_KEY_ICI' // À remplacer par ta clé VAPID
+      });
+
+      if (token) {
+        currentFCMToken = token;
+        console.log('FCM Token:', token);
+
+        // Sauvegarder le token dans Firebase pour cet utilisateur
+        if (currentUser && currentUser.uid) {
+          await db.ref(`users/${currentUser.uid}/pushToken`).set(token);
+          await db.ref(`users/${currentUser.uid}/pushEnabled`).set(true);
+          await db.ref(`users/${currentUser.uid}/pushEnabledAt`).set(Date.now());
+          console.log('Push enabled and saved to Firebase');
+        }
+      }
+    }
+
+    // Écouter les messages en foreground
+    messaging.onMessage((payload) => {
+      console.log('Message received (foreground):', payload);
+      showInAppNotification(payload);
+    });
+
+  } catch (error) {
+    console.error('Error setting up push:', error);
+  }
 }
 
-// Vérifie si les notifications sont activées
-function areNotificationsEnabled() {
-  if (!isNotificationSupported()) return false;
-  return Notification.permission === 'granted';
+function showInAppNotification(payload) {
+  const title = payload.notification?.title || payload.data?.title || 'Notification';
+  const body = payload.notification?.body || payload.data?.body || '';
+
+  // Afficher un toast custom
+  const toast = document.getElementById('toast');
+  if (toast) {
+    toast.innerHTML = `<strong>${title}</strong><br>${body}`;
+    toast.className = 'show';
+    setTimeout(() => {
+      toast.className = 'hide';
+    }, 5000);
+  }
 }
 
-// Vérifie si on a déjà demandé (pour ne pas re-afficher la bannière)
-function hasAskedForNotifications() {
-  return localStorage.getItem('pushNotificationsAsked') === 'true';
-}
+// ========================================
+// PUSH UI SETUP (Bannière d'invitation)
+// ========================================
 
-// Marque comme "déjà demandé"
-function markNotificationsAsked() {
-  localStorage.setItem('pushNotificationsAsked', 'true');
-}
+function setupPushUI() {
+  if (!currentUser || !currentUser.uid || !currentUser.email) {
+    console.log('User not ready for push UI');
+    return;
+  }
 
-// Affiche la bannière d'invitation
-function showInviteBanner() {
   const banner = document.getElementById('pushInviteBanner');
+  if (!banner) {
+    console.log('Push banner not found in DOM');
+    return;
+  }
+
+  // Vérifier si l'utilisateur a déjà activé les notifications
+  db.ref(`users/${currentUser.uid}/pushEnabled`).once('value', (snap) => {
+    const enabled = snap.val() === true;
+
+    if (enabled) {
+      // Déjà activé, masquer la bannière
+      hidePushBanner(banner);
+      updatePushBellIcon(true);
+    } else {
+      // Vérifier si l'utilisateur a déjà refusé
+      const dismissed = localStorage.getItem(`pushDismissed_${currentUser.uid}`);
+      if (dismissed) {
+        // Ne pas afficher si déjà refusé
+        return;
+      }
+
+      // Pas activé, afficher la bannière après 3 secondes
+      setTimeout(() => {
+        showPushBanner(banner);
+      }, 3000);
+    }
+  });
+}
+
+function showPushBanner(banner) {
   if (!banner) return;
-
-  // Afficher la bannière
-  banner.style.display = 'block';
-
-  // Attendre un instant puis ajouter la classe 'show' pour l'animation
   setTimeout(() => {
     banner.classList.add('show');
   }, 100);
 }
 
-// Cache la bannière d'invitation
-function hideInviteBanner() {
-  const banner = document.getElementById('pushInviteBanner');
+function hidePushBanner(banner) {
   if (!banner) return;
-
-  // Retirer la classe pour l'animation
   banner.classList.remove('show');
-
-  // Attendre la fin de l'animation puis cacher
-  setTimeout(() => {
-    banner.style.display = 'none';
-  }, 400);
 }
 
-// Demande la permission pour les notifications
-async function requestNotificationPermission() {
-  if (!isNotificationSupported()) {
-    // Détecter iOS
-    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
-
-    if (isIOS) {
-      alert('📱 Sur iPhone/iPad:\n\n1. Ouvre Réglages > Safari\n2. Notifications\n3. Active pour ce site');
-    } else {
-      alert('❌ Ton navigateur ne supporte pas les notifications push.');
-    }
-
-    markNotificationsAsked();
-    hideInviteBanner();
-    return false;
-  }
-
+async function enablePushNotifications() {
   try {
-    const permission = await Notification.requestPermission();
+    await setupPushNotifications();
 
-    // Marquer comme demandé dans tous les cas
-    markNotificationsAsked();
+    const banner = document.getElementById('pushInviteBanner');
+    hidePushBanner(banner);
 
-    if (permission === 'granted') {
-      console.log('✅ Notifications activées !');
+    updatePushBellIcon(true);
 
-      // Cacher la bannière
-      hideInviteBanner();
-
-      // Mettre à jour le bouton cloche
-      updateBellButton();
-
-      // Afficher une notification de test
-      new Notification('🎉 Notifications activées !', {
-        body: 'Tu recevras maintenant les mises à jour importantes.',
-        icon: '/icon-192.jpg',
-        badge: '/icon-192.jpg'
-      });
-
-      return true;
-    } else if (permission === 'denied') {
-      alert('❌ Permission refusée.\n\nPour activer :\n1. Clique sur le 🔒 à gauche de l\'URL\n2. Notifications > Autoriser');
-      hideInviteBanner();
-      return false;
+    if (typeof showToast === 'function') {
+      showToast('✅ Notifications activées !');
     } else {
-      // Permission 'default' (fermé sans choisir)
-      hideInviteBanner();
-      return false;
+      alert('✅ Notifications activées !');
     }
   } catch (error) {
-    console.error('Erreur permission notifications:', error);
-    alert('❌ Erreur lors de l\'activation des notifications.');
-    markNotificationsAsked();
-    hideInviteBanner();
-    return false;
+    console.error('Error enabling push:', error);
+    alert('Erreur lors de l\'activation des notifications');
   }
 }
 
-// Met à jour l'apparence du bouton cloche
-function updateBellButton() {
-  const bellBtn = document.getElementById('pushBellBtn');
-  if (!bellBtn) return;
+function dismissPushBanner() {
+  const banner = document.getElementById('pushInviteBanner');
+  hidePushBanner(banner);
 
-  const isEnabled = areNotificationsEnabled();
+  // Sauvegarder que l'utilisateur a refusé
+  if (currentUser && currentUser.uid) {
+    localStorage.setItem(`pushDismissed_${currentUser.uid}`, Date.now());
+  }
+}
 
-  if (isEnabled) {
-    bellBtn.classList.add('enabled');
-    bellBtn.title = 'Notifications activées';
+function updatePushBellIcon(enabled) {
+  const bell = document.querySelector('.push-bell');
+  if (!bell) return;
 
-    // Ajouter le point vert s'il n'existe pas
-    if (!bellBtn.querySelector('.push-dot')) {
-      const dot = document.createElement('span');
-      dot.className = 'push-dot';
-      bellBtn.appendChild(dot);
-    }
+  if (enabled) {
+    bell.classList.add('enabled');
   } else {
-    bellBtn.classList.remove('enabled');
-    bellBtn.title = 'Activer les notifications';
-
-    // Retirer le point vert
-    const dot = bellBtn.querySelector('.push-dot');
-    if (dot) dot.remove();
+    bell.classList.remove('enabled');
   }
 }
 
-// Initialisation au chargement de la page
-function initNotifications() {
-  const bellBtn = document.getElementById('pushBellBtn');
-  const inviteBanner = document.getElementById('pushInviteBanner');
+// Attacher les fonctions au bouton de la bannière
+window.addEventListener('DOMContentLoaded', () => {
   const activateBtn = document.getElementById('pushInviteActivate');
-  const dismissBtn = document.getElementById('pushInviteDismiss');
-
-  if (!bellBtn) {
-    console.warn('⚠️ Bouton cloche non trouvé');
-    return;
-  }
-
-  // Mettre à jour l'état initial du bouton cloche
-  updateBellButton();
-
-  // Afficher la bannière si notifications pas activées ET pas encore demandé
-  if (!areNotificationsEnabled() && !hasAskedForNotifications()) {
-    // Attendre 2 secondes avant d'afficher (pour ne pas être intrusif)
-    setTimeout(() => {
-      showInviteBanner();
-    }, 2000);
-  }
-
-  // Gérer le clic sur la cloche
-  bellBtn.addEventListener('click', async () => {
-    if (areNotificationsEnabled()) {
-      // Déjà activé - afficher un message
-      alert('✅ Les notifications sont déjà activées !');
-    } else {
-      // Demander la permission
-      await requestNotificationPermission();
-    }
-  });
-
-  // Gérer le clic sur "Activer" dans la bannière
   if (activateBtn) {
-    activateBtn.addEventListener('click', async () => {
-      await requestNotificationPermission();
-    });
+    activateBtn.onclick = enablePushNotifications;
   }
 
-  // Gérer le clic sur "✕" pour fermer la bannière
+  const dismissBtn = document.getElementById('pushInviteDismiss');
   if (dismissBtn) {
-    dismissBtn.addEventListener('click', () => {
-      markNotificationsAsked();
-      hideInviteBanner();
-    });
+    dismissBtn.onclick = dismissPushBanner;
   }
+});
 
-  console.log('🔔 Système de notifications initialisé');
-}
-
-// Lancer l'initialisation quand la page est chargée
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initNotifications);
-} else {
-  initNotifications();
-}
+// Export pour utilisation globale
+window.enablePushNotifications = enablePushNotifications;
+window.dismissPushBanner = dismissPushBanner;

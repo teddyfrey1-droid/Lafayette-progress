@@ -929,6 +929,157 @@ function showToast(message) {
         });
     }
 
+
+/* ========================================
+   GESTION DES NOTIFICATIONS PUSH - ADMIN
+   ======================================== */
+
+function renderPushTab() {
+  if (!isAdminUser()) return;
+
+  renderPushUsers();
+  renderPushSettings();
+}
+
+function renderPushUsers() {
+  const container = document.getElementById('pushUsersList');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (!allUsers) {
+    container.innerHTML = '<div style="color:#999;font-style:italic">Chargement...</div>';
+    return;
+  }
+
+  const users = Object.keys(allUsers).map(uid => ({
+    uid,
+    ...allUsers[uid]
+  }));
+
+  users.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+
+  if (users.length === 0) {
+    container.innerHTML = '<div style="color:#999;font-style:italic">Aucun utilisateur.</div>';
+    return;
+  }
+
+  users.forEach(u => {
+    const div = document.createElement('div');
+    div.className = 'user-item';
+
+    const pushEnabled = u.pushEnabled === true;
+    const pushDate = u.pushEnabledAt ? new Date(u.pushEnabledAt) : null;
+    const dateStr = pushDate ? pushDate.toLocaleDateString('fr-FR') + ' ' + pushDate.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}) : '';
+
+    const statusDot = pushEnabled 
+      ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;margin-right:8px;"></span>'
+      : '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#64748b;margin-right:8px;"></span>';
+
+    const statusText = pushEnabled 
+      ? '<span style="color:#22c55e;font-weight:700">ACTIVÉES</span>'
+      : '<span style="color:#64748b">Désactivées</span>';
+
+    div.innerHTML = `
+      <div class="user-info">
+        <div class="user-header">
+          <span class="user-name">${u.name || 'Utilisateur'}</span>
+          <span style="font-size:13px">${statusDot}${statusText}</span>
+        </div>
+        <div class="user-meta">
+          <div>${u.email || ''}</div>
+          ${dateStr ? `<div style="font-size:12px;color:#94a3b8;margin-top:4px">Activé le ${dateStr}</div>` : ''}
+        </div>
+      </div>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+function renderPushSettings() {
+  const container = document.getElementById('pushSettings');
+  if (!container) return;
+
+  if (!globalSettings || !globalSettings.notifications) {
+    container.innerHTML = '<div style="color:#999">Chargement...</div>';
+    return;
+  }
+
+  const notif = globalSettings.notifications || {};
+
+  container.innerHTML = `
+    <div class="push-setting-item">
+      <label class="switch">
+        <input type="checkbox" id="pushAutoUpdate" ${notif.autoOnUpdate ? 'checked' : ''} onchange="savePushSetting('autoOnUpdate', this.checked)">
+        <span class="slider"></span>
+      </label>
+      <div class="push-setting-label">
+        <div style="font-weight:700;font-size:14px">Mise à jour publiée</div>
+        <div style="font-size:12px;color:#94a3b8">Notifier quand une info est publiée</div>
+      </div>
+    </div>
+
+    <div class="push-setting-item">
+      <label class="switch">
+        <input type="checkbox" id="pushAutoObj" ${notif.autoOnObjChange ? 'checked' : ''} onchange="savePushSetting('autoOnObjChange', this.checked)">
+        <span class="slider"></span>
+      </label>
+      <div class="push-setting-label">
+        <div style="font-weight:700;font-size:14px">Objectif modifié</div>
+        <div style="font-size:12px;color:#94a3b8">Notifier les changements d'objectifs</div>
+      </div>
+    </div>
+
+    <div class="push-setting-item">
+      <label class="switch">
+        <input type="checkbox" id="pushAutoPilotage" ${notif.autoOnPilotage ? 'checked' : ''} onchange="savePushSetting('autoOnPilotage', this.checked)">
+        <span class="slider"></span>
+      </label>
+      <div class="push-setting-label">
+        <div style="font-weight:700;font-size:14px">Pilotage publié</div>
+        <div style="font-size:12px;color:#94a3b8">Notifier les mises à jour de primes</div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+      <button class="action-btn" onclick="sendTestNotification()" style="width:100%;font-size:14px;padding:12px">
+        📱 Envoyer une notification test
+      </button>
+    </div>
+  `;
+}
+
+function savePushSetting(key, value) {
+  if (!isAdminUser()) return;
+
+  db.ref(`settings/notifications/${key}`).set(value).then(() => {
+    showToast('Paramètre sauvegardé !');
+  }).catch(e => {
+    console.error(e);
+    alert('Erreur lors de la sauvegarde');
+  });
+}
+
+function sendTestNotification() {
+  if (!isAdminUser()) return;
+
+  if (!confirm('Envoyer une notification test à tous les utilisateurs avec notifications activées ?')) {
+    return;
+  }
+
+  maybeAutoNotify('test', {
+    title: '🔔 Notification de test',
+    body: 'Si vous recevez ce message, les notifications fonctionnent !',
+    link: 'index.html#dashboard'
+  }).then(() => {
+    showToast('Notification test envoyée !');
+  }).catch(e => {
+    console.error(e);
+    alert('Erreur : ' + e.message);
+  });
+}
+
     // --- COCKPIT SIMULATOR LOGIC ---
     let simObjs = {}; 
 
@@ -1733,6 +1884,12 @@ const el = document.createElement("div");
        const emailsTab = document.getElementById('tab-emails');
        if(emailsTab) emailsTab.style.display = t==='emails'?'block':'none';
        if(t==='emails'){ try{ if(window.renderMailUI) window.renderMailUI(); }catch(e){} }
+
+       // Onglet Push
+       if(t === 'push') { const b = document.getElementById('btnTabPush'); if(b) b.classList.add('active'); }
+       const pushTab = document.getElementById('tab-push');
+       if(pushTab) pushTab.style.display = t==='push'?'block':'none';
+       if(t==='push'){ try{ renderPushTab(); }catch(e){console.error(e);} }
     }
     function toggleCreateInputs() { document.getElementById("createTiersBlock").style.display = document.getElementById("noFixed").checked ? 'none' : 'block'; }
     function toggleEditInputs() { document.getElementById("editTiersBlock").style.display = document.getElementById("eoFixed").checked ? 'none' : 'block'; }
