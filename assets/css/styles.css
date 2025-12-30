@@ -2092,7 +2092,7 @@ body.dark-mode .weekday-chip{
 
 
 /* ====================================
-   PUSH NOTIFICATIONS SYSTEM
+   PUSH NOTIFICATIONS SYSTEM - PREMIUM
    ==================================== */
 
 /* Bouton cloche dans top-bar */
@@ -2147,7 +2147,7 @@ body.dark-mode .weekday-chip{
 }
 
 /* ====================================
-   BANNIÈRE D'INVITATION (SLIDE-UP)
+   BANNIÈRE PREMIUM - GLASS MORPHISM
    ==================================== */
 
 .push-invite-banner {
@@ -2155,129 +2155,220 @@ body.dark-mode .weekday-chip{
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  color: white;
-  padding: 16px 20px;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+
+  /* Glass morphism background */
+  background: linear-gradient(135deg, 
+    rgba(59, 130, 246, 0.95) 0%, 
+    rgba(37, 99, 235, 0.98) 100%);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+
+  /* Bordure subtile en haut */
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+
+  /* Ombres profondes */
+  box-shadow: 
+    0 -10px 40px rgba(0, 0, 0, 0.25),
+    0 -2px 8px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+
+  padding: 24px 20px 28px;
   z-index: 9999;
+
+  /* Animation slide-up */
   transform: translateY(100%);
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .push-invite-banner.show {
   transform: translateY(0);
 }
 
+/* Container central */
 .push-invite-banner .push-invite-content {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 18px;
   max-width: 1200px;
   margin: 0 auto;
 }
 
+/* Icône cloche PLUS GROSSE et animée */
 .push-invite-icon {
-  font-size: 32px;
+  font-size: 48px;
   flex-shrink: 0;
+  animation: bellFloat 3s ease-in-out infinite;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
 }
 
+@keyframes bellFloat {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-4px) rotate(-5deg);
+  }
+  50% {
+    transform: translateY(0) rotate(0deg);
+  }
+  75% {
+    transform: translateY(-4px) rotate(5deg);
+  }
+}
+
+/* Texte */
 .push-invite-text {
   flex: 1;
   min-width: 0;
 }
 
 .push-invite-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 900;
-  margin-bottom: 4px;
-  letter-spacing: -0.01em;
+  margin-bottom: 6px;
+  letter-spacing: -0.02em;
+  color: white;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  line-height: 1.2;
 }
 
 .push-invite-desc {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  opacity: 0.95;
-  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.95);
+  line-height: 1.4;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
 
+/* Boutons */
 .push-invite-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex-shrink: 0;
 }
 
 .push-invite-btn {
-  padding: 10px 20px;
-  font-size: 13px;
+  padding: 14px 28px;
+  font-size: 15px;
   font-weight: 900;
-  border-radius: 10px;
+  border-radius: 14px;
+
+  /* Bouton blanc éclatant */
   background: white;
   color: #2563eb;
+
   border: none;
   cursor: pointer;
-  transition: all 0.2s ease;
+
+  /* Ombres multiples pour effet 3D */
+  box-shadow: 
+    0 4px 14px rgba(0, 0, 0, 0.25),
+    0 2px 6px rgba(0, 0, 0, 0.15),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.1);
+
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 
 .push-invite-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transform: translateY(-3px);
+  box-shadow: 
+    0 8px 20px rgba(0, 0, 0, 0.3),
+    0 4px 10px rgba(0, 0, 0, 0.2),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.1);
 }
 
 .push-invite-btn:active {
-  transform: translateY(0);
+  transform: translateY(-1px);
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.2),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.1);
 }
 
 .push-invite-close {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+
+  /* Glass button */
   background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+
+  border: 1px solid rgba(255, 255, 255, 0.3);
   color: white;
-  font-size: 18px;
+  font-size: 20px;
   cursor: pointer;
+
   display: flex;
   align-items: center;
   justify-content: center;
+
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   transition: all 0.2s ease;
 }
 
 .push-invite-close:hover {
   background: rgba(255, 255, 255, 0.25);
+  transform: scale(1.05);
+}
+
+.push-invite-close:active {
+  transform: scale(0.95);
 }
 
 /* Responsive mobile */
 @media (max-width: 600px) {
   .push-invite-banner {
-    padding: 14px 16px;
+    padding: 20px 16px 24px;
   }
 
   .push-invite-banner .push-invite-content {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
+    gap: 14px;
   }
 
   .push-invite-icon {
-    font-size: 28px;
+    font-size: 42px;
   }
 
   .push-invite-title {
-    font-size: 15px;
+    font-size: 16px;
   }
 
   .push-invite-desc {
-    font-size: 12px;
+    font-size: 13px;
   }
 
   .push-invite-actions {
+    flex-direction: column;
     width: 100%;
-    justify-content: space-between;
+    gap: 10px;
   }
 
   .push-invite-btn {
-    flex: 1;
+    width: 100%;
+    padding: 14px 20px;
+  }
+
+  .push-invite-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* Animation d'apparition plus smooth */
+@keyframes slideUpBanner {
+  0% {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
