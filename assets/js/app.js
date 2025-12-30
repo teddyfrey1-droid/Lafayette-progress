@@ -87,13 +87,50 @@ let _objProgUnsub = null;
     }
 
     // --- PWA: service worker + bouton d'installation (si disponible) ---
-    (function initPWA(){
-      // Service worker (push désactivées pour l’instant)
-      if('serviceWorker' in navigator){
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('sw.js').catch(() => {});
-        });
-      }
+    function initPWA() {
+  // Service worker
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(err => console.error('SW error:', err));
+      navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(err => console.error('FCM SW error:', err));
+    });
+  }
+
+  // Install prompt
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    const btn = document.getElementById('installAppBtn');
+    if (btn) {
+      btn.style.display = 'block';
+      btn.onclick = async () => {
+        try {
+          btn.disabled = true;
+          deferredPrompt.prompt();
+          await deferredPrompt.userChoice;
+        } catch {}
+        deferredPrompt = null;
+        btn.style.display = 'none';
+        btn.disabled = false;
+      };
+    }
+  });
+
+  window.addEventListener('appinstalled', () => {
+    const btn = document.getElementById('installAppBtn');
+    if (btn) btn.style.display = 'none';
+    deferredPrompt = null;
+    
+    // Track PWA install
+    if (currentUser && currentUser.uid) {
+      db.ref(`users/${currentUser.uid}`).update({
+        pwaInstalled: true,
+        pwaInstalledAt: Date.now()
+      });
+    }
+  });
+}
 
       // Install prompt
       let deferredPrompt = null;
