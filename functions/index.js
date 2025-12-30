@@ -1,384 +1,255 @@
 // ═══════════════════════════════════════════════════════════════════════
-// ✨ CLOUD FUNCTIONS - HEIKO LAFAYETTE
-// ═══════════════════════════════════════════════════════════════════════
-// Fonctions:
-// - sendEmailToUser: Envoyer un email à un utilisateur
-// - sendEmailToUsers: Envoyer un email à plusieurs utilisateurs
-// - getSmtpConfigStatus: Obtenir le statut de la config SMTP
-// - setSmtpConfig: Définir la configuration SMTP
-// - testSmtp: Tester la configuration SMTP
-// - sendPushToUsers: Envoyer des notifications push (NOUVEAU)
+// FIREBASE CLOUD FUNCTIONS - HEIKO LAFAYETTE
 // ═══════════════════════════════════════════════════════════════════════
 
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
 
-// Initialiser Firebase Admin
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
-const db = admin.database();
+admin.initializeApp();
 
 // ═══════════════════════════════════════════════════════════════════════
-// FONCTIONS EMAIL
+// CONFIGURATION EMAIL (Mailgun)
 // ═══════════════════════════════════════════════════════════════════════
 
-/**
- * Envoyer un email à un utilisateur spécifique
- */
-exports.sendEmailToUser = functions.https.onCall(async (data, context) => {
-  // Vérifier l'authentification
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
-  }
-
-  const { userId, subject, html, text } = data;
-
-  if (!userId || !subject) {
-    throw new functions.https.HttpsError('invalid-argument', 'userId and subject are required');
-  }
-
-  try {
-    // Récupérer la config SMTP
-    const smtpConfigSnap = await db.ref('configPrivate/smtp').once('value');
-    const smtpConfig = smtpConfigSnap.val();
-
-    if (!smtpConfig || !smtpConfig.host || !smtpConfig.user || !smtpConfig.pass) {
-      throw new functions.https.HttpsError('failed-precondition', 'SMTP configuration is incomplete');
-    }
-
-    // Récupérer l'email de l'utilisateur
-    const userSnap = await db.ref(`users/${userId}/email`).once('value');
-    const userEmail = userSnap.val();
-
-    if (!userEmail) {
-      throw new functions.https.HttpsError('not-found', 'User email not found');
-    }
-
-    // Créer le transporter
-    const transporter = nodemailer.createTransport({
-      host: smtpConfig.host,
-      port: parseInt(smtpConfig.port) || 587,
-      secure: parseInt(smtpConfig.port) === 465,
-      auth: {
-        user: smtpConfig.user,
-        pass: smtpConfig.pass
-      }
-    });
-
-    // Envoyer l'email
-    const mailOptions = {
-      from: smtpConfig.from || smtpConfig.user,
-      to: userEmail,
-      subject: subject,
-      html: html || text || '',
-      text: text || ''
-    };
-
-    const info = await transporter.sendMail(mailOptions);
-
-    console.log(`Email sent to ${userEmail}:`, info.messageId);
-
-    return {
-      success: true,
-      messageId: info.messageId,
-      recipient: userEmail
-    };
-  } catch (error) {
-    console.error('Error sending email:', error);
-    throw new functions.https.HttpsError('internal', error.message);
+const transporter = nodemailer.createTransport({
+  host: 'smtp.mailgun.org',
+  port: 587,
+  secure: false,
+  auth: {
+    user: 'postmaster@sandbox123.mailgun.org', // ← REMPLACE avec ton user Mailgun
+    pass: 'ton-mot-de-passe-mailgun'           // ← REMPLACE avec ton pass Mailgun
   }
 });
 
-/**
- * Envoyer un email à plusieurs utilisateurs
- */
+// ═══════════════════════════════════════════════════════════════════════
+// FONCTION 1 : ENVOYER UN EMAIL À PLUSIEURS UTILISATEURS
+// ═══════════════════════════════════════════════════════════════════════
+
 exports.sendEmailToUsers = functions.https.onCall(async (data, context) => {
-  // Vérifier l'authentification
+  // Sécurité : Vérifier que l'utilisateur est authentifié
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    throw new functions.https.HttpsError('unauthenticated', 'Non authentifié');
   }
 
   const { userIds, subject, html, text } = data;
 
   if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-    throw new functions.https.HttpsError('invalid-argument', 'userIds must be a non-empty array');
+    throw new functions.https.HttpsError('invalid-argument', 'userIds requis');
   }
 
-  if (!subject) {
-    throw new functions.https.HttpsError('invalid-argument', 'subject is required');
+  if (!subject || !html) {
+    throw new functions.https.HttpsError('invalid-argument', 'subject et html requis');
   }
 
-  try {
-    // Récupérer la config SMTP
-    const smtpConfigSnap = await db.ref('configPrivate/smtp').once('value');
-    const smtpConfig = smtpConfigSnap.val();
+  const db = admin.database();
+  const results = { sent: 0, failed: 0, errors: [] };
 
-    if (!smtpConfig || !smtpConfig.host || !smtpConfig.user || !smtpConfig.pass) {
-      throw new functions.https.HttpsError('failed-precondition', 'SMTP configuration is incomplete');
-    }
+  for (const uid of userIds) {
+    try {
+      const userSnap = await db.ref(`users/${uid}`).once('value');
+      const user = userSnap.val();
 
-    // Créer le transporter
-    const transporter = nodemailer.createTransport({
-      host: smtpConfig.host,
-      port: parseInt(smtpConfig.port) || 587,
-      secure: parseInt(smtpConfig.port) === 465,
-      auth: {
-        user: smtpConfig.user,
-        pass: smtpConfig.pass
+      if (!user || !user.email) {
+        results.failed++;
+        results.errors.push({ uid, error: 'Email manquant' });
+        continue;
       }
-    });
 
-    // Récupérer les emails des utilisateurs
-    const usersSnapshot = await db.ref('users').once('value');
-    const users = usersSnapshot.val() || {};
+      await transporter.sendMail({
+        from: '"Heiko Lafayette" <noreply@heiko.com>',
+        to: user.email,
+        subject: subject,
+        text: text || '',
+        html: html
+      });
 
-    const emails = [];
-    userIds.forEach(uid => {
-      const user = users[uid];
-      if (user && user.email) {
-        emails.push(user.email);
-      }
-    });
-
-    if (emails.length === 0) {
-      console.log('No valid emails found');
-      return { success: true, sent: 0, message: 'No users with valid emails' };
+      results.sent++;
+    } catch (error) {
+      results.failed++;
+      results.errors.push({ uid, error: error.message });
     }
-
-    // Envoyer les emails (BCC pour masquer les destinataires)
-    const mailOptions = {
-      from: smtpConfig.from || smtpConfig.user,
-      bcc: emails,
-      subject: subject,
-      html: html || text || '',
-      text: text || ''
-    };
-
-    const info = await transporter.sendMail(mailOptions);
-
-    console.log(`Email sent to ${emails.length} recipients:`, info.messageId);
-
-    return {
-      success: true,
-      sent: emails.length,
-      messageId: info.messageId
-    };
-  } catch (error) {
-    console.error('Error sending emails:', error);
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
-
-/**
- * Obtenir le statut de la configuration SMTP
- */
-exports.getSmtpConfigStatus = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
 
-  try {
-    const snap = await db.ref('configPrivate/smtp').once('value');
-    const config = snap.val();
-
-    return {
-      configured: !!(config && config.host && config.user && config.pass),
-      host: config?.host || '',
-      port: config?.port || '',
-      user: config?.user || '',
-      from: config?.from || ''
-    };
-  } catch (error) {
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
-
-/**
- * Définir la configuration SMTP
- */
-exports.setSmtpConfig = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
-  }
-
-  const { host, port, user, pass, from } = data;
-
-  if (!host || !port || !user || !pass) {
-    throw new functions.https.HttpsError('invalid-argument', 'Missing required SMTP config fields');
-  }
-
-  try {
-    await db.ref('configPrivate/smtp').set({
-      host,
-      port,
-      user,
-      pass,
-      from: from || user,
-      updatedAt: Date.now(),
-      updatedBy: context.auth.uid
-    });
-
-    return { success: true };
-  } catch (error) {
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
-
-/**
- * Tester la configuration SMTP
- */
-exports.testSmtp = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
-  }
-
-  try {
-    const smtpConfigSnap = await db.ref('configPrivate/smtp').once('value');
-    const smtpConfig = smtpConfigSnap.val();
-
-    if (!smtpConfig || !smtpConfig.host || !smtpConfig.user || !smtpConfig.pass) {
-      throw new functions.https.HttpsError('failed-precondition', 'SMTP configuration is incomplete');
-    }
-
-    const transporter = nodemailer.createTransport({
-      host: smtpConfig.host,
-      port: parseInt(smtpConfig.port) || 587,
-      secure: parseInt(smtpConfig.port) === 465,
-      auth: {
-        user: smtpConfig.user,
-        pass: smtpConfig.pass
-      }
-    });
-
-    // Récupérer l'email de l'utilisateur
-    const userSnap = await db.ref(`users/${context.auth.uid}/email`).once('value');
-    const userEmail = userSnap.val();
-
-    if (!userEmail) {
-      throw new functions.https.HttpsError('not-found', 'User email not found');
-    }
-
-    const mailOptions = {
-      from: smtpConfig.from || smtpConfig.user,
-      to: userEmail,
-      subject: '🧪 Test SMTP - Heiko Lafayette',
-      html: `
-        <h2>✅ Configuration SMTP fonctionnelle</h2>
-        <p>Ce message confirme que votre configuration SMTP est correctement configurée.</p>
-        <p><strong>Serveur:</strong> ${smtpConfig.host}:${smtpConfig.port}</p>
-        <p><strong>Utilisateur:</strong> ${smtpConfig.user}</p>
-        <hr>
-        <p style="color: #666; font-size: 12px;">Heiko Lafayette - Système de notifications</p>
-      `
-    };
-
-    const info = await transporter.sendMail(mailOptions);
-
-    return {
-      success: true,
-      messageId: info.messageId,
-      recipient: userEmail
-    };
-  } catch (error) {
-    console.error('SMTP test error:', error);
-    throw new functions.https.HttpsError('internal', error.message);
-  }
+  return results;
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// NOTIFICATIONS PUSH (NOUVEAU)
+// FONCTION 2 : ENVOYER UNE NOTIFICATION PUSH À PLUSIEURS UTILISATEURS
 // ═══════════════════════════════════════════════════════════════════════
 
-/**
- * Envoyer des notifications push à plusieurs utilisateurs
- */
 exports.sendPushToUsers = functions.https.onCall(async (data, context) => {
-  // Vérifier l'authentification
+  // Sécurité : Vérifier que l'utilisateur est authentifié et admin
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    throw new functions.https.HttpsError('unauthenticated', 'Non authentifié');
   }
 
   const { userIds, title, body, link } = data;
 
   if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-    throw new functions.https.HttpsError('invalid-argument', 'userIds must be a non-empty array');
+    throw new functions.https.HttpsError('invalid-argument', 'userIds requis');
   }
 
-  if (!title) {
-    throw new functions.https.HttpsError('invalid-argument', 'title is required');
+  if (!title || !body) {
+    throw new functions.https.HttpsError('invalid-argument', 'title et body requis');
+  }
+
+  const db = admin.database();
+  const results = { sent: 0, failed: 0, noToken: 0, errors: [] };
+
+  // Récupérer les tokens de tous les utilisateurs
+  const tokens = [];
+  const usersWithoutToken = [];
+
+  for (const uid of userIds) {
+    try {
+      const userSnap = await db.ref(`users/${uid}`).once('value');
+      const user = userSnap.val();
+
+      if (!user) {
+        results.failed++;
+        continue;
+      }
+
+      // Vérifier si l'utilisateur a un token et les notifications activées
+      if (user.pushToken && user.pushEnabled === true) {
+        tokens.push(user.pushToken);
+      } else {
+        usersWithoutToken.push(uid);
+        results.noToken++;
+      }
+    } catch (error) {
+      results.failed++;
+      results.errors.push({ uid, error: error.message });
+    }
+  }
+
+  // Envoyer les notifications push
+  if (tokens.length > 0) {
+    try {
+      const message = {
+        notification: {
+          title: title,
+          body: body
+        },
+        data: {
+          link: link || 'index.html',
+          timestamp: Date.now().toString()
+        },
+        tokens: tokens
+      };
+
+      const response = await admin.messaging().sendMulticast(message);
+      results.sent = response.successCount;
+      results.failed += response.failureCount;
+
+      // Logger les tokens invalides pour nettoyage
+      if (response.failureCount > 0) {
+        response.responses.forEach((resp, idx) => {
+          if (!resp.success) {
+            console.error(`Token invalide: ${tokens[idx]}`);
+            // Optionnel : supprimer le token invalide de Firebase
+            // await db.ref(`users/${userIds[idx]}/pushToken`).remove();
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Erreur envoi push:', error);
+      results.errors.push({ error: error.message });
+    }
+  }
+
+  return {
+    sent: results.sent,
+    failed: results.failed,
+    noToken: results.noToken,
+    usersWithoutToken: usersWithoutToken,
+    errors: results.errors
+  };
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// FONCTION 3 : ENVOYER UN EMAIL À UN GROUPE
+// ═══════════════════════════════════════════════════════════════════════
+
+exports.sendEmailToGroup = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Non authentifié');
+  }
+
+  const { groupId, subject, html, text } = data;
+
+  if (!groupId || !subject || !html) {
+    throw new functions.https.HttpsError('invalid-argument', 'Paramètres manquants');
+  }
+
+  const db = admin.database();
+
+  // Récupérer le groupe
+  const groupSnap = await db.ref(`mailGroups/${groupId}`).once('value');
+  const group = groupSnap.val();
+
+  if (!group || !group.members || group.members.length === 0) {
+    throw new functions.https.HttpsError('not-found', 'Groupe vide ou introuvable');
+  }
+
+  // Envoyer à tous les membres du groupe
+  const results = { sent: 0, failed: 0, errors: [] };
+
+  for (const uid of group.members) {
+    try {
+      const userSnap = await db.ref(`users/${uid}`).once('value');
+      const user = userSnap.val();
+
+      if (!user || !user.email) {
+        results.failed++;
+        continue;
+      }
+
+      await transporter.sendMail({
+        from: '"Heiko Lafayette" <noreply@heiko.com>',
+        to: user.email,
+        subject: subject,
+        text: text || '',
+        html: html
+      });
+
+      results.sent++;
+    } catch (error) {
+      results.failed++;
+      results.errors.push({ uid, error: error.message });
+    }
+  }
+
+  return results;
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// FONCTION 4 : TESTER LA CONFIGURATION EMAIL
+// ═══════════════════════════════════════════════════════════════════════
+
+exports.testEmail = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Non authentifié');
+  }
+
+  const { to } = data;
+
+  if (!to) {
+    throw new functions.https.HttpsError('invalid-argument', 'Email destinataire requis');
   }
 
   try {
-    // Récupérer les tokens des utilisateurs
-    const usersSnapshot = await db.ref('users').once('value');
-    const users = usersSnapshot.val() || {};
-
-    const tokens = [];
-    userIds.forEach(uid => {
-      const user = users[uid];
-      if (user && user.pushEnabled && user.pushToken) {
-        tokens.push(user.pushToken);
-      }
+    await transporter.sendMail({
+      from: '"Heiko Lafayette" <noreply@heiko.com>',
+      to: to,
+      subject: '🧪 Test Email - Heiko Lafayette',
+      html: '<h2>✅ Configuration email OK !</h2><p>Si tu reçois ce message, tout fonctionne.</p>'
     });
 
-    if (tokens.length === 0) {
-      console.log('No valid push tokens found');
-      return { success: true, sent: 0, message: 'No users with push enabled' };
-    }
-
-    // Préparer le message
-    const message = {
-      notification: {
-        title: title,
-        body: body || ''
-      },
-      data: {
-        link: link || '/',
-        timestamp: Date.now().toString()
-      },
-      tokens: tokens
-    };
-
-    // Envoyer via FCM
-    const response = await admin.messaging().sendMulticast(message);
-
-    console.log(`✅ Push notification sent: ${response.successCount} success, ${response.failureCount} failures`);
-
-    // Nettoyer les tokens invalides
-    if (response.failureCount > 0) {
-      const tokensToRemove = [];
-      response.responses.forEach((resp, idx) => {
-        if (!resp.success) {
-          tokensToRemove.push(tokens[idx]);
-        }
-      });
-
-      // Supprimer les tokens invalides de la base de données
-      const updates = {};
-      Object.keys(users).forEach(uid => {
-        const user = users[uid];
-        if (user && user.pushToken && tokensToRemove.includes(user.pushToken)) {
-          updates[`users/${uid}/pushEnabled`] = false;
-          updates[`users/${uid}/pushToken`] = null;
-        }
-      });
-
-      if (Object.keys(updates).length > 0) {
-        await db.ref().update(updates);
-        console.log(`🧹 Cleaned ${Object.keys(updates).length / 2} invalid tokens`);
-      }
-    }
-
-    return {
-      success: true,
-      sent: response.successCount,
-      failed: response.failureCount
-    };
+    return { success: true, message: 'Email envoyé avec succès' };
   } catch (error) {
-    console.error('❌ Error sending push notifications:', error);
+    console.error('Erreur test email:', error);
     throw new functions.https.HttpsError('internal', error.message);
   }
 });
