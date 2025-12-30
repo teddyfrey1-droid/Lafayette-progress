@@ -1,29 +1,27 @@
-// ========================================
-// SYSTÈME DE NOTIFICATIONS PUSH & EMAIL
-// ========================================
+// ═══════════════════════════════════════════════════════════════════════
+// 🔔 SYSTÈME DE NOTIFICATIONS - HEIKO LAFAYETTE
+// ═══════════════════════════════════════════════════════════════════════
+// - Notifications Push (Firebase Cloud Messaging)
+// - Bannière d'invitation
+// - Onglet Notifications dans Manager
+// - Configuration des alertes automatiques
+// ═══════════════════════════════════════════════════════════════════════
 
 let currentFCMToken = null;
-let notificationConfig = {
-  objectiveReached: { push: true, email: true, fallback: true },
-  bonusCalculated: { push: true, email: true, fallback: true },
-  updates: { push: true, email: true, fallback: true },
-  feedback: { push: true, email: false, fallback: true },
-  systemAlert: { push: true, email: true, fallback: true },
-  directMessage: { push: true, email: false, fallback: true }
-};
 
-// ========================================
-// SETUP PUSH NOTIFICATIONS
-// ========================================
+// ═══════════════════════════════════════════════════════════════════════
+// PUSH NOTIFICATIONS SETUP
+// ═══════════════════════════════════════════════════════════════════════
+
 async function setupPushNotifications() {
   if (!('Notification' in window)) {
     console.log('Push notifications not supported');
-    return false;
+    return;
   }
 
   if (!firebase.messaging || !firebase.messaging.isSupported || !firebase.messaging.isSupported()) {
     console.log('FCM not supported');
-    return false;
+    return;
   }
 
   try {
@@ -39,37 +37,25 @@ async function setupPushNotifications() {
 
       if (token) {
         currentFCMToken = token;
-        console.log('FCM Token:', token);
+        console.log('✅ FCM Token obtenu:', token.substring(0, 20) + '...');
 
         // Sauvegarder le token dans Firebase pour cet utilisateur
         if (currentUser && currentUser.uid) {
           await db.ref(`users/${currentUser.uid}/pushToken`).set(token);
           await db.ref(`users/${currentUser.uid}/pushEnabled`).set(true);
           await db.ref(`users/${currentUser.uid}/pushEnabledAt`).set(Date.now());
-          console.log('✅ Push enabled and saved to Firebase');
-
-          // Mettre à jour l'UI
-          updatePushUI(true);
-
-          // Cacher la cloche du menu
-          updateBellVisibility(true);
+          console.log('✅ Push enabled et sauvegardé dans Firebase');
         }
-
-        // Écouter les messages en foreground
-        messaging.onMessage((payload) => {
-          console.log('Message received (foreground):', payload);
-          showInAppNotification(payload);
-        });
-
-        return true;
       }
-    } else {
-      console.log('Permission denied');
-      return false;
+
+      // Écouter les messages en foreground
+      messaging.onMessage((payload) => {
+        console.log('📨 Message reçu (foreground):', payload);
+        showInAppNotification(payload);
+      });
     }
   } catch (error) {
-    console.error('Error setting up push:', error);
-    return false;
+    console.error('❌ Erreur setup push:', error);
   }
 }
 
@@ -88,349 +74,419 @@ function showInAppNotification(payload) {
   }
 }
 
-// ========================================
-// GESTION DE LA CLOCHE DANS LE MENU
-// ========================================
-function updateBellVisibility(pushEnabled) {
-  // Trouver tous les éléments du menu avec la cloche
-  const menuItems = document.querySelectorAll('#globalMenu a');
-  menuItems.forEach(item => {
-    if (item.textContent.includes('🔔')) {
-      item.style.display = pushEnabled ? 'none' : 'flex';
-    }
-  });
-}
+// ═══════════════════════════════════════════════════════════════════════
+// PUSH UI SETUP (Bannière + Cloche)
+// ═══════════════════════════════════════════════════════════════════════
 
-// ========================================
-// CHARGER LA CONFIGURATION DES NOTIFICATIONS
-// ========================================
-async function loadNotificationConfig() {
-  if (!db) return;
-
-  try {
-    const snap = await db.ref('settings/notificationConfig').once('value');
-    const config = snap.val();
-
-    if (config) {
-      notificationConfig = { ...notificationConfig, ...config };
-    }
-
-    // Remplir l'UI avec les valeurs
-    updateNotificationUI();
-  } catch (error) {
-    console.error('Error loading notification config:', error);
-  }
-}
-
-function updateNotificationUI() {
-  Object.keys(notificationConfig).forEach(notifType => {
-    const config = notificationConfig[notifType];
-
-    // Push checkbox
-    const pushInput = document.querySelector(`input[data-notif="${notifType}"][data-channel="push"]`);
-    if (pushInput) pushInput.checked = config.push === true;
-
-    // Email checkbox
-    const emailInput = document.querySelector(`input[data-notif="${notifType}"][data-channel="email"]`);
-    if (emailInput) emailInput.checked = config.email === true;
-
-    // Fallback checkbox
-    const fallbackInput = document.querySelector(`input[data-notif="${notifType}"][data-fallback="true"]`);
-    if (fallbackInput) fallbackInput.checked = config.fallback !== false;
-  });
-}
-
-// ========================================
-// SAUVEGARDER LA CONFIGURATION
-// ========================================
-async function saveNotificationConfig() {
-  if (!isAdminUser || !isAdminUser()) {
-    alert('⛔ Seuls les administrateurs peuvent modifier cette configuration');
+function setupPushUI() {
+  if (!currentUser || !currentUser.uid || !currentUser.email) {
+    console.log('⏳ User pas prêt pour push UI');
     return;
   }
 
-  const config = {};
+  const banner = document.getElementById('pushInviteBanner');
+  const bell = document.getElementById('pushBellBtn');
 
-  // Lire toutes les checkboxes
-  document.querySelectorAll('input[data-notif]').forEach(input => {
-    const notifType = input.dataset.notif;
-    const channel = input.dataset.channel;
-    const isFallback = input.dataset.fallback === 'true';
-
-    if (!config[notifType]) {
-      config[notifType] = { push: false, email: false, fallback: true };
-    }
-
-    if (isFallback) {
-      config[notifType].fallback = input.checked;
-    } else if (channel) {
-      config[notifType][channel] = input.checked;
-    }
-  });
-
-  try {
-    await db.ref('settings/notificationConfig').set(config);
-    notificationConfig = config;
-
-    if (typeof showToast === 'function') {
-      showToast('✅ Configuration des notifications sauvegardée');
-    } else {
-      alert('✅ Configuration sauvegardée');
-    }
-
-    if (typeof logAction === 'function') {
-      logAction('notification_config_updated', { config });
-    }
-  } catch (error) {
-    console.error('Error saving notification config:', error);
-    alert('❌ Erreur lors de la sauvegarde');
-  }
-}
-
-// ========================================
-// AFFICHER L'ONGLET NOTIFICATIONS
-// ========================================
-async function showNotificationsTab() {
-  if (!currentUser || !currentUser.uid) return;
-
-  // Vérifier le statut push de l'utilisateur actuel
-  const pushSnap = await db.ref(`users/${currentUser.uid}/pushEnabled`).once('value');
-  const pushEnabled = pushSnap.val() === true;
-
-  updatePushUI(pushEnabled);
-  updateBellVisibility(pushEnabled);
-
-  // Afficher la section admin si admin
-  const adminSection = document.getElementById('notifAdminSection');
-  if (adminSection) {
-    adminSection.style.display = isAdminUser() ? 'block' : 'none';
+  if (!banner) {
+    console.log('⚠️ Push banner introuvable');
+    return;
   }
 
-  // Charger la configuration
-  await loadNotificationConfig();
-
-  // Charger la liste des utilisateurs avec leur statut push
-  if (isAdminUser()) {
-    await loadTeamPushStatus();
-  }
-}
-
-function updatePushUI(enabled) {
-  const statusBadge = document.getElementById('currentUserPushStatus');
-  const toggleBtn = document.getElementById('toggleMyPushBtn');
-
-  if (statusBadge) {
-    const dot = statusBadge.querySelector('.status-dot');
-    const text = statusBadge.querySelector('.status-text');
+  // Vérifier si l'utilisateur a déjà activé les notifications
+  db.ref(`users/${currentUser.uid}/pushEnabled`).once('value', (snap) => {
+    const enabled = snap.val() === true;
 
     if (enabled) {
-      statusBadge.classList.add('status-enabled');
-      statusBadge.classList.remove('status-disabled');
-      if (dot) dot.style.backgroundColor = '#10b981';
-      if (text) text.textContent = 'Notifications activées';
-    } else {
-      statusBadge.classList.add('status-disabled');
-      statusBadge.classList.remove('status-enabled');
-      if (dot) dot.style.backgroundColor = '#ef4444';
-      if (text) text.textContent = 'Notifications désactivées';
-    }
-  }
+      // Déjà activé : masquer bannière et cloche
+      hidePushBanner(banner);
+      updatePushBellIcon(true);
 
-  if (toggleBtn) {
-    toggleBtn.style.display = enabled ? 'none' : 'block';
-  }
-}
-
-// ========================================
-// CHARGER LE STATUT PUSH DE L'ÉQUIPE
-// ========================================
-async function loadTeamPushStatus() {
-  const listEl = document.getElementById('teamPushStatusList');
-  if (!listEl) return;
-
-  try {
-    const usersSnap = await db.ref('users').once('value');
-    const users = usersSnap.val() || {};
-
-    const usersList = Object.keys(users).map(uid => ({
-      uid,
-      ...users[uid]
-    })).filter(u => u.name); // Seulement les utilisateurs avec un nom
-
-    // Trier par nom
-    usersList.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-
-    // Créer l'HTML
-    let html = '';
-
-    usersList.forEach(user => {
-      const pushEnabled = user.pushEnabled === true;
-      const pushEnabledAt = user.pushEnabledAt ? new Date(user.pushEnabledAt).toLocaleDateString('fr-FR') : null;
-      const statusClass = pushEnabled ? 'status-enabled' : 'status-disabled';
-      const statusIcon = pushEnabled ? '✅' : '❌';
-      const statusText = pushEnabled ? 'Activé' : 'Non activé';
-      const dateText = pushEnabledAt ? `le ${pushEnabledAt}` : '';
-
-      html += `
-        <div class="team-push-item ${statusClass}">
-          <div class="team-push-avatar">
-            ${user.name ? user.name.charAt(0).toUpperCase() : '?'}
-          </div>
-          <div class="team-push-info">
-            <div class="team-push-name">${user.name || 'Utilisateur'}</div>
-            <div class="team-push-email">${user.email || ''}</div>
-          </div>
-          <div class="team-push-status">
-            <span class="status-icon">${statusIcon}</span>
-            <span class="status-label">${statusText}</span>
-            ${dateText ? `<span class="status-date">${dateText}</span>` : ''}
-          </div>
-        </div>
-      `;
-    });
-
-    if (usersList.length === 0) {
-      html = '<div class="text-muted text-center">Aucun utilisateur trouvé</div>';
-    }
-
-    listEl.innerHTML = html;
-  } catch (error) {
-    console.error('Error loading team push status:', error);
-    listEl.innerHTML = '<div class="text-muted text-center">Erreur de chargement</div>';
-  }
-}
-
-// ========================================
-// ACTIVER LES PUSH DEPUIS L'ONGLET
-// ========================================
-async function enablePushFromTab() {
-  try {
-    const success = await setupPushNotifications();
-    if (success) {
-      if (typeof showToast === 'function') {
-        showToast('✅ Notifications push activées !');
-      } else {
-        alert('✅ Notifications push activées !');
+      // Masquer la cloche après 5 secondes
+      if (bell) {
+        setTimeout(() => {
+          bell.style.display = 'none';
+        }, 5000);
       }
     } else {
-      alert('❌ Erreur lors de l'activation des notifications push');
-    }
-  } catch (error) {
-    console.error('Error enabling push:', error);
-    alert('❌ Erreur lors de l'activation');
-  }
-}
+      // Pas activé : afficher la cloche
+      if (bell) {
+        bell.style.display = 'inline-flex';
+      }
 
-// ========================================
-// ENVOYER UNE NOTIFICATION (INTELLIGENTE)
-// ========================================
-async function sendSmartNotification(notifType, recipients, payload) {
-  /*
-  notifType: 'objectiveReached', 'bonusCalculated', 'updates', etc.
-  recipients: array of user IDs
-  payload: { title, body, link }
-  */
-
-  if (!notificationConfig[notifType]) {
-    console.error(`Unknown notification type: ${notifType}`);
-    return;
-  }
-
-  const config = notificationConfig[notifType];
-  const pushEnabled = config.push === true;
-  const emailEnabled = config.email === true;
-  const fallbackEnabled = config.fallback !== false;
-
-  // Charger les infos des utilisateurs
-  const usersSnap = await db.ref('users').once('value');
-  const allUsers = usersSnap.val() || {};
-
-  const pushRecipients = [];
-  const emailRecipients = [];
-
-  recipients.forEach(uid => {
-    const user = allUsers[uid];
-    if (!user) return;
-
-    const userHasPush = user.pushEnabled === true && user.pushToken;
-
-    // Logique de notification
-    if (pushEnabled && userHasPush) {
-      pushRecipients.push(uid);
-    }
-
-    if (emailEnabled) {
-      emailRecipients.push(uid);
-    } else if (fallbackEnabled && !userHasPush) {
-      // Fallback: envoyer email si push pas activé
-      emailRecipients.push(uid);
+      // Vérifier si l'utilisateur a déjà refusé la bannière
+      const dismissed = localStorage.getItem(`pushDismissed_${currentUser.uid}`);
+      if (!dismissed) {
+        // Afficher la bannière après 3 secondes
+        setTimeout(() => {
+          showPushBanner(banner);
+        }, 3000);
+      }
     }
   });
 
-  // Envoyer les push
-  if (pushRecipients.length > 0 && pushEnabled) {
-    try {
-      // Appeler la Cloud Function pour envoyer les push
-      const sendPush = firebase.functions().httpsCallable('sendPushToUsers');
-      await sendPush({
-        userIds: pushRecipients,
-        title: payload.title,
-        body: payload.body,
-        link: payload.link
-      });
-      console.log(`✅ Push sent to ${pushRecipients.length} users`);
-    } catch (error) {
-      console.error('Error sending push:', error);
-    }
-  }
-
-  // Envoyer les emails
-  if (emailRecipients.length > 0 && (emailEnabled || fallbackEnabled)) {
-    try {
-      // Appeler la Cloud Function pour envoyer les emails
-      const sendEmail = firebase.functions().httpsCallable('sendEmailToUsers');
-      await sendEmail({
-        userIds: emailRecipients,
-        subject: payload.title,
-        html: `<p>${payload.body}</p>${payload.link ? `<p><a href="${payload.link}">Voir plus</a></p>` : ''}`
-      });
-      console.log(`✅ Email sent to ${emailRecipients.length} users`);
-    } catch (error) {
-      console.error('Error sending email:', error);
-    }
+  // Clic sur la cloche = activer les notifications
+  if (bell) {
+    bell.onclick = enablePushNotifications;
   }
 }
 
-// ========================================
-// INITIALISATION AU CHARGEMENT
-// ========================================
-window.addEventListener('DOMContentLoaded', () => {
-  // Attacher le bouton de sauvegarde
-  const saveBtn = document.getElementById('saveNotifConfigBtn');
-  if (saveBtn) {
-    saveBtn.onclick = saveNotificationConfig;
-  }
-
-  // Attacher le bouton d'activation push
-  const toggleBtn = document.getElementById('toggleMyPushBtn');
-  if (toggleBtn) {
-    toggleBtn.onclick = enablePushFromTab;
-  }
-
-  // Vérifier le statut push au chargement
+function showPushBanner(banner) {
+  if (!banner) return;
   setTimeout(() => {
-    if (currentUser && currentUser.uid) {
-      db.ref(`users/${currentUser.uid}/pushEnabled`).once('value').then(snap => {
-        const enabled = snap.val() === true;
-        updateBellVisibility(enabled);
-      });
+    banner.classList.add('show');
+  }, 100);
+}
+
+function hidePushBanner(banner) {
+  if (!banner) return;
+  banner.classList.remove('show');
+}
+
+async function enablePushNotifications() {
+  try {
+    await setupPushNotifications();
+
+    const banner = document.getElementById('pushInviteBanner');
+    const bell = document.getElementById('pushBellBtn');
+
+    hidePushBanner(banner);
+    updatePushBellIcon(true);
+
+    // Faire disparaître la cloche
+    if (bell) {
+      setTimeout(() => {
+        bell.style.display = 'none';
+      }, 2000);
     }
-  }, 1000);
+
+    if (typeof showToast === 'function') {
+      showToast('✅ Notifications activées !');
+    } else {
+      alert('✅ Notifications activées !');
+    }
+  } catch (error) {
+    console.error('❌ Erreur activation push:', error);
+    alert('Erreur lors de l\'activation des notifications');
+  }
+}
+
+function dismissPushBanner() {
+  const banner = document.getElementById('pushInviteBanner');
+  hidePushBanner(banner);
+
+  // Sauvegarder que l'utilisateur a refusé
+  if (currentUser && currentUser.uid) {
+    localStorage.setItem(`pushDismissed_${currentUser.uid}`, Date.now());
+  }
+}
+
+function updatePushBellIcon(enabled) {
+  const bell = document.querySelector('.push-bell');
+  if (!bell) return;
+
+  if (enabled) {
+    bell.classList.add('enabled');
+  } else {
+    bell.classList.remove('enabled');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ONGLET NOTIFICATIONS DANS LE MANAGER
+// ═══════════════════════════════════════════════════════════════════════
+
+function renderPushTab() {
+  if (!isAdminUser()) return;
+
+  renderPushUsers();
+  renderPushSettings();
+}
+
+function renderPushUsers() {
+  const container = document.getElementById('pushUsersList');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (!allUsers) {
+    container.innerHTML = '<div style="color:#999;font-style:italic">Chargement...</div>';
+    return;
+  }
+
+  const users = Object.keys(allUsers).map(uid => ({ uid, ...allUsers[uid] }));
+  users.sort((a, b) => a.name.localeCompare(b.name));
+
+  if (users.length === 0) {
+    container.innerHTML = '<div style="color:#999;font-style:italic">Aucun utilisateur.</div>';
+    return;
+  }
+
+  users.forEach(u => {
+    const div = document.createElement('div');
+    div.className = 'user-item';
+
+    const pushEnabled = u.pushEnabled === true;
+    const pushDate = u.pushEnabledAt ? new Date(u.pushEnabledAt) : null;
+    const dateStr = pushDate 
+      ? `${pushDate.toLocaleDateString('fr-FR')} ${pushDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+      : '';
+
+    const statusDot = pushEnabled 
+      ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;margin-right:8px"></span>'
+      : '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#64748b;margin-right:8px"></span>';
+
+    const statusText = pushEnabled 
+      ? '<span style="color:#22c55e;font-weight:700">ACTIVES</span>'
+      : '<span style="color:#64748b">Désactivées</span>';
+
+    div.innerHTML = `
+      <div class="user-info">
+        <div class="user-header">
+          <span class="user-name">${u.name || 'Utilisateur'}</span>
+          <span style="font-size:13px">${statusDot}${statusText}</span>
+        </div>
+        <div class="user-meta">
+          <div>${u.email || ''}</div>
+          ${dateStr ? `<div style="font-size:12px;color:#94a3b8;margin-top:4px">Activé le ${dateStr}</div>` : ''}
+        </div>
+      </div>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+function renderPushSettings() {
+  const container = document.getElementById('pushSettings');
+  if (!container) return;
+
+  if (!globalSettings || !globalSettings.notifications) {
+    container.innerHTML = '<div style="color:#999">Chargement...</div>';
+    return;
+  }
+
+  const notif = globalSettings.notifications;
+
+  container.innerHTML = `
+    <div class="push-setting-item">
+      <label class="switch">
+        <input type="checkbox" id="pushAutoUpdate" ${notif.autoOnUpdate ? 'checked' : ''} onchange="savePushSetting('autoOnUpdate', this.checked)">
+        <span class="slider"></span>
+      </label>
+      <div class="push-setting-label">
+        <div style="font-weight:700;font-size:14px">Mise à jour publiée</div>
+        <div style="font-size:12px;color:#94a3b8">Notifier quand une info est publiée</div>
+      </div>
+    </div>
+
+    <div class="push-setting-item">
+      <label class="switch">
+        <input type="checkbox" id="pushAutoObj" ${notif.autoOnObjChange ? 'checked' : ''} onchange="savePushSetting('autoOnObjChange', this.checked)">
+        <span class="slider"></span>
+      </label>
+      <div class="push-setting-label">
+        <div style="font-weight:700;font-size:14px">Objectif modifié</div>
+        <div style="font-size:12px;color:#94a3b8">Notifier les changements d'objectifs</div>
+      </div>
+    </div>
+
+    <div class="push-setting-item">
+      <label class="switch">
+        <input type="checkbox" id="pushAutoPilotage" ${notif.autoOnPilotage ? 'checked' : ''} onchange="savePushSetting('autoOnPilotage', this.checked)">
+        <span class="slider"></span>
+      </label>
+      <div class="push-setting-label">
+        <div style="font-weight:700;font-size:14px">Pilotage publié</div>
+        <div style="font-size:12px;color:#94a3b8">Notifier les mises à jour de primes</div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+      <button class="action-btn" onclick="sendTestNotification()" style="width:100%;font-size:14px;padding:12px">
+        📨 Envoyer une notification test
+      </button>
+    </div>
+  `;
+}
+
+function savePushSetting(key, value) {
+  if (!isAdminUser()) return;
+
+  db.ref(`settings/notifications/${key}`).set(value)
+    .then(() => {
+      showToast('✅ Paramètre sauvegardé !');
+    })
+    .catch(e => {
+      console.error(e);
+      alert('Erreur lors de la sauvegarde');
+    });
+}
+
+function sendTestNotification() {
+  if (!isAdminUser()) return;
+
+  if (!confirm('Envoyer une notification test à tous les utilisateurs avec notifications actives ?')) {
+    return;
+  }
+
+  sendSmartNotification('test', {
+    title: '🧪 Notification de test',
+    body: 'Si vous recevez ce message, les notifications fonctionnent !',
+    link: 'index.html#dashboard'
+  })
+    .then(() => {
+      showToast('✅ Notification test envoyée !');
+    })
+    .catch(e => {
+      console.error(e);
+      alert('Erreur: ' + e.message);
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SMART NOTIFICATION (Push + Email fallback)
+// ═══════════════════════════════════════════════════════════════════════
+
+async function sendSmartNotification(kind, payload) {
+  // kind: 'update', 'objective', 'pilotage', 'test'
+  // payload: { title, body, link }
+
+  if (!globalSettings || !globalSettings.notifications) {
+    console.log('⚠️ Notifications settings not loaded');
+    return;
+  }
+
+  const notif = globalSettings.notifications;
+
+  // Vérifier si ce type d'alerte est activé
+  let shouldSend = false;
+  if (kind === 'update' && notif.autoOnUpdate) shouldSend = true;
+  if (kind === 'objective' && notif.autoOnObjChange) shouldSend = true;
+  if (kind === 'pilotage' && notif.autoOnPilotage) shouldSend = true;
+  if (kind === 'test') shouldSend = true;
+
+  if (!shouldSend) {
+    console.log(`🔕 Notification "${kind}" désactivée`);
+    return;
+  }
+
+  // Déterminer les destinataires
+  const audience = notif.autoAudience || 'all';
+  const targetUserIds = [];
+
+  Object.keys(allUsers).forEach(uid => {
+    const u = allUsers[uid];
+    if (!u) return;
+
+    // Exclure le super admin
+    if (u.email && u.email.toLowerCase() === 'teddy.frey1@gmail.com') return;
+
+    if (audience === 'all') {
+      targetUserIds.push(uid);
+    } else if (audience === 'admins' && u.role === 'admin') {
+      targetUserIds.push(uid);
+    }
+  });
+
+  if (targetUserIds.length === 0) {
+    console.log('⚠️ Aucun destinataire');
+    return;
+  }
+
+  console.log(`📨 Envoi notification "${kind}" à ${targetUserIds.length} utilisateurs`);
+
+  // Essayer d'abord les notifications push
+  try {
+    const sendPushToUsers = firebase.functions().httpsCallable('sendPushToUsers');
+    const result = await sendPushToUsers({
+      userIds: targetUserIds,
+      title: payload.title || 'Notification',
+      body: payload.body || '',
+      link: payload.link || 'index.html'
+    });
+
+    console.log('✅ Push envoyé:', result.data);
+
+    // Si des utilisateurs n'ont pas reçu le push, fallback email
+    const sent = result.data.sent || 0;
+    if (sent < targetUserIds.length) {
+      console.log(`⚠️ ${targetUserIds.length - sent} utilisateurs sans push, fallback email...`);
+      await sendEmailFallback(targetUserIds, payload);
+    }
+  } catch (error) {
+    console.error('❌ Erreur push, fallback email:', error);
+    await sendEmailFallback(targetUserIds, payload);
+  }
+}
+
+async function sendEmailFallback(userIds, payload) {
+  try {
+    const sendEmailToUsers = firebase.functions().httpsCallable('sendEmailToUsers');
+
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+        <h2 style="color:#2563eb">${payload.title}</h2>
+        <p style="font-size:16px;line-height:1.6">${payload.body}</p>
+        ${payload.link ? `<a href="${payload.link}" style="display:inline-block;margin-top:20px;padding:12px 24px;background:#2563eb;color:white;text-decoration:none;border-radius:8px">Voir</a>` : ''}
+        <hr style="margin:30px 0;border:none;border-top:1px solid #e5e7eb">
+        <p style="font-size:12px;color:#6b7280">Heiko Lafayette - Système de notifications</p>
+      </div>
+    `;
+
+    const result = await sendEmailToUsers({
+      userIds: userIds,
+      subject: payload.title,
+      html: html,
+      text: payload.body
+    });
+
+    console.log('✅ Email fallback envoyé:', result.data);
+  } catch (error) {
+    console.error('❌ Erreur email fallback:', error);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// AUTO-NOTIFICATIONS (appelées depuis app.js)
+// ═══════════════════════════════════════════════════════════════════════
+
+async function maybeAutoNotify(kind, payload) {
+  // Wrapper pour les appels depuis app.js
+  try {
+    await sendSmartNotification(kind, payload);
+  } catch (e) {
+    console.error('❌ Erreur maybeAutoNotify:', e);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// INIT AU CHARGEMENT
+// ═══════════════════════════════════════════════════════════════════════
+
+window.addEventListener('DOMContentLoaded', () => {
+  // Attacher les boutons de la bannière
+  const activateBtn = document.getElementById('pushInviteActivate');
+  if (activateBtn) {
+    activateBtn.onclick = enablePushNotifications;
+  }
+
+  const dismissBtn = document.getElementById('pushInviteDismiss');
+  if (dismissBtn) {
+    dismissBtn.onclick = dismissPushBanner;
+  }
 });
 
 // Export pour utilisation globale
+window.enablePushNotifications = enablePushNotifications;
+window.dismissPushBanner = dismissPushBanner;
+window.setupPushUI = setupPushUI;
 window.setupPushNotifications = setupPushNotifications;
-window.showNotificationsTab = showNotificationsTab;
+window.renderPushTab = renderPushTab;
 window.sendSmartNotification = sendSmartNotification;
-window.enablePushFromTab = enablePushFromTab;
-window.loadNotificationConfig = loadNotificationConfig;
+window.maybeAutoNotify = maybeAutoNotify;
+window.savePushSetting = savePushSetting;
+window.sendTestNotification = sendTestNotification;
+
+// ═══════════════════════════════════════════════════════════════════════
+// FIN DU FICHIER
+// ═══════════════════════════════════════════════════════════════════════
