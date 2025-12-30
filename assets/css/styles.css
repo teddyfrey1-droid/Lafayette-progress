@@ -2089,3 +2089,214 @@ body.dark-mode .weekday-chip{
   .mail-settings-row{grid-template-columns:1fr;}
   .mail-settings-actions .btn{width:100%;}
 }
+
+
+/* ====================================
+   PUSH NOTIFICATIONS POPUP - BOTTOM
+   ==================================== */
+
+/* Bannière de notifications en bas */
+.push-banner {
+  position: fixed !important;
+  bottom: 20px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  margin: 0 !important;
+
+  max-width: 480px;
+  width: calc(100% - 32px);
+
+  padding: 18px 20px !important;
+  border-radius: 18px !important;
+
+  background: rgba(255, 255, 255, 0.96) !important;
+  border: 1px solid rgba(37, 99, 235, 0.25) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15), 
+              0 0 0 1px rgba(255, 255, 255, 0.8) inset !important;
+
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+
+  z-index: 9999 !important;
+
+  /* Animation slide up */
+  animation: slideUpBanner 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Mode nuit */
+body.dark-mode .push-banner {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border-color: rgba(59, 130, 246, 0.35) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 
+              0 0 0 1px rgba(148, 163, 184, 0.15) inset !important;
+}
+
+/* Animation d'entrée */
+@keyframes slideUpBanner {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Titre de la bannière */
+.push-banner-title {
+  font-size: 16px !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.02em !important;
+  color: #0f172a !important;
+  margin-bottom: 4px !important;
+}
+
+body.dark-mode .push-banner-title {
+  color: #f8fafc !important;
+}
+
+/* Description */
+.push-banner-desc {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #475569 !important;
+  line-height: 1.4 !important;
+}
+
+body.dark-mode .push-banner-desc {
+  color: #cbd5e1 !important;
+}
+
+/* Boutons d'actions */
+.push-banner-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-shrink: 0 !important;
+}
+
+.push-banner-actions .btn {
+  padding: 10px 18px !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3) !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.push-banner-actions .btn:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4) !important;
+}
+
+.push-banner-actions .btn:active {
+  transform: translateY(0) !important;
+}
+
+.push-banner-actions .icon-btn {
+  width: 38px !important;
+  height: 38px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 10px !important;
+  background: rgba(148, 163, 184, 0.12) !important;
+  border: 1px solid rgba(148, 163, 184, 0.2) !important;
+  font-size: 18px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.push-banner-actions .icon-btn:hover {
+  background: rgba(239, 68, 68, 0.12) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+}
+
+body.dark-mode .push-banner-actions .icon-btn {
+  background: rgba(148, 163, 184, 0.15) !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+}
+
+/* Responsive mobile */
+@media (max-width: 520px) {
+  .push-banner {
+    bottom: 16px !important;
+    width: calc(100% - 24px) !important;
+    padding: 16px 16px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 14px !important;
+  }
+
+  .push-banner-actions {
+    width: 100% !important;
+    justify-content: space-between !important;
+  }
+
+  .push-banner-actions .btn {
+    flex: 1 !important;
+    padding: 12px 14px !important;
+  }
+}
+
+/* Bouton cloche (amélioration visuelle) */
+.push-bell {
+  position: relative !important;
+  font-size: 22px !important;
+  transition: transform 0.2s ease !important;
+}
+
+.push-bell:hover {
+  transform: scale(1.1) !important;
+}
+
+.push-bell.enabled {
+  animation: bellRing 0.6s ease !important;
+}
+
+@keyframes bellRing {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-12deg); }
+  50% { transform: rotate(12deg); }
+  75% { transform: rotate(-8deg); }
+}
+
+/* Point vert actif */
+.push-dot {
+  position: absolute !important;
+  top: 8px !important;
+  right: 8px !important;
+  width: 10px !important;
+  height: 10px !important;
+  border-radius: 999px !important;
+  background: #22c55e !important;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
+  display: none !important;
+  animation: pulseDot 2s ease infinite !important;
+}
+
+.push-bell.enabled .push-dot {
+  display: block !important;
+}
+
+@keyframes pulseDot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.15);
+  }
+}
