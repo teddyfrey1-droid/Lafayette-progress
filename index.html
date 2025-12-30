@@ -331,6 +331,7 @@
     <div class="tab-nav">
       <button id="btnTabTeam" onclick="switchTab('team')" class="btn-tab active">👥 Équipe</button>
       <button id="btnTabEmails" onclick="switchTab('emails')" class="btn-tab" style="display:none;">📧 Mail</button>
+      <button id="btnTabPush" onclick="switchTab('push')" class="btn-tab" style="display:none;">📱 Push</button>
       <button id="btnTabObjs" onclick="switchTab('objs')" class="btn-tab">🎯 Pilotage</button>
       <button id="btnTabLogs" onclick="switchTab('logs')" class="btn-tab" style="display:none;">🕒 Historique</button>
       <button id="btnTabFeedbacks" onclick="switchTab('feedbacks')" class="btn-tab" style="display:none;">💬 Avis & Nouveautés</button>
@@ -420,6 +421,32 @@
         </div>
       </div>
     </div>
+
+  <!-- ==================== ONGLET PUSH ==================== -->
+  <div id="tab-push" style="display:none;">
+    <div class="admin-section">
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h2 style="margin:0;">📱 Gestion des Notifications Push</h2>
+      </div>
+
+      <!-- Section 1: Liste des utilisateurs -->
+      <div class="section-card" style="margin-bottom:20px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
+        <h3 style="margin-top:0;font-size:16px;color:var(--primary);">👥 Statut des notifications par utilisateur</h3>
+        <div id="pushUsersList"></div>
+      </div>
+
+      <!-- Section 2: Paramètres des alertes automatiques -->
+      <div class="section-card" style="margin-bottom:20px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
+        <h3 style="margin-top:0;font-size:16px;color:var(--primary);">⚙️ Alertes automatiques</h3>
+        <p style="font-size:13px;color:#94a3b8;margin-bottom:15px;">
+          Configure quelles actions déclenchent une notification push automatique
+        </p>
+        <div id="pushSettings"></div>
+      </div>
+
+    </div>
+  </div>
 
     <div id="tab-logs" style="display:none;">
       <div class="admin-section">
