@@ -438,6 +438,7 @@ function renderMenuSitesPreview(){
           currentUser.email = user.email;
 
           try{ _setupPushUI(); }catch(e){}
+          try{ setupPushNotifications(); }catch(e){}
 
           const newLogRef = db.ref("logs").push();
           newLogRef.set({ user: currentUser.name, action: "Connexion", type: "session", startTime: Date.now(), lastSeen: Date.now() });
