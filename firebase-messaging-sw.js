@@ -1,10 +1,9 @@
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
 
 firebase.initializeApp({
   apiKey: "AIzaSyAGaitqmFwExvJ9ZUpkdUdCKAqqDOP2cdQ",
   authDomain: "objectif-restaurant.firebaseapp.com",
-  databaseURL: "https://objectif-restaurant-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "objectif-restaurant",
   storageBucket: "objectif-restaurant.firebasestorage.app",
   messagingSenderId: "910113283000",
@@ -14,13 +13,10 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  console.log('Background message:', payload);
-  const { title, body, icon } = payload.notification || {};
-  self.registration.showNotification(title || 'Nouvelle notification', {
+  console.log('Message reçu en arrière-plan:', payload);
+  const { title, body } = payload.notification || {};
+  self.registration.showNotification(title || 'Notification', {
     body: body || '',
-    icon: icon || '/icon-192.jpg',
-    badge: '/icon-192.jpg',
-    vibrate: [200, 100, 200],
-    tag: 'lafayette-notif'
+    icon: '/icon-192.jpg'
   });
 });
