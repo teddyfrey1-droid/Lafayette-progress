@@ -680,7 +680,14 @@ function showToast(message) {
           // attach keys for stable UI state tracking
           try{ Object.keys(allObjs).forEach(k=>{ if(allObjs[k] && typeof allObjs[k]==='object') allObjs[k]._id = k; }); }catch(e){} 
           try {
-             renderDashboard(); 
+             renderDashboard();
+
+  // Initialize Push Notifications UI
+  try {
+    setupPushUI();
+  } catch(e) {
+    console.error('Erreur setupPushUI:', e);
+  } 
              if(isAdminUser()) {
                  renderAdminObjs();
              }
