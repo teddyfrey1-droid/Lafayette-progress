@@ -769,12 +769,7 @@ function showToast(message) {
       const isAdmin = isAdminUser();
 
       document.getElementById("btnAdmin").style.display = isAdmin ? 'block' : 'none';
-      
-  // Show Notifications tab for Admin
-  const btnNotifications = document.getElementById('btnTabNotifications');
-  if(btnNotifications) btnNotifications.style.display = isAdmin ? 'block' : 'none';
-
-  // Bind monthly history (lightweight)
+      // Bind monthly history (lightweight)
       renderUserHistory();
 
       
@@ -939,212 +934,6 @@ function showToast(message) {
    GESTION DES NOTIFICATIONS PUSH - ADMIN
    ======================================== */
 
-// ========================================
-// GESTION DES NOTIFICATIONS - ADMIN
-// ========================================
-
-function renderNotifTab() {
-  if (!isAdminUser()) return;
-  renderNotifUsers();
-  renderNotifSettings();
-}
-
-function renderNotifUsers() {
-  const container = document.getElementById('notifUsersList');
-  if (!container) return;
-
-  container.innerHTML = '';
-
-  if (!allUsers) {
-    container.innerHTML = '<div style="color:#999;font-style:italic;">Chargement...</div>';
-    return;
-  }
-
-  const users = Object.keys(allUsers).map(uid => ({ uid, ...allUsers[uid] }));
-  users.sort((a,b) => (a.name||'').localeCompare(b.name||''));
-
-  if (users.length === 0) {
-    container.innerHTML = '<div style="color:#999;font-style:italic;">Aucun utilisateur.</div>';
-    return;
-  }
-
-  users.forEach(u => {
-    const div = document.createElement('div');
-    div.className = 'user-item';
-
-    const pushEnabled = u.pushEnabled === true;
-    const pushDate = u.pushEnabledAt ? new Date(u.pushEnabledAt) : null;
-    const dateStr = pushDate ? 
-      `${pushDate.toLocaleDateString('fr-FR')} ${pushDate.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}` : 
-      '';
-
-    const statusDot = pushEnabled ? 
-      '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;margin-right:8px;"></span>' : 
-      '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#64748b;margin-right:8px;"></span>';
-
-    const statusText = pushEnabled ? 
-      '<span style="color:#22c55e;font-weight:700;">✓ ACTIVÉ</span>' : 
-      '<span style="color:#64748b;">✗ Désactivé</span>';
-
-    div.innerHTML = `
-      <div class="user-info">
-        <div class="user-header">
-          <span class="user-name">${u.name || 'Utilisateur'}</span>
-          <span style="font-size:13px;">${statusDot}${statusText}</span>
-        </div>
-        <div class="user-meta">
-          <div>${u.email || ''}</div>
-          ${dateStr ? `<div style="font-size:12px;color:#94a3b8;margin-top:4px;">Activé le ${dateStr}</div>` : ''}
-          ${!pushEnabled ? `<div style="font-size:12px;color:#f59e0b;margin-top:4px;">💡 Recevra uniquement les emails</div>` : ''}
-        </div>
-      </div>
-    `;
-
-    container.appendChild(div);
-  });
-}
-
-function renderNotifSettings() {
-  const container = document.getElementById('notifSettings');
-  if (!container) return;
-
-  if (!globalSettings || !globalSettings.notifications) {
-    container.innerHTML = '<div style="color:#999;">Chargement...</div>';
-    return;
-  }
-
-  const notif = globalSettings.notifications;
-
-  // Définir les types d'alertes disponibles
-  const alertTypes = [
-    {
-      key: 'autoOnUpdate',
-      title: '📢 Mise à jour publiée',
-      desc: 'Notifier quand une nouveauté est publiée',
-      icon: '📢'
-    },
-    {
-      key: 'autoOnObjChange',
-      title: '🎯 Objectif modifié',
-      desc: 'Notifier les changements d'objectifs',
-      icon: '🎯'
-    },
-    {
-      key: 'autoOnPilotage',
-      title: '💰 Pilotage publié',
-      desc: 'Notifier les mises à jour de primes',
-      icon: '💰'
-    }
-  ];
-
-  container.innerHTML = '';
-
-  alertTypes.forEach(alert => {
-    const settingDiv = document.createElement('div');
-    settingDiv.className = 'notif-setting-item';
-    settingDiv.style.cssText = 'background:rgba(59,130,246,0.05);border:1px solid rgba(59,130,246,0.15);border-radius:10px;padding:16px;margin-bottom:12px;';
-
-    const pushChecked = notif[alert.key] === true || notif[alert.key]?.push === true;
-    const emailChecked = notif[alert.key] === true || notif[alert.key]?.email === true;
-
-    settingDiv.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
-        <div style="flex:1;">
-          <div style="font-weight:700;font-size:14px;margin-bottom:4px;display:flex;align-items:center;gap:8px;">
-            <span>${alert.icon}</span>
-            <span>${alert.title}</span>
-          </div>
-          <div style="font-size:12px;color:#94a3b8;">${alert.desc}</div>
-        </div>
-        <div style="display:flex;gap:12px;align-items:center;">
-          <label class="notif-toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;">
-            <input type="checkbox" 
-                   class="notif-checkbox" 
-                   data-key="${alert.key}" 
-                   data-type="push" 
-                   ${pushChecked ? 'checked' : ''}
-                   onchange="saveNotifSetting('${alert.key}', 'push', this.checked)"
-                   style="width:18px;height:18px;cursor:pointer;">
-            <span style="color:#3b82f6;">📱 Push</span>
-          </label>
-          <label class="notif-toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;">
-            <input type="checkbox" 
-                   class="notif-checkbox" 
-                   data-key="${alert.key}" 
-                   data-type="email" 
-                   ${emailChecked ? 'checked' : ''}
-                   onchange="saveNotifSetting('${alert.key}', 'email', this.checked)"
-                   style="width:18px;height:18px;cursor:pointer;">
-            <span style="color:#8b5cf6;">📧 Email</span>
-          </label>
-        </div>
-      </div>
-    `;
-
-    container.appendChild(settingDiv);
-  });
-
-  // Ajouter une note explicative
-  const noteDiv = document.createElement('div');
-  noteDiv.style.cssText = 'margin-top:16px;padding:12px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;font-size:12px;color:#92400e;';
-  noteDiv.innerHTML = `
-    <strong>💡 Comment ça fonctionne :</strong><br>
-    • Si un utilisateur a activé les notifications push 📱, il reçoit les alertes configurées en push<br>
-    • Si un utilisateur n'a PAS activé les push, il recevra l'alerte par email 📧 (si coché)<br>
-    • Tu peux activer les deux pour plus de couverture !
-  `;
-  container.appendChild(noteDiv);
-}
-
-function saveNotifSetting(key, type, value) {
-  if (!isAdminUser()) return;
-
-  // Récupérer la config actuelle
-  const current = globalSettings?.notifications?.[key] || {};
-
-  // Si c'était un booléen simple, le convertir en objet
-  let newConfig;
-  if (typeof current === 'boolean') {
-    newConfig = { push: current, email: current };
-  } else {
-    newConfig = { ...current };
-  }
-
-  // Mettre à jour le type spécifique
-  newConfig[type] = value;
-
-  // Sauvegarder dans Firebase
-  db.ref(`settings/notifications/${key}`).set(newConfig)
-    .then(() => {
-      showToast(`✅ Paramètre "${key}" mis à jour !`);
-    })
-    .catch((e) => {
-      console.error(e);
-      alert('Erreur lors de la sauvegarde: ' + e.message);
-    });
-}
-
-function sendTestNotification() {
-  if (!isAdminUser()) return;
-
-  if (!confirm('Envoyer une notification test à tous les utilisateurs avec notifications actives ?')) {
-    return;
-  }
-
-  _maybeAutoNotify('test', {
-    title: '🧪 Notification de test',
-    body: 'Si vous recevez ce message, les notifications fonctionnent parfaitement ! 🎉',
-    link: 'index.html#dashboard'
-  })
-    .then(() => {
-      showToast('✅ Notification test envoyée !');
-    })
-    .catch((e) => {
-      console.error(e);
-      alert('Erreur: ' + e.message);
-    });
-}
-
 function renderPushTab() {
   if (!isAdminUser()) return;
 
@@ -1270,6 +1059,186 @@ function savePushSetting(key, value) {
     console.error(e);
     alert('Erreur lors de la sauvegarde');
   });
+}
+
+
+// ========================================
+// GESTION DES NOTIFICATIONS - ADMIN
+// ========================================
+
+function renderNotifTab() {
+  if (!isAdminUser()) return;
+  renderNotifUsers();
+  renderNotifSettings();
+}
+
+function renderNotifUsers() {
+  const container = document.getElementById('notifUsersList');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (!allUsers) {
+    container.innerHTML = '<div style="color:#999;font-style:italic;">Chargement...</div>';
+    return;
+  }
+
+  const users = Object.keys(allUsers).map(uid => ({ uid, ...allUsers[uid] }));
+  users.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+
+  if (users.length === 0) {
+    container.innerHTML = '<div style="color:#999;font-style:italic;">Aucun utilisateur.</div>';
+    return;
+  }
+
+  users.forEach(u => {
+    const div = document.createElement('div');
+    div.className = 'user-item';
+
+    const pushEnabled = u.pushEnabled === true;
+    const pushDate = u.pushEnabledAt ? new Date(u.pushEnabledAt) : null;
+    const dateStr = pushDate ? 
+      `${pushDate.toLocaleDateString('fr-FR')} ${pushDate.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}` : 
+      '';
+
+    const statusDot = pushEnabled ? 
+      '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;margin-right:8px;"></span>' : 
+      '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#64748b;margin-right:8px;"></span>';
+
+    const statusText = pushEnabled ? 
+      '<span style="color:#22c55e;font-weight:700;">✓ ACTIVÉ</span>' : 
+      '<span style="color:#64748b;">✗ Désactivé</span>';
+
+    div.innerHTML = `
+      <div class="user-info">
+        <div class="user-header">
+          <span class="user-name">${u.name || 'Utilisateur'}</span>
+          <span style="font-size:13px;">${statusDot}${statusText}</span>
+        </div>
+        <div class="user-meta">
+          <div>${u.email || ''}</div>
+          ${dateStr ? `<div style="font-size:12px;color:#94a3b8;margin-top:4px;">Activé le ${dateStr}</div>` : ''}
+          ${!pushEnabled ? `<div style="font-size:12px;color:#f59e0b;margin-top:4px;">💡 Recevra uniquement les emails</div>` : ''}
+        </div>
+      </div>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+function renderNotifSettings() {
+  const container = document.getElementById('notifSettings');
+  if (!container) return;
+
+  if (!globalSettings || !globalSettings.notifications) {
+    container.innerHTML = '<div style="color:#999;">Chargement...</div>';
+    return;
+  }
+
+  const notif = globalSettings.notifications;
+
+  const alertTypes = [
+    {
+      key: 'autoOnUpdate',
+      title: '📢 Mise à jour publiée',
+      desc: 'Notifier quand une nouveauté est publiée',
+      icon: '📢'
+    },
+    {
+      key: 'autoOnObjChange',
+      title: '🎯 Objectif modifié',
+      desc: 'Notifier les changements d\'objectifs',
+      icon: '🎯'
+    },
+    {
+      key: 'autoOnPilotage',
+      title: '💰 Pilotage publié',
+      desc: 'Notifier les mises à jour de primes',
+      icon: '💰'
+    }
+  ];
+
+  container.innerHTML = '';
+
+  alertTypes.forEach(alert => {
+    const settingDiv = document.createElement('div');
+    settingDiv.className = 'notif-setting-item';
+    settingDiv.style.cssText = 'background:rgba(59,130,246,0.05);border:1px solid rgba(59,130,246,0.15);border-radius:10px;padding:16px;margin-bottom:12px;';
+
+    const pushChecked = notif[alert.key] === true || (notif[alert.key] && notif[alert.key].push === true);
+    const emailChecked = notif[alert.key] === true || (notif[alert.key] && notif[alert.key].email === true);
+
+    settingDiv.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:14px;margin-bottom:4px;display:flex;align-items:center;gap:8px;">
+            <span>${alert.icon}</span>
+            <span>${alert.title}</span>
+          </div>
+          <div style="font-size:12px;color:#94a3b8;">${alert.desc}</div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <label class="notif-toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;">
+            <input type="checkbox" 
+                   class="notif-checkbox" 
+                   data-key="${alert.key}" 
+                   data-type="push" 
+                   ${pushChecked ? 'checked' : ''}
+                   onchange="saveNotifSetting('${alert.key}', 'push', this.checked)"
+                   style="width:18px;height:18px;cursor:pointer;">
+            <span style="color:#3b82f6;">📱 Push</span>
+          </label>
+          <label class="notif-toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;">
+            <input type="checkbox" 
+                   class="notif-checkbox" 
+                   data-key="${alert.key}" 
+                   data-type="email" 
+                   ${emailChecked ? 'checked' : ''}
+                   onchange="saveNotifSetting('${alert.key}', 'email', this.checked)"
+                   style="width:18px;height:18px;cursor:pointer;">
+            <span style="color:#8b5cf6;">📧 Email</span>
+          </label>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(settingDiv);
+  });
+
+  const noteDiv = document.createElement('div');
+  noteDiv.style.cssText = 'margin-top:16px;padding:12px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;font-size:12px;color:#92400e;';
+  noteDiv.innerHTML = `
+    <strong>💡 Comment ça fonctionne :</strong><br>
+    • Si un utilisateur a activé les notifications push 📱, il reçoit les alertes configurées en push<br>
+    • Si un utilisateur n'a PAS activé les push, il recevra l'alerte par email 📧 (si coché)<br>
+    • Tu peux activer les deux pour plus de couverture !
+  `;
+  container.appendChild(noteDiv);
+}
+
+function saveNotifSetting(key, type, value) {
+  if (!isAdminUser()) return;
+
+  const current = (globalSettings && globalSettings.notifications && globalSettings.notifications[key]) || {};
+
+  let newConfig;
+  if (typeof current === 'boolean') {
+    newConfig = { push: current, email: current };
+  } else {
+    newConfig = { ...current };
+  }
+
+  newConfig[type] = value;
+
+  db.ref(`settings/notifications/${key}`).set(newConfig)
+    .then(() => {
+      showToast(`✅ Paramètre "${key}" mis à jour !`);
+    })
+    .catch((e) => {
+      console.error(e);
+      alert('Erreur lors de la sauvegarde: ' + e.message);
+    });
 }
 
 function sendTestNotification() {
@@ -2081,38 +2050,1041 @@ const el = document.createElement("div");
     function toggleAdmin(show) { document.getElementById("adminPanel").classList.toggle("active", show); if(show) { renderAdminUsers(); renderSimulator(); } }
     document.getElementById("btnAdmin").onclick = () => toggleAdmin(true);
     function switchTab(t) {
-  document.querySelectorAll('.btn-tab').forEach(b => b.classList.remove('active'));
+       document.querySelectorAll('.btn-tab').forEach(b => b.classList.remove('active'));
+       if(t === 'team') document.getElementById('btnTabTeam').classList.add('active');
+       if(t === 'objs') document.getElementById('btnTabObjs').classList.add('active');
+       if(t === 'logs') document.getElementById('btnTabLogs').classList.add('active');
+       if(t === 'feedbacks') document.getElementById('btnTabFeedbacks').classList.add('active');
+       if(t === 'emails') { const b = document.getElementById('btnTabEmails'); if(b) b.classList.add('active'); }
+       
+       document.getElementById('tab-team').style.display = t==='team'?'block':'none';
+       document.getElementById('tab-objs').style.display = t==='objs'?'block':'none';
+       document.getElementById('tab-logs').style.display = t==='logs'?'block':'none';
+       document.getElementById('tab-feedbacks').style.display = t==='feedbacks'?'block':'none';
+       const emailsTab = document.getElementById('tab-emails');
+       if(emailsTab) emailsTab.style.display = t==='emails'?'block':'none';
+       if(t==='emails'){ try{ if(window.renderMailUI) window.renderMailUI(); }catch(e){} }
 
-  if(t === 'team') document.getElementById('btnTabTeam').classList.add('active');
-  if(t === 'objs') document.getElementById('btnTabObjs').classList.add('active');
-  if(t === 'logs') document.getElementById('btnTabLogs').classList.add('active');
-  if(t === 'feedbacks') document.getElementById('btnTabFeedbacks').classList.add('active');
-  if(t === 'emails') {
-    const b = document.getElementById('btnTabEmails');
-    if(b) b.classList.add('active');
+       // Onglet Push
+       if(t === 'push') { const b = document.getElementById('btnTabPush'); if(b) b.classList.add('active'); }
+       const pushTab = document.getElementById('tab-push');
+       if(pushTab) pushTab.style.display = t==='push'?'block':'none';
+       if(t==='push'){ try{ renderPushTab(); }catch(e){console.error(e);} }
+    }
+    function toggleCreateInputs() { document.getElementById("createTiersBlock").style.display = document.getElementById("noFixed").checked ? 'none' : 'block'; }
+    function toggleEditInputs() { document.getElementById("editTiersBlock").style.display = document.getElementById("eoFixed").checked ? 'none' : 'block'; }
+
+    function addObj() {
+       const name = document.getElementById("noName").value.trim();
+       const target = document.getElementById("noTarget").value.trim();
+       if(name.length < 2) { alert("⚠️ Le NOM est obligatoire."); return; }
+       if(target.length < 1) { alert("⚠️ La CIBLE est obligatoire."); return; }
+       const isFixed = document.getElementById("noFixed").checked;
+       const isNumeric = document.getElementById("noNumeric").checked;
+       let paliers = [];
+       if(isFixed) { paliers = [{ threshold: 100, prize: "0" }]; } 
+       else { paliers = [{threshold: parseFloat(document.getElementById("c_p1t").value)||50, prize: "0"}, {threshold: parseFloat(document.getElementById("c_p2t").value)||100, prize: "0"}, {threshold: parseFloat(document.getElementById("c_p3t").value)||120, prize: "0"}]; }
+       const id = "obj-" + Date.now();
+       db.ref("objectives/"+id).set({ 
+           name: name, 
+           target: target, 
+           current: 0, 
+           published: true, 
+           isPrimary: document.getElementById("noPrimary").checked, 
+           isInverse: document.getElementById("noInverse").checked, 
+           isFixed: isFixed, 
+           isNumeric: isNumeric,
+           paliers: paliers 
+       }).then(() => { showToast("✅ Objectif Ajouté !"); });
+       logAction("Création Objectif", name);
+    }
+
+    function renderAdminObjs() {
+      const pl = document.getElementById("pubList"); pl.innerHTML = "";
+      const ol = document.getElementById("objList"); if(ol) ol.innerHTML = "";
+      Object.keys(allObjs).forEach(k => {
+        const o = allObjs[k];
+        const d1 = document.createElement("div"); d1.className="user-item pub-row";
+        const state = o.published ? 'ACTIF' : 'INACTIF';
+        d1.innerHTML = `
+          <div class="user-info">
+            <div class="user-header" style="gap:10px;">
+              <span class="user-name">${o.name} ${o.isInverse?'📉':''} ${o.isFixed?'🎁':''}</span>
+              <span class="pub-state ${o.published?'on':'off'}">${state}</span>
+            </div>
+            <div class="user-meta">Publication + activation/désactivation</div>
+          </div>
+          <div class="user-actions">
+            <label class="switch" title="Activer / désactiver"><input type="checkbox" ${o.published?'checked':''} onchange="togglePub('${k}', this.checked)"><span class="slider"></span></label>
+            <div class="btn-group">
+              <button onclick="openObjectiveProgress('${k}')" class="action-btn" title="Suivi (graph)">📈</button>
+              <button onclick="openEditObj('${k}')" class="action-btn" title="Modifier">✏️</button>
+              <button onclick="deleteObj('${k}')" class="action-btn delete" title="Supprimer">🗑️</button>
+            </div>
+          </div>
+        `;
+        pl.appendChild(d1);
+        if(ol){
+        const d2 = document.createElement("div"); d2.className="user-item";
+        d2.id = "row-" + k; 
+        d2.innerHTML = `<span>${o.name} ${o.isInverse?'📉':''} ${o.isFixed?'🎁':''}</span><div style="display:flex; gap:10px;"><button onclick="openEditObj('${k}')" class="action-btn">✏️</button> <button onclick="deleteObj('${k}')" class="action-btn delete">🗑️</button></div>`;
+        ol.appendChild(d2);
+
+        }
+      });
+    }
+
+    function openEditObj(id) {
+      const o = allObjs[id];
+      document.getElementById("editObjPanel").classList.add("active");
+      document.getElementById("eoId").value = id;
+      document.getElementById("eoName").value = o.name;
+      document.getElementById("eoCurrent").value = o.current;
+      document.getElementById("eoTarget").value = o.target;
+      document.getElementById("eoPrimary").checked = o.isPrimary;
+      document.getElementById("eoInverse").checked = o.isInverse || false;
+      document.getElementById("eoFixed").checked = o.isFixed || false;
+      document.getElementById("eoNumeric").checked = o.isNumeric || false;
+      toggleEditInputs(); 
+      if(o.paliers && o.paliers.length > 0) {
+        if(o.isFixed) { document.getElementById("eoFixedPrize").value = o.paliers[0].prize; } 
+        else {
+            if(o.paliers[0]) { document.getElementById("p1t").value = o.paliers[0].threshold; document.getElementById("p1p").value = o.paliers[0].prize; }
+            if(o.paliers[1]) { document.getElementById("p2t").value = o.paliers[1].threshold; document.getElementById("p2p").value = o.paliers[1].prize; }
+            if(o.paliers[2]) { document.getElementById("p3t").value = o.paliers[2].threshold; document.getElementById("p3p").value = o.paliers[2].prize; }
+        }
+      }
+      document.getElementById("eoHideTarget").checked = o.hideTarget || false;
+      document.getElementById("eoHideCurrent").checked = o.hideCurrent || false;
+    }
+
+    function saveObj() {
+      const id = document.getElementById("eoId").value;
+      const isFixed = document.getElementById("eoFixed").checked;
+      const newName = document.getElementById("eoName").value;
+      const newCurrentRaw = document.getElementById("eoCurrent").value;
+      const newTargetRaw = document.getElementById("eoTarget").value;
+      const newIsInverse = document.getElementById("eoInverse").checked;
+      const newIsNumeric = document.getElementById("eoNumeric").checked;
+      let paliers = [];
+      const oldP = allObjs[id].paliers || [];
+      if(isFixed) { paliers = [{ threshold: 100, prize: oldP[0]?oldP[0].prize:"0" }]; } 
+      else { 
+          paliers = [
+              {threshold: parseFloat(document.getElementById("p1t").value), prize: oldP[0]?oldP[0].prize:"0"}, 
+              {threshold: parseFloat(document.getElementById("p2t").value), prize: oldP[1]?oldP[1].prize:"0"}, 
+              {threshold: parseFloat(document.getElementById("p3t").value), prize: oldP[2]?oldP[2].prize:"0"}
+          ]; 
+      }
+      db.ref("objectives/"+id).update({ 
+          name: newName, 
+          current: newCurrentRaw, 
+          target: newTargetRaw, 
+          isPrimary: document.getElementById("eoPrimary").checked, 
+          isInverse: newIsInverse, 
+          isFixed: isFixed, 
+          isNumeric: newIsNumeric,
+          hideTarget: document.getElementById("eoHideTarget").checked, 
+          hideCurrent: document.getElementById("eoHideCurrent").checked, 
+          paliers: paliers 
+      }).then(() => {
+          showToast("✅ Objectif Modifié !");
+          document.getElementById("editObjPanel").classList.remove("active");
+
+          // Auto notif (optionnel)
+          try{
+            const oName = String(newName||"Objectif");
+            const curNum = parseFloat(String(newCurrentRaw).replace(',', '.'));
+            const tarNum = parseFloat(String(newTargetRaw).replace(',', '.'));
+            const hideCur = !!document.getElementById("eoHideCurrent").checked;
+            const hideTar = !!document.getElementById("eoHideTarget").checked;
+            let msg = "";
+            if((hideCur || hideTar) && isFinite(curNum) && isFinite(tarNum)) {
+              const pct = getPct(curNum, tarNum, newIsInverse);
+              msg = `${oName} : ${pct.toFixed(0)}%`;
+            } else if(isFinite(curNum) && isFinite(tarNum)) {
+              msg = `${oName} : ${curNum}/${tarNum}`;
+            } else {
+              msg = `${oName} mis à jour`;
+            }
+            _maybeAutoNotify('objective', { title: "🎯 Objectif mis à jour", body: msg, link: "/index.html#dashboard" });
+          }catch(e){}
+
+          // Phase demandée : graph auto -> on enregistre un point du jour quand la valeur (current) est saisie/éditée
+          try{
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth()+1).padStart(2,'0');
+            const d = String(now.getDate()).padStart(2,'0');
+            const dayKey = `${y}-${m}-${d}`;
+            const curNum = parseFloat(String(newCurrentRaw).replace(',', '.'));
+            const tarNum = parseFloat(String(newTargetRaw).replace(',', '.'));
+            if(isFinite(curNum)){
+              const payload = {
+                updatedAt: Date.now(),
+                by: (currentUser && currentUser.name) ? currentUser.name : 'Admin',
+                current: curNum
+              };
+              if(isFinite(tarNum)) payload.target = tarNum;
+              if(isFinite(tarNum)){
+                const pct = getPct(curNum, tarNum, newIsInverse);
+                payload.pct = pct;
+                payload.value = pct; // compat (anciens points)
+              }
+              db.ref(`objectiveProgress/${id}/${dayKey}`).set(payload);
+            }
+          }catch(e){}
+      });
+      logAction("Modification", "Objectif : " + newName);
+    }
+
+    function deleteObj(id) { if(confirm("🗑️ Supprimer ?")) { db.ref("objectives/"+id).remove().then(() => showToast("🗑️ Supprimé")); logAction("Suppression", `Objectif ${id}`); } }
+    function togglePub(id, v) { db.ref("objectives/"+id+"/published").set(v); logAction("Publication", `Objectif ${id}: ${v}`); }
+    function createUser() { 
+        const email = (document.getElementById("nuEmail") || {}).value || "";
+        const name = (document.getElementById("nuName") || {}).value || "";
+        const hours = parseFloat((document.getElementById("nuHours") || {}).value) || 35;
+        const isAdmin = !!((document.getElementById("nuAdmin") || {}).checked);
+
+        const cleanEmail = String(email).trim();
+        if(!cleanEmail){
+          showToast("⚠️ Email requis.");
+          return;
+        }
+
+        // Création de compte SANS envoi d'email (fonctionnalité email désactivée).
+        // Mot de passe temporaire à communiquer manuellement.
+        const TEMP_PASSWORD = "Temp1234!";
+
+        const sec = firebase.initializeApp(firebaseConfig, "Sec"); 
+
+        sec.auth().createUserWithEmailAndPassword(cleanEmail, TEMP_PASSWORD).then(c => { 
+            db.ref('users/'+c.user.uid).set({ 
+              name: String(name).trim() || "Utilisateur", 
+              hours: hours, 
+              role: isAdmin ? 'admin' : 'staff', 
+              email: cleanEmail, 
+              status: 'active', 
+              primeEligible: true 
+            }); 
+            sec.delete(); 
+            showToast("✅ Membre créé (mot de passe temporaire : " + TEMP_PASSWORD + ")"); 
+        }).catch(e => { 
+            // Si l'utilisateur existe déjà, on ne renvoie plus d'email.
+            if(e && e.code === 'auth/email-already-in-use') {
+                showToast("⚠️ Ce membre existe déjà.");
+                sec.delete();
+            } else {
+                alert(e && e.message ? e.message : String(e)); 
+                sec.delete();
+            }
+        }); 
+    }
+
+
+    function renderAdminUsers() { 
+        const d = document.getElementById("usersList");
+        if(!d) return;
+        d.innerHTML = "";
+        let totalToPay = 0;
+
+        const entries = Object.keys(allUsers || {}).map(uid => ({ uid, u: (allUsers[uid] || {}) }))
+          .filter(e => !(e.u.email && String(e.u.email).toLowerCase() === String(SUPER_ADMIN_EMAIL||'').toLowerCase()));
+
+        const eligibleEntries = [];
+        const ineligibleEntries = [];
+        entries.forEach(e => {
+          const isEligible = (e.u.primeEligible !== false);
+          (isEligible ? eligibleEntries : ineligibleEntries).push(e);
+        });
+
+        const nameSort = (a,b) => {
+          const an = (a.u.name || a.u.email || a.uid || '').toString();
+          const bn = (b.u.name || b.u.email || b.uid || '').toString();
+          return an.localeCompare(bn, 'fr', { sensitivity: 'base' });
+        };
+        eligibleEntries.sort(nameSort);
+        ineligibleEntries.sort(nameSort);
+
+        function computeUserBonus(u){
+          const userRatio = (u.hours || 35) / BASE_HOURS; 
+          let userBonus = 0;
+
+          const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); 
+          let primOk = true; 
+          if(prims.length > 0) { 
+            primOk = prims.every(o => { 
+              let threshold = 100;
+              if(o.isFixed) threshold = 100;
+              else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold;
+              if(o.isNumeric) return parseFloat(o.current) >= threshold;
+              const pct = getPct(o.current, o.target, o.isInverse); 
+              return pct >= threshold;
+            }); 
+          } 
+
+          Object.values(allObjs).forEach(o => { 
+            if(!o.published) return; 
+            const pct = getPct(o.current, o.target, o.isInverse); 
+            const isLocked = !o.isPrimary && !primOk; 
+            let g = 0; 
+            if(o.isFixed) { 
+              let win = false;
+              if(o.isNumeric) win = parseFloat(o.current) >= o.target;
+              else win = pct >= 100;
+              if(win && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); 
+            } else { 
+              if(o.paliers) o.paliers.forEach(p => { 
+                let unlocked = false;
+                if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold;
+                else unlocked = pct >= p.threshold;
+                if(unlocked) g += parse(p.prize); 
+              }); 
+            } 
+            if(!isLocked) userBonus += (g * userRatio); 
+          }); 
+
+          return userBonus;
+        }
+
+        function renderUser(uid, u, isEligible){
+          const userBonus = isEligible ? computeUserBonus(u) : 0;
+          if(isEligible) totalToPay += userBonus;
+
+          const div = document.createElement("div"); 
+          div.className = "user-item"; 
+          const statusClass = (u.status === 'active') ? 'active' : 'pending';
+          const statusLabel = (u.status === 'active') ? 'ACTIF' : 'EN ATTENTE';
+          let adminBadge = ""; if(u.role === 'admin') adminBadge = `<span class="admin-tag">ADMIN</span>`;
+          const checked = isEligible ? 'checked' : '';
+          const gain = isEligible ? userBonus.toFixed(2) + '€' : '—';
+
+          div.innerHTML = `
+                <div class="user-info">
+                    <div class="user-header">
+                        <span class="user-name">${u.name || ''} ${adminBadge}</span>
+                        <div style="display:flex; align-items:center;">
+                            <span class="status-dot ${statusClass}"></span>
+                            <span class="status-text">${statusLabel}</span>
+                        </div>
+                    </div>
+                    <div class="user-email-sub">${u.email || ''}</div>
+                    <div class="user-meta">${u.hours || 35}h</div>
+                    <label class="check-label" style="margin-top:6px; font-size:11px; opacity:.95;">
+                      <input type="checkbox" ${checked} onchange="setUserPrimeEligible('${uid}', this.checked)"> 💶 Compte dans les primes
+                    </label>
+                </div>
+                <div class="user-actions">
+                    <div class="user-gain">${gain}</div>
+                    <div class="btn-group">
+                      <button onclick="openTeamArchive('${uid}')" class="action-btn" title="Archive mensuelle">📄</button>
+                      <button onclick="editUser('${uid}')" class="action-btn" title="Modifier">✏️</button>
+                      <button onclick="deleteUser('${uid}')" class="action-btn delete" title="Supprimer">🗑️</button>
+                    </div>
+                </div>`; 
+          d.appendChild(div); 
+        }
+
+        eligibleEntries.forEach(e => renderUser(e.uid, e.u, true));
+
+        const totalRow = document.createElement("div"); 
+        totalRow.className = "total-row";
+        totalRow.innerHTML = `<span>Total à payer</span><span>${totalToPay.toFixed(2)} €</span>`;
+        d.appendChild(totalRow);
+
+        if(ineligibleEntries.length){
+          const sep = document.createElement("div");
+          sep.className = "users-sep";
+          sep.textContent = "Non comptés dans les primes";
+          d.appendChild(sep);
+          ineligibleEntries.forEach(e => renderUser(e.uid, e.u, false));
+        }
+    }
+
+    function setUserPrimeEligible(uid, isEligible){
+      if(!isAdminUser()) return;
+      const val = !!isEligible;
+      const prev = (allUsers && allUsers[uid]) ? (allUsers[uid].primeEligible !== false) : true;
+
+      try{
+        if(allUsers && allUsers[uid]) allUsers[uid].primeEligible = val;
+        renderAdminUsers();
+      }catch(e){}
+
+      db.ref('users/' + uid + '/primeEligible').set(val).then(() => {
+        try{ logAction('Équipe', `PrimeEligible ${uid} -> ${val}`); }catch(e){}
+        try{ showToast(val ? '✅ Compte inclus dans les primes' : '🚫 Compte exclu des primes'); }catch(e){}
+      }).catch(() => {
+        try{
+          if(allUsers && allUsers[uid]) allUsers[uid].primeEligible = prev;
+          renderAdminUsers();
+        }catch(e){}
+        try{ showToast('Erreur mise à jour.'); }catch(e){}
+      });
+    }
+    window.setUserPrimeEligible = setUserPrimeEligible;
+    window.setUserPrimeEligible = setUserPrimeEligible;
+
+    // --- Archive mensuelle par équipier (Admin/Super Admin) ---
+    function openTeamArchive(uid){
+      if(!isAdminUser()) return;
+      const u = allUsers[uid];
+      if(!u) return;
+      _archiveUserId = uid;
+      _archiveUserName = u.name || (u.email||'');
+
+      // bonus calculé à date (reprend le calcul de la liste)
+      try{
+        const isEligible = (u.primeEligible !== false);
+        const userRatio = (u.hours || 35) / BASE_HOURS;
+        let userBonus = 0;
+
+        const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published);
+        let primOk = true;
+        if(prims.length > 0) {
+          primOk = prims.every(o => {
+            let threshold = 100;
+            if(o.isFixed) threshold = 100;
+            else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold;
+            if(o.isNumeric) return parseFloat(o.current) >= threshold;
+            const pct = getPct(o.current, o.target, o.isInverse);
+            return pct >= threshold;
+          });
+        }
+
+        if(isEligible) Object.values(allObjs).forEach(o => {
+          if(!o.published) return;
+          const pct = getPct(o.current, o.target, o.isInverse);
+          const isLocked = !o.isPrimary && !primOk;
+          let g = 0;
+          if(o.isFixed) {
+            let win = false;
+            if(o.isNumeric) win = parseFloat(o.current) >= o.target;
+            else win = pct >= 100;
+            if(win && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize);
+          } else {
+            (o.paliers||[]).forEach(p => {
+              let unlocked = false;
+              if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold;
+              else unlocked = pct >= p.threshold;
+              if(unlocked) g += parse(p.prize);
+            });
+          }
+          if(!isLocked) userBonus += (g * userRatio);
+        });
+        _archiveUserComputedBonus = isEligible ? userBonus : 0;
+      }catch(e){ _archiveUserComputedBonus = 0; }
+
+      const nameEl = document.getElementById('teamArchiveName');
+      if(nameEl) nameEl.textContent = _archiveUserName;
+      const modal = document.getElementById('teamArchiveModal');
+      if(modal) modal.style.display = 'flex';
+
+      renderTeamArchiveList();
+    }
+
+    function closeTeamArchive(){
+      const modal = document.getElementById('teamArchiveModal');
+      if(modal) modal.style.display = 'none';
+      _archiveUserId = null; _archiveUserName = null; _archiveUserComputedBonus = 0;
+    }
+
+    function _monthKey(d){
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      return `${y}-${m}`;
+    }
+
+    function archiveCurrentMonthForUser(){
+      if(!isAdminUser() || !_archiveUserId) return;
+      const key = _monthKey(new Date());
+      const ref = db.ref(`teamArchive/${_archiveUserId}/${key}`);
+      const payload = {
+        month: key,
+        amount: parseFloat((_archiveUserComputedBonus||0).toFixed(2)),
+        validatedAt: Date.now(),
+        sentAt: null,
+        note: ''
+      };
+      ref.update(payload).then(() => {
+        showToast('✅ Mois archivé');
+        logAction('Archive', `${_archiveUserName} — ${key} = ${payload.amount}€`);
+      }).catch(()=>{});
+    }
+
+    function addManualArchiveRow(){
+      if(!isAdminUser() || !_archiveUserId) return;
+      const key = prompt('Mois à ajouter (format AAAA-MM) :', _monthKey(new Date()));
+      if(!key || !/^\d{4}-\d{2}$/.test(key)) return;
+      const amount = parseFloat(prompt('Montant (€) :', '0')||'0') || 0;
+      db.ref(`teamArchive/${_archiveUserId}/${key}`).update({
+        month: key,
+        amount: parseFloat(amount.toFixed(2)),
+        validatedAt: Date.now(),
+        sentAt: null,
+        note: ''
+      }).then(() => showToast('✅ Ajouté'));
+    }
+
+    function renderTeamArchiveList(){
+      if(!_archiveUserId) return;
+      const list = document.getElementById('teamArchiveList');
+      if(!list) return;
+      list.innerHTML = '<div style="text-align:center; color:#999;">Chargement...</div>';
+
+      db.ref(`teamArchive/${_archiveUserId}`).once('value').then(snap => {
+        const data = snap.val() || {};
+        const keys = Object.keys(data).sort((a,b) => (b||'').localeCompare(a||''));
+        if(keys.length === 0){
+          list.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-weight:800;">Aucune archive.</div>';
+          return;
+        }
+        list.innerHTML = '';
+        keys.forEach(k => {
+          const r = data[k] || {};
+          const amount = (r.amount != null) ? Number(r.amount) : 0;
+          const sent = !!r.sentAt;
+          const row = document.createElement('div');
+          row.className = 'user-item';
+          row.innerHTML = `
+            <div class="user-info">
+              <div class="user-header" style="gap:10px;">
+                <span class="user-name">${k}</span>
+                <span class="pub-state ${sent?'on':'off'}" style="text-transform:none;">${sent?'Envoyé':'Non envoyé'}</span>
+              </div>
+              <div class="user-meta" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <span style="font-weight:900;">Montant :</span>
+                <input type="number" step="0.01" value="${amount.toFixed(2)}" style="max-width:140px;" onchange="updateArchiveAmount('${k}', this.value)">
+                <input type="text" placeholder="Note (optionnel)" value="${(r.note||'').replace(/"/g,'&quot;')}" style="flex:1; min-width:180px;" onchange="updateArchiveNote('${k}', this.value)">
+              </div>
+            </div>
+            <div class="user-actions">
+              <div class="btn-group">
+                <button class="action-btn" title="Marquer envoyé" onclick="toggleArchiveSent('${k}', ${sent})">${sent?'↩️':'📩'}</button>
+                <button class="action-btn delete" title="Supprimer" onclick="deleteArchiveRow('${k}')">🗑️</button>
+              </div>
+            </div>
+          `;
+          list.appendChild(row);
+        });
+      });
+    }
+
+    function updateArchiveAmount(monthKey, val){
+      if(!_archiveUserId || !isAdminUser()) return;
+      const n = parseFloat(val);
+      if(!isFinite(n)) return;
+      db.ref(`teamArchive/${_archiveUserId}/${monthKey}`).update({ amount: parseFloat(n.toFixed(2)) });
+    }
+    function updateArchiveNote(monthKey, val){
+      if(!_archiveUserId || !isAdminUser()) return;
+      db.ref(`teamArchive/${_archiveUserId}/${monthKey}`).update({ note: String(val||'') });
+    }
+    function toggleArchiveSent(monthKey, currentlySent){
+      if(!_archiveUserId || !isAdminUser()) return;
+      db.ref(`teamArchive/${_archiveUserId}/${monthKey}`).update({ sentAt: currentlySent ? null : Date.now() }).then(() => {
+        renderTeamArchiveList();
+      });
+    }
+    function deleteArchiveRow(monthKey){
+      if(!_archiveUserId || !isAdminUser()) return;
+      if(!confirm('Supprimer cette archive ?')) return;
+      db.ref(`teamArchive/${_archiveUserId}/${monthKey}`).remove().then(() => renderTeamArchiveList());
+    }
+
+    // --- Suivi (graph) par objectif (Admin/Super Admin) ---
+    let _objProgMode = 'pct'; // 'pct' ou 'num'
+    // Date helpers (ISO yyyy-mm-dd -> affichage FR lisible)
+    function _isoToLocalTs(iso){
+      if(!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return NaN;
+      const p = String(iso).split('-');
+      const y = parseInt(p[0],10);
+      const m = parseInt(p[1],10);
+      const d = parseInt(p[2],10);
+      if(!isFinite(y)||!isFinite(m)||!isFinite(d)) return NaN;
+      return new Date(y, m-1, d).getTime();
+    }
+    function _formatIsoDateFR(iso){
+      const ts = _isoToLocalTs(iso);
+      if(!isFinite(ts)) return iso || '';
+      const d = new Date(ts);
+      const day = d.getDate();
+      let month = d.toLocaleDateString('fr-FR', { month: 'long' });
+      const year = d.getFullYear();
+      // Capitalise month (ex: "Décembre") for a more readable, app-like format
+      month = month ? (month.charAt(0).toUpperCase() + month.slice(1)) : '';
+      return `${day} ${month} ${year}`.trim();
+    }
+    let _objProgHit = [];
+
+    function _bindObjProgCanvas(){
+      const canvas = document.getElementById('objProgCanvas');
+      if(!canvas || canvas._bound) return;
+      canvas._bound = true;
+
+      const tip = document.getElementById('objProgTooltip');
+      const hideTip = () => { if(tip) tip.style.display = 'none'; };
+
+      const showTip = (text, cssX, cssY, rect) => {
+        if(!tip) return;
+        tip.textContent = text;
+        tip.style.display = 'block';
+
+        const wrap = tip.parentElement;
+        const w = (wrap && wrap.clientWidth) ? wrap.clientWidth : rect.width;
+        const h = (wrap && wrap.clientHeight) ? wrap.clientHeight : rect.height;
+
+        // After display, we can measure tooltip size
+        const tw = tip.offsetWidth || 180;
+        const th = tip.offsetHeight || 44;
+
+        let left = cssX + 12;
+        let top  = cssY - (th + 12);
+
+        if(left + tw > w) left = Math.max(6, w - tw - 6);
+        if(top < 6) top = cssY + 12;
+        if(top + th > h) top = Math.max(6, h - th - 6);
+
+        tip.style.left = left + 'px';
+        tip.style.top  = top  + 'px';
+      };
+
+      const findNearest = (x, y) => {
+        let best = null;
+        let bestD = 1e9;
+        for(const p of (_objProgHit || [])){
+          const dx = x - p.x;
+          const dy = y - p.y;
+          const d = Math.sqrt(dx*dx + dy*dy);
+          if(d < bestD){ bestD = d; best = p; }
+        }
+        return { best, bestD };
+      };
+
+      canvas.style.cursor = 'default';
+
+      canvas.addEventListener('mousemove', (ev) => {
+        if(!_objProgHit || !_objProgHit.length){
+          hideTip();
+          canvas.style.cursor = 'default';
+          return;
+        }
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / Math.max(1, rect.width);
+        const scaleY = canvas.height / Math.max(1, rect.height);
+        const x = (ev.clientX - rect.left) * scaleX;
+        const y = (ev.clientY - rect.top) * scaleY;
+
+        const { best, bestD } = findNearest(x, y);
+        if(best && bestD <= 18){
+          canvas.style.cursor = 'pointer';
+          const cssX = best.x / scaleX;
+          const cssY = best.y / scaleY;
+          showTip(best.label, cssX, cssY, rect);
+        } else {
+          hideTip();
+          canvas.style.cursor = 'default';
+        }
+      });
+
+      canvas.addEventListener('mouseleave', () => {
+        hideTip();
+        canvas.style.cursor = 'default';
+      });
+
+      // Click still works (useful on mobile)
+      canvas.addEventListener('click', (ev) => {
+        if(!_objProgHit || !_objProgHit.length) return;
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / Math.max(1, rect.width);
+        const scaleY = canvas.height / Math.max(1, rect.height);
+        const x = (ev.clientX - rect.left) * scaleX;
+        const y = (ev.clientY - rect.top) * scaleY;
+        const { best, bestD } = findNearest(x, y);
+        if(best && bestD <= 18){
+          showToast(best.label);
+        }
+      });
+    }
+
+    function _getObjProgMode(o){
+      if(!o) return 'pct';
+      if(o.hideCurrent || o.hideTarget) return 'pct';
+      if(o.isNumeric) return 'num';
+      return 'pct';
+    }
+
+    function openObjectiveProgress(objId){
+      if(!isAdminUser()) return;
+      const o = allObjs[objId];
+      if(!o) return;
+      _objProgId = objId;
+      _objProgMode = _getObjProgMode(o);
+
+      const n = document.getElementById('objProgName');
+      if(n) n.textContent = o.name || objId;
+
+      const label = document.getElementById('objProgValueLabel');
+      const vEl = document.getElementById('objProgValue');
+      if(label){
+        label.textContent = (_objProgMode === 'num') ? 'VALEUR (NOMBRE)' : 'PROGRESSION (%)';
+      }
+      if(vEl){
+        vEl.value = '';
+        vEl.placeholder = (_objProgMode === 'num') ? 'ex: 12' : 'ex: 22';
+        vEl.step = (_objProgMode === 'num') ? '1' : '0.1';
+      }
+
+      const modal = document.getElementById('objectiveProgressModal');
+      if(modal) modal.style.display = 'flex';
+
+      // default date = aujourd'hui
+      const dEl = document.getElementById('objProgDate');
+      if(dEl){
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth()+1).padStart(2,'0');
+        const d = String(now.getDate()).padStart(2,'0');
+        dEl.value = `${y}-${m}-${d}`;
+      }
+      _bindObjProgCanvas();
+      _refreshObjectiveProgress();
+    }
+
+    function closeObjectiveProgress(){
+      const modal = document.getElementById('objectiveProgressModal');
+      if(modal) modal.style.display = 'none';
+      _objProgId = null;
+      if(_objProgUnsub){ try{ _objProgUnsub.off(); }catch(e){} }
+      _objProgUnsub = null;
+    }
+
+    function _computeObjProgRows(data){
+      const o = allObjs[_objProgId];
+      const mode = _objProgMode;
+      const rowsRaw = Object.keys(data||{})
+        .filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k))
+        .map(k => ({ id:k, date:k, ...(data[k]||{}) }))
+        .sort((a,b) => String(a.date).localeCompare(String(b.date)));
+
+      const out = [];
+      rowsRaw.forEach(r => {
+        const cur = (r.current != null) ? parseFloat(r.current) : NaN;
+        const tar = (r.target != null) ? parseFloat(r.target) : (o && o.target != null ? parseFloat(o.target) : NaN);
+        const pct = (r.pct != null) ? parseFloat(r.pct)
+          : (r.value != null) ? parseFloat(r.value)
+          : (isFinite(cur) && isFinite(tar)) ? getPct(cur, tar, !!(o && o.isInverse))
+          : NaN;
+
+        if(mode === 'num'){
+          let y = cur;
+          if(!isFinite(y)){
+            // fallback (si ancien enregistrement en %): approx = pct% * target
+            if(isFinite(pct) && isFinite(tar) && !(o && o.isInverse)) y = (pct/100) * tar;
+          }
+          if(isFinite(y)) out.push({ ...r, _y: y, _pct: isFinite(pct) ? pct : (isFinite(tar) ? getPct(y, tar, !!(o && o.isInverse)) : NaN) });
+        } else {
+          if(isFinite(pct)) out.push({ ...r, _y: pct, _pct: pct });
+        }
+      });
+      return out;
+    }
+
+    function _refreshObjectiveProgress(){
+      if(!_objProgId) return;
+      const list = document.getElementById('objProgList');
+      if(list) list.innerHTML = '<div style="text-align:center; color:#999;">Chargement...</div>';
+      const ref = db.ref(`objectiveProgress/${_objProgId}`);
+      if(_objProgUnsub){ try{ _objProgUnsub.off(); }catch(e){} }
+      _objProgUnsub = ref;
+      ref.on('value', snap => {
+        const data = snap.val() || {};
+        const rows = _computeObjProgRows(data);
+        _drawObjectiveProgress(rows, _objProgMode);
+
+        if(!list) return;
+        if(rows.length === 0){
+          list.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-weight:800;">Aucune donnée.</div>';
+          return;
+        }
+        list.innerHTML = '';
+        rows.slice().reverse().forEach(r => {
+          const div = document.createElement('div');
+          div.className = 'user-item';
+          const badge = (_objProgMode === 'num')
+            ? `${Number(r._y).toLocaleString('fr-FR')} <span style="opacity:.75; font-weight:900;">(${Number(r._pct).toFixed(1)}%)</span>`
+            : `${Number(r._pct).toFixed(1)}%`;
+          div.innerHTML = `
+            <div class="user-info">
+              <div class="user-header" style="gap:10px;">
+                <span class="user-name">${_formatIsoDateFR(r.date)}</span>
+                <span class="pub-state on" style="text-transform:none;">${badge}</span>
+              </div>
+              <div class="user-meta">Mise à jour</div>
+            </div>
+            <div class="user-actions">
+              <div class="btn-group">
+                <button class="action-btn delete" title="Supprimer" onclick="deleteObjectiveProgressPoint('${r.id}')">🗑️</button>
+              </div>
+            </div>
+          `;
+          list.appendChild(div);
+        });
+      });
+    }
+
+    function addObjectiveProgressPoint(){
+      if(!_objProgId || !isAdminUser()) return;
+      const o = allObjs[_objProgId];
+      const dEl = document.getElementById('objProgDate');
+      const vEl = document.getElementById('objProgValue');
+      const date = dEl ? String(dEl.value||'').trim() : '';
+      const raw = vEl ? parseFloat(String(vEl.value||'')) : NaN;
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) { alert('Date invalide.'); return; }
+      if(!isFinite(raw)) { alert('Valeur invalide.'); return; }
+
+      const payload = {
+        updatedAt: Date.now(),
+        by: (currentUser && currentUser.name) ? currentUser.name : 'Admin'
+      };
+
+      if(_objProgMode === 'num'){
+        payload.current = raw;
+        const tar = (o && o.target != null) ? parseFloat(o.target) : NaN;
+        if(isFinite(tar)) payload.target = tar;
+        if(isFinite(tar)){
+          const pct = getPct(raw, tar, !!(o && o.isInverse));
+          payload.pct = pct;
+          payload.value = pct; // compat
+        }
+      } else {
+        payload.pct = raw;
+        payload.value = raw;
+      }
+
+      db.ref(`objectiveProgress/${_objProgId}/${date}`).set(payload)
+        .then(() => { showToast('✅ Ajouté'); if(vEl) vEl.value=''; })
+        .catch(()=>{});
+    }
+
+    function deleteObjectiveProgressPoint(pointId){
+      if(!_objProgId || !isAdminUser()) return;
+      if(!confirm('Supprimer ce point ?')) return;
+      db.ref(`objectiveProgress/${_objProgId}/${pointId}`).remove().then(() => showToast('🗑️ Supprimé'));
+    }
+
+    function _drawObjectiveProgress(rows, mode){
+      const canvas = document.getElementById('objProgCanvas');
+      if(!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width; const h = canvas.height;
+      ctx.clearRect(0,0,w,h);
+
+      const isDark = document.body.classList.contains('dark-mode');
+      ctx.fillStyle = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
+      ctx.fillRect(0,0,w,h);
+
+      const pad = 28;
+      ctx.strokeStyle = isDark ? 'rgba(148,163,184,0.25)' : 'rgba(17,24,39,0.18)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pad, pad);
+      ctx.lineTo(pad, h-pad);
+      ctx.lineTo(w-pad, h-pad);
+      ctx.stroke();
+
+      if(!rows || rows.length < 1) return;
+
+      const xs = rows.map(r => _isoToLocalTs(r.date)).filter(t => isFinite(t));
+      if(xs.length === 0) return;
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const spanX = Math.max(1, maxX - minX);
+
+      let minY = 0;
+      let maxY = 100;
+      if(mode === 'num'){
+        const ys = rows.map(r => Number(r._y)).filter(v => isFinite(v));
+        if(ys.length){
+          minY = 0;
+          maxY = Math.max(1, Math.max(...ys) * 1.10);
+        }
+      }
+      const spanY = Math.max(1e-9, maxY - minY);
+
+      const pts = rows.map(r => {
+        const tx = _isoToLocalTs(r.date);
+        const vx = (tx - minX) / spanX;
+        const vy = (Number(r._y) - minY) / spanY;
+        const x = pad + vx * (w - 2*pad);
+        const y = (h - pad) - vy * (h - 2*pad);
+        return { x, y };
+      });
+
+      // Hit points (click) : affiche date + valeur/%
+      _objProgHit = pts.map((p, i) => {
+        const r = rows[i];
+        const dateIso = (r && r.date) ? r.date : '';
+        const date = _formatIsoDateFR(dateIso);
+        let label = date;
+        if(mode === 'num'){
+          const v = (r && isFinite(r._y)) ? Number(r._y) : NaN;
+          const pct = (r && isFinite(r._pct)) ? Number(r._pct) : NaN;
+          if(isFinite(v) && isFinite(pct)) label = `${date} — ${v.toLocaleString('fr-FR')} (${pct.toFixed(1)}%)`;
+          else if(isFinite(v)) label = `${date} — ${v.toLocaleString('fr-FR')}`;
+          else if(isFinite(pct)) label = `${date} — ${pct.toFixed(1)}%`;
+        } else {
+          const pct = (r && isFinite(r._pct)) ? Number(r._pct) : NaN;
+          if(isFinite(pct)) label = `${date} — ${pct.toFixed(1)}%`;
+        }
+        return { x: p.x, y: p.y, label };
+      });
+
+
+      ctx.strokeStyle = isDark ? 'rgba(59,130,246,0.85)' : 'rgba(37,99,235,0.90)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+
+      ctx.fillStyle = isDark ? 'rgba(255,255,255,0.92)' : 'rgba(17,24,39,0.88)';
+      pts.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 9, 0, Math.PI*2);
+        ctx.fill();
+        ctx.strokeStyle = isDark ? 'rgba(59,130,246,0.55)' : 'rgba(37,99,235,0.45)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      });
+    }
+
+    function editUser(uid) { const u = allUsers[uid]; document.getElementById("editUserPanel").classList.add("active"); document.getElementById("euId").value = uid; document.getElementById("euName").value = u.name; document.getElementById("euHours").value = u.hours; document.getElementById("euAdmin").checked = (u.role === 'admin'); }
+    function saveUser() { db.ref('users/'+document.getElementById("euId").value).update({ name: document.getElementById("euName").value, hours: parseFloat(document.getElementById("euHours").value), role: document.getElementById("euAdmin").checked ? 'admin' : 'staff' }); document.getElementById("editUserPanel").classList.remove("active"); showToast("✅ Modifié"); }
+    function deleteUser(uid) { if(confirm("Supprimer ?")) { db.ref('users/'+uid).remove(); showToast("🗑️ Supprimé"); } }
+
+    function deleteUserLogs(targetName) {
+        if(confirm("🗑️ Effacer tout l'historique de " + targetName + " ?")) {
+            const updates = {};
+            Object.keys(allLogs).forEach(k => {
+                if(allLogs[k].user === targetName) updates['logs/'+k] = null;
+            });
+            db.ref().update(updates).then(() => showToast("Historique nettoyé !"));
+        }
+    }
+
+    function toggleUserLogs(id) {
+        const el = document.getElementById(id);
+        if(el) el.classList.toggle('open');
+    }
+
+    function renderLogs(logs) {
+      const container = document.getElementById("logsContainer"); container.innerHTML = "";
+      const grouped = {};
+      Object.values(logs || {}).forEach(log => {
+          if(!grouped[log.user]) grouped[log.user] = { lastSeen: 0, sessions: [], actions: [] };
+          if(log.type === 'session') { grouped[log.user].sessions.push(log); if(log.lastSeen > grouped[log.user].lastSeen) grouped[log.user].lastSeen = log.lastSeen; } 
+          else { grouped[log.user].actions.push(log); if(log.time > grouped[log.user].lastSeen) grouped[log.user].lastSeen = log.time; }
+      });
+      const sortedUsers = Object.keys(grouped).sort((a,b) => grouped[b].lastSeen - grouped[a].lastSeen);
+      
+      sortedUsers.forEach(uName => {
+          const g = grouped[uName];
+          const d = new Date(g.lastSeen);
+          g.sessions.sort((a,b) => b.startTime - a.startTime); g.actions.sort((a,b) => b.time - a.time);
+          
+          // Generate Safe ID
+          const safeId = 'log-group-' + uName.replace(/[^a-zA-Z0-9]/g, '');
+
+          const div = document.createElement("div"); div.className = "log-user-group";
+          div.innerHTML = `
+             <div class="group-header">
+                <div class="group-info" onclick="toggleUserLogs('${safeId}')" style="flex:1;">
+                   👤 ${uName} <span style="font-weight:400; font-size:11px; color:var(--text-muted); margin-left:10px;">(Dernière: ${d.toLocaleString()}) ▼</span>
+                </div>
+                <button onclick="deleteUserLogs('${uName}')" class="btn-clear-hist" title="Effacer historique">🗑️ Effacer</button>
+             </div>
+             <div class="group-body" id="${safeId}">
+                <div><div class="log-col-title">🔌 Connexions</div><div class="log-list" id="sess-${safeId}"></div></div>
+                <div><div class="log-col-title">🛠️ Activité</div><div class="log-list" id="act-${safeId}"></div></div>
+             </div>`;
+          container.appendChild(div);
+          
+          const sc = document.getElementById(`sess-${safeId}`); 
+          if(g.sessions.length===0) sc.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; 
+          else g.sessions.forEach(s=>{ 
+              const st=new Date(s.startTime); const m=Math.floor((s.lastSeen-s.startTime)/60000); const dt=(m>60)?Math.floor(m/60)+"h "+(m%60)+"m":m+"m"; 
+              sc.innerHTML+=`<div class="log-entry"><span class="log-dot">🟢</span><span class="log-time-s">${st.toLocaleDateString().slice(0,5)} ${st.toLocaleTimeString().slice(0,5)}</span><span class="log-dur">${dt}</span></div>`; 
+          });
+
+          const ac = document.getElementById(`act-${safeId}`); 
+          if(g.actions.length===0) ac.innerHTML='<div class="log-entry" style="color:#ccc;">Rien</div>'; 
+          else g.actions.forEach(a=>{ 
+              const at=new Date(a.time); 
+              ac.innerHTML+=`<div class="log-entry"><span class="log-dot">🔵</span><span class="log-time-s">${at.toLocaleDateString().slice(0,5)} ${at.toLocaleTimeString().slice(0,5)}</span><span class="log-desc">${a.action} <span style="color:#94a3b8;">${a.detail}</span></span></div>`; 
+          });
+      });
+    }
+
+    function saveGlobalBudget() {
+      // Admin + Super Admin
+      if(!isAdminUser()) return;
+      const el = document.getElementById("simGlobalBudget");
+      const val = el ? parseFloat(el.value) : NaN;
+      if(!isNaN(val)) {
+        db.ref('settings/budget').set(val);
+        showToast("💰 Budget sauvegardé");
+        logAction("Budget", `Budget max = ${val}€`);
+      }
+    }
+
+    // Super Admin: sauvegarde du seuil garde-fou (% du CA) pour la simulation
+    function saveGuardrailMaxPct(){
+      if(!isAdminUser()) return;
+      const el = document.getElementById('simGuardrailPct');
+      const raw = el ? parseFloat(el.value) : NaN;
+      if(!isFinite(raw)) {
+        showToast("⚠️ Seuil invalide");
+        return;
+      }
+      const val = Math.max(1, Math.min(100, raw));
+      db.ref('settings/guardrailMaxPctOfCA').set(val).then(() => {
+        showToast(`✅ Seuil garde-fou = ${val}%`);
+        logAction("Guardrail", `Seuil coût primes/CA = ${val}%`);
+        // refléter tout de suite en local
+        if(globalSettings) globalSettings.guardrailMaxPctOfCA = val;
+        updateSim();
+      });
+    }
+    window.saveGuardrailMaxPct = saveGuardrailMaxPct;
+    function checkBudget() {
+       const budget = globalSettings.budget || 0; let maxLiability = 0; let totalUserRatio = 0;
+       Object.values(allUsers).forEach(u => {
+         if(u && u.email && String(u.email).toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return;
+         if(u && u.primeEligible === false) return;
+         totalUserRatio += ((u.hours || 35) / BASE_HOURS);
+       });
+       Object.values(allObjs).forEach(o => { if(!o.published) return; let maxP = 0; if(o.paliers) o.paliers.forEach(p => maxP += parse(p.prize)); maxLiability += (maxP * totalUserRatio); });
+       const pct = (maxLiability / budget) * 100; const bar = document.getElementById("simGauge"); bar.style.width = Math.min(pct, 100) + "%";
+       if(maxLiability > budget) { bar.classList.add("danger"); document.getElementById("simUsed").style.color = "#ef4444"; } 
+       else { bar.classList.remove("danger"); document.getElementById("simUsed").style.color = "#3b82f6"; }
+       document.getElementById("simUsed").innerText = `${maxLiability.toFixed(0)}€ Engagés`;
+       document.getElementById("simLeft").innerText = `Reste : ${(budget - maxLiability).toFixed(0)}€`;
+    }
+
+    function getPct(c, t, isInverse) {
+      let cv = parseFloat(String(c).replace(',', '.'));
+      let tv = parseFloat(String(t).replace(',', '.'));
+      if(isNaN(cv) || isNaN(tv)) return 0;
+      if(isInverse) { if(cv > tv) return 0; if(cv <= tv) return 100; return 0; }
+      if(!tv) return 0; return (cv/tv)*100;
+    }
+    function parse(s) { return parseFloat(String(s).replace(/[^0-9.]/g,''))||0; }
+
+  // PWA: force check update (évite les versions figées)
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      // si un nouveau SW prend le contrôle, on recharge une fois (sans boucle)
+      if(!window.__swReloaded){ window.__swReloaded = true; window.location.reload(); }
+    });
   }
-  if(t === 'notifications') {
-    const b = document.getElementById('btnTabNotifications');
-    if(b) b.classList.add('active');
-  }
-
-  document.getElementById('tab-team').style.display = (t==='team')?'block':'none';
-  document.getElementById('tab-objs').style.display = (t==='objs')?'block':'none';
-  document.getElementById('tab-logs').style.display = (t==='logs')?'block':'none';
-  document.getElementById('tab-feedbacks').style.display = (t==='feedbacks')?'block':'none';
-
-  const emailsTab = document.getElementById('tab-emails');
-  if(emailsTab) emailsTab.style.display = (t==='emails')?'block':'none';
-
-  const notifTab = document.getElementById('tab-notifications');
-  if(notifTab) notifTab.style.display = (t==='notifications')?'block':'none';
-
-  if(t==='emails') {
-    try{ if(window.renderMailUI) window.renderMailUI(); }catch(e){}
-  }
-
-  if(t==='notifications') {
-    try{ renderNotifTab(); }catch(e){ console.error(e); }
-  }
-}
-
