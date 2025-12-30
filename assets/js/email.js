@@ -112,8 +112,7 @@
     if(!grid) return;
 
     const users = getUsersArray()
-      .filter(u => (u.email || '').trim().length > 3)
-      .sort((a,b)=> String(a.name||'').localeCompare(String(b.name||'')));
+  .sort((a,b)=> String(a.name || '').localeCompare(String(b.name || '')));
 
     if(users.length === 0){
       grid.innerHTML = `<div class="mail-hint">Aucun utilisateur avec email trouvé.</div>`;
