@@ -1,3 +1,23 @@
+// ═══════════════════════════════════════════════════════════════════════
+// MODE DEBUG - DÉSACTIVER EN PRODUCTION
+// ═══════════════════════════════════════════════════════════════════════
+
+const DEBUG_MODE = true; // ← Mettre à false en production
+
+if (DEBUG_MODE) {
+  console.log('🔧 MODE DEBUG ACTIVÉ');
+  
+  // Vider le cache à chaque chargement (DEV uniquement)
+  // localStorage.clear(); // ← Décommenter si besoin
+  
+  // Logger toutes les erreurs
+  window.addEventListener('error', (e) => {
+    console.error('🚨 ERREUR GLOBALE:', e.message, e.filename, e.lineno);
+  });
+  
+  // Logger les données chargées
+  console.log('📊 LocalStorage actuel:', localStorage);
+}
 // CONFIG
     const firebaseConfig = {
       apiKey: "AIzaSyAGaitqmFwExvJ9ZUpkdUdCKAqqDOP2cdQ",
