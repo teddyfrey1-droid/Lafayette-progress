@@ -14,31 +14,36 @@ var currentFCMToken = null;
 // ═══════════════════════════════════════════════════════════════════════
 
 async function setupPushNotifications() {
+  // 🛡️ GUARD : Empêcher les appels répétés
+  if (window.pushSetupInProgress || window.pushSetupDone) {
+    console.log('⏭️ Setup push déjà en cours ou terminé');
+    return;
+  }
+  window.pushSetupInProgress = true;
+  
   if (!('Notification' in window)) {
     console.log('Push notifications not supported');
+    window.pushSetupInProgress = false;
     return;
   }
-
+  
   if (!firebase.messaging || !firebase.messaging.isSupported || !firebase.messaging.isSupported()) {
     console.log('FCM not supported');
+    window.pushSetupInProgress = false;
     return;
   }
-
+  
   try {
     const messaging = firebase.messaging();
-
     // Demander la permission et obtenir le token
     const permission = await Notification.requestPermission();
-
     if (permission === 'granted') {
       const token = await messaging.getToken({
         vapidKey: 'BHItjKUG0Dz7jagVmfULxS7B_qQcT0DM7O_11fKdERKFzxP3QiWisJoD3agcV22VYFhtpVw-9YuUzrRmCZIawyo'
       });
-
       if (token) {
         currentFCMToken = token;
         console.log('✅ FCM Token obtenu:', token.substring(0, 20) + '...');
-
         // Sauvegarder le token dans Firebase pour cet utilisateur
         if (currentUser && currentUser.uid) {
           await db.ref(`users/${currentUser.uid}/pushToken`).set(token);
@@ -46,7 +51,22 @@ async function setupPushNotifications() {
           await db.ref(`users/${currentUser.uid}/pushEnabledAt`).set(Date.now());
           console.log('✅ Push enabled et sauvegardé dans Firebase');
         }
+        // Écouter les messages en foreground
+        messaging.onMessage((payload) => {
+          console.log('📨 Message reçu (foreground):', payload);
+          showInAppNotification(payload);
+        });
+        
+        window.pushSetupDone = true; // ✅ Marqué comme terminé
       }
+    }
+  } catch (error) {
+    console.error('❌ Erreur setup push:', error);
+  } finally {
+    window.pushSetupInProgress = false;
+  }
+}
+
 
       // Écouter les messages en foreground
       messaging.onMessage((payload) => {
