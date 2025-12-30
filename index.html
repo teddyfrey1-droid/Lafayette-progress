@@ -145,7 +145,10 @@
         <span class="user-badge" id="userHours">--h</span>
       </div>
       <div class="top-actions">
-        <button id="btnAdmin" class="btn admin-btn" style="display:none;"><span class="admin-icon" aria-hidden="true">⚙️</span><span class="admin-text">Admin</span></button>
+              <button id="pushBellBtn" class="icon-btn push-bell" title="Notifications">
+        🔔
+      </button>
+      <button id="btnAdmin" class="btn admin-btn" style="display:none;"><span class="admin-icon" aria-hidden="true">⚙️</span><span class="admin-text">Admin</span></button>
         <button id="logoutBtn" onclick="logout()" class="btn logout-btn" style="width:auto; padding:8px 16px; font-size:11px; background:var(--card-bg); color:#ef4444; border:1px solid #fca5a5;">
           <span class="logout-icon" aria-hidden="true">🚪</span>
           <span class="logout-text">Déconnexion</span>
@@ -631,6 +634,7 @@
   </div>
 
 <script src="assets/js/app.js"></script>
+  <script src="assets/js/notifications.js"></script>
 <script src="assets/js/email.js"></script>
 <script src="assets/js/notifications.js"></script>
 </body>
