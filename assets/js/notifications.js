@@ -1,6 +1,7 @@
 // ========================================
 // PUSH NOTIFICATIONS SETUP
 // ========================================
+
 let currentFCMToken = null;
 
 async function setupPushNotifications() {
@@ -19,10 +20,9 @@ async function setupPushNotifications() {
 
     // Demander la permission et obtenir le token
     const permission = await Notification.requestPermission();
-
     if (permission === 'granted') {
       const token = await messaging.getToken({
-        vapidKey: 'BHItjKUG0Dz7jagVmfULxS7B_qQcT0DM7O_11fKdERKFzxP3QiWisJoD3agcV22VYFhtpVw-9YuUzrRmCZIawyo'
+        vapidKey: 'BHItjKUG0Dz7jagVmfULxS7B_qQcT0DM7O_11fKdERKFzxP3QiWisJoD3agcV22VYFhtpVw-9YuUzrRmCZIawyo' // À remplacer par ta clé VAPID
       });
 
       if (token) {
@@ -37,13 +37,14 @@ async function setupPushNotifications() {
           console.log('Push enabled and saved to Firebase');
         }
       }
-
-      // Écouter les messages en foreground
-      messaging.onMessage((payload) => {
-        console.log('Message received (foreground):', payload);
-        showInAppNotification(payload);
-      });
     }
+
+    // Écouter les messages en foreground
+    messaging.onMessage((payload) => {
+      console.log('Message received (foreground):', payload);
+      showInAppNotification(payload);
+    });
+
   } catch (error) {
     console.error('Error setting up push:', error);
   }
@@ -67,6 +68,7 @@ function showInAppNotification(payload) {
 // ========================================
 // PUSH UI SETUP (Bannière d'invitation)
 // ========================================
+
 function setupPushUI() {
   if (!currentUser || !currentUser.uid || !currentUser.email) {
     console.log('User not ready for push UI');
@@ -86,10 +88,10 @@ function setupPushUI() {
     if (enabled) {
       // Déjà activé, masquer la bannière
       hidePushBanner(banner);
+      updatePushBellIcon(true);
     } else {
       // Vérifier si l'utilisateur a déjà refusé
       const dismissed = localStorage.getItem(`pushDismissed_${currentUser.uid}`);
-
       if (dismissed) {
         // Ne pas afficher si déjà refusé
         return;
@@ -118,8 +120,11 @@ function hidePushBanner(banner) {
 async function enablePushNotifications() {
   try {
     await setupPushNotifications();
+
     const banner = document.getElementById('pushInviteBanner');
     hidePushBanner(banner);
+
+    updatePushBellIcon(true);
 
     if (typeof showToast === 'function') {
       showToast('✅ Notifications activées !');
@@ -139,6 +144,17 @@ function dismissPushBanner() {
   // Sauvegarder que l'utilisateur a refusé
   if (currentUser && currentUser.uid) {
     localStorage.setItem(`pushDismissed_${currentUser.uid}`, Date.now());
+  }
+}
+
+function updatePushBellIcon(enabled) {
+  const bell = document.querySelector('.push-bell');
+  if (!bell) return;
+
+  if (enabled) {
+    bell.classList.add('enabled');
+  } else {
+    bell.classList.remove('enabled');
   }
 }
 
