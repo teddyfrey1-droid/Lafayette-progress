@@ -78,7 +78,7 @@
       });
 
       if (!token) {
-        throw new Error('Impossible d'obtenir le token');
+        throw new Error('Impossible obtenir le token');
       }
 
       // Save token to Firebase for this user
@@ -182,7 +182,7 @@
           }
           updateUI();
         } else {
-          alert('Impossible d\'activer les notifications : ' + (result.error || 'Erreur inconnue'));
+          alert('Impossible activer les notifications: ' + (result.error || 'Erreur inconnue'));
         }
       }
     });
@@ -197,7 +197,7 @@
           }
           updateUI();
         } else {
-          alert('Impossible d\'activer les notifications : ' + (result.error || 'Erreur inconnue'));
+          alert('Impossible activer les notifications: ' + (result.error || 'Erreur inconnue'));
         }
       });
     }
