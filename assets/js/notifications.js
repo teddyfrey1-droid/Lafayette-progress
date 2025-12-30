@@ -7,7 +7,7 @@
 // - Configuration des alertes automatiques
 // ═══════════════════════════════════════════════════════════════════════
 
-let currentFCMToken = null;
+var currentFCMToken = null;
 
 // ═══════════════════════════════════════════════════════════════════════
 // PUSH NOTIFICATIONS SETUP
