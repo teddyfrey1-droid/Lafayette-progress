@@ -23,7 +23,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-  <!-- firebase-messaging-compat retiré (notifications push désactivées pour l’instant) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 
   <link rel="stylesheet" href="assets/css/styles.css">
@@ -81,7 +81,7 @@
         <button style="border:none; background:none; font-size:20px; cursor:pointer; color:var(--text-main);" onclick="closeTeamArchive()">×</button>
       </div>
       <div style="font-size:12px; color:var(--text-muted); font-weight:700; margin-bottom:10px;">
-        Valide une ligne en fin de mois (30/31) pour garder une trace, puis marque “Envoyé” si tu lui as partagé.
+        Valide une ligne en fin de mois (30/31) pour garder une trace, puis marque "Envoyé" si tu lui as partagé.
       </div>
       <div id="teamArchiveList" style="display:flex; flex-direction:column; gap:10px;"></div>
       <div style="height:12px;"></div>
@@ -151,12 +151,9 @@
           <span class="logout-text">Déconnexion</span>
         </button>
 
-        <!-- Notifications push désactivées pour l’instant -->
-              <button class="icon-btn" id="globalMenuBtn" onclick="toggleGlobalMenu()">☰</button>
+        <button class="icon-btn" id="globalMenuBtn" onclick="toggleGlobalMenu()">☰</button>
       </div>
     </div>
-
-    <!-- Bandeau push supprimé (push désactivées) -->
 
     <!-- Global menu (all users) -->
     <div class="global-menu-backdrop" id="globalMenuBackdrop" onclick="toggleGlobalMenu(false)"></div>
@@ -216,7 +213,7 @@
         </div>
       </nav>
       <div class="global-menu-foot">
-        <button id="installAppBtn" class="btn" style="width:100%; margin-top:10px; display:none;">⬇️ Installer l’app</button>
+        <button id="installAppBtn" class="btn" style="width:100%; margin-top:10px; display:none;">⬇️ Installer l'app</button>
       </div>
     </aside>
 
@@ -264,7 +261,7 @@
         <div class="kpi-card">
           <div class="kpi-label">Mise à jour</div>
           <div class="kpi-value" id="kpiUpdated">—</div>
-          <div class="kpi-sub">Aujourd’hui</div>
+          <div class="kpi-sub">Aujourd'hui</div>
         </div>
       </section>
 
