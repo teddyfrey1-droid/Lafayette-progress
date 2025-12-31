@@ -315,10 +315,12 @@
     const fromName = (safeGet('mailFromName')?.value || '').trim();
 
     const payload = {
-      recipients: uniq,
-      subject,
-      html: normalizeMessageToHtml(message),
-      fromName: fromName || null,
+  userIds: Array.from(selectedUserIds), // ← Utilise les IDs utilisateurs
+  subject,
+  html: normalizeMessageToHtml(message),
+  text: message // Ajoute aussi le texte brut
+};
+
       // optional: record selected ids
       meta: {
         selectedUserIds: Array.from(selectedUserIds),
