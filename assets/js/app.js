@@ -696,15 +696,12 @@ function showToast(message) {
              }
           } catch(e) { console.error(e); }
       });
-      db.ref('users').on('value', s => {
-  allUsers = s.val();
-  if(isAdminUser()) renderAdminUsers();
-  if(isAdminUser()) renderSimulator();
-  try{ if(window.renderMailUI) window.renderMailUI(); }catch(e){}
-  // ✅ Rafraîchir l'UI push après chargement des users
-  try{ setupPushUI(); }catch(e){}
-});
-
+      db.ref('users').on('value', s => { 
+        allUsers = s.val() || {}; 
+        if(isAdminUser()) { renderAdminUsers(); }
+        if(isAdminUser()) { renderSimulator(); }
+        try{ if(window.renderMailUI) window.renderMailUI(); }catch(e){}
+      });
       db.ref('settings').on('value', s => { 
         globalSettings = s.val() || { budget: 0 }; 
         if(globalSettings.guardrailMaxPctOfCA == null) {
@@ -1889,10 +1886,10 @@ const el = document.createElement("div");
        if(t==='emails'){ try{ if(window.renderMailUI) window.renderMailUI(); }catch(e){} }
 
        // Onglet Push
-       if(t === 'notifications') { const b = document.getElementById('btnTabNotifications'); if(b) b.classList.add('active'); }
-       const notificationsTab = document.getElementById('tab-notifications');
-       if(notificationsTab) notificationsTab.style.display = t==='notifications'?'block':'none';
-       if(t==='notifications'){ try{ renderPushTab(); }catch(e){console.error(e);} }
+       if(t === 'push') { const b = document.getElementById('btnTabPush'); if(b) b.classList.add('active'); }
+       const pushTab = document.getElementById('tab-push');
+       if(pushTab) pushTab.style.display = t==='push'?'block':'none';
+       if(t==='push'){ try{ renderPushTab(); }catch(e){console.error(e);} }
     }
     function toggleCreateInputs() { document.getElementById("createTiersBlock").style.display = document.getElementById("noFixed").checked ? 'none' : 'block'; }
     function toggleEditInputs() { document.getElementById("editTiersBlock").style.display = document.getElementById("eoFixed").checked ? 'none' : 'block'; }
