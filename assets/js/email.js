@@ -331,9 +331,9 @@
       showToast('📨 Envoi en cours…');
 
       // If region is empty, use default
-      const functions = region ? firebase.app().functions(region) : firebase.app().functions();
-      const call = functions.httpsCallable('sendBulkEmail');
-      const res = await call(payload);
+     const functions = region ? firebase.app().functions(region) : firebase.app().functions();
+const call = functions.httpsCallable('sendEmailToUsers'); // ← Change ici
+const res = await call(payload);
 
       const sent = res?.data?.sent ?? uniq.length;
       showToast(`✅ Email envoyé (${sent})`);
