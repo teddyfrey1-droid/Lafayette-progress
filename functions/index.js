@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════
-// FIREBASE CLOUD FUNCTIONS - HEIKO LAFAYETTE
+// FIREBASE CLOUD FUNCTIONS - HEIKO LAFAYETTE (v7)
 // ═══════════════════════════════════════════════════════════════════════
 
-const functions = require('firebase-functions');
+const { onCall } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
 
@@ -15,80 +15,32 @@ admin.initializeApp();
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'lafayetteheiko@gmail.com',  // ← TON EMAIL GMAIL
-    pass: 'eanysmkipkvvcwgu'  // ← MOT DE PASSE APPLICATION (pas ton mdp Gmail normal)
+    user: 'lafayetteheiko@gmail.com',
+    pass: 'ton-mot-de-passe-application-gmail'  // ← MOT DE PASSE APPLICATION
   }
 });
 
-// Pour créer un mot de passe d'application Gmail :
-// 1. Va sur https://myaccount.google.com/security
-// 2. Active la validation en 2 étapes
-// 3. Va dans "Mots de passe des applications"
-// 4. Crée un mot de passe pour "Mail"
-// 5. Copie le mot de passe généré ici
-
 // ═══════════════════════════════════════════════════════════════════════
-// FONCTION : ENVOI BULK EMAIL (pour l'onglet Diffusion)
+// FONCTION : ENVOI EMAIL À PLUSIEURS UTILISATEURS
 // ═══════════════════════════════════════════════════════════════════════
 
-exports.sendBulkEmail = functions.https.onCall(async (data, context) => {
-  // Sécurité : Vérifier que l'utilisateur est authentifié
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Non authentifié');
+exports.sendEmailToUsers = onCall(async (request) => {
+  // Vérifier l'authentification
+  if (!request.auth) {
+    console.error('❌ Pas d\'auth dans request');
+    throw new Error('Non authentifié');
   }
 
-  const { recipients, subject, html, fromName } = data;
+  console.log('✅ User authentifié:', request.auth.uid);
 
-  if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
-    throw new functions.https.HttpsError('invalid-argument', 'recipients requis');
-  }
-
-  if (!subject || !html) {
-    throw new functions.https.HttpsError('invalid-argument', 'subject et html requis');
-  }
-
-  const results = { sent: 0, failed: 0, errors: [] };
-
-  // Envoyer à chaque destinataire
-  for (const email of recipients) {
-    try {
-      await transporter.sendMail({
-        from: fromName ? `"${fromName}" <lafayetteheiko@gmail.com>` : '"Heiko Lafayette" <lafayetteheiko@gmail.com>',
-        to: email,
-        subject: subject,
-        html: html
-      });
-
-      results.sent++;
-      console.log(`✅ Email envoyé à: ${email}`);
-    } catch (error) {
-      results.failed++;
-      results.errors.push({ email, error: error.message });
-      console.error(`❌ Erreur envoi à ${email}:`, error.message);
-    }
-  }
-
-  return results;
-});
-
-// ═══════════════════════════════════════════════════════════════════════
-// FONCTION : ENVOYER UN EMAIL À PLUSIEURS UTILISATEURS
-// ═══════════════════════════════════════════════════════════════════════
-
-exports.sendEmailToUsers = functions.https.onCall(async (data, context) => {
-  // Sécurité : Vérifier que l'utilisateur est authentifié
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Non authentifié');
-  }
-
-  const { userIds, subject, html, text } = data;
+  const { userIds, subject, html, text } = request.data;
 
   if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-    throw new functions.https.HttpsError('invalid-argument', 'userIds requis');
+    throw new Error('userIds requis');
   }
 
   if (!subject || !html) {
-    throw new functions.https.HttpsError('invalid-argument', 'subject et html requis');
+    throw new Error('subject et html requis');
   }
 
   const db = admin.database();
@@ -114,9 +66,11 @@ exports.sendEmailToUsers = functions.https.onCall(async (data, context) => {
       });
 
       results.sent++;
+      console.log(`✅ Email envoyé à: ${user.email}`);
     } catch (error) {
       results.failed++;
       results.errors.push({ uid, error: error.message });
+      console.error(`❌ Erreur pour ${uid}:`, error.message);
     }
   }
 
@@ -124,31 +78,27 @@ exports.sendEmailToUsers = functions.https.onCall(async (data, context) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// FONCTION : ENVOYER UNE NOTIFICATION PUSH À PLUSIEURS UTILISATEURS
+// FONCTION : ENVOI PUSH À PLUSIEURS UTILISATEURS
 // ═══════════════════════════════════════════════════════════════════════
 
-exports.sendPushToUsers = functions.https.onCall(async (data, context) => {
-  // Sécurité : Vérifier que l'utilisateur est authentifié
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Non authentifié');
+exports.sendPushToUsers = onCall(async (request) => {
+  if (!request.auth) {
+    throw new Error('Non authentifié');
   }
 
-  const { userIds, title, body, link } = data;
+  const { userIds, title, body, link } = request.data;
 
   if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-    throw new functions.https.HttpsError('invalid-argument', 'userIds requis');
+    throw new Error('userIds requis');
   }
 
   if (!title || !body) {
-    throw new functions.https.HttpsError('invalid-argument', 'title et body requis');
+    throw new Error('title et body requis');
   }
 
   const db = admin.database();
   const results = { sent: 0, failed: 0, noToken: 0, errors: [] };
-
-  // Récupérer les tokens de tous les utilisateurs
   const tokens = [];
-  const usersWithoutToken = [];
 
   for (const uid of userIds) {
     try {
@@ -160,11 +110,9 @@ exports.sendPushToUsers = functions.https.onCall(async (data, context) => {
         continue;
       }
 
-      // Vérifier si l'utilisateur a un token et les notifications activées
       if (user.pushToken && user.pushEnabled === true) {
         tokens.push(user.pushToken);
       } else {
-        usersWithoutToken.push(uid);
         results.noToken++;
       }
     } catch (error) {
@@ -173,7 +121,6 @@ exports.sendPushToUsers = functions.https.onCall(async (data, context) => {
     }
   }
 
-  // Envoyer les notifications push
   if (tokens.length > 0) {
     try {
       const message = {
@@ -188,10 +135,97 @@ exports.sendPushToUsers = functions.https.onCall(async (data, context) => {
         tokens: tokens
       };
 
-      const response = await admin.messaging().sendMulticast(message);
+      const response = await admin.messaging().sendEachForMulticast(message);
       results.sent = response.successCount;
       results.failed += response.failureCount;
+    } catch (error) {
+      console.error('Erreur envoi push:', error);
+      results.errors.push({ error: error.message });
+    }
+  }
 
-      // Logger les tokens invalides pour nettoyage
-      if (response.failureCount > 0) {
-        response.responses.forEach((resp,
+  return results;
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// FONCTION : ENVOI EMAIL À UN GROUPE
+// ═══════════════════════════════════════════════════════════════════════
+
+exports.sendEmailToGroup = onCall(async (request) => {
+  if (!request.auth) {
+    throw new Error('Non authentifié');
+  }
+
+  const { groupId, subject, html, text } = request.data;
+
+  if (!groupId || !subject || !html) {
+    throw new Error('Paramètres manquants');
+  }
+
+  const db = admin.database();
+  const groupSnap = await db.ref(`mailGroups/${groupId}`).once('value');
+  const group = groupSnap.val();
+
+  if (!group || !group.userIds || group.userIds.length === 0) {
+    throw new Error('Groupe vide ou introuvable');
+  }
+
+  const results = { sent: 0, failed: 0, errors: [] };
+
+  for (const uid of group.userIds) {
+    try {
+      const userSnap = await db.ref(`users/${uid}`).once('value');
+      const user = userSnap.val();
+
+      if (!user || !user.email) {
+        results.failed++;
+        continue;
+      }
+
+      await transporter.sendMail({
+        from: '"Heiko Lafayette" <lafayetteheiko@gmail.com>',
+        to: user.email,
+        subject: subject,
+        text: text || '',
+        html: html
+      });
+
+      results.sent++;
+    } catch (error) {
+      results.failed++;
+      results.errors.push({ uid, error: error.message });
+    }
+  }
+
+  return results;
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// FONCTION : TEST EMAIL
+// ═══════════════════════════════════════════════════════════════════════
+
+exports.testEmail = onCall(async (request) => {
+  if (!request.auth) {
+    throw new Error('Non authentifié');
+  }
+
+  const { to } = request.data;
+
+  if (!to) {
+    throw new Error('Email destinataire requis');
+  }
+
+  try {
+    await transporter.sendMail({
+      from: '"Heiko Lafayette" <lafayetteheiko@gmail.com>',
+      to: to,
+      subject: '🧪 Test Email - Heiko Lafayette',
+      html: '<h2>✅ Configuration email OK !</h2><p>Si tu reçois ce message, tout fonctionne.</p>'
+    });
+
+    return { success: true, message: 'Email envoyé avec succès' };
+  } catch (error) {
+    console.error('Erreur test email:', error);
+    throw new Error(error.message);
+  }
+});
