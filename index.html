@@ -330,8 +330,8 @@
     
     <div class="tab-nav">
       <button id="btnTabTeam" onclick="switchTab('team')" class="btn-tab active">👥 Équipe</button>
-    <button id="btnTabEmails" onclick="switchTab('emails')" class="btn-tab" style="display:none">📧 Diffusion</button>
-      <button id="btnTabNotifications" onclick="switchTab('notifications')" class="btn-tab" style="display:none;">🔔 Notifications</button>
+      <button id="btnTabEmails" onclick="switchTab('emails')" class="btn-tab" style="display:none;">📧 Mail</button>
+      <button id="btnTabPush" onclick="switchTab('push')" class="btn-tab" style="display:none;">📱 Push</button>
       <button id="btnTabObjs" onclick="switchTab('objs')" class="btn-tab">🎯 Pilotage</button>
       <button id="btnTabLogs" onclick="switchTab('logs')" class="btn-tab" style="display:none;">🕒 Historique</button>
       <button id="btnTabFeedbacks" onclick="switchTab('feedbacks')" class="btn-tab" style="display:none;">💬 Avis & Nouveautés</button>
@@ -423,11 +423,11 @@
     </div>
 
   <!-- ==================== ONGLET PUSH ==================== -->
-  <div id="tab-notifications" style="display:none;">
+  <div id="tab-push" style="display:none;">
     <div class="admin-section">
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-        <h2 style="margin:0;">🔔 Gestion des Notifications</h2>
+        <h2 style="margin:0;">📱 Gestion des Notifications Push</h2>
       </div>
 
       <!-- Section 1: Liste des utilisateurs -->
@@ -663,6 +663,7 @@
 <script src="assets/js/app.js"></script>
   <script src="assets/js/notifications.js"></script>
 <script src="assets/js/email.js"></script>
+<script src="assets/js/notifications.js"></script>
 
   <!-- Bannière d'invitation notifications -->
   <div id="pushInviteBanner" class="push-invite-banner" style="display: none;">
