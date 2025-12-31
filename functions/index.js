@@ -16,7 +16,7 @@ const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: 'lafayetteheiko@gmail.com',
-    pass: 'ton-mot-de-passe-application-gmail'  // ← REMPLACE PAR TON MOT DE PASSE APPLICATION
+    pass: 'qqccgajxuogvejev'  // ← REMPLACE PAR TON MOT DE PASSE APPLICATION
   }
 });
 
