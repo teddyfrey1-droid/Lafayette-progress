@@ -352,25 +352,100 @@
 
     </div>
 
-    <div id="tab-emails" style="display:none;">
-      <div class="admin-section">
-        <h3 class="section-header-large">📧 Envoyer un email</h3>
+    <div id="tab-emails" style="display:none">
+  <div class="admin-section">
+    <h3 class="section-header-large">📢 Diffusion Multi-Canal</h3>
+    
+    <!-- Choix du canal -->
+    <div style="margin-bottom:20px; padding:16px; background:var(--card-bg); border:1px solid var(--border); border-radius:12px;">
+      <div style="font-weight:700; font-size:13px; margin-bottom:10px; color:var(--text-main);">Canal de diffusion</div>
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <label style="display:flex; align-items:center; gap:8px; padding:10px 14px; border:2px solid var(--border); border-radius:8px; cursor:pointer; background:var(--card-bg);">
+          <input type="radio" name="mailChannel" value="email" checked style="width:auto;">
+          <span style="font-size:13px; font-weight:600;">📧 Email uniquement</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:8px; padding:10px 14px; border:2px solid var(--border); border-radius:8px; cursor:pointer; background:var(--card-bg);">
+          <input type="radio" name="mailChannel" value="push" style="width:auto;">
+          <span style="font-size:13px; font-weight:600;">🔔 Push uniquement</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:8px; padding:10px 14px; border:2px solid var(--border); border-radius:8px; cursor:pointer; background:var(--card-bg);">
+          <input type="radio" name="mailChannel" value="both" style="width:auto;">
+          <span style="font-size:13px; font-weight:600;">📧+🔔 Les deux</span>
+        </label>
+      </div>
+      <div class="mail-hint" style="margin-top:8px;">
+        <input type="checkbox" id="mailFallback" checked style="width:auto; vertical-align:middle;">
+        <label for="mailFallback" style="font-size:12px; cursor:pointer;">Envoyer par email aux utilisateurs sans Push activé</label>
+      </div>
+    </div>
 
-        <div class="mail-settings-row">
-          <div class="mail-settings-field">
-            <label class="mail-label">Région Firebase Functions (optionnel)</label>
-            <input type="text" id="mailFunctionsRegion" placeholder="Ex: us-central1 ou europe-west1">
-            <div class="mail-hint">Si ton Cloud Function est déployée dans une région spécifique, renseigne-la ici. Sinon laisse vide.</div>
-          </div>
-          <div class="mail-settings-field">
-            <label class="mail-label">Nom affiché (optionnel)</label>
-            <input type="text" id="mailFromName" placeholder="Ex: Heiko La Fayette">
-            <div class="mail-hint">Utilisé uniquement si ta function le supporte.</div>
-          </div>
-          <div class="mail-settings-actions">
-            <button class="btn" onclick="saveMailSettings()">💾 Enregistrer</button>
-          </div>
-        </div>
+    <!-- Réglages (existant) -->
+    <div class="mail-settings-row">
+      <div class="mail-settings-field">
+        <label class="mail-label">Région Firebase Functions (optionnel)</label>
+        <input type="text" id="mailFunctionsRegion" placeholder="Ex: us-central1 ou europe-west1">
+        <div class="mail-hint">Si ton Cloud Function est déployée dans une région spécifique, renseigne-la ici. Sinon laisse vide.</div>
+      </div>
+      <div class="mail-settings-field">
+        <label class="mail-label">Nom affiché (optionnel)</label>
+        <input type="text" id="mailFromName" placeholder="Ex: Heiko La Fayette">
+        <div class="mail-hint">Utilisé uniquement si ta function le supporte.</div>
+      </div>
+      <div class="mail-settings-actions">
+        <button class="btn" onclick="saveMailSettings()">💾 Enregistrer</button>
+      </div>
+    </div>
+
+    <div style="margin-top:18px;">
+      <div class="mail-label" style="margin-bottom:8px;">Groupes rapides</div>
+      <div id="mailQuickGroups" class="mail-quick-groups"></div>
+    </div>
+
+    <div style="margin-top:18px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+        <div class="mail-label">Destinataires</div>
+        <button class="btn" onclick="togglePushStatusView()" style="width:auto; padding:8px 12px; font-size:11px; background:var(--border); color:var(--text-main);">
+          <span id="pushStatusToggleText">👁️ Voir statut Push</span>
+        </button>
+      </div>
+      <div id="mailUsersGrid" class="mail-users-grid"></div>
+      <div id="mailSelectedCount" class="mail-selected-count">0 destinataire(s) sélectionné(s)</div>
+    </div>
+
+    <div style="margin-top:18px;">
+      <label class="mail-label">Sujet</label>
+      <input type="text" id="mailSubject" placeholder="Ex: Planning de la semaine">
+      
+      <label class="mail-label" style="margin-top:10px;">Message</label>
+      <textarea id="mailMessage" rows="8" placeholder="Écris ton message (HTML accepté)"></textarea>
+      
+      <div class="mail-actions">
+        <button class="btn" onclick="sendMultiChannelMessage()">🚀 Envoyer</button>
+        <button class="btn" onclick="clearMailSelection()" style="background:#e2e8f0; color:#475569; border:1px solid #cbd5e1;">🔄 Réinitialiser</button>
+      </div>
+    </div>
+
+    <div class="mail-hint" style="margin-top:10px;">
+      💡 Le système adapte automatiquement le canal selon les préférences des utilisateurs.
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+      <h3 class="section-header-large" style="margin:0;">📮 Groupes mail</h3>
+      <button class="btn" onclick="openMailGroupModal()" style="width:auto;">+ Nouveau groupe</button>
+    </div>
+    <div id="mailGroupsList" style="margin-top:12px;"></div>
+  </div>
+
+  <div class="admin-section" style="border-left:4px solid #f59e0b;">
+    <h3 class="section-header-large" style="color:#b45309;">⚙️ Automatisation (préparé)</h3>
+    <div class="mail-hint">
+      Le système est prêt pour des envois automatiques (ex: quand le planning change) via une Function trigger. Le schéma du planning n'est pas défini dans ce projet, donc le trigger est fourni en modèle dans <code>functions/index.js</code> à adapter à ta structure.
+    </div>
+  </div>
+</div>
+
 
         <div style="margin-top:18px;">
           <div class="mail-label" style="margin-bottom:8px;">Groupes rapides</div>
