@@ -227,7 +227,7 @@ cat > diffusion.html <<'ENDOFFILE'
   <script src="assets/js/email.js"></script>
   
   <script>
-    // Init theme (same as app.js)
+    // Init theme
     if(localStorage.getItem('heiko:darkmode') === null) {
       localStorage.setItem('heiko:darkmode', 'true');
     }
@@ -271,14 +271,22 @@ cat > diffusion.html <<'ENDOFFILE'
               document.getElementById('nonAdminMessage').style.display = 'none';
               document.getElementById('btnAdmin').style.display = 'inline-block';
               
-              // Load mail UI
-              try {
-                if(typeof window.renderMailUI === 'function') {
-                  window.renderMailUI();
-                }
-              } catch(e) {
-                console.error(e);
-              }
+              // Charge les données Firebase pour le mail
+              firebase.database().ref('mailGroups').on('value', (snap) => {
+                window.mailGroups = snap.val() || {};
+                renderDiffusionUI();
+              });
+
+              firebase.database().ref('users').on('value', (snap) => {
+                window.allUsers = snap.val() || {};
+                renderDiffusionUI();
+              });
+
+              firebase.database().ref('settings').on('value', (snap) => {
+                window.globalSettings = snap.val() || {};
+                renderDiffusionUI();
+              });
+              
             } else {
               document.getElementById('adminOnlyContent').style.display = 'none';
               document.getElementById('nonAdminMessage').style.display = 'block';
@@ -290,6 +298,27 @@ cat > diffusion.html <<'ENDOFFILE'
         document.getElementById('appContent').style.display = 'none';
       }
     });
+    
+    function renderDiffusionUI() {
+      try {
+        // Appelle les fonctions de rendu depuis email.js
+        if(typeof window.renderQuickGroups === 'function') window.renderQuickGroups();
+        if(typeof window.renderUsersGrid === 'function') window.renderUsersGrid();
+        if(typeof window.renderGroupsList === 'function') window.renderGroupsList();
+        
+        // Synchronise les settings
+        const reg = document.getElementById('mailFunctionsRegion');
+        const fromName = document.getElementById('mailFromName');
+        if(reg && window.globalSettings && window.globalSettings.functionsRegion) {
+          reg.value = window.globalSettings.functionsRegion;
+        }
+        if(fromName && window.globalSettings && window.globalSettings.mailFromName) {
+          fromName.value = window.globalSettings.mailFromName;
+        }
+      } catch(e) {
+        console.error('Erreur rendu diffusion:', e);
+      }
+    }
     
     document.getElementById('btnLogin').onclick = function() {
       const email = document.getElementById('loginEmail').value.trim();
@@ -354,5 +383,4 @@ cat > diffusion.html <<'ENDOFFILE'
 </html>
 ENDOFFILE
 
-echo "✅ Fichier diffusion.html créé !"
-ls -la | grep diffusion
+echo "✅ Fichier diffusion.html créé avec chargement des données !"
