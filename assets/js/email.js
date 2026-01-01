@@ -491,4 +491,17 @@
   }
 
   init();
+  // Expose functions globally for diffusion.html
+window.renderQuickGroups = renderQuickGroups;
+window.renderUsersGrid = renderUsersGrid;
+window.renderGroupsList = renderGroupsList;
+window.saveMailSettings = saveMailSettings;
+window.sendManualEmail = sendManualEmail;
+window.clearMailSelection = clearMailSelection;
+window.openMailGroupModal = openMailGroupModal;
+window.closeMailGroupModal = closeMailGroupModal;
+window.saveMailGroup = saveMailGroup;
+window.attachMailGroupsListener = attachMailGroupsListener;
+
+
 })();
