@@ -596,6 +596,8 @@ async function sendMultiChannelMessage() {
   window.toggleMailGroupMember = toggleMailGroupMember;
   window.saveMailGroup = saveMailGroup;
   window.deleteMailGroup = deleteMailGroup;
+  window.sendMultiChannelMessage = sendMultiChannelMessage;
+  window.togglePushStatusView = togglePushStatusView;
 
   // -------------------------
   // Init
