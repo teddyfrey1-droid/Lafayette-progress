@@ -463,6 +463,124 @@
       alert('Erreur : suppression impossible.');
     }
   }
+// ═══════════════════════════════════════════════════════════════════════
+// MULTI-CANAL : Email + Push
+// ═══════════════════════════════════════════════════════════════════════
+
+let showPushStatus = false;
+
+function togglePushStatusView() {
+  showPushStatus = !showPushStatus;
+  const btn = document.getElementById('pushStatusToggleText');
+  if (btn) {
+    btn.textContent = showPushStatus ? '👁️ Masquer statut Push' : '👁️ Voir statut Push';
+  }
+  renderUsersGrid();
+}
+
+async function sendMultiChannelMessage() {
+  if (!isAdmin()) return;
+  if (typeof firebase === 'undefined' || !firebase) return;
+
+  const subject = safeGet('mailSubject')?.value.trim() || '';
+  const message = safeGet('mailMessage')?.value.trim() || '';
+  const channel = document.querySelector('input[name="mailChannel"]:checked')?.value || 'email';
+  const fallback = document.getElementById('mailFallback')?.checked || false;
+
+  if (selectedUserIds.size === 0) {
+    alert('Sélectionne au moins un destinataire');
+    return;
+  }
+  if (!subject) {
+    alert('Le sujet est obligatoire');
+    return;
+  }
+  if (!message) {
+    alert('Le message est obligatoire');
+    return;
+  }
+
+  const usersById = {};
+  getUsersArray().forEach(u => usersById[u.uid] = u);
+
+  // Séparer les utilisateurs selon leur statut Push
+  const usersWithPush = [];
+  const usersWithoutPush = [];
+  const emailRecipients = [];
+
+  Array.from(selectedUserIds).forEach(uid => {
+    const user = usersById[uid];
+    if (!user) return;
+
+    const hasPush = user.pushEnabled === true && user.pushToken;
+
+    if (channel === 'push' || channel === 'both') {
+      if (hasPush) {
+        usersWithPush.push(uid);
+      } else if (fallback) {
+        usersWithoutPush.push(uid);
+        if (user.email) emailRecipients.push(user.email);
+      }
+    }
+
+    if (channel === 'email' || channel === 'both') {
+      if (user.email) emailRecipients.push(user.email);
+    }
+  });
+
+  const region = getFunctionsRegion();
+  const functions = region ? firebase.app().functions(region) : firebase.app().functions();
+
+  try {
+    showToast('⏳ Envoi en cours...');
+
+    let sentEmail = 0;
+    let sentPush = 0;
+
+    // Envoi des Emails
+    if (emailRecipients.length > 0 && (channel === 'email' || channel === 'both' || (fallback && usersWithoutPush.length > 0))) {
+      const uniqueEmails = Array.from(new Set(emailRecipients));
+      const callEmail = functions.httpsCallable('sendBulkEmail');
+      const resEmail = await callEmail({
+        recipients: uniqueEmails,
+        subject: subject,
+        html: normalizeMessageToHtml(message)
+      });
+      sentEmail = resEmail?.data?.sent || 0;
+    }
+
+    // Envoi des Push
+    if (usersWithPush.length > 0 && (channel === 'push' || channel === 'both')) {
+      const callPush = functions.httpsCallable('sendPushToUsers');
+      const resPush = await callPush({
+        userIds: usersWithPush,
+        title: subject,
+        body: message.substring(0, 150) // Limiter le body
+      });
+      sentPush = resPush?.data?.sent || 0;
+    }
+
+    // Message de succès
+    let successMsg = '✅ Envoi terminé : ';
+    if (sentEmail > 0) successMsg += `${sentEmail} email(s)`;
+    if (sentPush > 0) successMsg += `${sentEmail > 0 ? ', ' : ''}${sentPush} notification(s)`;
+    
+    showToast(successMsg);
+
+    // Reset
+    safeGet('mailSubject').value = '';
+    safeGet('mailMessage').value = '';
+    clearMailSelection();
+
+    try {
+      logAction('Diffusion Multi-Canal', `Email:${sentEmail} Push:${sentPush} Canal:${channel}`);
+    } catch (e) {}
+
+  } catch (e) {
+    console.error(e);
+    alert('Erreur lors de l\'envoi. Vérifie les logs Firebase Functions.');
+  }
+}
 
   // -------------------------
   // Expose to window (for onclick attributes)
