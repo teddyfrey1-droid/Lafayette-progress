@@ -58,7 +58,7 @@ cat > diffusion.html <<'ENDOFFILE'
         <span class="user-badge" id="userHours">--h</span>
       </div>
       <div class="top-actions">
-        <button id="btnAdmin" class="btn admin-btn" style="display:none">
+        <button id="btnAdmin" class="btn admin-btn" style="display:none" onclick="window.location.href='index.html#admin'">
           <span class="admin-icon" aria-hidden="true">⚙</span>
           <span class="admin-text">Admin</span>
         </button>
@@ -101,7 +101,7 @@ cat > diffusion.html <<'ENDOFFILE'
           <h1 style="margin:0;">📧 DIFFUSION</h1>
         </div>
         <p style="color:var(--text-muted); font-size:14px; margin:0;">
-          Envoie d'emails groupés à ton équipe
+          Envoi d'emails groupés à ton équipe
         </p>
       </header>
 
@@ -354,4 +354,5 @@ cat > diffusion.html <<'ENDOFFILE'
 </html>
 ENDOFFILE
 
-echo "✅ diffusion.html créé !"
+echo "✅ Fichier diffusion.html créé !"
+ls -la | grep diffusion
