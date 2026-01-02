@@ -249,8 +249,84 @@
     }
   }
 
-  async function sendManualEmail(){
-    alert('Fonction d\'envoi à implémenter');
+ async function sendManualEmail(){
+  if(!isAdmin()) return;
+  if(typeof firebase === 'undefined' || !firebase) return;
+
+  const subject = (safeGet('mailSubject')?.value || '').trim();
+  const message = (safeGet('mailMessage')?.value || '').trim();
+
+  if(selectedUserIds.size === 0){ alert('⚠️ Sélectionne au moins un destinataire'); return; }
+  if(!subject){ alert('⚠️ Le sujet est obligatoire'); return; }
+  if(!message){ alert('⚠️ Le message est obligatoire'); return; }
+
+  const usersById = {};
+  getUsersArray().forEach(u => { usersById[u.uid] = u; });
+
+  const recipientEmails = Array.from(selectedUserIds)
+    .map(uid => (usersById[uid]?.email || '').trim())
+    .filter(e => e.length > 3);
+
+  const uniq = Array.from(new Set(recipientEmails));
+
+  if(uniq.length === 0){
+    alert('⚠️ Aucun email valide dans la sélection');
+    return;
+  }
+
+  const MAX = 80;
+  if(uniq.length > MAX){
+    const ok = confirm(`Tu as sélectionné ${uniq.length} emails. Limite: ${MAX}. Envoyer les ${MAX} premiers ?`);
+    if(!ok) return;
+    uniq.splice(MAX);
+  }
+
+  const region = getFunctionsRegion();
+  const fromName = (safeGet('mailFromName')?.value || '').trim();
+  const channel = getSelectedChannel();
+  const fallback = getFallbackToEmail();
+
+  const payload = {
+    recipients: uniq,
+    subject,
+    html: normalizeMessageToHtml(message),
+    fromName: fromName || null,
+    channel: channel,
+    fallbackToEmail: fallback,
+    meta: {
+      selectedUserIds: Array.from(selectedUserIds),
+      groupId: activeGroupId || null,
+      source: 'diffusion-ui'
+    }
+  };
+
+  try{
+    showToast('📨 Envoi en cours…');
+
+    const functions = region ? firebase.app().functions(region) : firebase.app().functions();
+    const call = functions.httpsCallable('sendBulkEmail');
+    const res = await call(payload);
+
+    const sent = res?.data?.sent ?? uniq.length;
+    const channelLabel = channel === 'email' ? 'Email' : channel === 'push' ? 'Push' : 'Email + Push';
+    showToast(`✅ ${channelLabel} envoyé (${sent})`);
+
+    safeGet('mailSubject').value = '';
+    safeGet('mailMessage').value = '';
+    clearMailSelection();
+
+    try{ logAction('Diffusion - Envoi', `${sent} destinataire(s) via ${channel}`); }catch(e){}
+  } catch(e){
+    console.error(e);
+    const msg = (e?.message || '').toLowerCase();
+    if(msg.includes('not-found') || msg.includes('functions') || msg.includes('unavailable')){
+      alert("La Cloud Function 'sendBulkEmail' n'est pas accessible.\n\nDéploie le dossier functions/ sur Firebase.");
+    } else {
+      alert("Erreur lors de l'envoi : " + (e.message || 'Inconnu'));
+    }
+  }
+}
+
   }
 
   function openMailGroupModal(groupId){
