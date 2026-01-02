@@ -297,56 +297,85 @@ cat > diffusion.html <<'ENDOFFILE'
     }
     
     // Check admin access after auth
-    firebase.auth().onAuthStateChanged(user => {
-      if(user) {
-        document.getElementById('loginOverlay').style.display = 'none';
-        document.getElementById('appContent').style.display = 'block';
+    // Check admin access after auth
+firebase.auth().onAuthStateChanged(user => {
+  if(user) {
+    document.getElementById('loginOverlay').style.display = 'none';
+    document.getElementById('appContent').style.display = 'block';
+    
+    firebase.database().ref('users/' + user.uid).once('value', snap => {
+      const u = snap.val();
+      if(u) {
+        window.currentUser = u;
+        window.currentUser.uid = user.uid;
+        window.currentUser.email = user.email;
         
-        firebase.database().ref('users/' + user.uid).once('value', snap => {
-          const u = snap.val();
-          if(u) {
-            window.currentUser = u;
-            window.currentUser.uid = user.uid;
-            window.currentUser.email = user.email;
+        document.getElementById('userName').textContent = u.name || 'Utilisateur';
+        document.getElementById('userHours').textContent = (u.hours || 35) + 'h';
+        
+        const role = (u.role || '').toLowerCase();
+        const isAdmin = (role === 'admin' || role === 'superadmin');
+        
+        if(isAdmin) {
+          document.getElementById('adminOnlyContent').style.display = 'block';
+          document.getElementById('nonAdminMessage').style.display = 'none';
+          document.getElementById('btnAdmin').style.display = 'inline-block';
+          
+          // IMPORTANT: Initialise les variables globales AVANT
+          window.allUsers = {};
+          window.mailGroups = {};
+          window.globalSettings = {};
+          
+          // Charge users EN PREMIER et attends qu'ils soient chargés
+          firebase.database().ref('users').once('value').then((snap) => {
+            window.allUsers = snap.val() || {};
+            console.log('✅ Users chargés:', Object.keys(window.allUsers).length);
             
-            document.getElementById('userName').textContent = u.name || 'Utilisateur';
-            document.getElementById('userHours').textContent = (u.hours || 35) + 'h';
+            // Puis écoute les changements
+            firebase.database().ref('users').on('value', (snap) => {
+              window.allUsers = snap.val() || {};
+              renderDiffusionUI();
+            });
             
-            const role = (u.role || '').toLowerCase();
-            const isAdmin = (role === 'admin' || role === 'superadmin');
+            // Maintenant charge les groupes
+            return firebase.database().ref('mailGroups').once('value');
+          }).then((snap) => {
+            window.mailGroups = snap.val() || {};
+            console.log('✅ Groupes chargés:', Object.keys(window.mailGroups).length);
             
-            if(isAdmin) {
-              document.getElementById('adminOnlyContent').style.display = 'block';
-              document.getElementById('nonAdminMessage').style.display = 'none';
-              document.getElementById('btnAdmin').style.display = 'inline-block';
-              
-              // Charge les données Firebase pour le mail
-              firebase.database().ref('mailGroups').on('value', (snap) => {
-                window.mailGroups = snap.val() || {};
-                renderDiffusionUI();
-              });
-
-              firebase.database().ref('users').on('value', (snap) => {
-                window.allUsers = snap.val() || {};
-                renderDiffusionUI();
-              });
-
-              firebase.database().ref('settings').on('value', (snap) => {
-                window.globalSettings = snap.val() || {};
-                renderDiffusionUI();
-              });
-              
-            } else {
-              document.getElementById('adminOnlyContent').style.display = 'none';
-              document.getElementById('nonAdminMessage').style.display = 'block';
-            }
-          }
-        });
-      } else {
-        document.getElementById('loginOverlay').style.display = 'flex';
-        document.getElementById('appContent').style.display = 'none';
+            firebase.database().ref('mailGroups').on('value', (snap) => {
+              window.mailGroups = snap.val() || {};
+              renderDiffusionUI();
+            });
+            
+            // Enfin les settings
+            return firebase.database().ref('settings').once('value');
+          }).then((snap) => {
+            window.globalSettings = snap.val() || {};
+            console.log('✅ Settings chargés');
+            
+            firebase.database().ref('settings').on('value', (snap) => {
+              window.globalSettings = snap.val() || {};
+              renderDiffusionUI();
+            });
+            
+            // Premier rendu après tout chargé
+            renderDiffusionUI();
+          }).catch(err => {
+            console.error('❌ Erreur chargement données:', err);
+          });
+          
+        } else {
+          document.getElementById('adminOnlyContent').style.display = 'none';
+          document.getElementById('nonAdminMessage').style.display = 'block';
+        }
       }
     });
+  } else {
+    document.getElementById('loginOverlay').style.display = 'flex';
+    document.getElementById('appContent').style.display = 'none';
+  }
+});
     
     function renderDiffusionUI() {
       try {
