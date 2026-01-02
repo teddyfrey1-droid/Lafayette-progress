@@ -1,3 +1,4 @@
+cat > assets/js/email.js <<'ENDOFFILE'
 /*
   Mail system (manual + group) for Lafayette-progress
   - Frontend writes/reads:
@@ -72,6 +73,43 @@
   }
 
   // -------------------------
+  // Multi-canal helpers
+  // -------------------------
+  function getSelectedChannel(){
+    try {
+      const radios = document.getElementsByName('diffusionChannel');
+      for(let r of radios){
+        if(r.checked) return r.value;
+      }
+    } catch(e){}
+    return 'email'; // par défaut
+  }
+
+  function getFallbackToEmail(){
+    const chk = safeGet('fallbackToEmail');
+    return chk ? chk.checked : true;
+  }
+
+  function updatePushStats(enabled, disabled){
+    const box = safeGet('pushStatsBox');
+    const enabledEl = safeGet('pushEnabledCount');
+    const disabledEl = safeGet('pushDisabledCount');
+    
+    if(!box) return;
+    
+    if(enabledEl) enabledEl.textContent = enabled;
+    if(disabledEl) disabledEl.textContent = disabled;
+    
+    // Montre la box si on a sélectionné Push ou Les deux
+    const channel = getSelectedChannel();
+    if(channel === 'push' || channel === 'both'){
+      box.style.display = 'block';
+    } else {
+      box.style.display = 'none';
+    }
+  }
+
+  // -------------------------
   // Data listeners
   // -------------------------
   function attachMailGroupsListener(){
@@ -94,7 +132,7 @@
     groupsArr.sort((a,b)=> String(a.name||'').localeCompare(String(b.name||'')));
 
     if(groupsArr.length === 0){
-      wrap.innerHTML = `<div class="mail-hint">Aucun groupe pour l'instant. Crée-en un dans “Groupes mail”.</div>`;
+      wrap.innerHTML = `<div class="mail-hint">Aucun groupe pour l'instant. Crée-en un dans "Groupes".</div>`;
       return;
     }
 
@@ -120,18 +158,32 @@
       return;
     }
 
+    let pushEnabledCount = 0;
+    let pushDisabledCount = 0;
+
     grid.innerHTML = users.map(u => {
       const selected = selectedUserIds.has(u.uid);
+      const hasPush = !!(u.fcmToken && u.fcmToken.trim());
+      
+      if(hasPush) pushEnabledCount++;
+      else pushDisabledCount++;
+
+      const pushBadge = hasPush 
+        ? `<span style="font-size:10px; padding:3px 6px; background:#10b981; color:white; border-radius:4px; font-weight:700; white-space:nowrap;">🔔 PUSH</span>`
+        : `<span style="font-size:10px; padding:3px 6px; background:#ef4444; color:white; border-radius:4px; font-weight:700; white-space:nowrap;">📧 EMAIL</span>`;
+
       return `<div class="mail-user-card ${selected?'selected':''}" onclick="toggleMailRecipient('${escapeHtml(u.uid)}')" title="Cliquer pour sélectionner">
         <div class="mail-user-check">${selected ? '✓' : ''}</div>
         <div style="min-width:0; flex:1;">
           <div class="mail-user-name">${escapeHtml(u.name || 'Sans nom')}</div>
           <div class="mail-user-email">${escapeHtml(u.email || '')}</div>
         </div>
+        ${pushBadge}
       </div>`;
     }).join('');
 
     setSelectedCount();
+    updatePushStats(pushEnabledCount, pushDisabledCount);
   }
 
   function renderGroupsList(){
@@ -142,7 +194,7 @@
     groupsArr.sort((a,b)=> String(a.name||'').localeCompare(String(b.name||'')));
 
     if(groupsArr.length === 0){
-      list.innerHTML = `<div class="mail-hint">Aucun groupe. Clique sur “Nouveau groupe”.</div>`;
+      list.innerHTML = `<div class="mail-hint">Aucun groupe. Clique sur "Nouveau groupe".</div>`;
       return;
     }
 
@@ -270,8 +322,8 @@
 
     try{
       await db.ref().update(updates);
-      showToast('✅ Réglages mail enregistrés');
-      try{ logAction('Mail - Réglages', regionVal ? `region=${regionVal}` : 'region=default'); }catch(e){}
+      showToast('✅ Réglages enregistrés');
+      try{ logAction('Diffusion - Réglages', regionVal ? `region=${regionVal}` : 'region=default'); }catch(e){}
     } catch(e){
       console.error(e);
       alert("Erreur : impossible d'enregistrer les réglages. Vérifie tes règles Firebase.");
@@ -314,17 +366,21 @@
 
     const region = getFunctionsRegion();
     const fromName = (safeGet('mailFromName')?.value || '').trim();
+    const channel = getSelectedChannel();
+    const fallback = getFallbackToEmail();
 
     const payload = {
       recipients: uniq,
       subject,
       html: normalizeMessageToHtml(message),
       fromName: fromName || null,
+      channel: channel, // 'email', 'push', 'both'
+      fallbackToEmail: fallback,
       // optional: record selected ids
       meta: {
         selectedUserIds: Array.from(selectedUserIds),
         groupId: activeGroupId || null,
-        source: 'admin-ui'
+        source: 'diffusion-ui'
       }
     };
 
@@ -337,14 +393,15 @@
       const res = await call(payload);
 
       const sent = res?.data?.sent ?? uniq.length;
-      showToast(`✅ Email envoyé (${sent})`);
+      const channelLabel = channel === 'email' ? 'Email' : channel === 'push' ? 'Push' : 'Email + Push';
+      showToast(`✅ ${channelLabel} envoyé (${sent})`);
 
       // Reset
       safeGet('mailSubject').value = '';
       safeGet('mailMessage').value = '';
       clearMailSelection();
 
-      try{ logAction('Mail - Envoi', `${sent} destinataire(s)`); }catch(e){}
+      try{ logAction('Diffusion - Envoi', `${sent} destinataire(s) via ${channel}`); }catch(e){}
     } catch(e){
       console.error(e);
       const msg = (e?.message || '').toLowerCase();
@@ -437,7 +494,7 @@
     try{
       await db.ref('mailGroups/' + id).set(payload);
       showToast(editingGroupId ? '✅ Groupe mis à jour' : '✅ Groupe créé');
-      try{ logAction('Mail - Groupe', `${editingGroupId ? 'Update' : 'Create'}: ${name}`); }catch(e){}
+      try{ logAction('Diffusion - Groupe', `${editingGroupId ? 'Update' : 'Create'}: ${name}`); }catch(e){}
       closeMailGroupModal();
     } catch(e){
       console.error(e);
@@ -451,12 +508,12 @@
 
     const g = mailGroups[groupId];
     const label = g?.name || groupId;
-    if(!confirm(`Supprimer le groupe “${label}” ?`)) return;
+    if(!confirm(`Supprimer le groupe "${label}" ?`)) return;
 
     try{
       await db.ref('mailGroups/' + groupId).remove();
       showToast('🗑️ Groupe supprimé');
-      try{ logAction('Mail - Groupe', `Delete: ${label}`); }catch(e){}
+      try{ logAction('Diffusion - Groupe', `Delete: ${label}`); }catch(e){}
       if(activeGroupId === groupId){ clearMailSelection(); }
     } catch(e){
       console.error(e);
@@ -479,6 +536,14 @@
   window.saveMailGroup = saveMailGroup;
   window.deleteMailGroup = deleteMailGroup;
 
+  // Expose functions globally for diffusion.html
+  window.renderQuickGroups = renderQuickGroups;
+  window.renderUsersGrid = renderUsersGrid;
+  window.renderGroupsList = renderGroupsList;
+  window.attachMailGroupsListener = attachMailGroupsListener;
+  window.getSelectedChannel = getSelectedChannel;
+  window.getFallbackToEmail = getFallbackToEmail;
+
   // -------------------------
   // Init
   // -------------------------
@@ -491,17 +556,8 @@
   }
 
   init();
-  // Expose functions globally for diffusion.html
-window.renderQuickGroups = renderQuickGroups;
-window.renderUsersGrid = renderUsersGrid;
-window.renderGroupsList = renderGroupsList;
-window.saveMailSettings = saveMailSettings;
-window.sendManualEmail = sendManualEmail;
-window.clearMailSelection = clearMailSelection;
-window.openMailGroupModal = openMailGroupModal;
-window.closeMailGroupModal = closeMailGroupModal;
-window.saveMailGroup = saveMailGroup;
-window.attachMailGroupsListener = attachMailGroupsListener;
-
 
 })();
+ENDOFFILE
+
+echo "✅ email.js créé avec support multi-canal complet !"
