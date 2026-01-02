@@ -356,20 +356,19 @@
 
   function sendManualEmail() {
     if (!isAdmin()) return;
-    if (!firebase.auth().currentUser) {
-    showToast('❌ Reconnecte-toi d\'abord');
-    return;
-      
-  try {
-    await firebase.auth().currentUser.getIdToken(true);
-  } catch (e) {
-    showToast('❌ Erreur auth: ' + e.message);
-    return;
     if (typeof firebase === 'undefined' || !firebase) return;
+
+    var user = null;
+    try { user = firebase.auth().currentUser; } catch (e) { user = null; }
+
+    if (!user) {
+      showToast("❌ Reconnecte-toi d'abord");
+      return;
+    }
 
     var subjectEl = safeGet('mailSubject');
     var messageEl = safeGet('mailMessage');
-    
+
     var subject = (subjectEl && subjectEl.value ? subjectEl.value : '').trim();
     var message = (messageEl && messageEl.value ? messageEl.value : '').trim();
 
@@ -386,30 +385,31 @@
       return;
     }
 
+    // Map users by uid
     var usersById = {};
-    var allUsers = getUsersArray();
-    for (var i = 0; i < allUsers.length; i++) {
-      usersById[allUsers[i].uid] = allUsers[i];
+    var allUsersArr = getUsersArray();
+    for (var i = 0; i < allUsersArr.length; i++) {
+      usersById[allUsersArr[i].uid] = allUsersArr[i];
     }
 
+    // Collect recipient emails
     var recipientEmails = [];
     selectedUserIds.forEach(function(uid) {
       var u = usersById[uid];
       if (u && u.email) {
-        var email = String(u.email).trim();
-        if (email.length > 3) {
-          recipientEmails.push(email);
-        }
+        var em = String(u.email).trim();
+        if (em.length > 3) recipientEmails.push(em);
       }
     });
 
+    // Unique (case-insensitive)
     var uniq = [];
     var seen = {};
     for (var j = 0; j < recipientEmails.length; j++) {
-      var email = recipientEmails[j];
-      if (!seen[email]) {
-        seen[email] = true;
-        uniq.push(email);
+      var key = String(recipientEmails[j]).toLowerCase();
+      if (!seen[key]) {
+        seen[key] = true;
+        uniq.push(recipientEmails[j]);
       }
     }
 
@@ -447,12 +447,15 @@
 
     showToast('📨 Envoi en cours…');
 
+    // Force a token refresh (helps avoid edge "unauthenticated" cases)
+    try { user.getIdToken(true).catch(function(){}); } catch (e) {}
+
     var functions = region ? firebase.app().functions(region) : firebase.app().functions();
     var call = functions.httpsCallable('sendBulkEmail');
-    
+
     call(payload).then(function(res) {
-      var sent = (res && res.data && res.data.sent) ? res.data.sent : uniq.length;
-      var channelLabel = channel === 'email' ? 'Email' : channel === 'push' ? 'Push' : 'Email + Push';
+      var sent = (res && res.data && typeof res.data.sent === 'number') ? res.data.sent : uniq.length;
+      var channelLabel = (channel === 'email') ? 'Email' : (channel === 'push' ? 'Push' : 'Email + Push');
       showToast('✅ ' + channelLabel + ' envoyé (' + sent + ')');
 
       if (subjectEl) subjectEl.value = '';
@@ -462,13 +465,18 @@
       try {
         logAction('Diffusion - Envoi', sent + ' via ' + channel);
       } catch (e) {}
+
     }).catch(function(e) {
       console.error(e);
       var msg = (e && e.message ? String(e.message) : '').toLowerCase();
       if (msg.indexOf('not-found') >= 0 || msg.indexOf('functions') >= 0) {
-        alert('Cloud Function introuvable.\nDéploie functions/');
+        alert('Cloud Function introuvable.\nVérifie le déploiement functions/ et/ou la région.');
+      } else if (msg.indexOf('permission') >= 0) {
+        alert('Accès refusé (admin requis).');
+      } else if (msg.indexOf('unauth') >= 0) {
+        alert('Non authentifié. Déconnecte-toi / reconnecte-toi puis réessaie.');
       } else {
-        alert('Erreur: ' + (e.message || 'Inconnu'));
+        alert('Erreur: ' + (e && e.message ? e.message : 'Inconnu'));
       }
     });
   }
