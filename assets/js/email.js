@@ -35,12 +35,18 @@ cat > assets/js/email.js <<'ENDOFFILE'
 
   function getUsersArray(){
     try{
-      const raw = (typeof allUsers !== 'undefined' && allUsers) ? allUsers : {};
-      return Object.keys(raw).map(uid => ({ uid, ...(raw[uid]||{}) }));
+      // Utilise window.allUsers explicitement
+      const raw = window.allUsers || {};
+      console.log('getUsersArray: raw users count =', Object.keys(raw).length);
+      const result = Object.keys(raw).map(uid => ({ uid, ...(raw[uid]||{}) }));
+      console.log('getUsersArray: mapped users count =', result.length);
+      return result;
     } catch(e){
+      console.error('getUsersArray error:', e);
       return [];
     }
   }
+ENDOFFILE
 
   function isAdmin(){
     try{ return typeof isAdminUser === 'function' ? !!isAdminUser() : false; }
