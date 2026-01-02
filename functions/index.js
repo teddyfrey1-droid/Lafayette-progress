@@ -1,4 +1,4 @@
-cat > functions/index.js <<'ENDJS'
+cat > functions/index.js <<'EOF'
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
@@ -97,4 +97,4 @@ exports.sendBulkEmail = functions.https.onCall(async (data, context) => {
     total: recipients.length
   };
 });
-ENDJS
+EOF
