@@ -20,6 +20,32 @@ cat > diffusion.html <<'ENDOFFILE'
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Firebase Config (doit être avant email.js) -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAGaitqmFwExvJ9ZUpkdUdCKAqqDOP2cdQ",
+      authDomain: "objectif-restaurant.firebaseapp.com",
+      databaseURL: "https://objectif-restaurant-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "objectif-restaurant",
+      storageBucket: "objectif-restaurant.firebasestorage.app",
+      messagingSenderId: "910113283000",
+      appId: "1:910113283000:web:0951fd9dca01aa6e46cd4d"
+    };
+    firebase.initializeApp(firebaseConfig);
+    
+    // Expose Firebase globally
+    window.db = firebase.database();
+    window.auth = firebase.auth();
+    
+    // Initialise les variables globales AVANT tout
+    window.allUsers = {};
+    window.mailGroups = {};
+    window.globalSettings = {};
+    window.currentUser = null;
+    
+    console.log('🔥 Firebase initialisé');
+  </script>
 </head>
 <body>
   
@@ -272,10 +298,32 @@ cat > diffusion.html <<'ENDOFFILE'
   </div>
 
   <!-- Scripts -->
-  <script src="assets/js/app.js"></script>
   <script src="assets/js/email.js"></script>
   
   <script>
+    // Helper functions
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      if(toast) {
+        toast.textContent = msg;
+        toast.className = 'show';
+        setTimeout(() => toast.className = 'hide', 3000);
+      }
+    }
+    window.showToast = showToast;
+    
+    function isAdminUser() {
+      if(!window.currentUser) return false;
+      const role = (window.currentUser.role || '').toLowerCase();
+      return role === 'admin' || role === 'superadmin';
+    }
+    window.isAdminUser = isAdminUser;
+    
+    function logAction(action, detail) {
+      console.log('Action:', action, detail);
+    }
+    window.logAction = logAction;
+    
     // Init theme
     if(localStorage.getItem('heiko:darkmode') === null) {
       localStorage.setItem('heiko:darkmode', 'true');
@@ -296,95 +344,20 @@ cat > diffusion.html <<'ENDOFFILE'
       if(icon) icon.textContent = isDark ? '🌙' : '☀️';
     }
     
-    // Check admin access after auth
-    // Check admin access after auth
-firebase.auth().onAuthStateChanged(user => {
-  if(user) {
-    document.getElementById('loginOverlay').style.display = 'none';
-    document.getElementById('appContent').style.display = 'block';
-    
-    firebase.database().ref('users/' + user.uid).once('value', snap => {
-      const u = snap.val();
-      if(u) {
-        window.currentUser = u;
-        window.currentUser.uid = user.uid;
-        window.currentUser.email = user.email;
-        
-        document.getElementById('userName').textContent = u.name || 'Utilisateur';
-        document.getElementById('userHours').textContent = (u.hours || 35) + 'h';
-        
-        const role = (u.role || '').toLowerCase();
-        const isAdmin = (role === 'admin' || role === 'superadmin');
-        
-        if(isAdmin) {
-          document.getElementById('adminOnlyContent').style.display = 'block';
-          document.getElementById('nonAdminMessage').style.display = 'none';
-          document.getElementById('btnAdmin').style.display = 'inline-block';
-          
-          // IMPORTANT: Initialise les variables globales AVANT
-          window.allUsers = {};
-          window.mailGroups = {};
-          window.globalSettings = {};
-          
-          // Charge users EN PREMIER et attends qu'ils soient chargés
-          firebase.database().ref('users').once('value').then((snap) => {
-            window.allUsers = snap.val() || {};
-            console.log('✅ Users chargés:', Object.keys(window.allUsers).length);
-            
-            // Puis écoute les changements
-            firebase.database().ref('users').on('value', (snap) => {
-              window.allUsers = snap.val() || {};
-              renderDiffusionUI();
-            });
-            
-            // Maintenant charge les groupes
-            return firebase.database().ref('mailGroups').once('value');
-          }).then((snap) => {
-            window.mailGroups = snap.val() || {};
-            console.log('✅ Groupes chargés:', Object.keys(window.mailGroups).length);
-            
-            firebase.database().ref('mailGroups').on('value', (snap) => {
-              window.mailGroups = snap.val() || {};
-              renderDiffusionUI();
-            });
-            
-            // Enfin les settings
-            return firebase.database().ref('settings').once('value');
-          }).then((snap) => {
-            window.globalSettings = snap.val() || {};
-            console.log('✅ Settings chargés');
-            
-            firebase.database().ref('settings').on('value', (snap) => {
-              window.globalSettings = snap.val() || {};
-              renderDiffusionUI();
-            });
-            
-            // Premier rendu après tout chargé
-            renderDiffusionUI();
-          }).catch(err => {
-            console.error('❌ Erreur chargement données:', err);
-          });
-          
-        } else {
-          document.getElementById('adminOnlyContent').style.display = 'none';
-          document.getElementById('nonAdminMessage').style.display = 'block';
-        }
-      }
-    });
-  } else {
-    document.getElementById('loginOverlay').style.display = 'flex';
-    document.getElementById('appContent').style.display = 'none';
-  }
-});
-    
+    // Render function
     function renderDiffusionUI() {
+      console.log('🎨 renderDiffusionUI appelée');
+      console.log('  - allUsers:', window.allUsers ? Object.keys(window.allUsers).length : 'undefined');
+      console.log('  - mailGroups:', window.mailGroups ? Object.keys(window.mailGroups).length : 'undefined');
+      
       try {
-        // Appelle les fonctions de rendu depuis email.js
         if(typeof window.renderQuickGroups === 'function') window.renderQuickGroups();
-        if(typeof window.renderUsersGrid === 'function') window.renderUsersGrid();
+        if(typeof window.renderUsersGrid === 'function') {
+          console.log('  - Appel renderUsersGrid...');
+          window.renderUsersGrid();
+        }
         if(typeof window.renderGroupsList === 'function') window.renderGroupsList();
         
-        // Synchronise les settings
         const reg = document.getElementById('mailFunctionsRegion');
         const fromName = document.getElementById('mailFromName');
         if(reg && window.globalSettings && window.globalSettings.functionsRegion) {
@@ -394,9 +367,91 @@ firebase.auth().onAuthStateChanged(user => {
           fromName.value = window.globalSettings.mailFromName;
         }
       } catch(e) {
-        console.error('Erreur rendu diffusion:', e);
+        console.error('❌ Erreur rendu diffusion:', e);
       }
     }
+    
+    // Auth
+    firebase.auth().onAuthStateChanged(user => {
+      console.log('🔐 Auth state changed:', user ? user.email : 'not logged in');
+      
+      if(user) {
+        document.getElementById('loginOverlay').style.display = 'none';
+        document.getElementById('appContent').style.display = 'block';
+        
+        firebase.database().ref('users/' + user.uid).once('value', snap => {
+          const u = snap.val();
+          if(u) {
+            window.currentUser = u;
+            window.currentUser.uid = user.uid;
+            window.currentUser.email = user.email;
+            
+            console.log('👤 User:', u.name, 'Role:', u.role);
+            
+            document.getElementById('userName').textContent = u.name || 'Utilisateur';
+            document.getElementById('userHours').textContent = (u.hours || 35) + 'h';
+            
+            const role = (u.role || '').toLowerCase();
+            const isAdmin = (role === 'admin' || role === 'superadmin');
+            
+            if(isAdmin) {
+              console.log('✅ Admin access granted');
+              document.getElementById('adminOnlyContent').style.display = 'block';
+              document.getElementById('nonAdminMessage').style.display = 'none';
+              document.getElementById('btnAdmin').style.display = 'inline-block';
+              
+              // Charge les données
+              console.log('📡 Chargement des données Firebase...');
+              
+              firebase.database().ref('users').once('value').then(snap => {
+                window.allUsers = snap.val() || {};
+                console.log('✅ Users loaded:', Object.keys(window.allUsers).length);
+                
+                // Listener temps réel
+                firebase.database().ref('users').on('value', snap => {
+                  window.allUsers = snap.val() || {};
+                  renderDiffusionUI();
+                });
+                
+                return firebase.database().ref('mailGroups').once('value');
+              }).then(snap => {
+                window.mailGroups = snap.val() || {};
+                console.log('✅ Groups loaded:', Object.keys(window.mailGroups).length);
+                
+                firebase.database().ref('mailGroups').on('value', snap => {
+                  window.mailGroups = snap.val() || {};
+                  renderDiffusionUI();
+                });
+                
+                return firebase.database().ref('settings').once('value');
+              }).then(snap => {
+                window.globalSettings = snap.val() || {};
+                console.log('✅ Settings loaded');
+                
+                firebase.database().ref('settings').on('value', snap => {
+                  window.globalSettings = snap.val() || {};
+                  renderDiffusionUI();
+                });
+                
+                // Premier rendu
+                console.log('🎬 Premier rendu...');
+                renderDiffusionUI();
+              }).catch(err => {
+                console.error('❌ Erreur chargement:', err);
+              });
+              
+            } else {
+              console.log('🚫 Access denied - not admin');
+              document.getElementById('adminOnlyContent').style.display = 'none';
+              document.getElementById('nonAdminMessage').style.display = 'block';
+            }
+          }
+        });
+      } else {
+        document.getElementById('loginOverlay').style.display = 'flex';
+        document.getElementById('appContent').style.display = 'none';
+      }
+    });
     
     // Listener pour mettre à jour les stats quand on change de canal
     document.addEventListener('change', function(e){
@@ -460,18 +515,10 @@ firebase.auth().onAuthStateChanged(user => {
     document.addEventListener('keydown', e => {
       if(e.key === 'Escape') toggleGlobalMenu(false);
     });
-    
-    function showToast(message) {
-      const toast = document.getElementById('toast');
-      toast.textContent = message;
-      toast.className = 'show';
-      setTimeout(() => { toast.className = 'hide'; }, 3000);
-    }
-    window.showToast = showToast;
   </script>
 
 </body>
 </html>
 ENDOFFILE
 
-echo "✅ diffusion.html créé avec le sélecteur multi-canal !"
+echo "✅ diffusion.html avec debug complet créé !"
