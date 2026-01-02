@@ -1,15 +1,6 @@
 cat > assets/js/email.js <<'ENDOFFILE'
 /*
   Mail system (manual + group) for Lafayette-progress
-  - Frontend writes/reads:
-    - settings/functionsRegion (optional)
-    - settings/mailFromName (optional)
-    - mailGroups/{groupId} { name, color, userIds, createdAt, updatedAt, createdBy, updatedBy }
-  - Frontend calls Cloud Function:
-    - sendBulkEmail (callable)
-
-  Note: This file assumes app.js has already loaded and defines:
-    db, firebase, allUsers, globalSettings, currentUser, isAdminUser, showToast, logAction
 */
 
 (function(){
@@ -18,7 +9,7 @@ cat > assets/js/email.js <<'ENDOFFILE'
   // -------------------------
   // State
   // -------------------------
-  let mailGroups = {}; // {id: {name,color,userIds}}
+  let mailGroups = {};
   let selectedUserIds = new Set();
   let activeGroupId = null;
   let editingGroupId = null;
@@ -35,18 +26,16 @@ cat > assets/js/email.js <<'ENDOFFILE'
 
   function getUsersArray(){
     try{
-      // Utilise window.allUsers explicitement
       const raw = window.allUsers || {};
-      console.log('getUsersArray: raw users count =', Object.keys(raw).length);
+      console.log('📋 getUsersArray: raw users =', Object.keys(raw).length);
       const result = Object.keys(raw).map(uid => ({ uid, ...(raw[uid]||{}) }));
-      console.log('getUsersArray: mapped users count =', result.length);
+      console.log('📋 getUsersArray: mapped users =', result.length);
       return result;
     } catch(e){
-      console.error('getUsersArray error:', e);
+      console.error('❌ getUsersArray error:', e);
       return [];
     }
   }
-ENDOFFILE
 
   function isAdmin(){
     try{ return typeof isAdminUser === 'function' ? !!isAdminUser() : false; }
@@ -61,7 +50,7 @@ ENDOFFILE
 
     const input = safeGet('mailFunctionsRegion');
     if(input && input.value && input.value.trim()) return input.value.trim();
-    return ''; // default region
+    return '';
   }
 
   function setSelectedCount(){
@@ -71,7 +60,6 @@ ENDOFFILE
   }
 
   function normalizeMessageToHtml(text){
-    // Allow HTML if user typed tags; otherwise simple newline to <br>
     const s = String(text ?? '');
     const hasTag = /<\w+[^>]*>/.test(s);
     if(hasTag) return s;
@@ -88,7 +76,7 @@ ENDOFFILE
         if(r.checked) return r.value;
       }
     } catch(e){}
-    return 'email'; // par défaut
+    return 'email';
   }
 
   function getFallbackToEmail(){
@@ -106,7 +94,6 @@ ENDOFFILE
     if(enabledEl) enabledEl.textContent = enabled;
     if(disabledEl) disabledEl.textContent = disabled;
     
-    // Montre la box si on a sélectionné Push ou Les deux
     const channel = getSelectedChannel();
     if(channel === 'push' || channel === 'both'){
       box.style.display = 'block';
@@ -152,12 +139,18 @@ ENDOFFILE
   }
 
   function renderUsersGrid(){
+    console.log('🎨 renderUsersGrid appelée');
     const grid = safeGet('mailUsersGrid');
-    if(!grid) return;
+    if(!grid) {
+      console.log('❌ Grid element not found');
+      return;
+    }
 
     const users = getUsersArray()
       .filter(u => (u.email || '').trim().length > 3)
       .sort((a,b)=> String(a.name||'').localeCompare(String(b.name||'')));
+
+    console.log('👥 Users to display:', users.length);
 
     if(users.length === 0){
       grid.innerHTML = `<div class="mail-hint">Aucun utilisateur avec email trouvé.</div>`;
@@ -187,6 +180,8 @@ ENDOFFILE
         ${pushBadge}
       </div>`;
     }).join('');
+
+    console.log('✅ Users rendered');
 
     setSelectedCount();
     updatePushStats(pushEnabledCount, pushDisabledCount);
@@ -248,8 +243,6 @@ ENDOFFILE
 
   function renderMailUI(){
     if(!isAdmin()) return;
-
-    // If tab not in DOM, nothing to do
     if(!safeGet('tab-emails')) return;
 
     syncSettingsInputs();
@@ -283,9 +276,8 @@ ENDOFFILE
     }).join('');
   }
 
-
   // -------------------------
-  // Public actions (attached to window)
+  // Public actions
   // -------------------------
   function toggleMailRecipient(uid){
     activeGroupId = null;
@@ -332,7 +324,7 @@ ENDOFFILE
       try{ logAction('Diffusion - Réglages', regionVal ? `region=${regionVal}` : 'region=default'); }catch(e){}
     } catch(e){
       console.error(e);
-      alert("Erreur : impossible d'enregistrer les réglages. Vérifie tes règles Firebase.");
+      alert("Erreur : impossible d'enregistrer les réglages.");
     }
   }
 
@@ -354,7 +346,6 @@ ENDOFFILE
       .map(uid => (usersById[uid]?.email || '').trim())
       .filter(e => e.length > 3);
 
-    // de-duplicate
     const uniq = Array.from(new Set(recipientEmails));
 
     if(uniq.length === 0){
@@ -362,10 +353,9 @@ ENDOFFILE
       return;
     }
 
-    // safety cap (adjust if needed)
     const MAX = 80;
     if(uniq.length > MAX){
-      const ok = confirm(`Tu as sélectionné ${uniq.length} emails. Limite de sécurité: ${MAX}. Envoyer quand même les ${MAX} premiers ?`);
+      const ok = confirm(`Tu as sélectionné ${uniq.length} emails. Limite: ${MAX}. Envoyer les ${MAX} premiers ?`);
       if(!ok) return;
       uniq.splice(MAX);
     }
@@ -380,9 +370,8 @@ ENDOFFILE
       subject,
       html: normalizeMessageToHtml(message),
       fromName: fromName || null,
-      channel: channel, // 'email', 'push', 'both'
+      channel: channel,
       fallbackToEmail: fallback,
-      // optional: record selected ids
       meta: {
         selectedUserIds: Array.from(selectedUserIds),
         groupId: activeGroupId || null,
@@ -393,7 +382,6 @@ ENDOFFILE
     try{
       showToast('📨 Envoi en cours…');
 
-      // If region is empty, use default
       const functions = region ? firebase.app().functions(region) : firebase.app().functions();
       const call = functions.httpsCallable('sendBulkEmail');
       const res = await call(payload);
@@ -402,7 +390,6 @@ ENDOFFILE
       const channelLabel = channel === 'email' ? 'Email' : channel === 'push' ? 'Push' : 'Email + Push';
       showToast(`✅ ${channelLabel} envoyé (${sent})`);
 
-      // Reset
       safeGet('mailSubject').value = '';
       safeGet('mailMessage').value = '';
       clearMailSelection();
@@ -412,7 +399,7 @@ ENDOFFILE
       console.error(e);
       const msg = (e?.message || '').toLowerCase();
       if(msg.includes('not-found') || msg.includes('functions') || msg.includes('unavailable')){
-        alert("La Cloud Function 'sendBulkEmail' n'est pas accessible.\n\nÀ faire: déployer le dossier functions/ sur Firebase (voir README) et vérifier la région.");
+        alert("La Cloud Function 'sendBulkEmail' n'est pas accessible.\n\nDéploie le dossier functions/ sur Firebase.");
       } else {
         alert("Erreur lors de l'envoi. Vérifie les logs Firebase Functions.");
       }
@@ -439,7 +426,6 @@ ENDOFFILE
       const ids = Array.isArray(mailGroups[groupId].userIds) ? mailGroups[groupId].userIds : [];
       modalSelected = new Set(ids);
 
-      // select color
       const color = mailGroups[groupId].color || '#3b82f6';
       const colorInput = safeGet('mailGroupColor');
       if(colorInput) colorInput.value = color;
@@ -485,7 +471,6 @@ ENDOFFILE
 
     const id = editingGroupId || ('g' + now);
 
-    // preserve createdAt if existing
     const existing = mailGroups[id] || {};
     const payload = {
       name,
@@ -528,7 +513,7 @@ ENDOFFILE
   }
 
   // -------------------------
-  // Expose to window (for onclick attributes)
+  // Expose to window
   // -------------------------
   window.renderMailUI = renderMailUI;
   window.toggleMailRecipient = toggleMailRecipient;
@@ -542,7 +527,6 @@ ENDOFFILE
   window.saveMailGroup = saveMailGroup;
   window.deleteMailGroup = deleteMailGroup;
 
-  // Expose functions globally for diffusion.html
   window.renderQuickGroups = renderQuickGroups;
   window.renderUsersGrid = renderUsersGrid;
   window.renderGroupsList = renderGroupsList;
@@ -554,8 +538,8 @@ ENDOFFILE
   // Init
   // -------------------------
   function init(){
+    console.log('📧 email.js initialisé');
     try{ attachMailGroupsListener(); }catch(e){ console.error(e); }
-    // Keep UI updated
     document.addEventListener('DOMContentLoaded', () => {
       try{ renderMailUI(); }catch(e){ console.error(e); }
     });
@@ -566,4 +550,4 @@ ENDOFFILE
 })();
 ENDOFFILE
 
-echo "✅ email.js créé avec support multi-canal complet !"
+echo "✅ email.js recréé sans erreur de syntaxe !"
