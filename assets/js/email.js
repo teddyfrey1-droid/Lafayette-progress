@@ -1,6 +1,6 @@
 /*
   Système de diffusion multi-canal pour Lafayette
-  Version finale sans bugs
+  Version finale sans bugs + auth + users fix
 */
 
 (function() {
@@ -121,16 +121,25 @@
     }
   }
 
-  function attachMailGroupsListener() {
-    if (typeof db === 'undefined' || !db) return;
-    
+  // ✅ FIX: Charge users + groups en live (comme contacts.js)
+  function attachListeners() {
+    if (typeof db === 'undefined' || !db) {
+      console.error('❌ DB non disponible');
+      return;
+    }
+
+    // Users live
+    db.ref('users').on('value', function(snap) {
+      window.allUsers = snap.val() || {};
+      console.log('👥 Users chargés:', Object.keys(window.allUsers).length);
+      renderMailUI();
+    });
+
+    // Groups live
     db.ref('mailGroups').on('value', function(snap) {
       mailGroups = snap.val() || {};
-      try {
-        renderMailUI();
-      } catch (e) {
-        console.error(e);
-      }
+      console.log('👥 Groups chargés:', Object.keys(mailGroups).length);
+      renderMailUI();
     });
   }
 
@@ -356,19 +365,16 @@
 
   function sendManualEmail() {
     if (!isAdmin()) return;
-    if (typeof firebase === 'undefined' || !firebase) return;
-
-    var user = null;
-    try { user = firebase.auth().currentUser; } catch (e) { user = null; }
-
-    if (!user) {
-      showToast("❌ Reconnecte-toi d'abord");
+    
+    // ✅ FIX AUTH: Vérifie connexion avant tout
+    if (typeof firebase === 'undefined' || !firebase || !firebase.auth().currentUser) {
+      showToast('❌ Reconnecte-toi d\'abord');
       return;
     }
 
     var subjectEl = safeGet('mailSubject');
     var messageEl = safeGet('mailMessage');
-
+    
     var subject = (subjectEl && subjectEl.value ? subjectEl.value : '').trim();
     var message = (messageEl && messageEl.value ? messageEl.value : '').trim();
 
@@ -385,31 +391,30 @@
       return;
     }
 
-    // Map users by uid
     var usersById = {};
-    var allUsersArr = getUsersArray();
-    for (var i = 0; i < allUsersArr.length; i++) {
-      usersById[allUsersArr[i].uid] = allUsersArr[i];
+    var allUsers = getUsersArray();
+    for (var i = 0; i < allUsers.length; i++) {
+      usersById[allUsers[i].uid] = allUsers[i];
     }
 
-    // Collect recipient emails
     var recipientEmails = [];
     selectedUserIds.forEach(function(uid) {
       var u = usersById[uid];
       if (u && u.email) {
-        var em = String(u.email).trim();
-        if (em.length > 3) recipientEmails.push(em);
+        var email = String(u.email).trim();
+        if (email.length > 3) {
+          recipientEmails.push(email);
+        }
       }
     });
 
-    // Unique (case-insensitive)
     var uniq = [];
     var seen = {};
     for (var j = 0; j < recipientEmails.length; j++) {
-      var key = String(recipientEmails[j]).toLowerCase();
-      if (!seen[key]) {
-        seen[key] = true;
-        uniq.push(recipientEmails[j]);
+      var email = recipientEmails[j];
+      if (!seen[email]) {
+        seen[email] = true;
+        uniq.push(email);
       }
     }
 
@@ -447,15 +452,15 @@
 
     showToast('📨 Envoi en cours…');
 
-    // Force a token refresh (helps avoid edge "unauthenticated" cases)
-    try { user.getIdToken(true).catch(function(){}); } catch (e) {}
-
-    var functions = region ? firebase.app().functions(region) : firebase.app().functions();
-    var call = functions.httpsCallable('sendBulkEmail');
-
-    call(payload).then(function(res) {
-      var sent = (res && res.data && typeof res.data.sent === 'number') ? res.data.sent : uniq.length;
-      var channelLabel = (channel === 'email') ? 'Email' : (channel === 'push' ? 'Push' : 'Email + Push');
+    // ✅ FIX AUTH: Force refresh token avant appel
+    firebase.auth().currentUser.getIdToken(true).then(function() {
+      var functions = region ? firebase.app().functions(region) : firebase.app().functions();
+      var call = functions.httpsCallable('sendBulkEmail');
+      
+      return call(payload);
+    }).then(function(res) {
+      var sent = (res && res.data && res.data.sent) ? res.data.sent : uniq.length;
+      var channelLabel = channel === 'email' ? 'Email' : channel === 'push' ? 'Push' : 'Email + Push';
       showToast('✅ ' + channelLabel + ' envoyé (' + sent + ')');
 
       if (subjectEl) subjectEl.value = '';
@@ -465,7 +470,6 @@
       try {
         logAction('Diffusion - Envoi', sent + ' via ' + channel);
       } catch (e) {}
-
     }).catch(function(e) {
       console.error(e);
       var msg = (e && e.message ? String(e.message) : '').toLowerCase();
@@ -589,24 +593,23 @@
   window.renderQuickGroups = renderQuickGroups;
   window.renderUsersGrid = renderUsersGrid;
   window.renderGroupsList = renderGroupsList;
-  window.attachMailGroupsListener = attachMailGroupsListener;
   window.getSelectedChannel = getSelectedChannel;
   window.getFallbackToEmail = getFallbackToEmail;
 
-  // Initialisation
+  // ✅ Initialisation : charge users + groups en temps réel
   console.log('📧 email.js initialisé');
   
   try {
-    attachMailGroupsListener();
+    attachListeners();
   } catch (e) {
-    console.error('Erreur listener:', e);
+    console.error('❌ Erreur listeners:', e);
   }
 
   document.addEventListener('DOMContentLoaded', function() {
     try {
       renderMailUI();
     } catch (e) {
-      console.error('Erreur render:', e);
+      console.error('❌ Erreur render:', e);
     }
   });
 
