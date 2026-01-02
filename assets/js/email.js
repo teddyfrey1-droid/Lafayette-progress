@@ -1,18 +1,13 @@
-/*
-  Mail system (manual + group) for Lafayette-progress
-*/
-
+cat > assets/js/email.js <<'ENDJS'
 (function(){
   'use strict';
 
-  // State
   let mailGroups = {};
   let selectedUserIds = new Set();
   let activeGroupId = null;
   let editingGroupId = null;
   let modalSelected = new Set();
 
-  // Utils
   function safeGet(id){ return document.getElementById(id); }
 
   function escapeHtml(str){
@@ -60,7 +55,6 @@
     return escapeHtml(s).replace(/\n/g, '<br>');
   }
 
-  // Multi-canal helpers
   function getSelectedChannel(){
     try {
       const radios = document.getElementsByName('diffusionChannel');
@@ -80,12 +74,9 @@
     const box = safeGet('pushStatsBox');
     const enabledEl = safeGet('pushEnabledCount');
     const disabledEl = safeGet('pushDisabledCount');
-    
     if(!box) return;
-    
     if(enabledEl) enabledEl.textContent = enabled;
     if(disabledEl) disabledEl.textContent = disabled;
-    
     const channel = getSelectedChannel();
     if(channel === 'push' || channel === 'both'){
       box.style.display = 'block';
@@ -94,7 +85,6 @@
     }
   }
 
-  // Data listeners
   function attachMailGroupsListener(){
     if(typeof db === 'undefined' || !db) return;
     db.ref('mailGroups').on('value', (snap) => {
@@ -103,7 +93,6 @@
     });
   }
 
-  // Rendering
   function renderQuickGroups(){
     const wrap = safeGet('mailQuickGroups');
     if(!wrap) return;
@@ -124,18 +113,14 @@
     console.log('🎨 renderUsersGrid appelée');
     const grid = safeGet('mailUsersGrid');
     if(!grid) return;
-
     const users = getUsersArray().filter(u => (u.email || '').trim().length > 3).sort((a,b)=> String(a.name||'').localeCompare(String(b.name||'')));
     console.log('👥 Users to display:', users.length);
-
     if(users.length === 0){
       grid.innerHTML = '<div class="mail-hint">Aucun utilisateur.</div>';
       return;
     }
-
     let pushEnabledCount = 0;
     let pushDisabledCount = 0;
-
     grid.innerHTML = users.map(u => {
       const selected = selectedUserIds.has(u.uid);
       const hasPush = !!(u.fcmToken && u.fcmToken.trim());
@@ -152,7 +137,6 @@
         ${pushBadge}
       </div>`;
     }).join('');
-
     console.log('✅ Users rendered');
     setSelectedCount();
     updatePushStats(pushEnabledCount, pushDisabledCount);
@@ -170,7 +154,6 @@
     getUsersArray().forEach(u => { usersById[u.uid] = u; });
     list.innerHTML = groupsArr.map(g => {
       const ids = Array.isArray(g.userIds) ? g.userIds : [];
-      const names = ids.map(id => usersById[id]?.name).filter(Boolean).slice(0,10);
       const color = g.color || '#3b82f6';
       return `<div class="user-item" style="border-left:4px solid ${color};">
         <div class="user-info">
@@ -209,7 +192,6 @@
     }).join('');
   }
 
-  // Public actions
   function toggleMailRecipient(uid){
     activeGroupId = null;
     if(selectedUserIds.has(uid)) selectedUserIds.delete(uid); else selectedUserIds.add(uid);
@@ -249,84 +231,59 @@
     }
   }
 
- async function sendManualEmail(){
-  if(!isAdmin()) return;
-  if(typeof firebase === 'undefined' || !firebase) return;
-
-  const subject = (safeGet('mailSubject')?.value || '').trim();
-  const message = (safeGet('mailMessage')?.value || '').trim();
-
-  if(selectedUserIds.size === 0){ alert('⚠️ Sélectionne au moins un destinataire'); return; }
-  if(!subject){ alert('⚠️ Le sujet est obligatoire'); return; }
-  if(!message){ alert('⚠️ Le message est obligatoire'); return; }
-
-  const usersById = {};
-  getUsersArray().forEach(u => { usersById[u.uid] = u; });
-
-  const recipientEmails = Array.from(selectedUserIds)
-    .map(uid => (usersById[uid]?.email || '').trim())
-    .filter(e => e.length > 3);
-
-  const uniq = Array.from(new Set(recipientEmails));
-
-  if(uniq.length === 0){
-    alert('⚠️ Aucun email valide dans la sélection');
-    return;
-  }
-
-  const MAX = 80;
-  if(uniq.length > MAX){
-    const ok = confirm(`Tu as sélectionné ${uniq.length} emails. Limite: ${MAX}. Envoyer les ${MAX} premiers ?`);
-    if(!ok) return;
-    uniq.splice(MAX);
-  }
-
-  const region = getFunctionsRegion();
-  const fromName = (safeGet('mailFromName')?.value || '').trim();
-  const channel = getSelectedChannel();
-  const fallback = getFallbackToEmail();
-
-  const payload = {
-    recipients: uniq,
-    subject,
-    html: normalizeMessageToHtml(message),
-    fromName: fromName || null,
-    channel: channel,
-    fallbackToEmail: fallback,
-    meta: {
-      selectedUserIds: Array.from(selectedUserIds),
-      groupId: activeGroupId || null,
-      source: 'diffusion-ui'
+  async function sendManualEmail(){
+    if(!isAdmin()) return;
+    if(typeof firebase === 'undefined' || !firebase) return;
+    const subject = (safeGet('mailSubject')?.value || '').trim();
+    const message = (safeGet('mailMessage')?.value || '').trim();
+    if(selectedUserIds.size === 0){ alert('⚠️ Sélectionne au moins un destinataire'); return; }
+    if(!subject){ alert('⚠️ Le sujet est obligatoire'); return; }
+    if(!message){ alert('⚠️ Le message est obligatoire'); return; }
+    const usersById = {};
+    getUsersArray().forEach(u => { usersById[u.uid] = u; });
+    const recipientEmails = Array.from(selectedUserIds).map(uid => (usersById[uid]?.email || '').trim()).filter(e => e.length > 3);
+    const uniq = Array.from(new Set(recipientEmails));
+    if(uniq.length === 0){ alert('⚠️ Aucun email valide'); return; }
+    const MAX = 80;
+    if(uniq.length > MAX){
+      const ok = confirm(`${uniq.length} emails. Limite: ${MAX}. Envoyer les ${MAX} premiers ?`);
+      if(!ok) return;
+      uniq.splice(MAX);
     }
-  };
-
-  try{
-    showToast('📨 Envoi en cours…');
-
-    const functions = region ? firebase.app().functions(region) : firebase.app().functions();
-    const call = functions.httpsCallable('sendBulkEmail');
-    const res = await call(payload);
-
-    const sent = res?.data?.sent ?? uniq.length;
-    const channelLabel = channel === 'email' ? 'Email' : channel === 'push' ? 'Push' : 'Email + Push';
-    showToast(`✅ ${channelLabel} envoyé (${sent})`);
-
-    safeGet('mailSubject').value = '';
-    safeGet('mailMessage').value = '';
-    clearMailSelection();
-
-    try{ logAction('Diffusion - Envoi', `${sent} destinataire(s) via ${channel}`); }catch(e){}
-  } catch(e){
-    console.error(e);
-    const msg = (e?.message || '').toLowerCase();
-    if(msg.includes('not-found') || msg.includes('functions') || msg.includes('unavailable')){
-      alert("La Cloud Function 'sendBulkEmail' n'est pas accessible.\n\nDéploie le dossier functions/ sur Firebase.");
-    } else {
-      alert("Erreur lors de l'envoi : " + (e.message || 'Inconnu'));
+    const region = getFunctionsRegion();
+    const fromName = (safeGet('mailFromName')?.value || '').trim();
+    const channel = getSelectedChannel();
+    const fallback = getFallbackToEmail();
+    const payload = {
+      recipients: uniq,
+      subject,
+      html: normalizeMessageToHtml(message),
+      fromName: fromName || null,
+      channel: channel,
+      fallbackToEmail: fallback,
+      meta: { selectedUserIds: Array.from(selectedUserIds), groupId: activeGroupId || null, source: 'diffusion-ui' }
+    };
+    try{
+      showToast('📨 Envoi en cours…');
+      const functions = region ? firebase.app().functions(region) : firebase.app().functions();
+      const call = functions.httpsCallable('sendBulkEmail');
+      const res = await call(payload);
+      const sent = res?.data?.sent ?? uniq.length;
+      const channelLabel = channel === 'email' ? 'Email' : channel === 'push' ? 'Push' : 'Email + Push';
+      showToast(`✅ ${channelLabel} envoyé (${sent})`);
+      safeGet('mailSubject').value = '';
+      safeGet('mailMessage').value = '';
+      clearMailSelection();
+      try{ logAction('Diffusion - Envoi', `${sent} via ${channel}`); }catch(e){}
+    } catch(e){
+      console.error(e);
+      const msg = (e?.message || '').toLowerCase();
+      if(msg.includes('not-found') || msg.includes('functions')){
+        alert("Cloud Function 'sendBulkEmail' introuvable.\nDéploie functions/");
+      } else {
+        alert("Erreur: " + (e.message || 'Inconnu'));
+      }
     }
-  }
-}
-
   }
 
   function openMailGroupModal(groupId){
@@ -364,19 +321,12 @@
     if(name.length < 2){ alert('Nom requis'); return; }
     if(modalSelected.size === 0){ alert('Sélectionne au moins un membre'); return; }
     const id = editingGroupId || ('g' + Date.now());
-    const payload = {
-      name, color,
-      userIds: Array.from(modalSelected),
-      updatedAt: Date.now(),
-      createdAt: mailGroups[id]?.createdAt || Date.now()
-    };
+    const payload = { name, color, userIds: Array.from(modalSelected), updatedAt: Date.now(), createdAt: mailGroups[id]?.createdAt || Date.now() };
     try{
       await db.ref('mailGroups/' + id).set(payload);
       showToast('✅ Groupe sauvegardé');
       closeMailGroupModal();
-    } catch(e){
-      alert('Erreur');
-    }
+    } catch(e){ alert('Erreur'); }
   }
 
   async function deleteMailGroup(groupId){
@@ -384,12 +334,9 @@
     try{
       await db.ref('mailGroups/' + groupId).remove();
       showToast('🗑️ Groupe supprimé');
-    } catch(e){
-      alert('Erreur');
-    }
+    } catch(e){ alert('Erreur'); }
   }
 
-  // Expose to window
   window.renderMailUI = renderMailUI;
   window.toggleMailRecipient = toggleMailRecipient;
   window.selectMailGroup = selectMailGroup;
@@ -408,11 +355,9 @@
   window.getSelectedChannel = getSelectedChannel;
   window.getFallbackToEmail = getFallbackToEmail;
 
-  // Init
   console.log('📧 email.js initialisé');
   try{ attachMailGroupsListener(); }catch(e){}
-  document.addEventListener('DOMContentLoaded', () => {
-    try{ renderMailUI(); }catch(e){}
-  });
+  document.addEventListener('DOMContentLoaded', () => { try{ renderMailUI(); }catch(e){} });
 
 })();
+ENDJS
