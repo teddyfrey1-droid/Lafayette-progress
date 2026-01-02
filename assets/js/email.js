@@ -356,6 +356,15 @@
 
   function sendManualEmail() {
     if (!isAdmin()) return;
+    if (!firebase.auth().currentUser) {
+    showToast('❌ Reconnecte-toi d\'abord');
+    return;
+      
+  try {
+    await firebase.auth().currentUser.getIdToken(true);
+  } catch (e) {
+    showToast('❌ Erreur auth: ' + e.message);
+    return;
     if (typeof firebase === 'undefined' || !firebase) return;
 
     var subjectEl = safeGet('mailSubject');
