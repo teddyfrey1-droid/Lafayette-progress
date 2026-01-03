@@ -708,3 +708,80 @@ body.dark-mode .objprog-tooltip { background: rgba(2,6,23,0.92); border: 1px sol
 .mail-user-email { font-size:12px; font-weight:700; color:#64748b; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .mail-actions { display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap; }
 @media (max-width: 720px){ .mail-settings-row{grid-template-columns:1fr;} .mail-settings-actions .btn{width:100%;} }
+/* --- BANNIÈRE PUSH NOTIFICATIONS (POP-UP) --- */
+.push-banner {
+  position: fixed;
+  bottom: 30px; /* Décollé du bas */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 400px;
+  
+  /* Style Glassmorphism V61 */
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.6);
+  
+  box-shadow: 0 20px 60px rgba(0,0,0,0.35); /* Grosse ombre pour bien flotter */
+  border-radius: 20px;
+  padding: 16px;
+  
+  display: flex; /* Indispensable pour l'alignement */
+  align-items: center;
+  gap: 12px;
+  
+  z-index: 10000; /* LE PLUS IMPORTANT : Au-dessus de tout */
+  animation: bannerSlideUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Mode sombre */
+body.dark-mode .push-banner {
+  background: rgba(15, 23, 42, 0.95);
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.push-icon-box {
+  width: 42px; height: 42px;
+  background: #eff6ff;
+  color: #2563eb;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+body.dark-mode .push-icon-box { background: rgba(37,99,235,0.2); }
+
+.push-content { flex: 1; }
+
+.push-title {
+  font-size: 14px; font-weight: 900; color: var(--text-main);
+  margin-bottom: 2px;
+}
+.push-desc {
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+  line-height: 1.25;
+}
+
+.push-btn {
+  background: var(--primary); 
+  color: white;
+  border: none; 
+  padding: 10px 16px;
+  border-radius: 12px; 
+  font-weight: 800; font-size: 11px;
+  cursor: pointer; 
+  white-space: nowrap;
+  box-shadow: 0 4px 10px rgba(37,99,235,0.3);
+}
+
+.close-push {
+  background: transparent; border: none;
+  color: var(--text-muted); font-size: 20px;
+  cursor: pointer; padding: 0 4px;
+}
+
+@keyframes bannerSlideUp {
+  from { transform: translate(-50%, 100px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
