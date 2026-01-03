@@ -1085,59 +1085,87 @@ function parse(s) { return parseFloat(String(s).replace(/[^0-9.]/g,''))||0; }
 
 // PWA
 if('serviceWorker' in navigator){ navigator.serviceWorker.addEventListener('controllerchange', () => { if(!window.__swReloaded){ window.__swReloaded = true; window.location.reload(); } }); }
-// --- GESTION DES NOTIFICATIONS (IPHONE & ANDROID) ---
+// --- GESTION DES NOTIFICATIONS (BANNIÈRE INTELLIGENTE) ---
 
-const VAPID_KEY = "BHItjKUG0Dz7jagVmfULxS7B_qQcT0DM7O_11fKdERKFzxP3QiWisJoD3agcV22VYFhtpVw-9YuUzrRmCZIawyo"; // 👈 COLLE TA CLÉ ICI
+// Ta clé VAPID (je l'ai récupérée de ton message)
+const VAPID_KEY = "BHItjKUG0Dz7jagVmfULxS7B_qQcT0DM7O_11fKdERKFzxP3QiWisJoD3agcV22VYFhtpVw-9YuUzrRmCZIawyo";
+
+// Vérifier l'état des notifs 2 secondes après le chargement
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(checkNotificationStatus, 2000);
+});
+
+function checkNotificationStatus() {
+    // Si le navigateur ne gère pas les notifs, on ne fait rien
+    if (!('Notification' in window)) return;
+    
+    // Si déjà accepté ou refusé, on n'affiche pas la bannière
+    if (Notification.permission === 'granted' || Notification.permission === 'denied') return;
+    
+    // Si l'utilisateur a déjà fermé la bannière manuellement (cookie local)
+    if (localStorage.getItem('heiko_push_banner_dismissed')) return;
+
+    // Sinon, on affiche la bannière
+    const banner = document.getElementById('pushPermissionBanner');
+    if (banner) banner.style.display = 'flex';
+}
+
+function dismissPushBanner() {
+    const banner = document.getElementById('pushPermissionBanner');
+    if (banner) banner.style.display = 'none';
+    // On retient que l'utilisateur a fermé la bannière
+    localStorage.setItem('heiko_push_banner_dismissed', 'true');
+}
 
 async function enableNotifications() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     alert("Ton téléphone ne supporte pas les notifications.");
     return;
   }
-
-  // 1. Vérifier si l'app est installée (Requis sur iOS)
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  
+  // Détection iOS (iPhone/iPad)
   const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  // Vérifie si l'app est installée sur l'écran d'accueil (mode standalone)
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
+  // Sur iPhone, les notifs ne marchent QUE si l'app est installée sur l'écran d'accueil
   if (isIos && !isStandalone) {
-    alert("📢 Pour activer les notifs sur iPhone :\n1. Clique sur Partager (carré avec flèche)\n2. Choisis 'Sur l'écran d'accueil'\n3. Ouvre l'app depuis l'accueil et réessaie ce bouton.");
+    alert("📢 Pour activer les notifs sur iPhone :\n1. Clique sur Partager (carré avec flèche)\n2. Choisis 'Sur l'écran d'accueil'\n3. Ouvre l'app depuis l'accueil et réessaie.");
     return;
   }
 
   try {
-    // 2. Demander la permission
     const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      alert("Permission refusée. Tu dois autoriser les notifications dans les réglages de ton téléphone.");
-      return;
-    }
+    
+    if (permission === 'granted') {
+        // Cache la bannière immédiatement
+        const banner = document.getElementById('pushPermissionBanner');
+        if (banner) banner.style.display = 'none';
 
-    // 3. Récupérer le Token
-    const messaging = firebase.messaging();
-    const token = await messaging.getToken({ vapidKey: VAPID_KEY });
-
-    if (token) {
-      if(currentUser && currentUser.uid){
-          // Sauvegarde le token dans le profil utilisateur
-          await db.ref('users/' + currentUser.uid).update({ 
-              fcmToken: token,
-              pushEnabled: true,
-              lastTokenUpdate: Date.now()
-          });
-          alert("✅ Notifications activées avec succès !");
-          
-          // Change le bouton visuellement s'il existe
-          const btn = document.getElementById('btnEnablePush');
-          if(btn) { btn.innerHTML = "🔔 Notifs actives"; btn.style.opacity = "0.5"; }
-      }
+        const messaging = firebase.messaging();
+        const token = await messaging.getToken({ vapidKey: VAPID_KEY });
+        
+        if (token && currentUser && currentUser.uid) {
+            await db.ref('users/' + currentUser.uid).update({ 
+                fcmToken: token,
+                pushEnabled: true,
+                lastTokenUpdate: Date.now()
+            });
+            showToast("✅ Notifications activées !");
+            
+            // Met à jour le bouton du menu si présent
+            const btn = document.getElementById('btnEnablePush');
+            if(btn) { btn.innerHTML = "<span>🔔 Notifs actives</span>"; btn.style.opacity = "0.5"; }
+        }
     } else {
-      alert("Impossible de récupérer le token d'identification.");
+        alert("Tu as refusé les notifications. Tu peux les activer dans les réglages de ton téléphone.");
+        dismissPushBanner();
     }
   } catch (error) {
     console.error("Erreur notifs:", error);
-    alert("Erreur : " + error.message);
   }
 }
 
-// Exposer la fonction pour le HTML
+// Exposer les fonctions pour qu'elles soient accessibles depuis le HTML
 window.enableNotifications = enableNotifications;
+window.dismissPushBanner = dismissPushBanner;
