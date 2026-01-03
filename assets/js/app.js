@@ -1085,3 +1085,59 @@ function parse(s) { return parseFloat(String(s).replace(/[^0-9.]/g,''))||0; }
 
 // PWA
 if('serviceWorker' in navigator){ navigator.serviceWorker.addEventListener('controllerchange', () => { if(!window.__swReloaded){ window.__swReloaded = true; window.location.reload(); } }); }
+// --- GESTION DES NOTIFICATIONS (IPHONE & ANDROID) ---
+
+const VAPID_KEY = "BHItjKUG0Dz7jagVmfULxS7B_qQcT0DM7O_11fKdERKFzxP3QiWisJoD3agcV22VYFhtpVw-9YuUzrRmCZIawyo"; // 👈 COLLE TA CLÉ ICI
+
+async function enableNotifications() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    alert("Ton téléphone ne supporte pas les notifications.");
+    return;
+  }
+
+  // 1. Vérifier si l'app est installée (Requis sur iOS)
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+  if (isIos && !isStandalone) {
+    alert("📢 Pour activer les notifs sur iPhone :\n1. Clique sur Partager (carré avec flèche)\n2. Choisis 'Sur l'écran d'accueil'\n3. Ouvre l'app depuis l'accueil et réessaie ce bouton.");
+    return;
+  }
+
+  try {
+    // 2. Demander la permission
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      alert("Permission refusée. Tu dois autoriser les notifications dans les réglages de ton téléphone.");
+      return;
+    }
+
+    // 3. Récupérer le Token
+    const messaging = firebase.messaging();
+    const token = await messaging.getToken({ vapidKey: VAPID_KEY });
+
+    if (token) {
+      if(currentUser && currentUser.uid){
+          // Sauvegarde le token dans le profil utilisateur
+          await db.ref('users/' + currentUser.uid).update({ 
+              fcmToken: token,
+              pushEnabled: true,
+              lastTokenUpdate: Date.now()
+          });
+          alert("✅ Notifications activées avec succès !");
+          
+          // Change le bouton visuellement s'il existe
+          const btn = document.getElementById('btnEnablePush');
+          if(btn) { btn.innerHTML = "🔔 Notifs actives"; btn.style.opacity = "0.5"; }
+      }
+    } else {
+      alert("Impossible de récupérer le token d'identification.");
+    }
+  } catch (error) {
+    console.error("Erreur notifs:", error);
+    alert("Erreur : " + error.message);
+  }
+}
+
+// Exposer la fonction pour le HTML
+window.enableNotifications = enableNotifications;
