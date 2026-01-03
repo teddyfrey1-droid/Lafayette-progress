@@ -1186,3 +1186,74 @@ async function enableNotifications() {
 // Exposer les fonctions pour qu'elles soient accessibles depuis le HTML
 window.enableNotifications = enableNotifications;
 window.dismissPushBanner = dismissPushBanner;
+// ============================================================
+// AFFICHAGE DU REGISTRE DES INCIDENTS (ADMIN)
+// ============================================================
+
+function renderIncidentsLog() {
+    const container = document.getElementById('incidentsContainer');
+    if(!container) return;
+
+    // On écoute toutes les alertes (même celles résolues)
+    db.ref('alerts').orderByChild('time').limitToLast(50).on('value', snap => {
+        const data = snap.val() || {};
+        const list = Object.values(data).sort((a,b) => b.time - a.time); // Plus récent en haut
+
+        if (list.length === 0) {
+            container.innerHTML = "<div style='text-align:center; color:#999; font-style:italic;'>Aucun incident enregistré.</div>";
+            return;
+        }
+
+        container.innerHTML = "";
+
+        list.forEach(item => {
+            const dateAlert = new Date(item.time).toLocaleString('fr-FR');
+            
+            // Si résolu, on affiche les détails de résolution
+            let statusHtml = "";
+            if (item.status === 'resolved') {
+                const dateResolved = new Date(item.handledAt).toLocaleString('fr-FR');
+                // Calcul du temps de réaction
+                const duration = Math.round((item.handledAt - item.time) / 60000); 
+                
+                statusHtml = `
+                    <div style="margin-top:8px; padding:8px; background:#ecfdf5; border-radius:8px; border:1px solid #10b981; color:#065f46; font-size:12px;">
+                        <strong>✅ RÉSOLU PAR :</strong> ${item.handledBy}<br>
+                        <strong>📅 DATE :</strong> ${dateResolved}<br>
+                        <strong>⏱️ DÉLAI :</strong> ${duration} min
+                    </div>
+                `;
+            } else {
+                statusHtml = `
+                    <div style="margin-top:8px; padding:8px; background:#fef2f2; border-radius:8px; border:1px solid #ef4444; color:#991b1b; font-size:12px; font-weight:bold;">
+                        ⚠️ EN COURS - NON TRAITÉ
+                    </div>
+                `;
+            }
+
+            const div = document.createElement('div');
+            div.className = "log-user-group"; // On réutilise le style des logs pour faire propre
+            div.style.padding = "15px";
+            
+            div.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                    <span style="font-weight:900; color:#ef4444; text-transform:uppercase;">🚨 ${item.title}</span>
+                    <span style="font-size:11px; color:#64748b;">${dateAlert}</span>
+                </div>
+                <div style="font-size:13px; color:#1e293b; line-height:1.4;">
+                    ${item.details || "Détails non disponibles"}
+                </div>
+                ${statusHtml}
+            `;
+            container.appendChild(div);
+        });
+    });
+}
+
+// Lancer le chargement du registre si on est Admin
+if(isAdminUser()) {
+    renderIncidentsLog();
+}
+// On le relance aussi lors du chargement des données
+const originalLoadData = window.loadData; // Sauvegarde l'ancienne fonction si besoin
+// (Mais le plus simple est d'ajouter l'appel dans la fonction loadData existante)
