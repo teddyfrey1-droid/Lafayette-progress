@@ -1105,26 +1105,29 @@ function checkNotificationStatus() {
     // Si le navigateur ne gère pas les notifs, on arrête
     if (!('Notification' in window)) return;
     
-    // Si DÉJÀ ACTIVÉ (granted) ou REFUSÉ (denied) => On ne montre rien
+    // Si déjà accepté ou refusé, on ne montre rien
     if (Notification.permission === 'granted' || Notification.permission === 'denied') return;
     
-    // Si l'utilisateur a fermé MANUELLEMENT la bannière "pour toujours", on respecte son choix
+    // Si l'utilisateur a fermé MANUELLEMENT la bannière "pour toujours"
     if (localStorage.getItem('heiko_push_banner_dismissed')) return;
 
-    // SINON : On affiche la bannière avec animation
+    // SINON : On affiche la bannière
     const banner = document.getElementById('pushPermissionBanner');
     if (banner) {
         banner.style.display = 'flex'; // On l'affiche
         
-        // Petit effet d'entrée pour attirer l'oeil (Slide vers le haut)
+        // --- ANIMATION : DU HAUT VERS LE CENTRE ---
+        // 1. Position de départ : Caché tout en haut (-100px plus haut que sa position finale)
         banner.style.opacity = '0';
-        banner.style.transform = 'translate(-50%, 20px)'; // Part d'un peu plus bas
+        banner.style.transition = 'none'; // Pas d'anim au placement initial
+        banner.style.transform = 'translate(-50%, -100px)'; 
         
+        // 2. Animation vers la position finale (top: 15%)
         setTimeout(() => {
-             banner.style.transition = 'all 0.4s ease-out';
+             banner.style.transition = 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'; // Effet rebond "Bounce"
              banner.style.opacity = '1';
-             banner.style.transform = 'translate(-50%, 0)'; // Arrive à sa place
-        }, 50);
+             banner.style.transform = 'translate(-50%, 0)'; // Arrive à sa place définie par le CSS
+        }, 100);
     }
 }
 
