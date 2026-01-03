@@ -363,7 +363,7 @@
     });
   }
 
-  function sendManualEmail() {
+ function sendManualEmail() {
     if (!isAdmin()) return;
     
     // ✅ FIX AUTH: Vérifie connexion avant tout
@@ -452,37 +452,39 @@
 
     showToast('📨 Envoi en cours…');
 
-    // ✅ FIX AUTH: Force refresh token avant appel
-    firebase.auth().currentUser.getIdToken(true).then(function() {
-      var functions = region ? firebase.app().functions(region) : firebase.app().functions();
-      var call = functions.httpsCallable('sendBulkEmail');
-      
-      return call(payload);
-    }).then(function(res) {
-      var sent = (res && res.data && res.data.sent) ? res.data.sent : uniq.length;
-      var channelLabel = channel === 'email' ? 'Email' : channel === 'push' ? 'Push' : 'Email + Push';
-      showToast('✅ ' + channelLabel + ' envoyé (' + sent + ')');
-
-      if (subjectEl) subjectEl.value = '';
-      if (messageEl) messageEl.value = '';
-      clearMailSelection();
-
+    // ✅ FIX: Utilise async/await pour éviter bug listener Firebase
+    (async function() {
       try {
-        logAction('Diffusion - Envoi', sent + ' via ' + channel);
-      } catch (e) {}
-    }).catch(function(e) {
-      console.error(e);
-      var msg = (e && e.message ? String(e.message) : '').toLowerCase();
-      if (msg.indexOf('not-found') >= 0 || msg.indexOf('functions') >= 0) {
-        alert('Cloud Function introuvable.\nVérifie le déploiement functions/ et/ou la région.');
-      } else if (msg.indexOf('permission') >= 0) {
-        alert('Accès refusé (admin requis).');
-      } else if (msg.indexOf('unauth') >= 0) {
-        alert('Non authentifié. Déconnecte-toi / reconnecte-toi puis réessaie.');
-      } else {
-        alert('Erreur: ' + (e && e.message ? e.message : 'Inconnu'));
+        await firebase.auth().currentUser.getIdToken(true);
+        var functions = region ? firebase.app().functions(region) : firebase.app().functions();
+        var call = functions.httpsCallable('sendBulkEmail');
+        var res = await call(payload);
+        
+        var sent = (res && res.data && res.data.sent) ? res.data.sent : uniq.length;
+        var channelLabel = channel === 'email' ? 'Email' : channel === 'push' ? 'Push' : 'Email + Push';
+        showToast('✅ ' + channelLabel + ' envoyé (' + sent + ')');
+
+        if (subjectEl) subjectEl.value = '';
+        if (messageEl) messageEl.value = '';
+        clearMailSelection();
+
+        try {
+          logAction('Diffusion - Envoi', sent + ' via ' + channel);
+        } catch (e) {}
+      } catch (e) {
+        console.error(e);
+        var msg = (e && e.message ? String(e.message) : '').toLowerCase();
+        if (msg.indexOf('not-found') >= 0 || msg.indexOf('functions') >= 0) {
+          alert('Cloud Function introuvable.\nVérifie le déploiement functions/ et/ou la région.');
+        } else if (msg.indexOf('permission') >= 0) {
+          alert('Accès refusé (admin requis).');
+        } else if (msg.indexOf('unauth') >= 0) {
+          alert('Non authentifié. Déconnecte-toi / reconnecte-toi puis réessaie.');
+        } else {
+          alert('Erreur: ' + (e && e.message ? e.message : 'Inconnu'));
+        }
       }
-    });
+    })();
   }
 
   function openMailGroupModal(groupId) {
