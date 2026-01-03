@@ -1096,11 +1096,6 @@ if('serviceWorker' in navigator){
 
 const VAPID_KEY = "BHItjKUG0Dz7jagVmfULxS7B_qQcT0DM7O_11fKdERKFzxP3QiWisJoD3agcV22VYFhtpVw-9YuUzrRmCZIawyo";
 
-// Vérifier l'état des notifs TRÈS VITE après le chargement (500ms)
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(checkNotificationStatus, 500);
-});
-
 function checkNotificationStatus() {
     // Si le navigateur ne gère pas les notifs, on arrête
     if (!('Notification' in window)) return;
