@@ -1,49 +1,33 @@
 /**
  * Cloud Functions - Email sender for Lafayette-progress
- *
- * Exports:
- *  - sendBulkEmail (callable)
- *
- * Required environment / params:
- *  - SMTP_HOST (string) or SMTP_SERVICE (string)
- *  - SMTP_PORT (int, default 587)
- *  - SMTP_USER (secret)
- *  - SMTP_PASS (secret)
- *  - MAIL_FROM_EMAIL (string) e.g. "heiko@lafayette.fr"
- *  - MAIL_FROM_NAME_DEFAULT (string, optional) e.g. "Heiko La Fayette"
  */
 
-const admin = require('firebase-admin');
-admin.initializeApp();
-
-const nodemailer = require('nodemailer');
-
-// Firebase Functions v2
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { logger } = require('firebase-functions');
 const { defineSecret, defineString, defineInt } = require('firebase-functions/params');
+const admin = require('firebase-admin');
+const nodemailer = require('nodemailer');
 
-// Optional: load local .env when running via emulator
-try {
-  require('dotenv').config();
-} catch (_) {}
+admin.initializeApp();
 
-// Params (can come from .env for local dev, or from Firebase CLI prompts)
+// Configuration des paramètres (variables d'environnement)
 const SMTP_HOST = defineString('SMTP_HOST', { default: '' });
 const SMTP_SERVICE = defineString('SMTP_SERVICE', { default: '' });
 const SMTP_PORT = defineInt('SMTP_PORT', { default: 587 });
 
-// Use Secret Manager-backed params for credentials
+// Secrets (mots de passe stockés de manière sécurisée dans Firebase)
 const SMTP_USER = defineSecret('SMTP_USER');
 const SMTP_PASS = defineSecret('SMTP_PASS');
 
 const MAIL_FROM_EMAIL = defineString('MAIL_FROM_EMAIL', { default: '' });
 const MAIL_FROM_NAME_DEFAULT = defineString('MAIL_FROM_NAME_DEFAULT', { default: 'Lafayette-progress' });
 
+// Vérifie si une chaîne ressemble à un email
 function isProbablyEmail(value) {
   return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+// Nettoie le HTML pour créer une version texte simple
 function stripHtmlToText(html) {
   if (typeof html !== 'string') return '';
   return html
@@ -54,6 +38,7 @@ function stripHtmlToText(html) {
     .trim();
 }
 
+// Vérifie que l'utilisateur qui appelle la fonction est bien Admin
 async function assertIsAdmin(uid) {
   const snap = await admin.database().ref(`users/${uid}`).once('value');
   const u = snap.val();
@@ -64,6 +49,7 @@ async function assertIsAdmin(uid) {
   return u;
 }
 
+// Configure le transporteur d'emails (Nodemailer)
 function buildTransporter() {
   const service = SMTP_SERVICE.value();
   const host = SMTP_HOST.value();
@@ -92,36 +78,40 @@ function buildTransporter() {
 function buildFromHeader(fromName, fromEmail) {
   const name = (fromName && String(fromName).trim()) || MAIL_FROM_NAME_DEFAULT.value();
   const email = (fromEmail && String(fromEmail).trim()) || MAIL_FROM_EMAIL.value();
-  if (!isProbablyEmail(email)) {
-    throw new HttpsError('failed-precondition', 'MAIL_FROM_EMAIL is missing or invalid.');
+  
+  if (!email || !isProbablyEmail(email)) {
+     return name; 
   }
   return `${name} <${email}>`;
 }
 
+// --- LA FONCTION PRINCIPALE APPELÉE PAR LE SITE ---
 exports.sendBulkEmail = onCall(
   {
-    // Default region (frontend can set settings/functionsRegion accordingly)
-    region: 'us-central1',
+    region: 'us-central1', // Vérifiez si vous êtes en us-central1 ou europe-west1
     secrets: [SMTP_USER, SMTP_PASS],
     cors: true,
     timeoutSeconds: 120,
     memory: '256MiB',
   },
   async (request) => {
+    // 1. Authentification requise
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'You must be signed in.');
     }
 
+    // 2. Vérification Admin
     const actor = await assertIsAdmin(request.auth.uid);
 
+    // 3. Récupération des données envoyées par le site
     const data = request.data || {};
     const recipients = Array.isArray(data.recipients) ? data.recipients : [];
     const subject = typeof data.subject === 'string' ? data.subject.trim() : '';
     const html = typeof data.html === 'string' ? data.html.trim() : '';
-
     const fromName = typeof data.fromName === 'string' ? data.fromName.trim() : '';
     const replyTo = typeof data.replyTo === 'string' ? data.replyTo.trim() : '';
 
+    // Nettoyage des emails
     const cleanRecipients = [...new Set(recipients.map(String).map(s => s.trim()))]
       .filter(isProbablyEmail);
 
@@ -131,19 +121,33 @@ exports.sendBulkEmail = onCall(
     if (cleanRecipients.length > 50) {
       throw new HttpsError('invalid-argument', 'Max 50 recipients per request.');
     }
-    if (!subject) {
-      throw new HttpsError('invalid-argument', 'Subject is required.');
-    }
-    if (!html) {
-      throw new HttpsError('invalid-argument', 'Message is required.');
-    }
+    if (!subject) throw new HttpsError('invalid-argument', 'Subject is required.');
+    if (!html) throw new HttpsError('invalid-argument', 'Message is required.');
 
+    // 4. Préparation de l'envoi
     const transporter = buildTransporter();
     const from = buildFromHeader(fromName, null);
-
     const messageText = stripHtmlToText(html);
 
-    // Log (without storing full email body)
+    // 5. Boucle d'envoi
+    let sent = 0;
+    for (const to of cleanRecipients) {
+      try {
+        await transporter.sendMail({
+          from,
+          to,
+          subject,
+          html,
+          text: messageText,
+          replyTo: isProbablyEmail(replyTo) ? replyTo : undefined,
+        });
+        sent += 1;
+      } catch (err) {
+        logger.error(`Failed to send to ${to}`, err);
+      }
+    }
+
+    // 6. Enregistrement dans les logs Firebase (optionnel)
     const logRef = admin.database().ref('mailLogs').push();
     await logRef.set({
       createdAt: Date.now(),
@@ -151,56 +155,9 @@ exports.sendBulkEmail = onCall(
       actorEmail: actor && actor.email ? String(actor.email) : null,
       subject,
       recipientsCount: cleanRecipients.length,
-    });
-
-    let sent = 0;
-    for (const to of cleanRecipients) {
-      await transporter.sendMail({
-        from,
-        to,
-        subject,
-        html,
-        text: messageText,
-        replyTo: isProbablyEmail(replyTo) ? replyTo : undefined,
-      });
-      sent += 1;
-    }
-
-    logger.info('Bulk email sent', {
-      actorUid: request.auth.uid,
-      recipientsCount: cleanRecipients.length,
-      subject,
+      sentCount: sent
     });
 
     return { success: true, sent };
   }
 );
-
-
-/**
- * Example (disabled): automatic email when a planning item is created.
- *
- * IMPORTANT: you must adapt the RTDB path + schema to your planning structure.
- *
- * // const { onValueCreated } = require('firebase-functions/v2/database');
- * // exports.onPlanningCreated = onValueCreated(
- * //   { ref: '/planning/{eventId}', region: 'us-central1', secrets: [SMTP_USER, SMTP_PASS] },
- * //   async (event) => {
- * //     const planning = event.data.val();
- * //     const userId = planning && planning.userId;
- * //     if (!userId) return;
- * //
- * //     const userSnap = await admin.database().ref(`users/${userId}`).once('value');
- * //     const user = userSnap.val();
- * //     if (!user || !user.email) return;
- * //
- * //     const transporter = buildTransporter();
- * //     await transporter.sendMail({
- * //       from: buildFromHeader(null, null),
- * //       to: String(user.email),
- * //       subject: 'Nouveau planning',
- * //       text: 'Tu as été ajouté au planning.',
- * //     });
- * //   }
- * // );
- */
