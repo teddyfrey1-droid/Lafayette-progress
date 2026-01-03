@@ -209,10 +209,13 @@
             <div class="menu-sub-title">📞 Contacts</div>
             <a class="menu-sub-link" href="contacts.html#contacts" onclick="toggleGlobalMenu(false)">Voir tout</a>
           </div>
-          <div class="menu-preview-grid" id="menuContactsPreview"></div>
+        <div class="menu-preview-grid" id="menuContactsPreview"></div>
         </div>
 
-        <!-- AJOUTE CE SÉPARATEUR ET CE LIEN ICI -->
+        <button class="global-menu-link" id="btnEnablePush" onclick="enableNotifications()">
+          <span>🔔 Activer les notifications</span>
+          <span style="opacity:.55; font-weight:900;">›</span>
+        </button>
         <div class="global-menu-sep" aria-hidden="true"></div>
         
         <a class="global-menu-link" href="diffusion.html" onclick="toggleGlobalMenu(false)" style="background:rgba(37,99,235,0.08); font-weight:600;">
