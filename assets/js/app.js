@@ -515,7 +515,7 @@ function loadData() {
       renderUpdatesPublic();
       checkNewUpdates(window.allUpdates);
       if(isSuperAdmin()) renderUpdatesAdmin();
-    if(isAdminUser()) { renderIncidentsLog(); 
+   if(isAdminUser()) { renderIncidentsLog(); }
   });
 }
 
