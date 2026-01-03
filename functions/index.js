@@ -159,3 +159,100 @@ exports.sendSmartBroadcast = onCall(
     return { successCount, details: { emails: emailTargets.size, pushes: pushTokens.length } };
   }
 );
+// ============================================================
+// WEBHOOK POUR ALERTES EXTERNES (EatPilot -> App)
+// ============================================================
+const { onRequest } = require("firebase-functions/v2/https");
+
+exports.receiveExternalAlert = onRequest(
+  { cors: true, region: 'us-central1' }, // ou 'europe-west1' selon ton projet
+  async (req, res) => {
+    // 1. Sécurité simple (Mot de passe dans l'URL)
+    const secret = req.query.secret;
+    if (secret !== "SUPER_SECRET_LAFAYETTE_99") {
+      return res.status(403).send("Accès refusé.");
+    }
+
+    // 2. Récupérer le contenu envoyé par Gmail
+    const { subject, bodyHtml } = req.body;
+
+    if (!subject || !bodyHtml) return res.status(400).send("Données manquantes");
+
+    try {
+      // 3. Récupérer toute l'équipe active
+      const snap = await admin.database().ref('users').once('value');
+      const allUsers = snap.val() || {};
+      
+      const recipientIds = Object.keys(allUsers).filter(uid => {
+          // On envoie à tous les comptes actifs
+          return allUsers[uid].status === 'active';
+      });
+
+      if (recipientIds.length === 0) return res.send("Aucun destinataire.");
+
+      // 4. Préparer les tokens Push et Emails
+      let pushTokens = [];
+      let emailTargets = new Set();
+
+      recipientIds.forEach(uid => {
+          const u = allUsers[uid];
+          // PUSH
+          const token = u.fcmToken || u.pushToken || (u.fcm ? u.fcm.token : null);
+          if (token) pushTokens.push(token);
+          // EMAIL
+          if (u.email && u.email.includes('@')) emailTargets.add(u.email);
+      });
+
+      // 5. Envoyer le PUSH
+      if (pushTokens.length > 0) {
+          await admin.messaging().sendEachForMulticast({
+              tokens: pushTokens,
+              notification: {
+                  title: "🚨 ALERTE FRIGO / TEMPÉRATURE",
+                  body: subject.replace("[EatPilot]", "").trim(), // On nettoie un peu le titre
+              },
+              data: { url: '/index.html#dashboard', type: 'alert' }
+          });
+      }
+
+      // 6. Envoyer les EMAILS (via Nodemailer configuré plus haut)
+      // On réutilise ta fonction buildTransporter() existante dans ce fichier
+      if (emailTargets.size > 0) {
+          const transporter = buildTransporter(); // Utilise la fonction définie au début du fichier
+          const senderEmail = process.env.MAIL_FROM_EMAIL || process.env.SMTP_USER;
+          
+          // On envoie en copie cachée (BCC) pour pas que tout le monde voit les emails
+          await transporter.sendMail({
+              from: `"Alerte Heiko" <${senderEmail}>`,
+              bcc: Array.from(emailTargets), // Envoi groupé caché
+              subject: "🚨 " + subject,
+              html: `
+                <div style="background:#fee2e2; padding:20px; border-radius:10px; font-family:sans-serif; color:#991b1b;">
+                   <h2 style="margin-top:0;">⚠️ ALERTE TEMPÉRATURE</h2>
+                   <p>Une alerte critique a été reçue d'EatPilot :</p>
+                   <div style="background:white; padding:15px; border-radius:8px; border:1px solid #fca5a5; color:#333;">
+                      ${bodyHtml}
+                   </div>
+                   <p style="font-weight:bold; margin-top:20px;">Merci de vérifier sur place immédiatement.</p>
+                </div>
+              `
+          });
+      }
+
+      // Log dans l'historique
+      await admin.database().ref('logs').push({
+          user: "Système EatPilot",
+          action: "Alerte Température",
+          detail: subject,
+          type: "alert",
+          time: Date.now()
+      });
+
+      res.status(200).send("Alerte diffusée avec succès !");
+
+    } catch (error) {
+      console.error("Erreur Webhook:", error);
+      res.status(500).send("Erreur serveur: " + error.message);
+    }
+  }
+);
