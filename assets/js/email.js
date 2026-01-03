@@ -2,19 +2,20 @@
   Mail & Push System for Lafayette-progress
   - Gère la sélection des utilisateurs
   - Gère le choix des canaux (Email / Push)
-  - Envoie les IDs au backend pour traitement intelligent
+  - Envoie les IDs au backend pour traitement intelligent (Smart Broadcast)
 */
 
 (function(){
   'use strict';
 
-  // State
+  // --- STATE ---
   let mailGroups = {}; 
   let selectedUserIds = new Set();
   let activeGroupId = null;
   let editingGroupId = null;
   let modalSelected = new Set();
 
+  // --- UTILS ---
   function safeGet(id){ return document.getElementById(id); }
   function escapeHtml(str){ return String(str ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
@@ -23,11 +24,6 @@
       const raw = (typeof window.allUsers !== 'undefined' && window.allUsers) ? window.allUsers : {};
       return Object.keys(raw).map(uid => ({ uid, ...(raw[uid]||{}) }));
     } catch(e){ return []; }
-  }
-
-  function isAdmin(){
-    // On suppose que l'accès à la page est déjà protégé, mais on vérifie si possible
-    return true; 
   }
 
   function getFunctionsRegion(){
@@ -83,14 +79,15 @@
     grid.innerHTML = users.map(u => {
       const selected = selectedUserIds.has(u.uid);
       const hasEmail = (u.email && u.email.includes('@'));
-      // On suppose que le token est stocké dans fcmToken ou pushToken
-      const hasPush = !!(u.fcmToken || u.pushToken); 
+      // On vérifie si un token Push est présent (fcmToken ou pushToken)
+      const hasPush = !!(u.fcmToken || u.pushToken || (u.fcm && u.fcm.token)); 
 
       return `
       <div class="mail-user-card ${selected?'selected':''}" onclick="toggleMailRecipient('${u.uid}')">
         <div class="mail-user-check">${selected ? '✓' : ''}</div>
         <div style="min-width:0; flex:1;">
           <div class="mail-user-name">${escapeHtml(u.name || 'Sans nom')}</div>
+          
           <div class="user-badges">
              <span class="channel-icon ${hasEmail ? 'has-email' : 'missing'}" title="${hasEmail ? u.email : 'Pas d\'email'}">
                ${hasEmail ? '📧 Email' : '📧 --'}
@@ -99,6 +96,7 @@
                ${hasPush ? '🔔 Push' : '🔕 --'}
              </span>
           </div>
+
         </div>
       </div>`;
     }).join('');
@@ -123,7 +121,7 @@
     }).join('');
   }
 
-  // --- ACTIONS ---
+  // --- ACTIONS DE SÉLECTION ---
 
   function toggleMailRecipient(uid){
     activeGroupId = null;
@@ -146,13 +144,13 @@
     renderUsersGrid(); renderQuickGroups();
   }
 
-  // --- SENDING LOGIC (SMART) ---
+  // --- SENDING LOGIC (SMART BROADCAST) ---
 
   async function sendManualEmail(){
     const subject = (safeGet('mailSubject')?.value || '').trim();
     const message = (safeGet('mailMessage')?.value || '').trim();
     
-    // Récupération des canaux
+    // Récupération des choix de canaux (cases à cocher injectées)
     const sendEmail = safeGet('chanEmail')?.checked || false;
     const sendPush = safeGet('chanPush')?.checked || false;
 
@@ -164,7 +162,7 @@
     const region = getFunctionsRegion();
     const fromName = (safeGet('mailFromName')?.value || '').trim();
 
-    // On envoie les UIDs, le backend fera le tri intelligent
+    // Payload intelligent : on envoie les IDs et les préférences
     const payload = {
       recipientIds: Array.from(selectedUserIds),
       subject,
@@ -178,14 +176,16 @@
 
     try{
       showToast('🚀 Envoi en cours...');
+      // On appelle la nouvelle fonction Cloud "sendSmartBroadcast"
       const functions = region ? firebase.app().functions(region) : firebase.app().functions();
-      const call = functions.httpsCallable('sendSmartBroadcast'); // Nom de la nouvelle fonction
+      const call = functions.httpsCallable('sendSmartBroadcast'); 
       const res = await call(payload);
 
       const { successCount, failureCount } = res.data || {};
-      showToast(`✅ Envoyé ! (${successCount} succès)`);
+      const failMsg = failureCount > 0 ? ` (${failureCount} échecs)` : '';
+      showToast(`✅ Envoyé ! (${successCount} succès)${failMsg}`);
       
-      // Reset
+      // Reset formulaire
       safeGet('mailSubject').value = '';
       safeGet('mailMessage').value = '';
       clearMailSelection();
@@ -196,8 +196,8 @@
     }
   }
 
-  // --- GROUPS MODAL ---
-  // (Le reste du code pour gérer la modale des groupes reste identique, simplifié ici pour brièveté)
+  // --- GESTION DES GROUPES (MODALE) ---
+
   function openMailGroupModal(groupId){
     const modal = safeGet('mailGroupModal');
     if(!modal) return;
@@ -224,6 +224,7 @@
        </div>`;
     }).join('');
   }
+  // Exposé globalement pour l'onclick HTML
   window.toggleGroupMember = function(uid){
     if(modalSelected.has(uid)) modalSelected.delete(uid); else modalSelected.add(uid);
     renderGroupModalMembers();
@@ -247,35 +248,39 @@
   }
   
   async function saveMailSettings(){
-     // Code existant de sauvegarde des settings
      const region = safeGet('mailFunctionsRegion').value.trim();
      const name = safeGet('mailFromName').value.trim();
      await firebase.database().ref('settings').update({ functionsRegion: region, mailFromName: name });
      showToast('Paramètres sauvegardés');
   }
 
-  // --- INJECTION HTML SÉLECTEUR ---
-  // Ajoute les checkboxes dynamiquement si elles n'existent pas dans le HTML statique
+  // --- INJECTION HTML SÉLECTEUR DE CANAUX ---
+  // Ajoute dynamiquement les cases à cocher si elles n'existent pas encore dans le DOM
   function injectChannelSelector(){
     const subjectLabel = Array.from(document.querySelectorAll('.mail-label')).find(el => el.textContent.includes('Sujet'));
+    
     if(subjectLabel && !document.getElementById('chanEmail')){
        const div = document.createElement('div');
-       div.className = 'channel-selector';
+       div.className = 'channel-selector'; // Classe définie dans le nouveau CSS (ajouté en bas du fichier styles)
        div.innerHTML = `
-         <label class="channel-option"><input type="checkbox" id="chanEmail" checked> 📧 Email</label>
-         <label class="channel-option"><input type="checkbox" id="chanPush" checked> 🔔 Notification Push</label>
+         <label class="channel-option" title="Envoyer par email">
+            <input type="checkbox" id="chanEmail" checked> 📧 Email
+         </label>
+         <label class="channel-option" title="Envoyer une notification mobile">
+            <input type="checkbox" id="chanPush" checked> 🔔 Notification Push
+         </label>
        `;
        subjectLabel.parentNode.insertBefore(div, subjectLabel);
        
        const hint = document.createElement('div');
        hint.className = 'mail-hint';
        hint.style.marginBottom = '15px';
-       hint.innerHTML = "💡 <b>Smart Send :</b> Si vous cochez 'Push', les utilisateurs sans push recevront automatiquement un Email à la place.";
+       hint.innerHTML = "💡 <b>Smart Send :</b> Si le Push est activé mais que l'utilisateur n'a pas l'app, il recevra un Email (si disponible).";
        subjectLabel.parentNode.insertBefore(hint, subjectLabel);
     }
   }
 
-  // EXPORTS
+  // --- EXPORTS GLOBAUX ---
   window.renderQuickGroups = renderQuickGroups;
   window.renderUsersGrid = renderUsersGrid;
   window.renderGroupsList = renderGroupsList;
@@ -289,12 +294,20 @@
   window.toggleMailRecipient = toggleMailRecipient;
   window.selectMailGroup = selectMailGroup;
 
-  // INIT
+  // --- INIT ---
   document.addEventListener('DOMContentLoaded', () => {
-     injectChannelSelector();
-     renderQuickGroups();
-     renderUsersGrid();
-     renderGroupsList();
+     injectChannelSelector(); // Crée les cases à cocher
+     
+     if(window.mailGroups) renderQuickGroups();
+     if(window.allUsers) renderUsersGrid();
+     
+     if(firebase.database){
+         firebase.database().ref('mailGroups').on('value', (s) => {
+             mailGroups = s.val() || {};
+             renderQuickGroups();
+             renderGroupsList();
+         });
+     }
   });
 
 })();
