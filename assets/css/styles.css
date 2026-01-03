@@ -708,80 +708,99 @@ body.dark-mode .objprog-tooltip { background: rgba(2,6,23,0.92); border: 1px sol
 .mail-user-email { font-size:12px; font-weight:700; color:#64748b; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .mail-actions { display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap; }
 @media (max-width: 720px){ .mail-settings-row{grid-template-columns:1fr;} .mail-settings-actions .btn{width:100%;} }
-/* --- BANNIÈRE PUSH NOTIFICATIONS (POP-UP) --- */
+/* --- BANNIÈRE PUSH (VERSION POP-UP CENTRALE) --- */
 .push-banner {
   position: fixed;
-  bottom: 30px; /* Décollé du bas */
+  top: 15%; /* On la place haut, mais pas tout en haut */
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%); /* On centre horizontalement */
+  
   width: 90%;
-  max-width: 400px;
+  max-width: 420px; /* Plus large */
   
-  /* Style Glassmorphism V61 */
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.6);
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--primary);
   
-  box-shadow: 0 20px 60px rgba(0,0,0,0.35); /* Grosse ombre pour bien flotter */
-  border-radius: 20px;
-  padding: 16px;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.4); /* Grosse ombre pour l'effet flottant */
+  border-radius: 24px; /* Coins très ronds */
+  padding: 30px; /* Plus d'espace intérieur */
   
-  display: flex; /* Indispensable pour l'alignement */
+  display: flex;
+  flex-direction: column; /* On empile les éléments */
   align-items: center;
-  gap: 12px;
+  text-align: center;
+  gap: 15px;
   
-  z-index: 10000; /* LE PLUS IMPORTANT : Au-dessus de tout */
-  animation: bannerSlideUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+  z-index: 10000;
 }
 
 /* Mode sombre */
 body.dark-mode .push-banner {
-  background: rgba(15, 23, 42, 0.95);
-  border-color: rgba(148, 163, 184, 0.2);
+  background: rgba(30, 41, 59, 0.98);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .push-icon-box {
-  width: 42px; height: 42px;
+  font-size: 32px; /* Icône plus grosse */
   background: #eff6ff;
-  color: #2563eb;
-  border-radius: 12px;
+  color: var(--primary);
+  width: 70px; height: 70px; /* Carré plus gros */
+  border-radius: 20px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 20px;
-  flex-shrink: 0;
+  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.15);
+  margin-bottom: 5px;
 }
 body.dark-mode .push-icon-box { background: rgba(37,99,235,0.2); }
 
-.push-content { flex: 1; }
+.push-content { width: 100%; }
 
 .push-title {
-  font-size: 14px; font-weight: 900; color: var(--text-main);
-  margin-bottom: 2px;
+  font-size: 18px; /* Titre plus gros */
+  font-weight: 900;
+  color: var(--text-main);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: -0.5px;
 }
+
 .push-desc {
-  font-size: 11px; font-weight: 600; color: var(--text-muted);
-  line-height: 1.25;
+  font-size: 14px; /* Texte plus lisible */
+  color: var(--text-muted);
+  line-height: 1.5;
+  font-weight: 500;
+  padding: 0 10px;
 }
 
 .push-btn {
-  background: var(--primary); 
+  width: 100%; /* Bouton pleine largeur */
+  padding: 16px;
+  font-size: 14px;
+  border-radius: 14px;
+  background: var(--primary);
   color: white;
-  border: none; 
-  padding: 10px 16px;
-  border-radius: 12px; 
-  font-weight: 800; font-size: 11px;
-  cursor: pointer; 
-  white-space: nowrap;
-  box-shadow: 0 4px 10px rgba(37,99,235,0.3);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(37, 99, 235, 0.3);
+  transition: transform 0.2s;
 }
+.push-btn:active { transform: scale(0.98); }
 
+/* Croix de fermeture (en haut à droite) */
 .close-push {
-  background: transparent; border: none;
-  color: var(--text-muted); font-size: 20px;
-  cursor: pointer; padding: 0 4px;
+  position: absolute;
+  top: 15px; right: 15px;
+  width: 32px; height: 32px;
+  font-size: 22px;
+  background: rgba(0,0,0,0.05);
+  border-radius: 50%;
+  border: none;
+  color: var(--text-muted);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
 }
-
-@keyframes bannerSlideUp {
-  from { transform: translate(-50%, 100px); opacity: 0; }
-  to { transform: translate(-50%, 0); opacity: 1; }
-}
+body.dark-mode .close-push { background: rgba(255,255,255,0.1); }
