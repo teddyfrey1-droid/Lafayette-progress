@@ -1084,36 +1084,54 @@ function getPct(c, t, isInverse) {
 function parse(s) { return parseFloat(String(s).replace(/[^0-9.]/g,''))||0; }
 
 // PWA
-if('serviceWorker' in navigator){ navigator.serviceWorker.addEventListener('controllerchange', () => { if(!window.__swReloaded){ window.__swReloaded = true; window.location.reload(); } }); }
-// --- GESTION DES NOTIFICATIONS (BANNIÈRE INTELLIGENTE) ---
+if('serviceWorker' in navigator){ 
+    navigator.serviceWorker.addEventListener('controllerchange', () => { 
+        if(!window.__swReloaded){ window.__swReloaded = true; window.location.reload(); } 
+    }); 
+}
 
-// Ta clé VAPID (je l'ai récupérée de ton message)
+// ============================================================
+// GESTION DES NOTIFICATIONS (BANNIÈRE INTELLIGENTE)
+// ============================================================
+
 const VAPID_KEY = "BHItjKUG0Dz7jagVmfULxS7B_qQcT0DM7O_11fKdERKFzxP3QiWisJoD3agcV22VYFhtpVw-9YuUzrRmCZIawyo";
 
-// Vérifier l'état des notifs 2 secondes après le chargement
+// Vérifier l'état des notifs TRÈS VITE après le chargement (500ms)
 document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(checkNotificationStatus, 2000);
+    setTimeout(checkNotificationStatus, 500);
 });
 
 function checkNotificationStatus() {
-    // Si le navigateur ne gère pas les notifs, on ne fait rien
+    // Si le navigateur ne gère pas les notifs, on arrête
     if (!('Notification' in window)) return;
     
-    // Si déjà accepté ou refusé, on n'affiche pas la bannière
+    // Si DÉJÀ ACTIVÉ (granted) ou REFUSÉ (denied) => On ne montre rien
     if (Notification.permission === 'granted' || Notification.permission === 'denied') return;
     
-    // Si l'utilisateur a déjà fermé la bannière manuellement (cookie local)
+    // Si l'utilisateur a fermé MANUELLEMENT la bannière "pour toujours", on respecte son choix
     if (localStorage.getItem('heiko_push_banner_dismissed')) return;
 
-    // Sinon, on affiche la bannière
+    // SINON : On affiche la bannière avec animation
     const banner = document.getElementById('pushPermissionBanner');
-    if (banner) banner.style.display = 'flex';
+    if (banner) {
+        banner.style.display = 'flex'; // On l'affiche
+        
+        // Petit effet d'entrée pour attirer l'oeil (Slide vers le haut)
+        banner.style.opacity = '0';
+        banner.style.transform = 'translate(-50%, 20px)'; // Part d'un peu plus bas
+        
+        setTimeout(() => {
+             banner.style.transition = 'all 0.4s ease-out';
+             banner.style.opacity = '1';
+             banner.style.transform = 'translate(-50%, 0)'; // Arrive à sa place
+        }, 50);
+    }
 }
 
 function dismissPushBanner() {
     const banner = document.getElementById('pushPermissionBanner');
     if (banner) banner.style.display = 'none';
-    // On retient que l'utilisateur a fermé la bannière
+    // On retient que l'utilisateur a fermé la bannière pour ne plus l'embêter
     localStorage.setItem('heiko_push_banner_dismissed', 'true');
 }
 
@@ -1123,12 +1141,11 @@ async function enableNotifications() {
     return;
   }
   
-  // Détection iOS (iPhone/iPad)
+  // Détection iOS
   const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  // Vérifie si l'app est installée sur l'écran d'accueil (mode standalone)
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
-  // Sur iPhone, les notifs ne marchent QUE si l'app est installée sur l'écran d'accueil
+  // Sur iPhone, il faut l'app sur l'écran d'accueil
   if (isIos && !isStandalone) {
     alert("📢 Pour activer les notifs sur iPhone :\n1. Clique sur Partager (carré avec flèche)\n2. Choisis 'Sur l'écran d'accueil'\n3. Ouvre l'app depuis l'accueil et réessaie.");
     return;
