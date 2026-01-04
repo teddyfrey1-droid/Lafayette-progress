@@ -17,9 +17,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 
-<style>
-    /* --- STYLES ALERTES (INCIDENTS) --- */
-    
+  <style>
+    /* STYLES ALERTES (INCIDENTS) */
     .alert-card {
       background: var(--card-bg);
       border: 1px solid var(--border-color);
@@ -238,7 +237,7 @@
         </div>
       </section>
 
-     <section id="panelAlerts" style="display:none;">
+      <section id="panelAlerts" style="display:none;">
          <div class="admin-section" style="border-left:4px solid #ef4444; background: rgba(254,226,226,0.1);">
             <div style="display:flex; gap:15px; align-items:center;">
                <div style="font-size:24px;">🚨</div>
@@ -248,16 +247,11 @@
                </div>
             </div>
             <div style="margin-top:15px; text-align:right;">
-               <button class="btn" onclick="simulateAlert()" style="width:auto; font-size:11px; padding:6px 12px; background:#71717a; border:none;">
+               <button id="btnSimulateAlert" class="btn" onclick="simulateAlert()" style="display:none; width:auto; font-size:11px; padding:6px 12px; background:#71717a; border:none;">
                  🧪 Simuler une alerte
                </button>
             </div>
          </div>
-         
-         <div id="alertsList" style="margin-top:20px;">
-            <div class="alert-empty">Chargement...</div>
-         </div>
-      </section>
          
          <div id="alertsList" style="margin-top:20px;">
             <div class="alert-empty">Chargement...</div>
@@ -292,7 +286,7 @@
   <script src="assets/js/app.js"></script>
   <script src="assets/js/email.js"></script>
   
-<script>
+  <script>
     // --- 1. CONFIGURATION & OUTILS ---
     if(localStorage.getItem('heiko_dark_mode') === 'true') document.body.classList.add('dark-mode');
     
@@ -309,8 +303,7 @@
     }
     window.showToast = showToast;
 
-    // --- 2. AUTHENTIFICATION ---
-   // --- 2. AUTHENTIFICATION & GESTION DES DROITS ---
+    // --- 2. AUTHENTIFICATION & GESTION DES DROITS ---
     const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com"; // TON EMAIL
 
     firebase.auth().onAuthStateChanged(user => {
@@ -323,7 +316,7 @@
           if(u) {
             window.currentUser = u;
             window.currentUser.uid = user.uid;
-            window.currentUser.email = user.email; // On s'assure d'avoir l'email
+            window.currentUser.email = user.email; // Important
             
             document.getElementById('userName').textContent = u.name || 'Membre';
             const hours = u.hours || 35;
@@ -331,7 +324,6 @@
             
             const isAdmin = (u.role === 'admin' || u.role === 'superadmin');
             
-            // Gestion de l'affichage Admin (Onglet Diffusion)
             if(isAdmin) {
               document.getElementById('adminOnlyContent').style.display = 'block';
               document.getElementById('nonAdminMessage').style.display = 'none';
@@ -341,46 +333,27 @@
               firebase.database().ref('mailGroups').on('value', s => { window.mailGroups = s.val() || {}; renderDiffusionUI(); });
               firebase.database().ref('users').on('value', s => { window.allUsers = s.val() || {}; renderDiffusionUI(); });
               firebase.database().ref('settings').on('value', s => { window.globalSettings = s.val() || {}; renderDiffusionUI(); });
+
             } else {
               document.getElementById('adminOnlyContent').style.display = 'none';
               document.getElementById('nonAdminMessage').style.display = 'block';
             }
 
-            // --- GESTION DU BOUTON SIMULATION (SUPER ADMIN SEULEMENT) ---
+            // GESTION BOUTON SIMULATION (SUPER ADMIN UNIQUEMENT)
             const btnSimu = document.getElementById('btnSimulateAlert');
             if(btnSimu) {
-                // On compare l'email connecté avec l'email du chef
+                // On compare l'email
                 const isSuperChef = (user.email && user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
-                
                 if (isSuperChef) {
-                    btnSimu.style.display = 'inline-block'; // Affiche le bouton
+                    btnSimu.style.display = 'inline-block';
                 } else {
-                    btnSimu.style.display = 'none'; // Cache le bouton
+                    btnSimu.style.display = 'none';
                 }
             }
           }
         });
         
-        loadAlertsData();
-
-      } else {
-        document.getElementById('loginOverlay').style.display = 'flex';
-        document.getElementById('appContent').style.display = 'none';
-      }
-    });
-              // Chargement données mail (Admin seulement)
-              firebase.database().ref('mailGroups').on('value', s => { window.mailGroups = s.val() || {}; renderDiffusionUI(); });
-              firebase.database().ref('users').on('value', s => { window.allUsers = s.val() || {}; renderDiffusionUI(); });
-              firebase.database().ref('settings').on('value', s => { window.globalSettings = s.val() || {}; renderDiffusionUI(); });
-
-            } else {
-              document.getElementById('adminOnlyContent').style.display = 'none';
-              document.getElementById('nonAdminMessage').style.display = 'block';
-            }
-          }
-        });
-        
-        // Charger les alertes dès qu'on est connecté
+        // Charger les alertes
         loadAlertsData();
 
       } else {
@@ -407,7 +380,7 @@
       document.getElementById('panelAlerts').style.display = (tabName === 'alerts') ? 'block' : 'none';
     }
 
-    // Init Onglets
+    // Init Onglets au chargement
     if(window.location.hash === '#alerts') switchTab('alerts'); else switchTab('diffusion');
 
 
@@ -479,6 +452,7 @@
     window.solveIssue = function(alertId) {
       if(!window.currentUser) return alert("Erreur: Tu dois être connecté.");
       const name = window.currentUser.name || "Équipe";
+      
       if(confirm("Confirmes-tu avoir réglé ce problème ?")) {
         firebase.database().ref(`alerts/${alertId}`).update({
           resolvedBy: window.currentUser.uid,
@@ -492,11 +466,9 @@
       }
     }
 
-    // --- 5. FONCTION DE SIMULATION (CORRIGÉE) ---
+    // --- 5. FONCTION DE SIMULATION ---
     window.simulateAlert = function() {
-      console.log("Tentative de simulation...");
       if(!firebase.apps.length) return alert("Erreur: Firebase non connecté");
-      
       if(!confirm("Créer une fausse alerte pour tester l'affichage ?")) return;
       
       const fakeIssues = [
@@ -515,8 +487,7 @@
       }).then(() => {
         showToast("🧪 Alerte de test envoyée !");
       }).catch(err => {
-        alert("Erreur: " + err.message);
-        console.error(err);
+        alert("Erreur (Permission): " + err.message);
       });
     }
 
