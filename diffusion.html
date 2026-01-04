@@ -303,8 +303,9 @@
     }
     window.showToast = showToast;
 
-    // --- 2. AUTHENTIFICATION & GESTION DES DROITS ---
-    
+    // --- 2. AUTHENTIFICATION ---
+    const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com"; 
+
     firebase.auth().onAuthStateChanged(user => {
       if(user) {
         document.getElementById('loginOverlay').style.display = 'none';
@@ -315,48 +316,33 @@
           if(u) {
             window.currentUser = u;
             window.currentUser.uid = user.uid;
-            window.currentUser.email = user.email; 
+            window.currentUser.email = user.email;
             
-            // Mise à jour de l'interface utilisateur
-            const elName = document.getElementById('userName');
-            const elHours = document.getElementById('userHours');
-            if(elName) elName.textContent = u.name || 'Membre';
-            if(elHours) elHours.textContent = (u.hours || 35) + 'h';
+            document.getElementById('userName').textContent = u.name || 'Membre';
+            if(u.hours) document.getElementById('userHours').textContent = u.hours + 'h';
             
             const isAdmin = (u.role === 'admin' || u.role === 'superadmin');
             
-            // Gestion de l'affichage Admin (Onglet Diffusion)
             if(isAdmin) {
-              const adminContent = document.getElementById('adminOnlyContent');
-              if(adminContent) adminContent.style.display = 'block';
+              document.getElementById('adminOnlyContent').style.display = 'block';
+              document.getElementById('nonAdminMessage').style.display = 'none';
+              document.getElementById('btnAdmin').style.display = 'inline-block';
               
-              const nonAdminMsg = document.getElementById('nonAdminMessage');
-              if(nonAdminMsg) nonAdminMsg.style.display = 'none';
-              
-              const btnAdmin = document.getElementById('btnAdmin');
-              if(btnAdmin) btnAdmin.style.display = 'inline-block';
-              
-              // Chargement données mail (si fonctions disponibles)
               if(typeof window.renderDiffusionUI === 'function') {
                   firebase.database().ref('mailGroups').on('value', s => { window.mailGroups = s.val() || {}; renderDiffusionUI(); });
                   firebase.database().ref('users').on('value', s => { window.allUsers = s.val() || {}; renderDiffusionUI(); });
                   firebase.database().ref('settings').on('value', s => { window.globalSettings = s.val() || {}; renderDiffusionUI(); });
               }
             } else {
-              const adminContent = document.getElementById('adminOnlyContent');
-              if(adminContent) adminContent.style.display = 'none';
-              
-              const nonAdminMsg = document.getElementById('nonAdminMessage');
-              if(nonAdminMsg) nonAdminMsg.style.display = 'block';
+              document.getElementById('adminOnlyContent').style.display = 'none';
+              document.getElementById('nonAdminMessage').style.display = 'block';
             }
 
-            // GESTION BOUTON SIMULATION (SUPER ADMIN UNIQUEMENT)
+            // BOUTON SIMULATION (Admin/SuperAdmin uniquement)
             const btnSimu = document.getElementById('btnSimulateAlert');
             if(btnSimu) {
-                // On utilise une adresse en dur ici si app.js n'a pas chargé la variable
                 const targetEmail = (typeof SUPER_ADMIN_EMAIL !== 'undefined') ? SUPER_ADMIN_EMAIL : "teddy.frey1@gmail.com";
                 const isSuperChef = (user.email && user.email.toLowerCase() === targetEmail.toLowerCase());
-                
                 if (isSuperChef) {
                     btnSimu.style.display = 'inline-block';
                 } else {
@@ -366,25 +352,19 @@
           }
         });
         
-        // Charger les alertes
         loadAlertsData();
 
       } else {
-        const loginOverlay = document.getElementById('loginOverlay');
-        const appContent = document.getElementById('appContent');
-        if(loginOverlay) loginOverlay.style.display = 'flex';
-        if(appContent) appContent.style.display = 'none';
+        document.getElementById('loginOverlay').style.display = 'flex';
+        document.getElementById('appContent').style.display = 'none';
       }
     });
 
-    const btnLogin = document.getElementById('btnLogin');
-    if(btnLogin) {
-        btnLogin.onclick = function() {
-          const email = document.getElementById('loginEmail').value.trim();
-          const pass = document.getElementById('loginPass').value;
-          firebase.auth().signInWithEmailAndPassword(email, pass).catch(() => alert('Erreur mot de passe'));
-        };
-    }
+    document.getElementById('btnLogin').onclick = function() {
+      const email = document.getElementById('loginEmail').value.trim();
+      const pass = document.getElementById('loginPass').value;
+      firebase.auth().signInWithEmailAndPassword(email, pass).catch(() => alert('Erreur mot de passe'));
+    };
 
     window.logout = function() { firebase.auth().signOut(); location.reload(); }
     window.togglePass = function() { const x = document.getElementById('loginPass'); x.type = x.type==='password'?'text':'password'; }
@@ -403,9 +383,7 @@
       if(pAlert) pAlert.style.display = (tabName === 'alerts') ? 'block' : 'none';
     }
 
-    // Init Onglets au chargement
     if(window.location.hash === '#alerts') switchTab('alerts'); else switchTab('diffusion');
-
 
     // --- 4. LOGIQUE ALERTES (INCIDENTS) ---
     function loadAlertsData() {
@@ -475,7 +453,6 @@
     window.solveIssue = function(alertId) {
       if(!window.currentUser) return alert("Erreur: Tu dois être connecté.");
       const name = window.currentUser.name || "Équipe";
-      
       if(confirm("Confirmes-tu avoir réglé ce problème ?")) {
         firebase.database().ref(`alerts/${alertId}`).update({
           resolvedBy: window.currentUser.uid,
@@ -489,9 +466,9 @@
       }
     }
 
-    // --- 5. FONCTION DE SIMULATION (VERSION FETCH) ---
+    // --- 5. FONCTION DE SIMULATION (VERSION FETCH CORRIGÉE) ---
     window.simulateAlert = async function() {
-      // URL de ta fonction (la même que dans Google Script)
+      // URL de ta fonction
       const url = "https://us-central1-objectif-restaurant.cloudfunctions.net/receiveExternalAlert?secret=SUPER_SECRET_LAFAYETTE_99";
       
       if(!confirm("Lancer une simulation complète (Push + Historique) ?")) return;
@@ -507,7 +484,6 @@
       try {
         showToast("🚀 Envoi de la simulation...");
         
-        // On appelle la fonction pour de vrai
         await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
