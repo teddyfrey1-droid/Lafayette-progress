@@ -991,78 +991,40 @@ function renderAdminUsers() {
       const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); let primOk = true; if(prims.length > 0) { primOk = prims.every(o => { let threshold = 100; if(o.isFixed) threshold = 100; else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold; if(o.isNumeric) return parseFloat(o.current) >= threshold; const pct = getPct(o.current, o.target, o.isInverse); return pct >= threshold; }); } 
       Object.values(allObjs).forEach(o => { if(!o.published) return; const pct = getPct(o.current, o.target, o.isInverse); const isLocked = !o.isPrimary && !primOk; let g = 0; if(o.isFixed) { let win = false; if(o.isNumeric) win = parseFloat(o.current) >= o.target; else win = pct >= 100; if(win && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); } else { if(o.paliers) o.paliers.forEach(p => { let unlocked = false; if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold; else unlocked = pct >= p.threshold; if(unlocked) g += parse(p.prize); }); } if(!isLocked) userBonus += (g * userRatio); }); return userBonus;
     }
-   function renderUser(uid, u, isEligible){
-      const userBonus = isEligible ? computeUserBonus(u) : 0; if(isEligible) totalToPay += userBonus;
-      const div = document.createElement("div"); div.className = "user-item"; 
-      const statusClass = (u.status === 'active') ? 'active' : 'pending'; 
-      const statusLabel = (u.status === 'active') ? 'ACTIF' : 'EN ATTENTE'; 
-      let adminBadge = ""; if(u.role === 'admin') adminBadge = `<span class="admin-tag">ADMIN</span>`; 
-      const checked = isEligible ? 'checked' : ''; 
-      const gain = isEligible ? userBonus.toFixed(2) + '€' : '—';
+   function createUser() {
+    const name = document.getElementById('nuName').value;
+    const email = document.getElementById('nuEmail').value;
+    const hours = document.getElementById('nuHours').value;
+    const isAdmin = document.getElementById('nuAdmin').checked;
 
-      // --- ON RECONSTRUIT LE CONTENU ---
-      div.innerHTML = `
-        <div class="user-info">
-          <div class="user-header">
-            <span class="user-name">${u.name || ''} ${adminBadge}</span>
-            <div style="display:flex; align-items:center;">
-              <span class="status-dot ${statusClass}"></span>
-              <span class="status-text">${statusLabel}</span>
-            </div>
-          </div>
-          <div class="user-email-sub">${u.email || ''}</div>
-          <div class="user-meta">${u.hours || 35}h</div>
-          <label class="check-label" style="margin-top:6px; font-size:11px; opacity:.95;">
-            <input type="checkbox" ${checked} onchange="setUserPrimeEligible('${uid}', this.checked)"> 💶 Compte dans les primes
-          </label>
-        </div>
-        <div class="user-actions">
-          <div class="user-gain">${gain}</div>
-          <div class="btn-group"></div>
-        </div>`;
+    if(!name || !email) return alert("Nom et Email requis");
 
-      const btnGroup = div.querySelector('.btn-group');
+    // Génération d'un mot de passe aléatoire invisible
+    const tempPassword = Math.random().toString(36).slice(-10) + "Aa1!";
 
-      // 1. Bouton Clé (🔑) - NOUVEAU
-      const btnReset = document.createElement('button');
-      btnReset.innerHTML = '🔑';
-      btnReset.className = 'action-btn';
-      btnReset.title = "Renvoyer l'email de configuration du mot de passe";
-      btnReset.onclick = () => {
-          if(confirm(`Envoyer un lien de configuration de mot de passe à ${u.email} ?`)) {
-              firebase.auth().sendPasswordResetEmail(u.email)
-                  .then(() => showToast("✅ Email envoyé !"))
-                  .catch(err => alert("❌ Erreur : " + err.message));
-          }
-      };
-
-      // 2. Bouton Archive (📄)
-      const btnArchive = document.createElement('button');
-      btnArchive.innerHTML = '📄';
-      btnArchive.className = 'action-btn';
-      btnArchive.onclick = () => openTeamArchive(uid);
-
-      // 3. Bouton Modifier (✏️)
-      const btnEdit = document.createElement('button');
-      btnEdit.innerHTML = '✏️';
-      btnEdit.className = 'action-btn';
-      btnEdit.onclick = () => editUser(uid);
-
-      // 4. Bouton Supprimer (🗑️)
-      const btnDel = document.createElement('button');
-      btnDel.innerHTML = '🗑️';
-      btnDel.className = 'action-btn delete';
-      btnDel.onclick = () => deleteUser(uid);
-
-      // On ajoute les boutons dans l'ordre au groupe
-      btnGroup.appendChild(btnReset);
-      btnGroup.appendChild(btnArchive);
-      btnGroup.appendChild(btnEdit);
-      btnGroup.appendChild(btnDel);
-
-      d.appendChild(div); 
-    }
-
+    firebase.auth().createUserWithEmailAndPassword(email, tempPassword)
+        .then((userCredential) => {
+            // Envoi immédiat du mail de configuration du mot de passe
+            firebase.auth().sendPasswordResetEmail(email);
+            
+            const uid = userCredential.user.uid;
+            return firebase.database().ref('users/' + uid).set({
+                name: name,
+                email: email,
+                hours: parseInt(hours) || 35,
+                role: isAdmin ? 'admin' : 'staff',
+                status: 'pending'
+            });
+        })
+        .then(() => {
+            showToast("✅ Membre créé ! Invitation envoyée par mail.");
+            document.getElementById('nuName').value = "";
+            document.getElementById('nuEmail').value = "";
+            document.getElementById('nuHours').value = "";
+            document.getElementById('nuAdmin').checked = false;
+        })
+        .catch(err => alert("Erreur : " + err.message));
+}
 function setUserPrimeEligible(uid, isEligible){
   if(!isAdminUser()) return; const val = !!isEligible; const prev = (allUsers && allUsers[uid]) ? (allUsers[uid].primeEligible !== false) : true;
   try{ if(allUsers && allUsers[uid]) allUsers[uid].primeEligible = val; renderAdminUsers(); }catch(e){}
