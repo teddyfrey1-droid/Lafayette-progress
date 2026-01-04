@@ -163,7 +163,10 @@ const { onRequest } = require('firebase-functions/v2/https');
 
 // --- WEBHOOK ALERTE EATPILOT ---
 exports.receiveExternalAlert = onRequest(
-  { region: 'us-central1' },
+  { 
+    region: 'us-central1',
+    cors: true,
+  },
   async (req, res) => {
     // 1. Sécurité simple
     if (req.query.secret !== 'SUPER_SECRET_LAFAYETTE_99') {
