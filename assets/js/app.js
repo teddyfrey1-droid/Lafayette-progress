@@ -1199,6 +1199,7 @@ async function enableNotifications() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     return;
   }
+  
   const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
@@ -1226,7 +1227,7 @@ async function enableNotifications() {
   }
 }
 
-// --- EXPORTS (RÉPARE LES ERREURS REFERENCEERROR) ---
+// --- EXPORTS POUR L'INDEX ---
 window.clearLoginError = clearLoginError;
 window.createUser = createUser;
 window.logout = logout;
