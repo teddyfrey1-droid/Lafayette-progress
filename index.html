@@ -322,6 +322,7 @@
       <button id="btnTabObjs" onclick="switchTab('objs')" class="btn-tab">🎯 Pilotage</button>
       <button id="btnTabLogs" onclick="switchTab('logs')" class="btn-tab" style="display:none;">🕒 Historique</button>
       <button id="btnTabFeedbacks" onclick="switchTab('feedbacks')" class="btn-tab" style="display:none;">💬 Avis & Nouveautés</button>
+      <button id="btnTabEmails" onclick="switchTab('emails')" class="btn-tab" style="display:none;">📧 Email</button>
     </div>
 
     <div id="tab-team">
@@ -348,29 +349,24 @@
           <div class="mail-settings-field">
             <label class="mail-label">Région Firebase Functions (optionnel)</label>
             <input type="text" id="mailFunctionsRegion" placeholder="Ex: us-central1 ou europe-west1">
-            <div class="mail-hint">Si ton Cloud Function est déployée dans une région spécifique, renseigne-la ici. Sinon laisse vide.</div>
           </div>
           <div class="mail-settings-field">
             <label class="mail-label">Nom affiché (optionnel)</label>
             <input type="text" id="mailFromName" placeholder="Ex: Heiko La Fayette">
-            <div class="mail-hint">Utilisé uniquement si ta function le supporte.</div>
           </div>
           <div class="mail-settings-actions">
             <button class="btn" onclick="saveMailSettings()">💾 Enregistrer</button>
           </div>
         </div>
-
         <div style="margin-top:18px;">
           <div class="mail-label" style="margin-bottom:8px;">Groupes rapides</div>
           <div id="mailQuickGroups" class="mail-quick-groups"></div>
         </div>
-
         <div style="margin-top:18px;">
           <div class="mail-label" style="margin-bottom:8px;">Destinataires</div>
           <div id="mailUsersGrid" class="mail-users-grid"></div>
           <div id="mailSelectedCount" class="mail-selected-count">0 destinataire(s) sélectionné(s)</div>
         </div>
-
         <div style="margin-top:18px;">
           <label class="mail-label">Sujet</label>
           <input type="text" id="mailSubject" placeholder="Ex : Planning de la semaine">
@@ -380,10 +376,8 @@
             <button class="btn" onclick="sendManualEmail()">📤 Envoyer</button>
             <button class="btn" onclick="clearMailSelection()" style="background:#e2e8f0; color:#475569; border:1px solid #cbd5e1;">↩️ Réinitialiser</button>
           </div>
-          <div class="mail-hint" style="margin-top:10px;">Pour l'envoi réel, il faut déployer une Cloud Function.</div>
         </div>
       </div>
-
       <div class="admin-section">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
           <h3 class="section-header-large" style="margin:0;">👥 Groupes mail</h3>
@@ -393,21 +387,8 @@
       </div>
     </div>
 
-  <div id="tab-logs" style="display:none;">
+    <div id="tab-logs" style="display:none;">
       <div class="admin-section" style="border-left: 4px solid #ef4444;">
-        <h3 class="section-header-large" style="color:#b91c1c;">🚨 Registre des Incidents</h3>
-        <div style="font-size:11px; color:#666; margin-bottom:15px;">Historique des alertes (Frigo, etc.) et de leur résolution pour contrôle.</div>
-        <div id="incidentsContainer" style="display:flex; flex-direction:column; gap:10px;">
-           <div style="text-align:center; color:#999;">Chargement...</div>
-        </div>
-      </div>
-
-      <div class="admin-section">
-        <h3 class="section-header-large">🕒 Activité par Utilisateur</h3>
-        <div style="font-size:11px; color:#666; margin-bottom:15px;">Cliquez sur un nom pour voir le détail <span style="font-size:10px;">▼</span></div>
-        <div id="logsContainer" class="logs-wrapper"></div>
-      </div>
-    </div>
         <h3 class="section-header-large" style="color:#b91c1c;">🚨 Registre des Incidents</h3>
         <div style="font-size:11px; color:#666; margin-bottom:15px;">Historique des alertes (Frigo, etc.) et de leur résolution pour contrôle.</div>
         <div id="incidentsContainer" style="display:flex; flex-direction:column; gap:10px;">
