@@ -149,66 +149,71 @@ exports.sendSmartBroadcast = onCall(
   }
 );
 
-// --- FONCTION 2 : WEBHOOK ALERTE EATPILOT (CORS MANUEL BLINDÉ) ---
+// --- WEBHOOK ALERTE EATPILOT (Version Robuste) ---
 exports.receiveExternalAlert = onRequest(
-  { region: 'us-central1' }, // Pas de cors: true ici, on le gère manuellement
+  { region: 'us-central1' }, 
   async (req, res) => {
     
-    // 1. GESTION CORS MANUELLE (Permet au bouton Simuler de fonctionner)
+    // 1. HEADERS CORS (INDISPENSABLES)
+    // On les met tout de suite pour être sûr qu'ils partent
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
 
-    // Réponse rapide pour la vérification du navigateur (Preflight)
+    // 2. GESTION PREFLIGHT (OPTIONS)
     if (req.method === 'OPTIONS') {
       res.status(204).send('');
       return;
     }
 
-    // 2. SÉCURITÉ DU WEBHOOK
-    if (req.query.secret !== 'SUPER_SECRET_LAFAYETTE_99') {
-      return res.status(403).send('Forbidden');
-    }
-
-    const data = req.body || {};
-    const subject = data.subject || 'Alerte Technique';
-    const bodyHtml = data.bodyHtml || '';
-    const timestamp = Date.now();
-
     try {
-      // 3. ENREGISTREMENT EN BASE
-      await admin.database().ref('alerts').push({
-        title: subject,
-        body: bodyHtml,
-        date: timestamp,
-        source: 'EatPilot'
-      });
+        // 3. VÉRIFICATION SECRET
+        if (req.query.secret !== 'SUPER_SECRET_LAFAYETTE_99') {
+          // Même en cas d'erreur, on garde les headers CORS sinon le navigateur masque l'erreur réelle
+          res.status(403).send('Forbidden');
+          return;
+        }
 
-      // 4. NOTIFICATION PUSH AUTOMATIQUE
-      const snap = await admin.database().ref('users').once('value');
-      const users = snap.val() || {};
-      const tokens = [];
+        const data = req.body || {};
+        const subject = data.subject || 'Alerte Technique';
+        const bodyHtml = data.bodyHtml || '';
+        const timestamp = Date.now();
 
-      Object.values(users).forEach(u => {
-        const t = u.fcmToken || u.pushToken || (u.fcm ? u.fcm.token : null);
-        if (t) tokens.push(t);
-      });
-
-      if (tokens.length > 0) {
-        await admin.messaging().sendEachForMulticast({
-          tokens: tokens,
-          notification: {
-            title: '⚠️ ' + subject,
-            body: 'Nouvelle alerte reçue. Voir le détail.'
-          },
-          data: { url: '/diffusion.html#alerts' }
+        // 4. SAUVEGARDE EN BASE
+        await admin.database().ref('alerts').push({
+            title: subject,
+            body: bodyHtml,
+            date: timestamp,
+            source: 'EatPilot'
         });
-      }
 
-      res.status(200).send('OK');
+        // 5. ENVOI PUSH
+        const snap = await admin.database().ref('users').once('value');
+        const users = snap.val() || {};
+        const tokens = [];
+
+        Object.values(users).forEach(u => {
+            const t = u.fcmToken || u.pushToken || (u.fcm ? u.fcm.token : null);
+            if (t) tokens.push(t);
+        });
+
+        if (tokens.length > 0) {
+            await admin.messaging().sendEachForMulticast({
+            tokens: tokens,
+            notification: {
+                title: '⚠️ ' + subject,
+                body: 'Nouvelle alerte reçue. Voir le détail.'
+            },
+            data: { url: '/diffusion.html#alerts' }
+            });
+        }
+
+        res.status(200).send('OK');
+
     } catch (e) {
-      logger.error(e);
-      res.status(500).send('Error');
+        logger.error("Erreur Alert:", e);
+        // Important : on renvoie les headers même en cas de crash
+        res.status(500).send('Internal Server Error: ' + e.message);
     }
   }
 );
