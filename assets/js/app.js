@@ -954,32 +954,32 @@ function createUser() {
 
     if(!name || !email) return alert("Nom et Email requis");
 
-    // ÉTAPE CLÉ : On génère un mot de passe aléatoire que l'admin ne connaît pas
+    // Génération d'un mot de passe aléatoire invisible
     const tempPassword = Math.random().toString(36).slice(-10) + "Aa1!";
 
-    // Création du compte dans le système Firebase
     firebase.auth().createUserWithEmailAndPassword(email, tempPassword)
         .then((userCredential) => {
-            // ON ENVOIE LE MAIL DE RÉINITIALISATION IMMÉDIATEMENT
-            // C'est ce mail qui permettra à l'employé de créer son propre MDP
+            // Envoi immédiat du mail de configuration du mot de passe
             firebase.auth().sendPasswordResetEmail(email);
             
             const uid = userCredential.user.uid;
-            // On enregistre les infos dans ta base de données
             return firebase.database().ref('users/' + uid).set({
                 name: name,
                 email: email,
                 hours: parseInt(hours) || 35,
-                role: isAdmin ? 'admin' : 'user'
+                role: isAdmin ? 'admin' : 'staff',
+                status: 'pending'
             });
         })
         .then(() => {
-            alert("Membre créé ! Un email d'invitation lui a été envoyé pour configurer son mot de passe.");
-            // Code pour vider les champs du formulaire ici...
+            showToast("✅ Membre créé ! Invitation envoyée par mail.");
+            document.getElementById('nuName').value = "";
+            document.getElementById('nuEmail').value = "";
+            document.getElementById('nuHours').value = "";
+            document.getElementById('nuAdmin').checked = false;
         })
         .catch(err => alert("Erreur : " + err.message));
 }
-
 function renderAdminUsers() { 
     const d = document.getElementById("usersList"); if(!d) return; d.innerHTML = ""; let totalToPay = 0;
     const entries = Object.keys(allUsers || {}).map(uid => ({ uid, u: (allUsers[uid] || {}) })).filter(e => !(e.u.email && String(e.u.email).toLowerCase() === String(SUPER_ADMIN_EMAIL||'').toLowerCase()));
