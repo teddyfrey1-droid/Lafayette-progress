@@ -1196,10 +1196,21 @@ function dismissPushBanner() {
 }
 
 async function enableNotifications() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    alert("Ton téléphone ne supporte pas les notifications.");
-    return;
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+        const messaging = firebase.messaging();
+        const token = await messaging.getToken({ vapidKey: VAPID_KEY });
+        if (token && currentUser) {
+            await db.ref('users/' + currentUser.uid).update({ fcmToken: token, pushEnabled: true });
+            showToast("✅ Notifications activées !");
+        }
+    }
+  } catch (error) { 
+      console.error(error); 
   }
+} 
   
   // Détection iOS
   const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
