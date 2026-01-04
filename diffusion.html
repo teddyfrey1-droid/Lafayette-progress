@@ -12,28 +12,89 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
   
   <link rel="stylesheet" href="assets/css/styles.css">
+  
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 
   <style>
     /* STYLES ALERTES (INCIDENTS) */
-    .alert-card { background: var(--card-bg); border: 1px solid var(--border-color); border-left: 5px solid #ef4444; border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); transition: all 0.3s ease; position: relative; overflow: hidden; }
-    .alert-card.resolved { border-left-color: #10b981; background: rgba(16,185,129,0.04); opacity: 0.85; }
+    .alert-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-left: 5px solid #ef4444; /* Rouge par défaut (Urgence) */
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Style quand c'est résolu */
+    .alert-card.resolved {
+      border-left-color: #10b981; /* Vert */
+      background: rgba(16,185,129,0.04); /* Fond très léger vert */
+      opacity: 0.85;
+    }
+
     .alert-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
-    .alert-badge { font-size: 10px; font-weight: 900; text-transform: uppercase; padding: 4px 8px; border-radius: 6px; background: #fee2e2; color: #991b1b; }
-    .alert-card.resolved .alert-badge { background: #d1fae5; color: #065f46; }
+    
+    .alert-badge { 
+      font-size: 10px; font-weight: 900; text-transform: uppercase; 
+      padding: 4px 8px; border-radius: 6px; 
+      background: #fee2e2; color: #991b1b; 
+    }
+    .alert-card.resolved .alert-badge {
+      background: #d1fae5; color: #065f46; /* Badge vert si résolu */
+    }
+    
     body.dark-mode .alert-badge { background: rgba(239,68,68,0.2); color: #fca5a5; }
     body.dark-mode .alert-card.resolved .alert-badge { background: rgba(16,185,129,0.2); color: #6ee7b7; }
+
     .alert-date { font-size: 11px; font-weight: 700; color: var(--text-muted); }
     .alert-title { font-size: 15px; font-weight: 900; color: var(--text-main); margin-bottom: 6px; line-height: 1.3; }
     .alert-snippet { font-size: 13px; color: var(--text-main); opacity: 0.8; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 15px; }
-    .alert-footer { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--border-color); }
-    .btn-resolve { background: #10b981; color: white; width: 100%; padding: 14px; border: none; border-radius: 12px; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; box-shadow: 0 4px 12px rgba(16,185,129,0.3); display: flex; align-items: center; justify-content: center; gap: 8px; transition: transform 0.1s; }
+
+    /* FOOTER & ACTIONS */
+    .alert-footer {
+      margin-top: 10px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    /* GROS BOUTON D'ACTION */
+    .btn-resolve {
+      background: #10b981;
+      color: white;
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      font-weight: 800;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: transform 0.1s;
+    }
     .btn-resolve:active { transform: scale(0.98); }
     .btn-resolve span { font-size: 18px; }
-    .resolved-info { text-align: center; color: #059669; font-weight: 800; font-size: 12px; display: flex; flex-direction: column; gap: 4px; padding: 5px; }
+
+    /* INFO RÉSOLUTION */
+    .resolved-info {
+      text-align: center;
+      color: #059669;
+      font-weight: 800;
+      font-size: 12px;
+      display: flex; flex-direction: column; gap: 4px;
+      padding: 5px;
+    }
     .resolved-by { font-size: 14px; font-weight: 900; }
+    
     .alert-empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-style: italic; }
   </style>
 </head>
@@ -150,8 +211,10 @@
           <div style="margin-top:30px;">
             <label class="mail-label">Sujet</label>
             <input type="text" id="mailSubject" placeholder="Ex: Planning de la semaine">
+            
             <label class="mail-label" style="margin-top:10px;">Message</label>
             <textarea id="mailMessage" rows="8" placeholder="Écris ton message (HTML accepté)"></textarea>
+            
             <div class="mail-actions">
               <button class="btn" onclick="sendManualEmail()">✉ Envoyer</button>
               <button class="btn" onclick="clearMailSelection()" style="background:#e2e8f0; color:#475569; border:1px solid #cbd5e1;">Réinitialiser</button>
@@ -223,7 +286,7 @@
   <script src="assets/js/app.js"></script>
   <script src="assets/js/email.js"></script>
   
-  <script>
+<script>
     // --- 1. CONFIGURATION & OUTILS ---
     if(localStorage.getItem('heiko_dark_mode') === 'true') document.body.classList.add('dark-mode');
     
@@ -241,8 +304,7 @@
     window.showToast = showToast;
 
     // --- 2. AUTHENTIFICATION & GESTION DES DROITS ---
-    const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com"; 
-
+    
     firebase.auth().onAuthStateChanged(user => {
       if(user) {
         document.getElementById('loginOverlay').style.display = 'none';
@@ -253,33 +315,48 @@
           if(u) {
             window.currentUser = u;
             window.currentUser.uid = user.uid;
-            window.currentUser.email = user.email;
+            window.currentUser.email = user.email; 
             
-            document.getElementById('userName').textContent = u.name || 'Membre';
-            if(u.hours) document.getElementById('userHours').textContent = u.hours + 'h';
+            // Mise à jour de l'interface utilisateur
+            const elName = document.getElementById('userName');
+            const elHours = document.getElementById('userHours');
+            if(elName) elName.textContent = u.name || 'Membre';
+            if(elHours) elHours.textContent = (u.hours || 35) + 'h';
             
             const isAdmin = (u.role === 'admin' || u.role === 'superadmin');
             
+            // Gestion de l'affichage Admin (Onglet Diffusion)
             if(isAdmin) {
-              document.getElementById('adminOnlyContent').style.display = 'block';
-              document.getElementById('nonAdminMessage').style.display = 'none';
-              document.getElementById('btnAdmin').style.display = 'inline-block';
+              const adminContent = document.getElementById('adminOnlyContent');
+              if(adminContent) adminContent.style.display = 'block';
               
+              const nonAdminMsg = document.getElementById('nonAdminMessage');
+              if(nonAdminMsg) nonAdminMsg.style.display = 'none';
+              
+              const btnAdmin = document.getElementById('btnAdmin');
+              if(btnAdmin) btnAdmin.style.display = 'inline-block';
+              
+              // Chargement données mail (si fonctions disponibles)
               if(typeof window.renderDiffusionUI === 'function') {
                   firebase.database().ref('mailGroups').on('value', s => { window.mailGroups = s.val() || {}; renderDiffusionUI(); });
                   firebase.database().ref('users').on('value', s => { window.allUsers = s.val() || {}; renderDiffusionUI(); });
                   firebase.database().ref('settings').on('value', s => { window.globalSettings = s.val() || {}; renderDiffusionUI(); });
               }
             } else {
-              document.getElementById('adminOnlyContent').style.display = 'none';
-              document.getElementById('nonAdminMessage').style.display = 'block';
+              const adminContent = document.getElementById('adminOnlyContent');
+              if(adminContent) adminContent.style.display = 'none';
+              
+              const nonAdminMsg = document.getElementById('nonAdminMessage');
+              if(nonAdminMsg) nonAdminMsg.style.display = 'block';
             }
 
-            // BOUTON SIMULATION (Admin/SuperAdmin)
+            // GESTION BOUTON SIMULATION (SUPER ADMIN UNIQUEMENT)
             const btnSimu = document.getElementById('btnSimulateAlert');
             if(btnSimu) {
+                // On utilise une adresse en dur ici si app.js n'a pas chargé la variable
                 const targetEmail = (typeof SUPER_ADMIN_EMAIL !== 'undefined') ? SUPER_ADMIN_EMAIL : "teddy.frey1@gmail.com";
                 const isSuperChef = (user.email && user.email.toLowerCase() === targetEmail.toLowerCase());
+                
                 if (isSuperChef) {
                     btnSimu.style.display = 'inline-block';
                 } else {
@@ -289,19 +366,25 @@
           }
         });
         
+        // Charger les alertes
         loadAlertsData();
 
       } else {
-        document.getElementById('loginOverlay').style.display = 'flex';
-        document.getElementById('appContent').style.display = 'none';
+        const loginOverlay = document.getElementById('loginOverlay');
+        const appContent = document.getElementById('appContent');
+        if(loginOverlay) loginOverlay.style.display = 'flex';
+        if(appContent) appContent.style.display = 'none';
       }
     });
 
-    document.getElementById('btnLogin').onclick = function() {
-      const email = document.getElementById('loginEmail').value.trim();
-      const pass = document.getElementById('loginPass').value;
-      firebase.auth().signInWithEmailAndPassword(email, pass).catch(() => alert('Erreur mot de passe'));
-    };
+    const btnLogin = document.getElementById('btnLogin');
+    if(btnLogin) {
+        btnLogin.onclick = function() {
+          const email = document.getElementById('loginEmail').value.trim();
+          const pass = document.getElementById('loginPass').value;
+          firebase.auth().signInWithEmailAndPassword(email, pass).catch(() => alert('Erreur mot de passe'));
+        };
+    }
 
     window.logout = function() { firebase.auth().signOut(); location.reload(); }
     window.togglePass = function() { const x = document.getElementById('loginPass'); x.type = x.type==='password'?'text':'password'; }
@@ -320,7 +403,9 @@
       if(pAlert) pAlert.style.display = (tabName === 'alerts') ? 'block' : 'none';
     }
 
+    // Init Onglets au chargement
     if(window.location.hash === '#alerts') switchTab('alerts'); else switchTab('diffusion');
+
 
     // --- 4. LOGIQUE ALERTES (INCIDENTS) ---
     function loadAlertsData() {
@@ -390,6 +475,7 @@
     window.solveIssue = function(alertId) {
       if(!window.currentUser) return alert("Erreur: Tu dois être connecté.");
       const name = window.currentUser.name || "Équipe";
+      
       if(confirm("Confirmes-tu avoir réglé ce problème ?")) {
         firebase.database().ref(`alerts/${alertId}`).update({
           resolvedBy: window.currentUser.uid,
@@ -405,7 +491,7 @@
 
     // --- 5. FONCTION DE SIMULATION (VERSION FETCH) ---
     window.simulateAlert = async function() {
-      // URL de ta fonction avec CORS activé
+      // URL de ta fonction (la même que dans Google Script)
       const url = "https://us-central1-objectif-restaurant.cloudfunctions.net/receiveExternalAlert?secret=SUPER_SECRET_LAFAYETTE_99";
       
       if(!confirm("Lancer une simulation complète (Push + Historique) ?")) return;
@@ -421,6 +507,7 @@
       try {
         showToast("🚀 Envoi de la simulation...");
         
+        // On appelle la fonction pour de vrai
         await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
