@@ -946,9 +946,38 @@ function saveObj() {
 
 function deleteObj(id) { if(confirm("🗑️ Supprimer ?")) { db.ref("objectives/"+id).remove().then(() => showToast("🗑️ Supprimé")); logAction("Suppression", `Objectif ${id}`); } }
 function togglePub(id, v) { db.ref("objectives/"+id+"/published").set(v); logAction("Publication", `Objectif ${id}: ${v}`); }
-function createUser() { 
-    const email = (document.getElementById("nuEmail") || {}).value || ""; const name = (document.getElementById("nuName") || {}).value || ""; const hours = parseFloat((document.getElementById("nuHours") || {}).value) || 35; const isAdmin = !!((document.getElementById("nuAdmin") || {}).checked); const cleanEmail = String(email).trim(); if(!cleanEmail){ showToast("⚠️ Email requis."); return; } const TEMP_PASSWORD = "Temp1234!"; const sec = firebase.initializeApp(firebaseConfig, "Sec"); 
-    sec.auth().createUserWithEmailAndPassword(cleanEmail, TEMP_PASSWORD).then(c => { db.ref('users/'+c.user.uid).set({ name: String(name).trim() || "Utilisateur", hours: hours, role: isAdmin ? 'admin' : 'staff', email: cleanEmail, status: 'active', primeEligible: true }); sec.delete(); showToast("✅ Membre créé (mot de passe temporaire : " + TEMP_PASSWORD + ")"); }).catch(e => { if(e && e.code === 'auth/email-already-in-use') { showToast("⚠️ Ce membre existe déjà."); sec.delete(); } else { alert(e && e.message ? e.message : String(e)); sec.delete(); } }); 
+function createUser() {
+    const name = document.getElementById('nuName').value;
+    const email = document.getElementById('nuEmail').value;
+    const hours = document.getElementById('nuHours').value;
+    const isAdmin = document.getElementById('nuAdmin').checked;
+
+    if(!name || !email) return alert("Nom et Email requis");
+
+    // ÉTAPE CLÉ : On génère un mot de passe aléatoire que l'admin ne connaît pas
+    const tempPassword = Math.random().toString(36).slice(-10) + "Aa1!";
+
+    // Création du compte dans le système Firebase
+    firebase.auth().createUserWithEmailAndPassword(email, tempPassword)
+        .then((userCredential) => {
+            // ON ENVOIE LE MAIL DE RÉINITIALISATION IMMÉDIATEMENT
+            // C'est ce mail qui permettra à l'employé de créer son propre MDP
+            firebase.auth().sendPasswordResetEmail(email);
+            
+            const uid = userCredential.user.uid;
+            // On enregistre les infos dans ta base de données
+            return firebase.database().ref('users/' + uid).set({
+                name: name,
+                email: email,
+                hours: parseInt(hours) || 35,
+                role: isAdmin ? 'admin' : 'user'
+            });
+        })
+        .then(() => {
+            alert("Membre créé ! Un email d'invitation lui a été envoyé pour configurer son mot de passe.");
+            // Code pour vider les champs du formulaire ici...
+        })
+        .catch(err => alert("Erreur : " + err.message));
 }
 
 function renderAdminUsers() { 
