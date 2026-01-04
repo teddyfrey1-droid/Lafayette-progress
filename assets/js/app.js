@@ -1298,6 +1298,8 @@ async function enableNotifications() {
     console.error("Erreur notifs:", error);
   }
 
+}
+
 // --- EXPORTS POUR L'INDEX ---
 window.clearLoginError = clearLoginError;
 window.createUser = createUser;
