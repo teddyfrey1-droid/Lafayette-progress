@@ -159,3 +159,69 @@ exports.sendSmartBroadcast = onCall(
     return { successCount, details: { emails: emailTargets.size, pushes: pushTokens.length } };
   }
 );
+const { onRequest } = require('firebase-functions/v2/https');
+
+// --- WEBHOOK ALERTE EATPILOT ---
+exports.receiveExternalAlert = onRequest(
+  { region: 'us-central1' }, // Important: Doit correspondre à ton URL Google Script
+  async (req, res) => {
+    // 1. Vérification du Secret (Sécurité basique)
+    const secret = req.query.secret;
+    if (secret !== 'SUPER_SECRET_LAFAYETTE_99') {
+      return res.status(403).send('Forbidden: Invalid Secret');
+    }
+
+    // 2. Récupération des données du Body
+    const data = req.body || {};
+    const subject = data.subject || 'Alerte Technique';
+    const bodyHtml = data.bodyHtml || 'Contenu vide';
+    const timestamp = Date.now();
+
+    try {
+      // 3. Sauvegarde dans l'Historique (RTDB)
+      const alertRef = admin.database().ref('alerts').push();
+      await alertRef.set({
+        title: subject,
+        body: bodyHtml, // On garde le HTML brut pour l'affichage détail si besoin
+        date: timestamp,
+        type: 'critical', // Pour le styling CSS (rouge)
+        source: 'EatPilot'
+      });
+
+      // 4. Envoi du Push à TOUS les utilisateurs (Staff + Admin)
+      // On récupère tous les utilisateurs ayant un token
+      const snap = await admin.database().ref('users').once('value');
+      const users = snap.val() || {};
+      const tokens = [];
+
+      Object.values(users).forEach(u => {
+        // On vérifie tous les champs de token possibles selon ta structure actuelle
+        const t = u.fcmToken || u.pushToken || (u.fcm ? u.fcm.token : null);
+        if (t) tokens.push(t);
+      });
+
+      if (tokens.length > 0) {
+        const message = {
+          tokens: tokens,
+          notification: {
+            title: '⚠️ ' + subject,
+            body: 'Nouvelle alerte EatPilot reçue. Touche pour voir l\'historique.'
+          },
+          data: { 
+            url: '/alerts.html', // Redirection vers la nouvelle page
+            type: 'alert'
+          }
+        };
+        
+        // Envoi groupé
+        await admin.messaging().sendEachForMulticast(message);
+      }
+
+      return res.status(200).send('Alert processed and broadcasted.');
+
+    } catch (error) {
+      logger.error('Error processing alert:', error);
+      return res.status(500).send('Internal Server Error');
+    }
+  }
+);
