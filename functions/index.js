@@ -161,23 +161,23 @@ exports.sendSmartBroadcast = onCall(
 );
 const { onRequest } = require('firebase-functions/v2/https');
 
-// --- WEBHOOK ALERTE EATPILOT (CORS MANUEL) ---
+// --- WEBHOOK ALERTE EATPILOT (Version avec CORS MANUEL) ---
 exports.receiveExternalAlert = onRequest(
-  { region: 'us-central1' }, // On retire "cors: true" ici, on le gère en bas
+  { region: 'us-central1' }, // On retire "cors: true" pour le gérer nous-mêmes
   async (req, res) => {
     
-    // 1. FORCER LES AUTORISATIONS (CORS)
+    // 1. DÉBLOCAGE SÉCURITÉ (CORS) - Indispensable pour le bouton "Simuler"
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.set('Access-Control-Allow-Headers', 'Content-Type');
 
-    // Si le navigateur demande l'autorisation (OPTIONS), on dit OUI tout de suite
+    // Si le navigateur demande une vérification, on dit OUI tout de suite
     if (req.method === 'OPTIONS') {
       res.status(204).send('');
       return;
     }
 
-    // 2. VÉRIFICATION SECRET
+    // 2. VÉRIFICATION DU SECRET
     if (req.query.secret !== 'SUPER_SECRET_LAFAYETTE_99') {
       return res.status(403).send('Forbidden');
     }
@@ -188,7 +188,7 @@ exports.receiveExternalAlert = onRequest(
     const timestamp = Date.now();
 
     try {
-      // 3. SAUVEGARDE
+      // 3. SAUVEGARDE EN BASE
       await admin.database().ref('alerts').push({
         title: subject,
         body: bodyHtml,
@@ -196,7 +196,7 @@ exports.receiveExternalAlert = onRequest(
         source: 'EatPilot'
       });
 
-      // 4. NOTIFICATION PUSH
+      // 4. ENVOI PUSH
       const snap = await admin.database().ref('users').once('value');
       const users = snap.val() || {};
       const tokens = [];
@@ -213,7 +213,9 @@ exports.receiveExternalAlert = onRequest(
             title: '⚠️ ' + subject,
             body: 'Nouvelle alerte reçue. Voir le détail.'
           },
-          data: { url: '/diffusion.html#alerts' }
+          data: { 
+            url: '/diffusion.html#alerts'
+          }
         });
       }
 
