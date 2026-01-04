@@ -990,14 +990,48 @@ function renderAdminUsers() {
     }
     function renderUser(uid, u, isEligible){
       const userBonus = isEligible ? computeUserBonus(u) : 0; if(isEligible) totalToPay += userBonus;
-      const div = document.createElement("div"); div.className = "user-item"; const statusClass = (u.status === 'active') ? 'active' : 'pending'; const statusLabel = (u.status === 'active') ? 'ACTIF' : 'EN ATTENTE'; let adminBadge = ""; if(u.role === 'admin') adminBadge = `<span class="admin-tag">ADMIN</span>`; const checked = isEligible ? 'checked' : ''; const gain = isEligible ? userBonus.toFixed(2) + '€' : '—';
-      div.innerHTML = `<div class="user-info"><div class="user-header"><span class="user-name">${u.name || ''} ${adminBadge}</span><div style="display:flex; align-items:center;"><span class="status-dot ${statusClass}"></span><span class="status-text">${statusLabel}</span></div></div><div class="user-email-sub">${u.email || ''}</div><div class="user-meta">${u.hours || 35}h</div><label class="check-label" style="margin-top:6px; font-size:11px; opacity:.95;"><input type="checkbox" ${checked} onchange="setUserPrimeEligible('${uid}', this.checked)"> 💶 Compte dans les primes</label></div><div class="user-actions"><div class="user-gain">${gain}</div><div class="btn-group"><button onclick="openTeamArchive('${uid}')" class="action-btn" title="Archive mensuelle">📄</button><button onclick="editUser('${uid}')" class="action-btn" title="Modifier">✏️</button><button onclick="deleteUser('${uid}')" class="action-btn delete" title="Supprimer">🗑️</button></div></div>`; d.appendChild(div); 
-    }
-    eligibleEntries.forEach(e => renderUser(e.uid, e.u, true));
-    const totalRow = document.createElement("div"); totalRow.className = "total-row"; totalRow.innerHTML = `<span>Total à payer</span><span>${totalToPay.toFixed(2)} €</span>`; d.appendChild(totalRow);
-    if(ineligibleEntries.length){ const sep = document.createElement("div"); sep.className = "users-sep"; sep.textContent = "Non comptés dans les primes"; d.appendChild(sep); ineligibleEntries.forEach(e => renderUser(e.uid, e.u, false)); }
-}
+      const div = document.createElement("div"); div.className = "user-item"; 
+      const statusClass = (u.status === 'active') ? 'active' : 'pending'; 
+      const gain = isEligible ? userBonus.toFixed(2) + '€' : '—';
 
+      div.innerHTML = `
+        <div class="user-info">
+          <div class="user-header">
+            <span class="user-name">${u.name || ''}</span>
+            <span class="status-dot ${statusClass}"></span>
+          </div>
+          <div class="user-email-sub">${u.email || ''}</div>
+        </div>
+        <div class="user-actions">
+          <div class="user-gain">${gain}</div>
+          <div class="btn-group"></div>
+        </div>`;
+
+      const btnGroup = div.querySelector('.btn-group');
+
+      // --- NOUVEAU BOUTON CLÉ (🔑) ---
+      const btnReset = document.createElement('button');
+      btnReset.innerHTML = '🔑';
+      btnReset.className = 'action-btn';
+      btnReset.title = "Renvoyer l'email de configuration du mot de passe";
+      btnReset.onclick = () => {
+          if(confirm(`Renvoyer un lien de configuration de mot de passe à ${u.email} ?`)) {
+              auth.sendPasswordResetEmail(u.email)
+                  .then(() => showToast("✅ Email envoyé !"))
+                  .catch(err => alert("Erreur : " + err.message));
+          }
+      };
+
+      // BOUTON SUPPRIMER (🗑️)
+      const btnDel = document.createElement('button');
+      btnDel.innerHTML = '🗑️';
+      btnDel.className = 'action-btn delete';
+      btnDel.onclick = () => { if(confirm("Supprimer ?")) db.ref('users/'+uid).remove(); };
+
+      btnGroup.appendChild(btnReset); // On ajoute la clé
+      btnGroup.appendChild(btnDel);   // On ajoute la poubelle
+      d.appendChild(div); 
+    }
 function setUserPrimeEligible(uid, isEligible){
   if(!isAdminUser()) return; const val = !!isEligible; const prev = (allUsers && allUsers[uid]) ? (allUsers[uid].primeEligible !== false) : true;
   try{ if(allUsers && allUsers[uid]) allUsers[uid].primeEligible = val; renderAdminUsers(); }catch(e){}
