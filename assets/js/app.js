@@ -399,6 +399,7 @@ auth.onAuthStateChanged(user => {
     });
     loadData();
     renderNativeCalendar();
+    listenToAlerts();
   } else {
     document.getElementById("loginOverlay").style.display = "flex";
     document.getElementById("appContent").style.display = "none";
