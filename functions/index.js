@@ -161,18 +161,17 @@ exports.sendSmartBroadcast = onCall(
 );
 const { onRequest } = require('firebase-functions/v2/https');
 
-// --- WEBHOOK ALERTE EATPILOT (AVEC CORS MANUEL) ---
+// --- WEBHOOK ALERTE EATPILOT (Version avec CORS MANUEL) ---
 exports.receiveExternalAlert = onRequest(
-  { region: 'us-central1' }, // On enlève "cors: true" ici car on le gère nous-mêmes en bas
+  { region: 'us-central1' }, // On retire "cors: true" pour le gérer nous-mêmes
   async (req, res) => {
     
-    // 1. DÉBLOCAGE SÉCURITÉ (CORS)
-    // On autorise n'importe qui à appeler la fonction (nécessaire pour le bouton du site)
+    // 1. DÉBLOCAGE SÉCURITÉ (CORS) - On ouvre les portes manuellement
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-    // Si c'est une demande de "vérification" du navigateur (OPTIONS), on dit OUI tout de suite
+    // Si le navigateur demande "Est-ce que je peux venir ?", on répond OUI tout de suite
     if (req.method === 'OPTIONS') {
       res.status(204).send('');
       return;
@@ -189,7 +188,7 @@ exports.receiveExternalAlert = onRequest(
     const timestamp = Date.now();
 
     try {
-      // 3. SAUVEGARDE EN BASE
+      // 3. Sauvegarde en base
       await admin.database().ref('alerts').push({
         title: subject,
         body: bodyHtml,
@@ -197,7 +196,7 @@ exports.receiveExternalAlert = onRequest(
         source: 'EatPilot'
       });
 
-      // 4. ENVOI PUSH
+      // 4. Envoi Push
       const snap = await admin.database().ref('users').once('value');
       const users = snap.val() || {};
       const tokens = [];
@@ -216,37 +215,6 @@ exports.receiveExternalAlert = onRequest(
           },
           data: { 
             url: '/diffusion.html#alerts'
-          }
-        });
-      }
-
-      res.status(200).send('OK');
-    } catch (e) {
-      logger.error(e);
-      res.status(500).send('Error');
-    }
-  }
-);
-
-      // 3. Envoi Push à l'équipe
-      const snap = await admin.database().ref('users').once('value');
-      const users = snap.val() || {};
-      const tokens = [];
-
-      Object.values(users).forEach(u => {
-        const t = u.fcmToken || u.pushToken || (u.fcm ? u.fcm.token : null);
-        if (t) tokens.push(t);
-      });
-
-      if (tokens.length > 0) {
-        await admin.messaging().sendEachForMulticast({
-          tokens: tokens,
-          notification: {
-            title: '⚠️ ' + subject,
-            body: 'Nouvelle alerte reçue. Voir le détail.'
-          },
-          data: { 
-            url: '/diffusion.html#alerts' // Redirection vers l'onglet Alertes
           }
         });
       }
