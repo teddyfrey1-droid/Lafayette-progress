@@ -238,16 +238,26 @@
         </div>
       </section>
 
-      <section id="panelAlerts" style="display:none;">
+     <section id="panelAlerts" style="display:none;">
          <div class="admin-section" style="border-left:4px solid #ef4444; background: rgba(254,226,226,0.1);">
             <div style="display:flex; gap:15px; align-items:center;">
                <div style="font-size:24px;">🚨</div>
-               <div>
+               <div style="flex:1;">
                  <h3 style="margin:0; font-size:16px; color:#b91c1c;">Surveillance Automatique</h3>
                  <p style="margin:4px 0 0 0; font-size:13px; color:#7f1d1d;">Connecté à EatPilot. Les alertes critiques (froid, technique) apparaissent ici en temps réel.</p>
                </div>
             </div>
+            <div style="margin-top:15px; text-align:right;">
+               <button class="btn" onclick="simulateAlert()" style="width:auto; font-size:11px; padding:6px 12px; background:#71717a; border:none;">
+                 🧪 Simuler une alerte
+               </button>
+            </div>
          </div>
+         
+         <div id="alertsList" style="margin-top:20px;">
+            <div class="alert-empty">Chargement...</div>
+         </div>
+      </section>
          
          <div id="alertsList" style="margin-top:20px;">
             <div class="alert-empty">Chargement...</div>
