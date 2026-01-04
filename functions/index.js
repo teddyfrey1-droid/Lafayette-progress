@@ -1,9 +1,8 @@
 /**
- * Cloud Functions - Smart Broadcast (Email + Push)
- * Gère l'envoi intelligent : Email, Push, ou les deux.
+ * Cloud Functions - Smart Broadcast & Alerting
  */
 
-const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { logger } = require('firebase-functions');
 const { defineSecret, defineString, defineInt } = require('firebase-functions/params');
 const admin = require('firebase-admin');
@@ -46,7 +45,7 @@ async function assertIsAdmin(uid) {
   }
 }
 
-// --- FONCTION PRINCIPALE ---
+// --- FONCTION 1 : ENVOI EMAIL / PUSH (DASHBOARD) ---
 exports.sendSmartBroadcast = onCall(
   {
     region: 'us-central1',
@@ -56,11 +55,9 @@ exports.sendSmartBroadcast = onCall(
     cors: true, 
   },
   async (request) => {
-    // 1. Sécurité
     if (!request.auth) throw new HttpsError('unauthenticated', 'Connexion requise.');
     await assertIsAdmin(request.auth.uid);
 
-    // 2. Récupération des données
     const data = request.data || {};
     const { recipientIds, subject, html, fromName, channels } = data;
     
@@ -69,14 +66,12 @@ exports.sendSmartBroadcast = onCall(
 
     if (!recipientIds || recipientIds.length === 0) return { successCount: 0 };
 
-    // 3. Récupération des infos utilisateurs
     const snap = await admin.database().ref('users').once('value');
     const allUsers = snap.val() || {};
 
     let emailTargets = new Set(); 
     let pushTokens = [];
 
-    // 4. Logique Intelligente
     recipientIds.forEach(uid => {
       const user = allUsers[uid];
       if (!user) return;
@@ -88,13 +83,11 @@ exports.sendSmartBroadcast = onCall(
 
       let willReceivePush = false;
 
-      // Logique PUSH
       if (usePush && isPushable) {
         pushTokens.push(userPushToken);
         willReceivePush = true;
       }
 
-      // Logique EMAIL (Si demandé OU si fallback car pas de push)
       if (isEmailable) {
         if (useEmail || (usePush && !willReceivePush)) {
           emailTargets.add(userEmail);
@@ -103,9 +96,7 @@ exports.sendSmartBroadcast = onCall(
     });
 
     let successCount = 0;
-    const errors = [];
 
-    // 5. Envoi PUSH
     if (pushTokens.length > 0) {
       try {
         const message = {
@@ -123,7 +114,6 @@ exports.sendSmartBroadcast = onCall(
       }
     }
 
-    // 6. Envoi EMAILS
     if (emailTargets.size > 0) {
       try {
         const transporter = buildTransporter();
@@ -148,7 +138,6 @@ exports.sendSmartBroadcast = onCall(
       }
     }
 
-    // 7. Log
     await admin.database().ref('mailLogs').push({
       date: Date.now(),
       authorUid: request.auth.uid,
@@ -159,25 +148,24 @@ exports.sendSmartBroadcast = onCall(
     return { successCount, details: { emails: emailTargets.size, pushes: pushTokens.length } };
   }
 );
-const { onRequest } = require('firebase-functions/v2/https');
 
-// --- WEBHOOK ALERTE EATPILOT (Version avec CORS MANUEL) ---
+// --- FONCTION 2 : WEBHOOK ALERTE EATPILOT (CORS MANUEL BLINDÉ) ---
 exports.receiveExternalAlert = onRequest(
-  { region: 'us-central1' }, // On retire "cors: true" pour le gérer nous-mêmes
+  { region: 'us-central1' }, // Pas de cors: true ici, on le gère manuellement
   async (req, res) => {
     
-    // 1. DÉBLOCAGE SÉCURITÉ (CORS) - Indispensable pour le bouton "Simuler"
+    // 1. GESTION CORS MANUELLE (Permet au bouton Simuler de fonctionner)
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-    // Si le navigateur demande une vérification, on dit OUI tout de suite
+    // Réponse rapide pour la vérification du navigateur (Preflight)
     if (req.method === 'OPTIONS') {
       res.status(204).send('');
       return;
     }
 
-    // 2. VÉRIFICATION DU SECRET
+    // 2. SÉCURITÉ DU WEBHOOK
     if (req.query.secret !== 'SUPER_SECRET_LAFAYETTE_99') {
       return res.status(403).send('Forbidden');
     }
@@ -188,7 +176,7 @@ exports.receiveExternalAlert = onRequest(
     const timestamp = Date.now();
 
     try {
-      // 3. SAUVEGARDE EN BASE
+      // 3. ENREGISTREMENT EN BASE
       await admin.database().ref('alerts').push({
         title: subject,
         body: bodyHtml,
@@ -196,7 +184,7 @@ exports.receiveExternalAlert = onRequest(
         source: 'EatPilot'
       });
 
-      // 4. ENVOI PUSH
+      // 4. NOTIFICATION PUSH AUTOMATIQUE
       const snap = await admin.database().ref('users').once('value');
       const users = snap.val() || {};
       const tokens = [];
@@ -213,9 +201,7 @@ exports.receiveExternalAlert = onRequest(
             title: '⚠️ ' + subject,
             body: 'Nouvelle alerte reçue. Voir le détail.'
           },
-          data: { 
-            url: '/diffusion.html#alerts'
-          }
+          data: { url: '/diffusion.html#alerts' }
         });
       }
 
