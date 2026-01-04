@@ -310,6 +310,9 @@
     window.showToast = showToast;
 
     // --- 2. AUTHENTIFICATION ---
+   // --- 2. AUTHENTIFICATION & GESTION DES DROITS ---
+    const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com"; // TON EMAIL
+
     firebase.auth().onAuthStateChanged(user => {
       if(user) {
         document.getElementById('loginOverlay').style.display = 'none';
@@ -320,6 +323,7 @@
           if(u) {
             window.currentUser = u;
             window.currentUser.uid = user.uid;
+            window.currentUser.email = user.email; // On s'assure d'avoir l'email
             
             document.getElementById('userName').textContent = u.name || 'Membre';
             const hours = u.hours || 35;
@@ -327,11 +331,43 @@
             
             const isAdmin = (u.role === 'admin' || u.role === 'superadmin');
             
+            // Gestion de l'affichage Admin (Onglet Diffusion)
             if(isAdmin) {
               document.getElementById('adminOnlyContent').style.display = 'block';
               document.getElementById('nonAdminMessage').style.display = 'none';
               document.getElementById('btnAdmin').style.display = 'inline-block';
               
+              // Chargement données mail
+              firebase.database().ref('mailGroups').on('value', s => { window.mailGroups = s.val() || {}; renderDiffusionUI(); });
+              firebase.database().ref('users').on('value', s => { window.allUsers = s.val() || {}; renderDiffusionUI(); });
+              firebase.database().ref('settings').on('value', s => { window.globalSettings = s.val() || {}; renderDiffusionUI(); });
+            } else {
+              document.getElementById('adminOnlyContent').style.display = 'none';
+              document.getElementById('nonAdminMessage').style.display = 'block';
+            }
+
+            // --- GESTION DU BOUTON SIMULATION (SUPER ADMIN SEULEMENT) ---
+            const btnSimu = document.getElementById('btnSimulateAlert');
+            if(btnSimu) {
+                // On compare l'email connecté avec l'email du chef
+                const isSuperChef = (user.email && user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
+                
+                if (isSuperChef) {
+                    btnSimu.style.display = 'inline-block'; // Affiche le bouton
+                } else {
+                    btnSimu.style.display = 'none'; // Cache le bouton
+                }
+            }
+          }
+        });
+        
+        loadAlertsData();
+
+      } else {
+        document.getElementById('loginOverlay').style.display = 'flex';
+        document.getElementById('appContent').style.display = 'none';
+      }
+    });
               // Chargement données mail (Admin seulement)
               firebase.database().ref('mailGroups').on('value', s => { window.mailGroups = s.val() || {}; renderDiffusionUI(); });
               firebase.database().ref('users').on('value', s => { window.allUsers = s.val() || {}; renderDiffusionUI(); });
