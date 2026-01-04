@@ -223,7 +223,24 @@
   <script src="assets/js/email.js"></script>
   
   <script>
-    // --- 1. CONFIGURATION & OUTILS ---
+    // --- 1. INITIALISATION FIREBASE ---
+    // C'est la partie qui manquait et qui faisait tout planter !
+    const firebaseConfig = {
+      apiKey: "AIzaSyAGaitqmFwExvJ9ZUpkdUdCKAqqDOP2cdQ",
+      authDomain: "objectif-restaurant.firebaseapp.com",
+      databaseURL: "https://objectif-restaurant-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "objectif-restaurant",
+      storageBucket: "objectif-restaurant.firebasestorage.app",
+      messagingSenderId: "910113283000",
+      appId: "1:910113283000:web:0951fd9dca01aa6e46cd4d"
+    };
+    
+    // On initialise si ce n'est pas déjà fait
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+
+    // --- 2. CONFIGURATION & OUTILS ---
     if(localStorage.getItem('heiko_dark_mode') === 'true') document.body.classList.add('dark-mode');
     
     function toggleDarkMode() {
@@ -239,7 +256,23 @@
     }
     window.showToast = showToast;
 
-    // --- 2. AUTHENTIFICATION ---
+    // Fonctions globales manquantes (définies ici pour ne pas dépendre de app.js)
+    window.clearLoginError = function() {
+      document.getElementById('loginPass').classList.remove('error');
+      document.getElementById('loginEmail').classList.remove('error');
+    };
+    
+    window.togglePass = function() {
+      const x = document.getElementById('loginPass');
+      x.type = x.type === 'password' ? 'text' : 'password';
+    };
+    
+    window.logout = function() {
+      firebase.auth().signOut();
+      window.location.reload();
+    };
+
+    // --- 3. AUTHENTIFICATION & GESTION DES DROITS ---
     const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com"; 
 
     firebase.auth().onAuthStateChanged(user => {
@@ -299,14 +332,13 @@
     document.getElementById('btnLogin').onclick = function() {
       const email = document.getElementById('loginEmail').value.trim();
       const pass = document.getElementById('loginPass').value;
-      firebase.auth().signInWithEmailAndPassword(email, pass).catch(() => alert('Erreur mot de passe'));
+      firebase.auth().signInWithEmailAndPassword(email, pass).catch(() => {
+        document.getElementById('loginPass').classList.add('error');
+        alert('Erreur mot de passe');
+      });
     };
 
-    window.logout = function() { firebase.auth().signOut(); location.reload(); }
-    window.togglePass = function() { const x = document.getElementById('loginPass'); x.type = x.type==='password'?'text':'password'; }
-    window.clearLoginError = function() {} 
-
-    // --- 3. GESTION ONGLETS ---
+    // --- 4. GESTION ONGLETS ---
     window.switchTab = function(tabName) {
       const btnDiff = document.getElementById('tabBtnDiffusion');
       const btnAlert = document.getElementById('tabBtnAlerts');
@@ -321,7 +353,7 @@
 
     if(window.location.hash === '#alerts') switchTab('alerts'); else switchTab('diffusion');
 
-    // --- 4. LOGIQUE ALERTES (INCIDENTS) ---
+    // --- 5. LOGIQUE ALERTES (INCIDENTS) ---
     function loadAlertsData() {
       const container = document.getElementById('alertsList');
       if(!container) return;
@@ -402,9 +434,8 @@
       }
     }
 
-    // --- 5. FONCTION DE SIMULATION (VERSION FETCH CORRIGÉE) ---
+    // --- 6. FONCTION DE SIMULATION (VERSION FETCH) ---
     window.simulateAlert = async function() {
-      // URL de ta fonction
       const url = "https://us-central1-objectif-restaurant.cloudfunctions.net/receiveExternalAlert?secret=SUPER_SECRET_LAFAYETTE_99";
       
       if(!confirm("Lancer une simulation complète (Push + Historique) ?")) return;
