@@ -292,6 +292,7 @@
       history.replaceState(null, null, tabName === 'alerts' ? '#alerts' : '#diffusion');
     }
 
+    // Chargement des alertes avec système de validation
     function loadAlertsData() {
       const container = document.getElementById('alertsList');
       // On écoute Firebase : alerts (limitToLast 50)
@@ -303,6 +304,84 @@
           container.innerHTML = `<div class="alert-empty">Aucune alerte enregistrée.</div>`;
           return;
         }
+
+        // Tri : plus récent en haut
+        const list = Object.keys(data).map(k => ({id: k, ...data[k]})).sort((a,b) => b.date - a.date);
+
+        list.forEach(item => {
+          const d = new Date(item.date);
+          const dateStr = d.toLocaleDateString('fr-FR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+          const cleanBody = (item.body || '').replace(/<[^>]+>/g, ' ').substring(0, 180) + '...';
+
+          // --- GESTION DES VALIDATIONS ---
+          const validations = item.validations || {};
+          const validatedBy = Object.values(validations); // Liste des gens qui ont validé
+          
+          // Est-ce que MOI j'ai déjà validé ?
+          const myUid = window.currentUser ? window.currentUser.uid : null;
+          const iHaveValidated = myUid && validations[myUid];
+
+          // Construction de la liste des noms
+          let namesHtml = '';
+          if(validatedBy.length > 0) {
+             namesHtml = '<div style="margin-top:5px;">Vu par : ' + 
+               validatedBy.map(v => `<span class="seen-name">✔ ${v.name}</span>`).join('') + 
+               '</div>';
+          } else {
+             namesHtml = '<div style="margin-top:5px;">Non lu</div>';
+          }
+
+          // Bouton de validation (Affiché seulement si je n\'ai pas encore validé)
+          let actionBtn = '';
+          if(!iHaveValidated) {
+            actionBtn = `
+              <button class="btn-validate" onclick="validateAlert('${item.id}')">
+                 ✅ J'ai pris en compte
+              </button>
+            `;
+          } else {
+             // Si j'ai validé, on affiche un petit message discret à la place du bouton
+             actionBtn = `<div style="text-align:center; font-size:11px; color:#10b981; font-weight:800; padding:6px;">Validation enregistrée</div>`;
+          }
+
+          const card = document.createElement('div');
+          card.className = 'alert-card';
+          card.innerHTML = `
+            <div class="alert-header">
+               <span class="alert-badge">${item.source || 'ALERTE'}</span>
+               <span class="alert-date">${dateStr}</span>
+            </div>
+            <div class="alert-title">${item.title}</div>
+            <div class="alert-snippet">${cleanBody}</div>
+            
+            <div class="alert-footer">
+               ${actionBtn}
+               <div class="alert-seen-list">${namesHtml}</div>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      });
+    }
+
+    // Fonction appelée quand on clique sur le bouton vert
+    function validateAlert(alertId) {
+      if(!window.currentUser) return alert("Erreur: Utilisateur non identifié");
+      
+      const uid = window.currentUser.uid;
+      const name = window.currentUser.name || "Membre";
+
+      // On écrit dans la base de données : alerts/ID/validations/UID
+      firebase.database().ref(`alerts/${alertId}/validations/${uid}`).set({
+        name: name,
+        time: Date.now()
+      }).then(() => {
+        window.showToast("✅ Validé !");
+      }).catch(e => {
+        console.error(e);
+        alert("Erreur lors de la validation");
+      });
+    }
 
         // Tri : plus récent en haut
         const list = Object.keys(data).map(k => ({...data[k]})).sort((a,b) => b.date - a.date);
