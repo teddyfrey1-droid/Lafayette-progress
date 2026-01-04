@@ -45,7 +45,7 @@ async function assertIsAdmin(uid) {
   }
 }
 
-// --- FONCTION 1 : ENVOI EMAIL / PUSH (DASHBOARD) ---
+// --- FONCTION 1 : ENVOI EMAIL & PUSH (INTEGRALITÉ RESTAURÉE) ---
 exports.sendSmartBroadcast = onCall(
   {
     region: 'us-central1',
@@ -55,9 +55,11 @@ exports.sendSmartBroadcast = onCall(
     cors: true, 
   },
   async (request) => {
+    // 1. Sécurité
     if (!request.auth) throw new HttpsError('unauthenticated', 'Connexion requise.');
     await assertIsAdmin(request.auth.uid);
 
+    // 2. Récupération des données
     const data = request.data || {};
     const { recipientIds, subject, html, fromName, channels } = data;
     
@@ -66,28 +68,33 @@ exports.sendSmartBroadcast = onCall(
 
     if (!recipientIds || recipientIds.length === 0) return { successCount: 0 };
 
+    // 3. Récupération des infos utilisateurs
     const snap = await admin.database().ref('users').once('value');
     const allUsers = snap.val() || {};
 
     let emailTargets = new Set(); 
     let pushTokens = [];
 
+    // 4. Logique Intelligente
     recipientIds.forEach(uid => {
       const user = allUsers[uid];
       if (!user) return;
 
       const userEmail = user.email;
+      // On récupère le token peu importe où il est stocké
       const userPushToken = user.fcmToken || user.pushToken || (user.fcm ? user.fcm.token : null);
       const isPushable = !!userPushToken;
       const isEmailable = (userEmail && userEmail.includes('@'));
 
       let willReceivePush = false;
 
+      // Logique PUSH
       if (usePush && isPushable) {
         pushTokens.push(userPushToken);
         willReceivePush = true;
       }
 
+      // Logique EMAIL (Si demandé OU si fallback car pas de push)
       if (isEmailable) {
         if (useEmail || (usePush && !willReceivePush)) {
           emailTargets.add(userEmail);
@@ -97,6 +104,7 @@ exports.sendSmartBroadcast = onCall(
 
     let successCount = 0;
 
+    // 5. Envoi PUSH
     if (pushTokens.length > 0) {
       try {
         const message = {
@@ -114,6 +122,7 @@ exports.sendSmartBroadcast = onCall(
       }
     }
 
+    // 6. Envoi EMAILS
     if (emailTargets.size > 0) {
       try {
         const transporter = buildTransporter();
@@ -138,6 +147,7 @@ exports.sendSmartBroadcast = onCall(
       }
     }
 
+    // 7. Log en base de données
     await admin.database().ref('mailLogs').push({
       date: Date.now(),
       authorUid: request.auth.uid,
@@ -149,27 +159,29 @@ exports.sendSmartBroadcast = onCall(
   }
 );
 
-// --- WEBHOOK ALERTE EATPILOT (Version Robuste) ---
+// --- FONCTION 2 : WEBHOOK ALERTE EATPILOT (CORRECTIF CORS) ---
 exports.receiveExternalAlert = onRequest(
-  { region: 'us-central1' }, 
+  { region: 'us-central1' }, // PAS de "cors: true" ici, on gère manuellement
   async (req, res) => {
     
-    // 1. HEADERS CORS (INDISPENSABLES)
-    // On les met tout de suite pour être sûr qu'ils partent
+    // 1. HEADERS CORS OBLIGATOIRES
+    // Autorise tout le monde (*) à appeler cette fonction
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.set('Access-Control-Max-Age', '3600');
 
     // 2. GESTION PREFLIGHT (OPTIONS)
+    // Si le navigateur demande l'autorisation avant d'envoyer, on dit OUI
     if (req.method === 'OPTIONS') {
       res.status(204).send('');
       return;
     }
 
+    // 3. LOGIQUE MÉTIER
     try {
-        // 3. VÉRIFICATION SECRET
+        // Vérification du secret
         if (req.query.secret !== 'SUPER_SECRET_LAFAYETTE_99') {
-          // Même en cas d'erreur, on garde les headers CORS sinon le navigateur masque l'erreur réelle
           res.status(403).send('Forbidden');
           return;
         }
@@ -179,7 +191,7 @@ exports.receiveExternalAlert = onRequest(
         const bodyHtml = data.bodyHtml || '';
         const timestamp = Date.now();
 
-        // 4. SAUVEGARDE EN BASE
+        // Sauvegarde de l'alerte
         await admin.database().ref('alerts').push({
             title: subject,
             body: bodyHtml,
@@ -187,11 +199,10 @@ exports.receiveExternalAlert = onRequest(
             source: 'EatPilot'
         });
 
-        // 5. ENVOI PUSH
+        // Envoi Push automatique à tous les utilisateurs
         const snap = await admin.database().ref('users').once('value');
         const users = snap.val() || {};
         const tokens = [];
-
         Object.values(users).forEach(u => {
             const t = u.fcmToken || u.pushToken || (u.fcm ? u.fcm.token : null);
             if (t) tokens.push(t);
@@ -202,17 +213,17 @@ exports.receiveExternalAlert = onRequest(
             tokens: tokens,
             notification: {
                 title: '⚠️ ' + subject,
-                body: 'Nouvelle alerte reçue. Voir le détail.'
+                body: 'Nouvelle alerte reçue.'
             },
             data: { url: '/diffusion.html#alerts' }
             });
         }
 
-        res.status(200).send('OK');
+        // Réponse succès avec marqueur pour vérifier la mise à jour
+        res.status(200).send('OK CORS ACTIVE');
 
     } catch (e) {
         logger.error("Erreur Alert:", e);
-        // Important : on renvoie les headers même en cas de crash
         res.status(500).send('Internal Server Error: ' + e.message);
     }
   }
