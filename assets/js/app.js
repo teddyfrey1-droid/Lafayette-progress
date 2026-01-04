@@ -1196,27 +1196,14 @@ function dismissPushBanner() {
 }
 
 async function enableNotifications() {
-  if (!('serviceWorker' in navigator)) return;
-  try {
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-        const messaging = firebase.messaging();
-        const token = await messaging.getToken({ vapidKey: VAPID_KEY });
-        if (token && currentUser) {
-            await db.ref('users/' + currentUser.uid).update({ fcmToken: token, pushEnabled: true });
-            showToast("✅ Notifications activées !");
-        }
-    }
-  } catch (error) { 
-      console.error(error); 
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    alert("Ton téléphone ne supporte pas les notifications.");
+    return;
   }
-} 
   
-  // Détection iOS
   const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
-  // Sur iPhone, il faut l'app sur l'écran d'accueil
   if (isIos && !isStandalone) {
     alert("📢 Pour activer les notifs sur iPhone :\n1. Clique sur Partager (carré avec flèche)\n2. Choisis 'Sur l'écran d'accueil'\n3. Ouvre l'app depuis l'accueil et réessaie.");
     return;
@@ -1224,9 +1211,7 @@ async function enableNotifications() {
 
   try {
     const permission = await Notification.requestPermission();
-    
     if (permission === 'granted') {
-        // Cache la bannière immédiatement
         const banner = document.getElementById('pushPermissionBanner');
         if (banner) banner.style.display = 'none';
 
@@ -1240,13 +1225,11 @@ async function enableNotifications() {
                 lastTokenUpdate: Date.now()
             });
             showToast("✅ Notifications activées !");
-            
-            // Met à jour le bouton du menu si présent
             const btn = document.getElementById('btnEnablePush');
             if(btn) { btn.innerHTML = "<span>🔔 Notifs actives</span>"; btn.style.opacity = "0.5"; }
         }
     } else {
-        alert("Tu as refusé les notifications. Tu peux les activer dans les réglages de ton téléphone.");
+        alert("Tu as refusé les notifications.");
         dismissPushBanner();
     }
   } catch (error) {
@@ -1254,9 +1237,7 @@ async function enableNotifications() {
   }
 }
 
-// --- TOUTE FIN DU FICHIER ---
-
-// On expose les fonctions pour le HTML
+// --- TOUTE FIN DU FICHIER (EXPORTS) ---
 window.clearLoginError = clearLoginError;
 window.createUser = createUser;
 window.logout = logout;
@@ -1264,4 +1245,3 @@ window.enableNotifications = enableNotifications;
 window.dismissPushBanner = dismissPushBanner;
 window.switchTab = switchTab;
 window.toggleAdmin = toggleAdmin;
-window.renderTeamArchive = renderTeamArchive; // Si vous l'utilisez
