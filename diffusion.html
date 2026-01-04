@@ -491,9 +491,12 @@
     }
 
     // --- 5. FONCTION DE SIMULATION ---
-    window.simulateAlert = function() {
-      if(!firebase.apps.length) return alert("Erreur: Firebase non connecté");
-      if(!confirm("Créer une fausse alerte pour tester l'affichage ?")) return;
+   // --- 5. FONCTION DE SIMULATION (VERSION QUI ENVOIE LE PUSH) ---
+    window.simulateAlert = async function() {
+      // URL de ta fonction (la même que dans Google Script)
+      const url = "https://us-central1-objectif-restaurant.cloudfunctions.net/receiveExternalAlert?secret=SUPER_SECRET_LAFAYETTE_99";
+      
+      if(!confirm("Lancer une simulation complète (Push + Historique) ?")) return;
       
       const fakeIssues = [
         "Température Frigo Positif (+12°C)",
@@ -503,6 +506,26 @@
       ];
       const randomIssue = fakeIssues[Math.floor(Math.random() * fakeIssues.length)];
 
+      try {
+        showToast("🚀 Envoi de la simulation...");
+        
+        // On appelle la fonction pour de vrai
+        await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subject: "SIMULATION: " + randomIssue,
+            bodyHtml: "Ceci est un test technique déclenché depuis le dashboard pour vérifier les notifications."
+          })
+        });
+
+        // Pas besoin d'écrire dans la base ici, la Cloud Function va le faire !
+        showToast("✅ Simulation réussie ! Vérifie ton téléphone.");
+        
+      } catch (e) {
+        alert("Erreur lors de la simulation : " + e.message);
+      }
+    }
       firebase.database().ref('alerts').push({
         title: "TEST: " + randomIssue,
         body: "Ceci est une simulation pour vérifier le système. Aucune action requise.",
