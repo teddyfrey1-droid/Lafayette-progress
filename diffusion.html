@@ -150,8 +150,10 @@
           <div style="margin-top:30px;">
             <label class="mail-label">Sujet</label>
             <input type="text" id="mailSubject" placeholder="Ex: Planning de la semaine">
+            
             <label class="mail-label" style="margin-top:10px;">Message</label>
             <textarea id="mailMessage" rows="8" placeholder="Écris ton message (HTML accepté)"></textarea>
+            
             <div class="mail-actions">
               <button class="btn" onclick="sendManualEmail()">✉ Envoyer</button>
               <button class="btn" onclick="clearMailSelection()" style="background:#e2e8f0; color:#475569; border:1px solid #cbd5e1;">Réinitialiser</button>
@@ -220,7 +222,6 @@
     </div>
   </div>
 
-  <script src="assets/js/app.js"></script>
   <script src="assets/js/email.js"></script>
   
   <script>
@@ -240,9 +241,11 @@
     }
     window.showToast = showToast;
 
-    // --- 2. AUTHENTIFICATION ---
-    // Correction : On utilise la variable globale si elle existe déjà dans app.js
-    const TARGET_ADMIN_EMAIL = (typeof SUPER_ADMIN_EMAIL !== 'undefined') ? SUPER_ADMIN_EMAIL : "teddy.frey1@gmail.com";
+    // --- 2. AUTHENTIFICATION & GESTION DES DROITS ---
+    const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com"; 
+
+    // Initialisation de Firebase dans cette page si nécessaire
+    // (Les scripts inclus en haut devraient suffire)
 
     firebase.auth().onAuthStateChanged(user => {
       if(user) {
@@ -257,7 +260,8 @@
             window.currentUser.email = user.email;
             
             document.getElementById('userName').textContent = u.name || 'Membre';
-            if(u.hours) document.getElementById('userHours').textContent = u.hours + 'h';
+            const hours = u.hours || 35;
+            document.getElementById('userHours').textContent = hours + 'h';
             
             const isAdmin = (u.role === 'admin' || u.role === 'superadmin');
             
@@ -276,10 +280,11 @@
               document.getElementById('nonAdminMessage').style.display = 'block';
             }
 
-            // BOUTON SIMULATION (Admin/SuperAdmin uniquement)
+            // BOUTON SIMULATION (Admin/SuperAdmin)
             const btnSimu = document.getElementById('btnSimulateAlert');
             if(btnSimu) {
-                const isSuperChef = (user.email && user.email.toLowerCase() === TARGET_ADMIN_EMAIL.toLowerCase());
+                const targetEmail = (typeof SUPER_ADMIN_EMAIL !== 'undefined') ? SUPER_ADMIN_EMAIL : "teddy.frey1@gmail.com";
+                const isSuperChef = (user.email && user.email.toLowerCase() === targetEmail.toLowerCase());
                 if (isSuperChef) {
                     btnSimu.style.display = 'inline-block';
                 } else {
@@ -289,6 +294,7 @@
           }
         });
         
+        // Charger les alertes
         loadAlertsData();
 
       } else {
@@ -405,7 +411,7 @@
 
     // --- 5. FONCTION DE SIMULATION (VERSION FETCH) ---
     window.simulateAlert = async function() {
-      // URL de ta fonction
+      // URL de ta fonction avec CORS activé
       const url = "https://us-central1-objectif-restaurant.cloudfunctions.net/receiveExternalAlert?secret=SUPER_SECRET_LAFAYETTE_99";
       
       if(!confirm("Lancer une simulation complète (Push + Historique) ?")) return;
