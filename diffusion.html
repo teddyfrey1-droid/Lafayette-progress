@@ -17,67 +17,86 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 
- <style>
-    /* Styles Alertes & Validation */
+<style>
+    /* --- STYLES ALERTES (INCIDENTS) --- */
+    
     .alert-card {
       background: var(--card-bg);
       border: 1px solid var(--border-color);
-      border-left: 4px solid #ef4444;
+      border-left: 5px solid #ef4444; /* Rouge par défaut (Urgence) */
       border-radius: 16px;
       padding: 16px;
       margin-bottom: 12px;
       box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
     }
-    .alert-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
-    .alert-badge { font-size: 10px; font-weight: 900; text-transform: uppercase; padding: 4px 8px; border-radius: 6px; background: #fee2e2; color: #991b1b; }
+
+    /* Style quand c'est résolu */
+    .alert-card.resolved {
+      border-left-color: #10b981; /* Vert */
+      background: rgba(16,185,129,0.04); /* Fond très léger vert */
+      opacity: 0.85;
+    }
+
+    .alert-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+    
+    .alert-badge { 
+      font-size: 10px; font-weight: 900; text-transform: uppercase; 
+      padding: 4px 8px; border-radius: 6px; 
+      background: #fee2e2; color: #991b1b; 
+    }
+    .alert-card.resolved .alert-badge {
+      background: #d1fae5; color: #065f46; /* Badge vert si résolu */
+    }
+    
     body.dark-mode .alert-badge { background: rgba(239,68,68,0.2); color: #fca5a5; }
+    body.dark-mode .alert-card.resolved .alert-badge { background: rgba(16,185,129,0.2); color: #6ee7b7; }
+
     .alert-date { font-size: 11px; font-weight: 700; color: var(--text-muted); }
     .alert-title { font-size: 15px; font-weight: 900; color: var(--text-main); margin-bottom: 6px; line-height: 1.3; }
-    .alert-snippet { font-size: 13px; color: var(--text-main); opacity: 0.8; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 12px; }
-    .alert-empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-style: italic; }
+    .alert-snippet { font-size: 13px; color: var(--text-main); opacity: 0.8; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 15px; }
 
-    /* NOUVEAU : Zone de validation */
+    /* FOOTER & ACTIONS */
     .alert-footer {
-      border-top: 1px solid var(--border-color);
-      padding-top: 10px;
       margin-top: 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-color);
     }
-    .btn-validate {
-      background: #10b981; /* Vert */
+
+    /* GROS BOUTON D'ACTION */
+    .btn-resolve {
+      background: #10b981;
       color: white;
+      width: 100%;
+      padding: 14px;
       border: none;
-      padding: 10px;
-      border-radius: 8px;
+      border-radius: 12px;
       font-weight: 800;
-      font-size: 12px;
-      cursor: pointer;
+      font-size: 13px;
       text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(16,185,129,0.3);
       display: flex; align-items: center; justify-content: center; gap: 8px;
       transition: transform 0.1s;
-      width: 100%;
     }
-    .btn-validate:active { transform: scale(0.98); }
-    .alert-seen-list {
-      font-size: 11px;
-      color: var(--text-muted);
-      font-style: italic;
-      line-height: 1.4;
+    .btn-resolve:active { transform: scale(0.98); }
+    .btn-resolve span { font-size: 18px; }
+
+    /* INFO RÉSOLUTION */
+    .resolved-info {
+      text-align: center;
+      color: #059669;
+      font-weight: 800;
+      font-size: 12px;
+      display: flex; flex-direction: column; gap: 4px;
+      padding: 5px;
     }
-    .seen-name {
-      display: inline-block;
-      background: rgba(16,185,129,0.1);
-      color: #047857;
-      padding: 2px 6px;
-      border-radius: 4px;
-      margin-right: 4px;
-      margin-bottom: 4px;
-      font-weight: 700;
-      font-style: normal;
-    }
-    body.dark-mode .seen-name { color: #6ee7b7; background: rgba(16,185,129,0.2); }
+    .resolved-by { font-size: 14px; font-weight: 900; }
+    
+    .alert-empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-style: italic; }
   </style>
 </head>
 <body>
