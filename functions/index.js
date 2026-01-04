@@ -161,14 +161,24 @@ exports.sendSmartBroadcast = onCall(
 );
 const { onRequest } = require('firebase-functions/v2/https');
 
-// --- WEBHOOK ALERTE EATPILOT ---
+// --- WEBHOOK ALERTE EATPILOT (AVEC CORS MANUEL) ---
 exports.receiveExternalAlert = onRequest(
-  { 
-    region: 'us-central1',
-    cors: true,
-  },
+  { region: 'us-central1' }, // On enlève "cors: true" ici car on le gère nous-mêmes en bas
   async (req, res) => {
-    // 1. Sécurité simple
+    
+    // 1. DÉBLOCAGE SÉCURITÉ (CORS)
+    // On autorise n'importe qui à appeler la fonction (nécessaire pour le bouton du site)
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+    // Si c'est une demande de "vérification" du navigateur (OPTIONS), on dit OUI tout de suite
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+
+    // 2. VÉRIFICATION DU SECRET
     if (req.query.secret !== 'SUPER_SECRET_LAFAYETTE_99') {
       return res.status(403).send('Forbidden');
     }
@@ -179,13 +189,44 @@ exports.receiveExternalAlert = onRequest(
     const timestamp = Date.now();
 
     try {
-      // 2. Sauvegarde en base
+      // 3. SAUVEGARDE EN BASE
       await admin.database().ref('alerts').push({
         title: subject,
         body: bodyHtml,
         date: timestamp,
         source: 'EatPilot'
       });
+
+      // 4. ENVOI PUSH
+      const snap = await admin.database().ref('users').once('value');
+      const users = snap.val() || {};
+      const tokens = [];
+
+      Object.values(users).forEach(u => {
+        const t = u.fcmToken || u.pushToken || (u.fcm ? u.fcm.token : null);
+        if (t) tokens.push(t);
+      });
+
+      if (tokens.length > 0) {
+        await admin.messaging().sendEachForMulticast({
+          tokens: tokens,
+          notification: {
+            title: '⚠️ ' + subject,
+            body: 'Nouvelle alerte reçue. Voir le détail.'
+          },
+          data: { 
+            url: '/diffusion.html#alerts'
+          }
+        });
+      }
+
+      res.status(200).send('OK');
+    } catch (e) {
+      logger.error(e);
+      res.status(500).send('Error');
+    }
+  }
+);
 
       // 3. Envoi Push à l'équipe
       const snap = await admin.database().ref('users').once('value');
