@@ -1243,6 +1243,14 @@ async function enableNotifications() {
   }
 }
 
-// Exposer les fonctions pour qu'elles soient accessibles depuis le HTML
+// --- TOUTE FIN DU FICHIER ---
+
+// On expose les fonctions pour le HTML
+window.clearLoginError = clearLoginError;
+window.createUser = createUser;
+window.logout = logout;
 window.enableNotifications = enableNotifications;
 window.dismissPushBanner = dismissPushBanner;
+window.switchTab = switchTab;
+window.toggleAdmin = toggleAdmin;
+window.renderTeamArchive = renderTeamArchive; // Si vous l'utilisez
