@@ -1297,7 +1297,7 @@ function renderIncidentsLog() {
 // Lancer le chargement du registre si on est Admin
 if(isAdminUser()) {
     renderIncidentsLog();
-}
 // On le relance aussi lors du chargement des données
 const originalLoadData = window.loadData; // Sauvegarde l'ancienne fonction si besoin
 // (Mais le plus simple est d'ajouter l'appel dans la fonction loadData existante)
+}
