@@ -1122,7 +1122,259 @@ function _drawObjectiveProgress(rows, mode){
   ctx.strokeStyle = isDark ? 'rgba(59,130,246,0.85)' : 'rgba(37,99,235,0.90)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y); ctx.stroke();
   ctx.fillStyle = isDark ? 'rgba(255,255,255,0.92)' : 'rgba(17,24,39,0.88)'; pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 9, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = isDark ? 'rgba(59,130,246,0.55)' : 'rgba(37,99,235,0.45)'; ctx.lineWidth = 2; ctx.stroke(); });
 }
+// --- GESTION DES MISES A JOUR (UPDATES) ---
+function renderUpdatesPublic() {
+    const c = document.getElementById("publicUpdatesList"); 
+    if(!c) return; 
+    c.innerHTML = "";
+    const arr = Object.values(window.allUpdates || {}).sort((a,b) => b.date - a.date);
+    if(arr.length === 0) { c.innerHTML = "<div style='text-align:center;color:#999;'>Aucune nouveauté.</div>"; return; }
+    arr.forEach(u => {
+        const d = new Date(u.date).toLocaleDateString();
+        let tag = ""; if(u.type==='new') tag = `<span class="update-tag tag-new">✨ Nouveauté</span>`; else if(u.type==='impr') tag = `<span class="update-tag tag-impr">🛠️ Amélioration</span>`; else tag = `<span class="update-tag tag-fix">🐛 Correction</span>`;
+        const div = document.createElement("div"); div.className = "update-card";
+        div.innerHTML = `<div class="update-header">${tag}<span class="update-date">${d}</span></div><span class="update-title">${u.title}</span><div class="update-body">${u.desc}</div>`;
+        c.appendChild(div);
+    });
+}
 
+function renderUpdatesAdmin() {
+    const c = document.getElementById("adminUpdatesList"); 
+    if(!c) return; 
+    c.innerHTML = "";
+    const arr = []; Object.keys(window.allUpdates || {}).forEach(k => arr.push({id:k, ...window.allUpdates[k]}));
+    arr.sort((a,b) => b.date - a.date);
+    if(arr.length === 0) { c.innerHTML = "<div style='color:#ccc; font-style:italic;'>Aucune publication.</div>"; return; }
+    arr.forEach(u => {
+        const d = new Date(u.date).toLocaleDateString();
+        const div = document.createElement("div"); div.className = "update-card";
+        div.innerHTML = `<div class="update-header"><span style="font-weight:800;font-size:12px;">${u.type.toUpperCase()} - ${d}</span><div style="display:flex; gap:10px;"><button onclick="editUpdate('${u.id}')" style="background:none;border:none;cursor:pointer;">✏️</button><button onclick="deleteUpdate('${u.id}')" style="background:none;border:none;cursor:pointer;">🗑️</button></div></div><div style="font-weight:bold;">${u.title}</div><div style="font-size:12px;">${u.desc}</div>`;
+        c.appendChild(div);
+    });
+}
+
+function saveUpdate() {
+    const t = document.getElementById("uptTitle").value.trim();
+    const d = document.getElementById("uptDesc").value.trim();
+    const type = document.getElementById("uptType").value;
+    const id = document.getElementById("uptId").value;
+    if(!t) return;
+    
+    if(id) {
+        db.ref('updates/'+id).update({ title:t, desc:d, type:type }).then(() => { showToast("Modifié !"); cancelUpdateEdit(); });
+    } else {
+        db.ref('updates').push({ title:t, desc:d, type:type, date:Date.now() }).then(()=> {
+            showToast("Publié !");
+            _maybeAutoNotify('update', { title:t, body:d });
+            cancelUpdateEdit();
+        });
+    }
+}
+function deleteUpdate(id) { if(confirm("Supprimer ?")) db.ref('updates/'+id).remove(); }
+function editUpdate(id) {
+    const u = window.allUpdates[id]; if(!u) return;
+    document.getElementById("uptId").value = id;
+    document.getElementById("uptTitle").value = u.title;
+    document.getElementById("uptDesc").value = u.desc;
+    document.getElementById("uptType").value = u.type;
+    document.getElementById("btnSaveUpdate").textContent = "💾 Modifier";
+    document.getElementById("btnCancelUpdate").style.display = "inline-block";
+}
+function cancelUpdateEdit() {
+    document.getElementById("uptId").value = ""; document.getElementById("uptTitle").value = ""; document.getElementById("uptDesc").value = "";
+    document.getElementById("btnSaveUpdate").textContent = "Publier l'info";
+    document.getElementById("btnCancelUpdate").style.display = "none";
+}
+function checkNewUpdates(updates) {
+    const arr = Object.values(updates).sort((a,b) => b.date - a.date);
+    if(arr.length === 0) return;
+    const latest = arr[0];
+    const latestId = latest.title + "_" + latest.date;
+    const lastSeen = localStorage.getItem('heiko_last_update_seen');
+    if(latestId !== lastSeen) {
+        const alertBox = document.getElementById("topAlert");
+        document.getElementById("topAlertText").textContent = latest.title;
+        alertBox.classList.remove("trigger");
+        void alertBox.offsetWidth; alertBox.classList.add("trigger");
+        localStorage.setItem('heiko_last_update_seen', latestId);
+    }
+}
+
+// --- GESTION AVIS & LOGS ---
+function renderFeedbacks(feeds) {
+    const container = document.getElementById("feedbacksContainer"); if(!container) return; container.innerHTML = "";
+    const arr = Object.values(feeds).sort((a,b) => b.time - a.time);
+    if(arr.length === 0) { container.innerHTML = "<div style='color:#999;font-style:italic;'>Aucun avis.</div>"; return; }
+    arr.forEach(f => {
+        const d = new Date(f.time).toLocaleString();
+        const div = document.createElement("div"); div.className = "log-user-group"; div.style.padding="10px";
+        div.innerHTML = `<div style="font-weight:bold;">${f.user} <span style="font-size:11px;color:#666;">${d}</span></div><div>${f.msg}</div>`;
+        container.appendChild(div);
+    });
+}
+
+// --- SIMULATEUR & PILOTAGE ---
+function renderSimulator() {
+    const container = document.getElementById("simObjList"); 
+    if(!container) return;
+    container.innerHTML = "";
+    
+    // Initialisation
+    let simObjs = JSON.parse(JSON.stringify(window.allObjs || {})); 
+    document.getElementById("simGlobalBudget").value = globalSettings.budget || 0;
+    const guardInput = document.getElementById('simGuardrailPct');
+    if(guardInput) guardInput.value = String(getGuardrailMaxPctOfCA());
+
+    let totalPotential35h = 0;
+    Object.keys(simObjs).forEach(k => {
+        const o = simObjs[k]; if(!o.published) return; 
+        let maxObjPrize = 0;
+        if(o.isFixed) { maxObjPrize = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0; } 
+        else { if(o.paliers) o.paliers.forEach(p => maxObjPrize += parse(p.prize)); }
+        totalPotential35h += maxObjPrize;
+        
+        // Affichage simple pour le pilotage
+        const div = document.createElement("div"); div.className = "cockpit-obj-row";
+        
+        let sliders = "";
+        (o.paliers || []).forEach((p, i) => {
+             sliders += `<div class="slider-row"><div class="slider-label-line"><span class="slider-label">Palier ${p.threshold}</span><span class="slider-val" id="val-${k}-${i}">${p.prize}€</span></div><input type="range" min="0" max="50" step="5" value="${parse(p.prize)}" oninput="document.getElementById('val-${k}-${i}').innerText=this.value+'€'; window.allObjs['${k}'].paliers[${i}].prize=this.value; updateSim();"></div>`;
+        });
+
+        div.innerHTML = `
+            <div class="cockpit-obj-head">
+               <div class="cockpit-obj-title"><span>${o.name}</span><span class="cost" id="cost-${k}">...</span></div>
+            </div>
+            <div class="cockpit-obj-body" style="display:block; padding:10px;">${sliders}</div>
+        `; 
+        container.appendChild(div);
+    });
+    
+    const totalEl = document.getElementById("simTotalPerUser");
+    if(totalEl) totalEl.innerText = `${totalPotential35h.toFixed(0)}€`;
+    
+    updateSim(); // Calcul initial
+}
+
+function updateSim() {
+   const budget = parseFloat(document.getElementById("simGlobalBudget").value) || 0;
+   const simCA = parseFloat(document.getElementById('simMonthlyCA')?.value) || 0;
+   
+   let totalUserRatio = 0;
+   Object.values(window.allUsers || {}).forEach(u => { 
+       if(u.primeEligible !== false) totalUserRatio += ((u.hours || 35) / BASE_HOURS); 
+   });
+
+   let maxLiability = 0; 
+   Object.keys(window.allObjs || {}).forEach(k => {
+       const o = window.allObjs[k]; if(!o.published) return;
+       let maxP = 0; 
+       if(o.isFixed) { maxP = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0; } 
+       else { if(o.paliers) o.paliers.forEach(p => maxP += parse(p.prize)); }
+       
+       const cost = maxP * totalUserRatio;
+       maxLiability += cost;
+       
+       const costLabel = document.getElementById(`cost-${k}`);
+       if(costLabel) costLabel.innerText = `Coût : ${cost.toFixed(0)}€`;
+   });
+   
+   const pct = (budget > 0) ? (maxLiability / budget) * 100 : 0; 
+   const bar = document.getElementById("simGauge"); 
+   if(bar) {
+       bar.style.width = Math.min(pct, 100) + "%";
+       if(maxLiability > budget) bar.classList.add("danger"); else bar.classList.remove("danger");
+   }
+   
+   const usedEl = document.getElementById("simUsed");
+   if(usedEl) {
+       usedEl.innerText = `${maxLiability.toFixed(0)}€ Engagés`;
+       usedEl.style.color = (maxLiability > budget) ? "#ef4444" : "#3b82f6";
+   }
+   
+   const leftEl = document.getElementById("simLeft");
+   if(leftEl) leftEl.innerText = `Reste : ${(budget - maxLiability).toFixed(0)}€`;
+   
+   // Garde-fous
+   const pctCAEl = document.getElementById('simPctCA');
+   if(pctCAEl) pctCAEl.innerText = (simCA > 0) ? ((maxLiability/simCA)*100).toFixed(1) + "% du CA" : "—";
+   
+   const guardBox = document.getElementById('guardrailBox');
+   if(guardBox) {
+       const warnings = [];
+       if(maxLiability > budget) warnings.push("Budget dépassé !");
+       if(simCA > 0 && (maxLiability/simCA)*100 > getGuardrailMaxPctOfCA()) warnings.push("Attention : Ratio Primes/CA élevé.");
+       
+       if(warnings.length > 0) {
+           guardBox.style.display = 'block';
+           document.getElementById('guardrailText').innerHTML = warnings.join("<br>");
+       } else {
+           guardBox.style.display = 'none';
+       }
+   }
+}
+
+function saveGlobalBudget() {
+    const v = parseFloat(document.getElementById("simGlobalBudget").value);
+    db.ref('settings/budget').set(v).then(()=>showToast("Budget enregistré"));
+}
+function saveGuardrailMaxPct() {
+    const v = parseFloat(document.getElementById("simGuardrailPct").value);
+    db.ref('settings/guardrailMaxPctOfCA').set(v).then(()=>showToast("Seuil enregistré"));
+}
+function publishSim() {
+    if(confirm("Publier les nouveaux montants ?")) {
+        const updates = {};
+        // Sauvegarde des paliers modifiés
+        Object.keys(window.allObjs).forEach(k => {
+            updates['objectives/' + k + '/paliers'] = window.allObjs[k].paliers;
+        });
+        db.ref().update(updates).then(() => {
+            showToast("✅ Publié !");
+            _maybeAutoNotify('pilotage', {});
+        });
+    }
+}
+
+// --- ADMIN USERS & OBJS ---
+function renderAdminUsers() { 
+    const d = document.getElementById("usersList"); if(!d) return; d.innerHTML = "";
+    Object.keys(window.allUsers || {}).forEach(uid => {
+        const u = window.allUsers[uid];
+        const div = document.createElement("div"); div.className = "user-item";
+        div.innerHTML = `<div class="user-info"><span class="user-name">${u.name} (${u.hours}h)</span><span class="user-email-sub">${u.email}</span></div><div class="user-actions"><button class="action-btn" onclick="editUser('${uid}')">✏️</button><button class="action-btn delete" onclick="deleteUser('${uid}')">🗑️</button></div>`;
+        d.appendChild(div);
+    });
+}
+function renderAdminObjs() {
+    const pl = document.getElementById("pubList"); if(!pl) return; pl.innerHTML = "";
+    Object.keys(window.allObjs || {}).forEach(k => {
+        const o = window.allObjs[k];
+        const div = document.createElement("div"); div.className="user-item";
+        div.innerHTML = `<div class="user-info"><span class="user-name">${o.name}</span></div><div class="user-actions"><label class="switch"><input type="checkbox" ${o.published?'checked':''} onchange="togglePub('${k}', this.checked)"><span class="slider"></span></label><button class="action-btn" onclick="openEditObj('${k}')">✏️</button></div>`;
+        pl.appendChild(div);
+    });
+}
+function togglePub(id, v) { db.ref("objectives/"+id+"/published").set(v); }
+function deleteUser(uid) { if(confirm("Supprimer ?")) db.ref('users/'+uid).remove(); }
+function editUser(uid) { 
+    const u = window.allUsers[uid]; 
+    if(!u) return;
+    document.getElementById("editUserPanel").classList.add("active"); 
+    document.getElementById("euId").value = uid; 
+    document.getElementById("euName").value = u.name; 
+    document.getElementById("euHours").value = u.hours; 
+    document.getElementById("euAdmin").checked = (u.role === 'admin'); 
+}
+function saveUser() { 
+    const id = document.getElementById("euId").value;
+    db.ref('users/'+id).update({ 
+        name: document.getElementById("euName").value, 
+        hours: parseFloat(document.getElementById("euHours").value), 
+        role: document.getElementById("euAdmin").checked ? 'admin' : 'staff' 
+    }); 
+    document.getElementById("editUserPanel").classList.remove("active"); 
+}
 function getPct(c, t, isInverse) {
   let cv = parseFloat(String(c).replace(',', '.')); let tv = parseFloat(String(t).replace(',', '.')); if(isNaN(cv) || isNaN(tv)) return 0;
   if(isInverse) { if(cv > tv) return 0; if(cv <= tv) return 100; return 0; }
