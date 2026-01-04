@@ -1197,27 +1197,21 @@ function dismissPushBanner() {
 
 async function enableNotifications() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    alert("Ton téléphone ne supporte pas les notifications.");
     return;
   }
-  
   const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
   if (isIos && !isStandalone) {
-    alert("📢 Pour activer les notifs sur iPhone :\n1. Clique sur Partager (carré avec flèche)\n2. Choisis 'Sur l'écran d'accueil'\n3. Ouvre l'app depuis l'accueil et réessaie.");
+    alert("📢 Pour activer les notifs sur iPhone :\n1. Clique sur Partager\n2. 'Sur l'écran d'accueil'\n3. Ouvre l'app depuis l'accueil.");
     return;
   }
 
   try {
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
-        const banner = document.getElementById('pushPermissionBanner');
-        if (banner) banner.style.display = 'none';
-
         const messaging = firebase.messaging();
         const token = await messaging.getToken({ vapidKey: VAPID_KEY });
-        
         if (token && currentUser && currentUser.uid) {
             await db.ref('users/' + currentUser.uid).update({ 
                 fcmToken: token,
@@ -1225,19 +1219,14 @@ async function enableNotifications() {
                 lastTokenUpdate: Date.now()
             });
             showToast("✅ Notifications activées !");
-            const btn = document.getElementById('btnEnablePush');
-            if(btn) { btn.innerHTML = "<span>🔔 Notifs actives</span>"; btn.style.opacity = "0.5"; }
         }
-    } else {
-        alert("Tu as refusé les notifications.");
-        dismissPushBanner();
     }
   } catch (error) {
     console.error("Erreur notifs:", error);
   }
-} // <--- Fermeture de enableNotifications
+}
 
-// --- EXPORTS POUR LE HTML ---
+// --- EXPORTS (RÉPARE LES ERREURS REFERENCEERROR) ---
 window.clearLoginError = clearLoginError;
 window.createUser = createUser;
 window.logout = logout;
@@ -1245,3 +1234,4 @@ window.enableNotifications = enableNotifications;
 window.dismissPushBanner = dismissPushBanner;
 window.switchTab = switchTab;
 window.toggleAdmin = toggleAdmin;
+window.setUserPrimeEligible = setUserPrimeEligible;
