@@ -312,15 +312,18 @@
     }
 
     // Chargement des alertes avec système de validation
+    // --- NOUVELLE LOGIQUE GESTION INCIDENT ---
+
     function loadAlertsData() {
       const container = document.getElementById('alertsList');
-      // On écoute Firebase : alerts (limitToLast 50)
+      
+      // On charge les 50 dernières alertes
       firebase.database().ref('alerts').orderByChild('date').limitToLast(50).on('value', (snap) => {
         const data = snap.val();
         container.innerHTML = "";
         
         if(!data) {
-          container.innerHTML = `<div class="alert-empty">Aucune alerte enregistrée.</div>`;
+          container.innerHTML = `<div class="alert-empty">Aucun incident enregistré.</div>`;
           return;
         }
 
@@ -330,52 +333,52 @@
         list.forEach(item => {
           const d = new Date(item.date);
           const dateStr = d.toLocaleDateString('fr-FR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
-          const cleanBody = (item.body || '').replace(/<[^>]+>/g, ' ').substring(0, 180) + '...';
+          const cleanBody = (item.body || '').replace(/<[^>]+>/g, ' ').substring(0, 200);
 
-          // --- GESTION DES VALIDATIONS ---
-          const validations = item.validations || {};
-          const validatedBy = Object.values(validations); // Liste des gens qui ont validé
+          // Est-ce que le problème est réglé ?
+          // On regarde s'il y a un champ "resolvedBy" dans l'objet alerte
+          const isResolved = !!item.resolvedBy;
           
-          // Est-ce que MOI j'ai déjà validé ?
-          const myUid = window.currentUser ? window.currentUser.uid : null;
-          const iHaveValidated = myUid && validations[myUid];
+          let footerHtml = '';
+          let cardClass = 'alert-card';
+          let badgeText = item.source || 'INCIDENT';
 
-          // Construction de la liste des noms
-          let namesHtml = '';
-          if(validatedBy.length > 0) {
-             namesHtml = '<div style="margin-top:5px;">Vu par : ' + 
-               validatedBy.map(v => `<span class="seen-name">✔ ${v.name}</span>`).join('') + 
-               '</div>';
+          if (isResolved) {
+             // CAS 1 : C'EST RÉGLÉ (Par n'importe qui)
+             cardClass += ' resolved';
+             badgeText = 'RÉSOLU';
+             
+             const resolverName = item.resolvedByName || 'Un membre';
+             const resolvedTime = item.resolvedAt ? new Date(item.resolvedAt).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}) : '';
+             
+             footerHtml = `
+               <div class="resolved-info">
+                 <div class="resolved-by">✅ Réglé par ${escapeHtml(resolverName)}</div>
+                 <div style="font-size:11px; opacity:0.8;">à ${resolvedTime}</div>
+               </div>
+             `;
+             
           } else {
-             namesHtml = '<div style="margin-top:5px;">Non lu</div>';
-          }
-
-          // Bouton de validation (Affiché seulement si je n\'ai pas encore validé)
-          let actionBtn = '';
-          if(!iHaveValidated) {
-            actionBtn = `
-              <button class="btn-validate" onclick="validateAlert('${item.id}')">
-                 ✅ J'ai pris en compte
-              </button>
-            `;
-          } else {
-             // Si j'ai validé, on affiche un petit message discret à la place du bouton
-             actionBtn = `<div style="text-align:center; font-size:11px; color:#10b981; font-weight:800; padding:6px;">Validation enregistrée</div>`;
+             // CAS 2 : PAS ENCORE RÉGLÉ (Urgence)
+             // On affiche le gros bouton vert
+             footerHtml = `
+               <button class="btn-resolve" onclick="solveIssue('${item.id}')">
+                 <span>✅</span> J'ai réglé le problème
+               </button>
+             `;
           }
 
           const card = document.createElement('div');
-          card.className = 'alert-card';
+          card.className = cardClass;
           card.innerHTML = `
             <div class="alert-header">
-               <span class="alert-badge">${item.source || 'ALERTE'}</span>
+               <span class="alert-badge">${badgeText}</span>
                <span class="alert-date">${dateStr}</span>
             </div>
             <div class="alert-title">${item.title}</div>
             <div class="alert-snippet">${cleanBody}</div>
-            
             <div class="alert-footer">
-               ${actionBtn}
-               <div class="alert-seen-list">${namesHtml}</div>
+               ${footerHtml}
             </div>
           `;
           container.appendChild(card);
@@ -383,49 +386,35 @@
       });
     }
 
-    // Fonction appelée quand on clique sur le bouton vert
-    function validateAlert(alertId) {
-      if(!window.currentUser) return alert("Erreur: Utilisateur non identifié");
+    // Fonction appelée quand on clique sur le bouton
+    function solveIssue(alertId) {
+      if(!window.currentUser) return alert("Erreur: Tu dois être connecté.");
       
-      const uid = window.currentUser.uid;
-      const name = window.currentUser.name || "Membre";
+      const name = window.currentUser.name || "Équipe";
 
-      // On écrit dans la base de données : alerts/ID/validations/UID
-      firebase.database().ref(`alerts/${alertId}/validations/${uid}`).set({
-        name: name,
-        time: Date.now()
-      }).then(() => {
-        window.showToast("✅ Validé !");
-      }).catch(e => {
-        console.error(e);
-        alert("Erreur lors de la validation");
-      });
-    }
-
-        // Tri : plus récent en haut
-        const list = Object.keys(data).map(k => ({...data[k]})).sort((a,b) => b.date - a.date);
-
-        list.forEach(item => {
-          const d = new Date(item.date);
-          const dateStr = d.toLocaleDateString('fr-FR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
-          // Nettoyage HTML pour snippet
-          const cleanBody = (item.body || '').replace(/<[^>]+>/g, ' ').substring(0, 180) + '...';
-
-          const card = document.createElement('div');
-          card.className = 'alert-card';
-          card.innerHTML = `
-            <div class="alert-header">
-               <span class="alert-badge">${item.source || 'ALERTE'}</span>
-               <span class="alert-date">${dateStr}</span>
-            </div>
-            <div class="alert-title">${item.title}</div>
-            <div class="alert-snippet">${cleanBody}</div>
-          `;
-          container.appendChild(card);
+      if(confirm("Confirmes-tu avoir réglé ce problème ?")) {
+        // On met à jour l'alerte pour dire "C'est fini"
+        // Une seule écriture suffit pour bloquer tout le monde ensuite
+        firebase.database().ref(`alerts/${alertId}`).update({
+          resolvedBy: window.currentUser.uid,
+          resolvedByName: name,
+          resolvedAt: Date.now()
+        }).then(() => {
+          window.showToast("✅ Incident clos !");
+          // Pas besoin de recharger, le .on('value') mettra à jour l'affichage tout seul
+        }).catch(e => {
+          alert("Erreur: " + e.message);
         });
+      }
+    }
+    
+    // Petite fonction utilitaire pour éviter les failles XSS
+    function escapeHtml(text) {
+      if (!text) return text;
+      return text.replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
       });
     }
-
     // --- COPIE DES SCRIPTS EMAIL.JS / APP.JS POUR LA PAGE ---
     // (Le reste du JS gère l'auth et la partie Diffusion via email.js inclus plus haut)
     
