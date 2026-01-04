@@ -950,12 +950,97 @@ function togglePub(id, v) { db.ref("objectives/"+id+"/published").set(v); logAct
 function renderAdminUsers() { 
     const d = document.getElementById("usersList"); if(!d) return; d.innerHTML = ""; let totalToPay = 0;
     
-    // 1. Préparation des données
+    // 1. Tri et séparation (Éligibles vs Non éligibles)
     const entries = Object.keys(allUsers || {}).map(uid => ({ uid, u: (allUsers[uid] || {}) })).filter(e => !(e.u.email && String(e.u.email).toLowerCase() === String(SUPER_ADMIN_EMAIL||'').toLowerCase()));
-    const eligibleEntries = []; const ineligibleEntries = []; entries.forEach(e => { const isEligible = (e.u.primeEligible !== false); (isEligible ? eligibleEntries : ineligibleEntries).push(e); });
-    const nameSort = (a,b) => { const an = (a.u.name || a.u.email || a.uid || '').toString(); const bn = (b.u.name || b.u.email || b.uid || '').toString(); return an.localeCompare(bn, 'fr', { sensitivity: 'base' }); };
+    const eligibleEntries = []; const ineligibleEntries = []; 
+    entries.forEach(e => { const isEligible = (e.u.primeEligible !== false); (isEligible ? eligibleEntries : ineligibleEntries).push(e); });
+    
+    const nameSort = (a,b) => (a.u.name || '').localeCompare(b.u.name || '');
     eligibleEntries.sort(nameSort); ineligibleEntries.sort(nameSort);
 
+    // 2. Calculateur de bonus interne
+    function computeUserBonus(u){
+      const userRatio = (u.hours || 35) / BASE_HOURS; let userBonus = 0;
+      const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); 
+      let primOk = true; 
+      if(prims.length > 0) { primOk = prims.every(o => { let threshold = 100; if(o.isFixed) threshold = 100; else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold; if(o.isNumeric) return parseFloat(o.current) >= threshold; return getPct(o.current, o.target, o.isInverse) >= threshold; }); } 
+      
+      Object.values(allObjs).forEach(o => { 
+        if(!o.published) return; 
+        const pct = getPct(o.current, o.target, o.isInverse); 
+        const isLocked = !o.isPrimary && !primOk; 
+        let g = 0; 
+        if(o.isFixed) { 
+          let win = o.isNumeric ? parseFloat(o.current) >= o.target : pct >= 100;
+          if(win && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); 
+        } else { 
+          if(o.paliers) o.paliers.forEach(p => { 
+            let unlocked = o.isNumeric ? parseFloat(o.current) >= p.threshold : pct >= p.threshold;
+            if(unlocked) g += parse(p.prize); 
+          }); 
+        } 
+        if(!isLocked) userBonus += (g * userRatio); 
+      }); 
+      return userBonus;
+    }
+
+    // 3. Fonction de rendu d'une ligne (avec tous les détails)
+    function renderUser(uid, u, isEligible){
+      const userBonus = isEligible ? computeUserBonus(u) : 0; if(isEligible) totalToPay += userBonus;
+      const div = document.createElement("div"); div.className = "user-item"; 
+      const statusClass = (u.status === 'active') ? 'active' : 'pending'; 
+      const statusLabel = (u.status === 'active') ? 'ACTIF' : 'EN ATTENTE'; 
+      let adminBadge = (u.role === 'admin') ? `<span class="admin-tag">ADMIN</span>` : ""; 
+      const checkedAttr = isEligible ? 'checked' : '';
+
+      div.innerHTML = `
+        <div class="user-info">
+          <div class="user-header">
+            <span class="user-name">${u.name || ''} ${adminBadge}</span>
+            <div style="display:flex; align-items:center;">
+              <span class="status-dot ${statusClass}"></span>
+              <span class="status-text">${statusLabel}</span>
+            </div>
+          </div>
+          <div class="user-email-sub">${u.email || ''}</div>
+          <div class="user-meta">${u.hours || 35}h</div>
+          <label class="check-label" style="margin-top:6px; font-size:11px; opacity:.95;">
+            <input type="checkbox" ${checkedAttr} onchange="setUserPrimeEligible('${uid}', this.checked)"> 💶 Compte dans les primes
+          </label>
+        </div>
+        <div class="user-actions">
+          <div class="user-gain">${isEligible ? userBonus.toFixed(2) + '€' : '—'}</div>
+          <div class="btn-group">
+            <button class="action-btn" title="Lien MDP" onclick="reinviteUser('${u.email}')">🔑</button>
+            <button class="action-btn" title="Modifier" onclick="editUser('${uid}')">✏️</button>
+            <button class="action-btn" title="Archives" onclick="openTeamArchive('${uid}')">📄</button>
+            <button class="action-btn delete" title="Supprimer" onclick="deleteUser('${uid}')">🗑️</button>
+          </div>
+        </div>`;
+      d.appendChild(div); 
+    }
+
+    // 4. Exécution
+    eligibleEntries.forEach(e => renderUser(e.uid, e.u, true));
+    
+    const totalDiv = document.createElement("div");
+    totalDiv.className = "total-row";
+    totalDiv.innerHTML = `<span>TOTAL À PAYER</span><strong>${totalToPay.toFixed(2)} €</strong>`;
+    d.appendChild(totalDiv);
+
+    if(ineligibleEntries.length > 0) {
+        const sep = document.createElement("div"); sep.className = "users-sep"; sep.textContent = "Membres hors primes"; d.appendChild(sep);
+        ineligibleEntries.forEach(e => renderUser(e.uid, e.u, false));
+    }
+}
+
+// Fonction de secours pour la clé 🔑
+function reinviteUser(email) {
+    if(confirm(`Renvoyer l'email de configuration de mot de passe à ${email} ?`)) {
+        auth.sendPasswordResetEmail(email).then(() => showToast("✅ Email envoyé !"));
+    }
+}
+window.reinviteUser = reinviteUser;
     // 2. Logique de calcul des bonus
     function computeUserBonus(u){
       const userRatio = (u.hours || 35) / BASE_HOURS; let userBonus = 0;
