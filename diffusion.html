@@ -17,8 +17,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 
-  <style>
-    /* Styles spécifiques pour les cartes d'alerte */
+ <style>
+    /* Styles Alertes & Validation */
     .alert-card {
       background: var(--card-bg);
       border: 1px solid var(--border-color);
@@ -33,8 +33,51 @@
     body.dark-mode .alert-badge { background: rgba(239,68,68,0.2); color: #fca5a5; }
     .alert-date { font-size: 11px; font-weight: 700; color: var(--text-muted); }
     .alert-title { font-size: 15px; font-weight: 900; color: var(--text-main); margin-bottom: 6px; line-height: 1.3; }
-    .alert-snippet { font-size: 13px; color: var(--text-main); opacity: 0.8; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .alert-snippet { font-size: 13px; color: var(--text-main); opacity: 0.8; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 12px; }
     .alert-empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-style: italic; }
+
+    /* NOUVEAU : Zone de validation */
+    .alert-footer {
+      border-top: 1px solid var(--border-color);
+      padding-top: 10px;
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .btn-validate {
+      background: #10b981; /* Vert */
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: 800;
+      font-size: 12px;
+      cursor: pointer;
+      text-transform: uppercase;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: transform 0.1s;
+      width: 100%;
+    }
+    .btn-validate:active { transform: scale(0.98); }
+    .alert-seen-list {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-style: italic;
+      line-height: 1.4;
+    }
+    .seen-name {
+      display: inline-block;
+      background: rgba(16,185,129,0.1);
+      color: #047857;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-right: 4px;
+      margin-bottom: 4px;
+      font-weight: 700;
+      font-style: normal;
+    }
+    body.dark-mode .seen-name { color: #6ee7b7; background: rgba(16,185,129,0.2); }
   </style>
 </head>
 <body>
