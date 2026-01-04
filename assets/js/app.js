@@ -1235,9 +1235,9 @@ async function enableNotifications() {
   } catch (error) {
     console.error("Erreur notifs:", error);
   }
-}
+} // <--- Fermeture de enableNotifications
 
-// --- TOUTE FIN DU FICHIER (EXPORTS) ---
+// --- EXPORTS POUR LE HTML ---
 window.clearLoginError = clearLoginError;
 window.createUser = createUser;
 window.logout = logout;
