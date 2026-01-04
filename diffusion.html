@@ -377,6 +377,27 @@
                </button>
              `;
           }
+          // Fonction de TEST pour générer une fausse alerte
+    function simulateAlert() {
+      if(!confirm("Créer une fausse alerte pour tester l'affichage ?")) return;
+      
+      const fakeIssues = [
+        "Température Frigo Positif (+12°C)",
+        "Coupure Courant Zone Cuisine",
+        "Sonde Congélateur HS",
+        "Porte Chambre Froide Ouverte"
+      ];
+      const randomIssue = fakeIssues[Math.floor(Math.random() * fakeIssues.length)];
+
+      firebase.database().ref('alerts').push({
+        title: "TEST: " + randomIssue,
+        body: "Ceci est une simulation pour vérifier le système d'alerte. Aucune action requise sur le matériel.",
+        date: Date.now(),
+        source: "SIMULATION"
+      }).then(() => {
+        window.showToast("🧪 Alerte de test envoyée !");
+      });
+    }
 
           const card = document.createElement('div');
           card.className = cardClass;
