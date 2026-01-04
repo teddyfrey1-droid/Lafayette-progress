@@ -946,36 +946,6 @@ function saveObj() {
 
 function deleteObj(id) { if(confirm("🗑️ Supprimer ?")) { db.ref("objectives/"+id).remove().then(() => showToast("🗑️ Supprimé")); logAction("Suppression", `Objectif ${id}`); } }
 function togglePub(id, v) { db.ref("objectives/"+id+"/published").set(v); logAction("Publication", `Objectif ${id}: ${v}`); }
-function createUser() { 
-    const email = (document.getElementById("nuEmail") || {}).value || ""; 
-    const name = (document.getElementById("nuName") || {}).value || ""; 
-    const hours = parseFloat((document.getElementById("nuHours") || {}).value) || 35; 
-    const isAdmin = !!((document.getElementById("nuAdmin") || {}).checked); 
-    const cleanEmail = String(email).trim(); 
-    
-    if(!cleanEmail){ showToast("⚠️ Email requis."); return; } 
-
-    // On génère un mot de passe complexe que l'admin n'a pas besoin de connaître
-    const TEMP_PASS = Math.random().toString(36).slice(-10) + "Aa1!"; 
-    
-    // Création du compte et envoi immédiat du mail de configuration
-    auth.createUserWithEmailAndPassword(cleanEmail, TEMP_PASS).then(c => { 
-        // Envoi du mail officiel Firebase pour que l'employé choisisse son MDP
-        auth.sendPasswordResetEmail(cleanEmail);
-        
-        db.ref('users/'+c.user.uid).set({ 
-            name: String(name).trim() || "Utilisateur", 
-            hours: hours, 
-            role: isAdmin ? 'admin' : 'staff', 
-            email: cleanEmail, 
-            status: 'pending', 
-            primeEligible: true 
-        }); 
-        showToast("✅ Membre créé ! Invitation envoyée par email."); 
-    }).catch(e => { 
-        alert(e && e.message ? e.message : "Erreur création"); 
-    }); 
-}
 
 function renderAdminUsers() { 
     const d = document.getElementById("usersList"); if(!d) return; d.innerHTML = ""; let totalToPay = 0;
