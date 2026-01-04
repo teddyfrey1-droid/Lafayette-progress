@@ -991,15 +991,77 @@ function renderAdminUsers() {
       const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); let primOk = true; if(prims.length > 0) { primOk = prims.every(o => { let threshold = 100; if(o.isFixed) threshold = 100; else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold; if(o.isNumeric) return parseFloat(o.current) >= threshold; const pct = getPct(o.current, o.target, o.isInverse); return pct >= threshold; }); } 
       Object.values(allObjs).forEach(o => { if(!o.published) return; const pct = getPct(o.current, o.target, o.isInverse); const isLocked = !o.isPrimary && !primOk; let g = 0; if(o.isFixed) { let win = false; if(o.isNumeric) win = parseFloat(o.current) >= o.target; else win = pct >= 100; if(win && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); } else { if(o.paliers) o.paliers.forEach(p => { let unlocked = false; if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold; else unlocked = pct >= p.threshold; if(unlocked) g += parse(p.prize); }); } if(!isLocked) userBonus += (g * userRatio); }); return userBonus;
     }
-    function renderUser(uid, u, isEligible){
+   function renderUser(uid, u, isEligible){
       const userBonus = isEligible ? computeUserBonus(u) : 0; if(isEligible) totalToPay += userBonus;
-      const div = document.createElement("div"); div.className = "user-item"; const statusClass = (u.status === 'active') ? 'active' : 'pending'; const statusLabel = (u.status === 'active') ? 'ACTIF' : 'EN ATTENTE'; let adminBadge = ""; if(u.role === 'admin') adminBadge = `<span class="admin-tag">ADMIN</span>`; const checked = isEligible ? 'checked' : ''; const gain = isEligible ? userBonus.toFixed(2) + '€' : '—';
-      div.innerHTML = `<div class="user-info"><div class="user-header"><span class="user-name">${u.name || ''} ${adminBadge}</span><div style="display:flex; align-items:center;"><span class="status-dot ${statusClass}"></span><span class="status-text">${statusLabel}</span></div></div><div class="user-email-sub">${u.email || ''}</div><div class="user-meta">${u.hours || 35}h</div><label class="check-label" style="margin-top:6px; font-size:11px; opacity:.95;"><input type="checkbox" ${checked} onchange="setUserPrimeEligible('${uid}', this.checked)"> 💶 Compte dans les primes</label></div><div class="user-actions"><div class="user-gain">${gain}</div><div class="btn-group"><button onclick="openTeamArchive('${uid}')" class="action-btn" title="Archive mensuelle">📄</button><button onclick="editUser('${uid}')" class="action-btn" title="Modifier">✏️</button><button onclick="deleteUser('${uid}')" class="action-btn delete" title="Supprimer">🗑️</button></div></div>`; d.appendChild(div); 
+      const div = document.createElement("div"); div.className = "user-item"; 
+      const statusClass = (u.status === 'active') ? 'active' : 'pending'; 
+      const statusLabel = (u.status === 'active') ? 'ACTIF' : 'EN ATTENTE'; 
+      let adminBadge = ""; if(u.role === 'admin') adminBadge = `<span class="admin-tag">ADMIN</span>`; 
+      const checked = isEligible ? 'checked' : ''; 
+      const gain = isEligible ? userBonus.toFixed(2) + '€' : '—';
+
+      // --- ON RECONSTRUIT LE CONTENU ---
+      div.innerHTML = `
+        <div class="user-info">
+          <div class="user-header">
+            <span class="user-name">${u.name || ''} ${adminBadge}</span>
+            <div style="display:flex; align-items:center;">
+              <span class="status-dot ${statusClass}"></span>
+              <span class="status-text">${statusLabel}</span>
+            </div>
+          </div>
+          <div class="user-email-sub">${u.email || ''}</div>
+          <div class="user-meta">${u.hours || 35}h</div>
+          <label class="check-label" style="margin-top:6px; font-size:11px; opacity:.95;">
+            <input type="checkbox" ${checked} onchange="setUserPrimeEligible('${uid}', this.checked)"> 💶 Compte dans les primes
+          </label>
+        </div>
+        <div class="user-actions">
+          <div class="user-gain">${gain}</div>
+          <div class="btn-group"></div>
+        </div>`;
+
+      const btnGroup = div.querySelector('.btn-group');
+
+      // 1. Bouton Clé (🔑) - NOUVEAU
+      const btnReset = document.createElement('button');
+      btnReset.innerHTML = '🔑';
+      btnReset.className = 'action-btn';
+      btnReset.title = "Renvoyer l'email de configuration du mot de passe";
+      btnReset.onclick = () => {
+          if(confirm(`Envoyer un lien de configuration de mot de passe à ${u.email} ?`)) {
+              firebase.auth().sendPasswordResetEmail(u.email)
+                  .then(() => showToast("✅ Email envoyé !"))
+                  .catch(err => alert("❌ Erreur : " + err.message));
+          }
+      };
+
+      // 2. Bouton Archive (📄)
+      const btnArchive = document.createElement('button');
+      btnArchive.innerHTML = '📄';
+      btnArchive.className = 'action-btn';
+      btnArchive.onclick = () => openTeamArchive(uid);
+
+      // 3. Bouton Modifier (✏️)
+      const btnEdit = document.createElement('button');
+      btnEdit.innerHTML = '✏️';
+      btnEdit.className = 'action-btn';
+      btnEdit.onclick = () => editUser(uid);
+
+      // 4. Bouton Supprimer (🗑️)
+      const btnDel = document.createElement('button');
+      btnDel.innerHTML = '🗑️';
+      btnDel.className = 'action-btn delete';
+      btnDel.onclick = () => deleteUser(uid);
+
+      // On ajoute les boutons dans l'ordre au groupe
+      btnGroup.appendChild(btnReset);
+      btnGroup.appendChild(btnArchive);
+      btnGroup.appendChild(btnEdit);
+      btnGroup.appendChild(btnDel);
+
+      d.appendChild(div); 
     }
-    eligibleEntries.forEach(e => renderUser(e.uid, e.u, true));
-    const totalRow = document.createElement("div"); totalRow.className = "total-row"; totalRow.innerHTML = `<span>Total à payer</span><span>${totalToPay.toFixed(2)} €</span>`; d.appendChild(totalRow);
-    if(ineligibleEntries.length){ const sep = document.createElement("div"); sep.className = "users-sep"; sep.textContent = "Non comptés dans les primes"; d.appendChild(sep); ineligibleEntries.forEach(e => renderUser(e.uid, e.u, false)); }
-}
 
 function setUserPrimeEligible(uid, isEligible){
   if(!isAdminUser()) return; const val = !!isEligible; const prev = (allUsers && allUsers[uid]) ? (allUsers[uid].primeEligible !== false) : true;
