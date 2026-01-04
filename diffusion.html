@@ -286,7 +286,7 @@
   <script src="assets/js/app.js"></script>
   <script src="assets/js/email.js"></script>
   
- <script>
+<script>
     // --- 1. CONFIGURATION & OUTILS ---
     if(localStorage.getItem('heiko_dark_mode') === 'true') document.body.classList.add('dark-mode');
     
@@ -304,7 +304,6 @@
     window.showToast = showToast;
 
     // --- 2. AUTHENTIFICATION & GESTION DES DROITS ---
-    // (On utilise la variable SUPER_ADMIN_EMAIL déjà définie dans app.js si elle existe)
     
     firebase.auth().onAuthStateChanged(user => {
       if(user) {
@@ -490,8 +489,7 @@
       }
     }
 
-    // --- 5. FONCTION DE SIMULATION ---
-   // --- 5. FONCTION DE SIMULATION (VERSION QUI ENVOIE LE PUSH) ---
+    // --- 5. FONCTION DE SIMULATION (VERSION FETCH) ---
     window.simulateAlert = async function() {
       // URL de ta fonction (la même que dans Google Script)
       const url = "https://us-central1-objectif-restaurant.cloudfunctions.net/receiveExternalAlert?secret=SUPER_SECRET_LAFAYETTE_99";
@@ -519,23 +517,11 @@
           })
         });
 
-        // Pas besoin d'écrire dans la base ici, la Cloud Function va le faire !
         showToast("✅ Simulation réussie ! Vérifie ton téléphone.");
         
       } catch (e) {
         alert("Erreur lors de la simulation : " + e.message);
       }
-    }
-      firebase.database().ref('alerts').push({
-        title: "TEST: " + randomIssue,
-        body: "Ceci est une simulation pour vérifier le système. Aucune action requise.",
-        date: Date.now(),
-        source: "SIMULATION"
-      }).then(() => {
-        showToast("🧪 Alerte de test envoyée !");
-      }).catch(err => {
-        alert("Erreur (Permission): " + err.message);
-      });
     }
 
     // Helpers
