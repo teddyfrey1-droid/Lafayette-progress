@@ -947,248 +947,217 @@ function saveObj() {
 function deleteObj(id) { if(confirm("🗑️ Supprimer ?")) { db.ref("objectives/"+id).remove().then(() => showToast("🗑️ Supprimé")); logAction("Suppression", `Objectif ${id}`); } }
 function togglePub(id, v) { db.ref("objectives/"+id+"/published").set(v); logAction("Publication", `Objectif ${id}: ${v}`); }
 
-function renderAdminUsers() { 
-    const d = document.getElementById("usersList"); if(!d) return; d.innerHTML = ""; let totalToPay = 0;
-    
-    // 1. Tri et séparation (Éligibles vs Non éligibles)
-    const entries = Object.keys(allUsers || {}).map(uid => ({ uid, u: (allUsers[uid] || {}) })).filter(e => !(e.u.email && String(e.u.email).toLowerCase() === String(SUPER_ADMIN_EMAIL||'').toLowerCase()));
-    const eligibleEntries = []; const ineligibleEntries = []; 
-    entries.forEach(e => { const isEligible = (e.u.primeEligible !== false); (isEligible ? eligibleEntries : ineligibleEntries).push(e); });
-    
-    const nameSort = (a,b) => (a.u.name || '').localeCompare(b.u.name || '');
-    eligibleEntries.sort(nameSort); ineligibleEntries.sort(nameSort);
+function renderAdminUsers() {
+  const d = document.getElementById("usersList");
+  if(!d) return;
+  d.innerHTML = "";
+  let totalToPay = 0;
 
-    // 2. Calculateur de bonus interne
-    function computeUserBonus(u){
-      const userRatio = (u.hours || 35) / BASE_HOURS; let userBonus = 0;
-      const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); 
-      let primOk = true; 
-      if(prims.length > 0) { primOk = prims.every(o => { let threshold = 100; if(o.isFixed) threshold = 100; else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold; if(o.isNumeric) return parseFloat(o.current) >= threshold; return getPct(o.current, o.target, o.isInverse) >= threshold; }); } 
-      
-      Object.values(allObjs).forEach(o => { 
-        if(!o.published) return; 
-        const pct = getPct(o.current, o.target, o.isInverse); 
-        const isLocked = !o.isPrimary && !primOk; 
-        let g = 0; 
-        if(o.isFixed) { 
-          let win = o.isNumeric ? parseFloat(o.current) >= o.target : pct >= 100;
-          if(win && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); 
-        } else { 
-          if(o.paliers) o.paliers.forEach(p => { 
-            let unlocked = o.isNumeric ? parseFloat(o.current) >= p.threshold : pct >= p.threshold;
-            if(unlocked) g += parse(p.prize); 
-          }); 
-        } 
-        if(!isLocked) userBonus += (g * userRatio); 
-      }); 
-      return userBonus;
+  // 1) Préparation des données (hors super-admin)
+  const entries = Object.keys(allUsers || {})
+    .map(uid => ({ uid, u: (allUsers[uid] || {}) }))
+    .filter(e => !(e.u.email && String(e.u.email).toLowerCase() === String(SUPER_ADMIN_EMAIL || '').toLowerCase()));
+
+  const eligibleEntries = [];
+  const ineligibleEntries = [];
+  entries.forEach(e => {
+    const isEligible = (e.u.primeEligible !== false);
+    (isEligible ? eligibleEntries : ineligibleEntries).push(e);
+  });
+
+  const nameSort = (a,b) => {
+    const an = (a.u.name || a.u.email || a.uid || '').toString();
+    const bn = (b.u.name || b.u.email || b.uid || '').toString();
+    return an.localeCompare(bn, 'fr', { sensitivity: 'base' });
+  };
+  eligibleEntries.sort(nameSort);
+  ineligibleEntries.sort(nameSort);
+
+  // 2) Calcul du bonus (si inclus primes)
+  function computeUserBonus(u){
+    const userRatio = ((u.hours || 35) / BASE_HOURS);
+    let userBonus = 0;
+
+    const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published);
+    let primOk = true;
+    if(prims.length > 0) {
+      primOk = prims.every(o => {
+        let threshold = 100;
+        if(o.isFixed) threshold = 100;
+        else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold;
+        if(o.isNumeric) return parseFloat(o.current) >= threshold;
+        const pct = getPct(o.current, o.target, o.isInverse);
+        return pct >= threshold;
+      });
     }
 
-    // 3. Fonction de rendu d'une ligne (avec tous les détails)
-    function renderUser(uid, u, isEligible){
-      const userBonus = isEligible ? computeUserBonus(u) : 0; if(isEligible) totalToPay += userBonus;
-      const div = document.createElement("div"); div.className = "user-item"; 
-      const statusClass = (u.status === 'active') ? 'active' : 'pending'; 
-      const statusLabel = (u.status === 'active') ? 'ACTIF' : 'EN ATTENTE'; 
-      let adminBadge = (u.role === 'admin') ? `<span class="admin-tag">ADMIN</span>` : ""; 
-      const checkedAttr = isEligible ? 'checked' : '';
+    Object.values(allObjs).forEach(o => {
+      if(!o.published) return;
+      const isLocked = !o.isPrimary && !primOk;
+      if(isLocked) return;
 
-      div.innerHTML = `
-        <div class="user-info">
-          <div class="user-header">
-            <span class="user-name">${u.name || ''} ${adminBadge}</span>
-            <div style="display:flex; align-items:center;">
-              <span class="status-dot ${statusClass}"></span>
-              <span class="status-text">${statusLabel}</span>
-            </div>
-          </div>
-          <div class="user-email-sub">${u.email || ''}</div>
-          <div class="user-meta">${u.hours || 35}h</div>
-          <label class="check-label" style="margin-top:6px; font-size:11px; opacity:.95;">
-            <input type="checkbox" ${checkedAttr} onchange="setUserPrimeEligible('${uid}', this.checked)"> 💶 Compte dans les primes
-          </label>
+      const pct = getPct(o.current, o.target, o.isInverse);
+      let g = 0;
+
+      if(o.isFixed) {
+        let win = false;
+        if(o.isNumeric) win = parseFloat(o.current) >= o.target;
+        else win = pct >= 100;
+        if(win && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize);
+      } else {
+        (o.paliers || []).forEach(p => {
+          let unlocked = false;
+          if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold;
+          else unlocked = pct >= p.threshold;
+          if(unlocked) g += parse(p.prize);
+        });
+      }
+
+      userBonus += (g * userRatio);
+    });
+
+    return userBonus;
+  }
+
+  function safeHours(u){
+    const h = (u && u.hours != null) ? parseFloat(String(u.hours).replace(',', '.')) : NaN;
+    if(!isFinite(h) || h <= 0) return 35;
+    return Math.round(h * 10) / 10;
+  }
+
+  // 3) Rendu d'un utilisateur
+  function renderUserRow(uid, u, isEligible){
+    const status = (u.status === 'active') ? 'active' : 'pending';
+    const statusLabel = (status === 'active') ? 'Actif' : 'En attente';
+    const hours = safeHours(u);
+    const isAdminFlag = (u.role === 'admin') || (u.email && String(u.email).toLowerCase() === String(SUPER_ADMIN_EMAIL || '').toLowerCase());
+
+    const userBonus = isEligible ? computeUserBonus(u) : 0;
+    if(isEligible) totalToPay += userBonus;
+    const gain = isEligible ? (userBonus.toFixed(2) + '€') : '—';
+
+    const div = document.createElement('div');
+    div.className = 'user-item';
+
+    div.innerHTML = `
+      <div class="user-info" style="min-width:0;">
+        <div class="user-header" style="gap:10px; flex-wrap:wrap;">
+          <span class="user-name">${escapeHtml(u.name || '')}</span>
+          ${isAdminFlag ? `<span class="pub-state on" style="font-size:11px; padding:2px 8px;">ADMIN</span>` : ``}
+          <span class="status-dot ${status}" title="${statusLabel}"></span>
+          <span style="font-size:11px; color:var(--text-muted); font-weight:800;">${statusLabel}</span>
         </div>
-        <div class="user-actions">
-          <div class="user-gain">${isEligible ? userBonus.toFixed(2) + '€' : '—'}</div>
-          <div class="btn-group">
-            <button class="action-btn" title="Lien MDP" onclick="reinviteUser('${u.email}')">🔑</button>
-            <button class="action-btn" title="Modifier" onclick="editUser('${uid}')">✏️</button>
-            <button class="action-btn" title="Archives" onclick="openTeamArchive('${uid}')">📄</button>
-            <button class="action-btn delete" title="Supprimer" onclick="deleteUser('${uid}')">🗑️</button>
-          </div>
-        </div>`;
-      d.appendChild(div); 
-    }
+        <div class="user-meta" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <span class="user-email-sub">${escapeHtml(u.email || '')}</span>
+          <span style="opacity:.85;">⏱️ ${hours}h</span>
+        </div>
+      </div>
+      <div class="user-actions">
+        <div class="user-gain">${gain}</div>
+        <div class="btn-group"></div>
+      </div>`;
 
-    // 4. Exécution
-    eligibleEntries.forEach(e => renderUser(e.uid, e.u, true));
-    
-    const totalDiv = document.createElement("div");
-    totalDiv.className = "total-row";
-    totalDiv.innerHTML = `<span>TOTAL À PAYER</span><strong>${totalToPay.toFixed(2)} €</strong>`;
-    d.appendChild(totalDiv);
+    const btnGroup = div.querySelector('.btn-group');
 
-    if(ineligibleEntries.length > 0) {
-        const sep = document.createElement("div"); sep.className = "users-sep"; sep.textContent = "Membres hors primes"; d.appendChild(sep);
-        ineligibleEntries.forEach(e => renderUser(e.uid, e.u, false));
-    }
+    // Toggle "Primes" (inclure / exclure du calcul)
+    const primeWrap = document.createElement('label');
+    primeWrap.style.display = 'inline-flex';
+    primeWrap.style.alignItems = 'center';
+    primeWrap.style.gap = '6px';
+    primeWrap.style.marginRight = '6px';
+    primeWrap.style.fontSize = '11px';
+    primeWrap.style.fontWeight = '900';
+    primeWrap.style.color = 'var(--text-muted)';
+    primeWrap.title = 'Inclure / exclure du calcul des primes';
+    primeWrap.innerHTML = `<input type="checkbox" ${isEligible ? 'checked' : ''} style="transform:scale(1.05);"> <span>Primes</span>`;
+    const chk = primeWrap.querySelector('input');
+    chk.onchange = () => setUserPrimeEligible(uid, chk.checked);
+
+    // Modifier (nom / email / heures)
+    const btnEdit = document.createElement('button');
+    btnEdit.innerHTML = '✏️';
+    btnEdit.className = 'action-btn';
+    btnEdit.title = 'Modifier (nom, email, heures)';
+    btnEdit.onclick = () => quickEditUser(uid);
+
+    // Renvoyer l'invitation (reset mdp)
+    const btnReset = document.createElement('button');
+    btnReset.innerHTML = '🔑';
+    btnReset.className = 'action-btn';
+    btnReset.title = "Renvoyer l'email de configuration du mot de passe";
+    btnReset.onclick = () => {
+      if(!u.email) { alert('Email manquant.'); return; }
+      if(confirm(`Renvoyer un lien de configuration de mot de passe à ${u.email} ?`)) {
+        auth.sendPasswordResetEmail(u.email)
+          .then(() => showToast('✅ Email envoyé !'))
+          .catch(err => alert('Erreur : ' + err.message));
+      }
+    };
+
+    // Supprimer
+    const btnDel = document.createElement('button');
+    btnDel.innerHTML = '🗑️';
+    btnDel.className = 'action-btn delete';
+    btnDel.title = "Supprimer l'utilisateur";
+    btnDel.onclick = () => { if(confirm('Supprimer ?')) db.ref('users/'+uid).remove(); };
+
+    btnGroup.appendChild(primeWrap);
+    btnGroup.appendChild(btnEdit);
+    btnGroup.appendChild(btnReset);
+    btnGroup.appendChild(btnDel);
+
+    d.appendChild(div);
+  }
+
+  // 4) Affichage : inclus primes, total, puis hors primes
+  eligibleEntries.forEach(e => renderUserRow(e.uid, e.u, true));
+
+  const totalDiv = document.createElement('div');
+  totalDiv.className = 'total-row';
+  totalDiv.innerHTML = `<span>TOTAL À PAYER</span><strong>${totalToPay.toFixed(2)} €</strong>`;
+  d.appendChild(totalDiv);
+
+  if(ineligibleEntries.length > 0) {
+    const sep = document.createElement('div');
+    sep.className = 'users-sep';
+    sep.textContent = 'Hors primes';
+    d.appendChild(sep);
+    ineligibleEntries.forEach(e => renderUserRow(e.uid, e.u, false));
+  }
 }
 
-// Fonction de secours pour la clé 🔑
-function reinviteUser(email) {
-    if(confirm(`Renvoyer l'email de configuration de mot de passe à ${email} ?`)) {
-        auth.sendPasswordResetEmail(email).then(() => showToast("✅ Email envoyé !"));
-    }
+function quickEditUser(uid){
+  if(!isAdminUser()) return;
+  const u = (allUsers && allUsers[uid]) ? (allUsers[uid] || {}) : {};
+
+  const name = prompt('Nom', (u.name || '').toString());
+  if(name === null) return;
+
+  const email = prompt('Email (affichage / reset mdp)', (u.email || '').toString());
+  if(email === null) return;
+
+  const hoursStr = prompt('Heures / semaine', (u.hours != null ? String(u.hours) : '35'));
+  if(hoursStr === null) return;
+
+  const hours = parseFloat(String(hoursStr).replace(',', '.'));
+  if(!isFinite(hours) || hours <= 0){
+    alert('Heures invalides.');
+    return;
+  }
+
+  const updates = {
+    name: String(name).trim(),
+    email: String(email).trim(),
+    hours: Math.round(hours * 10) / 10
+  };
+
+  db.ref('users/'+uid).update(updates).then(() => {
+    showToast('✅ Modifié');
+    try{ logAction('Équipe', `Modif user ${uid}`); }catch(e){}
+  }).catch(err => alert('Erreur : ' + (err && err.message ? err.message : err)));
 }
-window.reinviteUser = reinviteUser;
-    // 2. Logique de calcul des bonus
-    function computeUserBonus(u){
-      const userRatio = (u.hours || 35) / BASE_HOURS; let userBonus = 0;
-      const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); let primOk = true; if(prims.length > 0) { primOk = prims.every(o => { let threshold = 100; if(o.isFixed) threshold = 100; else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold; if(o.isNumeric) return parseFloat(o.current) >= threshold; const pct = getPct(o.current, o.target, o.isInverse); return pct >= threshold; }); } 
-      Object.values(allObjs).forEach(o => { if(!o.published) return; const pct = getPct(o.current, o.target, o.isInverse); const isLocked = !o.isPrimary && !primOk; let g = 0; if(o.isFixed) { let win = false; if(o.isNumeric) win = parseFloat(o.current) >= o.target; else win = pct >= 100; if(win && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); } else { if(o.paliers) o.paliers.forEach(p => { let unlocked = false; if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold; else unlocked = pct >= p.threshold; if(unlocked) g += parse(p.prize); }); } if(!isLocked) userBonus += (g * userRatio); }); return userBonus;
-    }
+window.quickEditUser = quickEditUser;
 
-    // 3. Fonction d'affichage d'une ligne utilisateur (UN SEUL EXEMPLAIRE)
-    function renderUser(uid, u, isEligible){
-      const userBonus = isEligible ? computeUserBonus(u) : 0; if(isEligible) totalToPay += userBonus;
-      const div = document.createElement("div"); div.className = "user-item"; 
-      const statusClass = (u.status === 'active') ? 'active' : 'pending'; 
-      const gain = isEligible ? userBonus.toFixed(2) + '€' : '—';
-
-      div.innerHTML = `
-        <div class="user-info">
-          <div class="user-header">
-            <span class="user-name">${u.name || ''}</span>
-            <span class="status-dot ${statusClass}"></span>
-          </div>
-          <div class="user-email-sub">${u.email || ''}</div>
-        </div>
-        <div class="user-actions">
-          <div class="user-gain">${gain}</div>
-          <div class="btn-group"></div>
-        </div>`;
-
-      const btnGroup = div.querySelector('.btn-group');
-
-      // Bouton Clé 🔑
-      const btnReset = document.createElement('button');
-      btnReset.innerHTML = '🔑';
-      btnReset.className = 'action-btn';
-      btnReset.title = "Renvoyer l'invitation";
-      btnReset.onclick = () => {
-          if(confirm(`Renvoyer un lien de mot de passe à ${u.email} ?`)) {
-              auth.sendPasswordResetEmail(u.email).then(() => showToast("✅ Email envoyé !"));
-          }
-      };
-
-      // Bouton Supprimer 🗑️
-      const btnDel = document.createElement('button');
-      btnDel.innerHTML = '🗑️';
-      btnDel.className = 'action-btn delete';
-      btnDel.onclick = () => { if(confirm("Supprimer ?")) db.ref('users/'+uid).remove(); };
-
-      btnGroup.appendChild(btnReset);
-      btnGroup.appendChild(btnDel);
-      d.appendChild(div); 
-    }
-
-    // 4. Lancement de l'affichage
-    eligibleEntries.forEach(e => renderUser(e.uid, e.u, true));
-
-    // Ligne du total
-    const totalDiv = document.createElement("div");
-    totalDiv.className = "total-row";
-    totalDiv.innerHTML = `<span>TOTAL À PAYER</span><strong>${totalToPay.toFixed(2)} €</strong>`;
-    d.appendChild(totalDiv);
-
-    if(ineligibleEntries.length > 0) {
-        const sep = document.createElement("div"); sep.className = "users-sep"; sep.textContent = "Hors primes"; d.appendChild(sep);
-        ineligibleEntries.forEach(e => renderUser(e.uid, e.u, false));
-    }
-
-} // <--- CETTE ACCOLADE FERME renderAdminUsers
-  function renderUser(uid, u, isEligible){
-      const userBonus = isEligible ? computeUserBonus(u) : 0; if(isEligible) totalToPay += userBonus;
-      const div = document.createElement("div"); div.className = "user-item"; 
-      const statusClass = (u.status === 'active') ? 'active' : 'pending'; 
-      const gain = isEligible ? userBonus.toFixed(2) + '€' : '—';
-
-      div.innerHTML = `
-        <div class="user-info">
-          <div class="user-header">
-            <span class="user-name">${u.name || ''}</span>
-            <span class="status-dot ${statusClass}"></span>
-          </div>
-          <div class="user-email-sub">${u.email || ''}</div>
-        </div>
-        <div class="user-actions">
-          <div class="user-gain">${gain}</div>
-          <div class="btn-group"></div>
-        </div>`;
-
-      const btnGroup = div.querySelector('.btn-group');
-      const btnReset = document.createElement('button');
-      btnReset.innerHTML = '🔑';
-      btnReset.className = 'action-btn';
-      btnReset.onclick = () => {
-          if(confirm(`Renvoyer le mail à ${u.email} ?`)) {
-              auth.sendPasswordResetEmail(u.email).then(() => showToast("✅ Envoyé !"));
-          }
-      };
-      const btnDel = document.createElement('button');
-      btnDel.innerHTML = '🗑️';
-      btnDel.className = 'action-btn delete';
-      btnDel.onclick = () => { if(confirm("Supprimer ?")) db.ref('users/'+uid).remove(); };
-
-      btnGroup.appendChild(btnReset);
-      btnGroup.appendChild(btnDel);
-      d.appendChild(div); 
-    }
-  
-    function renderUser(uid, u, isEligible){
-      const userBonus = isEligible ? computeUserBonus(u) : 0; if(isEligible) totalToPay += userBonus;
-      const div = document.createElement("div"); div.className = "user-item"; 
-      const statusClass = (u.status === 'active') ? 'active' : 'pending'; 
-      const gain = isEligible ? userBonus.toFixed(2) + '€' : '—';
-
-      div.innerHTML = `
-        <div class="user-info">
-          <div class="user-header">
-            <span class="user-name">${u.name || ''}</span>
-            <span class="status-dot ${statusClass}"></span>
-          </div>
-          <div class="user-email-sub">${u.email || ''}</div>
-        </div>
-        <div class="user-actions">
-          <div class="user-gain">${gain}</div>
-          <div class="btn-group"></div>
-        </div>`;
-
-      const btnGroup = div.querySelector('.btn-group');
-
-      // --- NOUVEAU BOUTON CLÉ (🔑) ---
-      const btnReset = document.createElement('button');
-      btnReset.innerHTML = '🔑';
-      btnReset.className = 'action-btn';
-      btnReset.title = "Renvoyer l'email de configuration du mot de passe";
-      btnReset.onclick = () => {
-          if(confirm(`Renvoyer un lien de configuration de mot de passe à ${u.email} ?`)) {
-              auth.sendPasswordResetEmail(u.email)
-                  .then(() => showToast("✅ Email envoyé !"))
-                  .catch(err => alert("Erreur : " + err.message));
-          }
-      };
-
-      // BOUTON SUPPRIMER (🗑️)
-      const btnDel = document.createElement('button');
-      btnDel.innerHTML = '🗑️';
-      btnDel.className = 'action-btn delete';
-      btnDel.onclick = () => { if(confirm("Supprimer ?")) db.ref('users/'+uid).remove(); };
-
-      btnGroup.appendChild(btnReset); // On ajoute la clé
-      btnGroup.appendChild(btnDel);   // On ajoute la poubelle
-      d.appendChild(div); 
-    }
 function setUserPrimeEligible(uid, isEligible){
   if(!isAdminUser()) return; const val = !!isEligible; const prev = (allUsers && allUsers[uid]) ? (allUsers[uid].primeEligible !== false) : true;
   try{ if(allUsers && allUsers[uid]) allUsers[uid].primeEligible = val; renderAdminUsers(); }catch(e){}
