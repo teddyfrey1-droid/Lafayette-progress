@@ -292,171 +292,24 @@
   <script src="assets/js/app.js"></script>
   <script src="assets/js/email.js"></script>
   
-  <script>
-    // --- GESTION DES ONGLETS & ALERTES ---
+<script>
+    // --- 1. CONFIGURATION & OUTILS ---
+    if(localStorage.getItem('heiko_dark_mode') === 'true') document.body.classList.add('dark-mode');
     
-    // Initialisation
-    window.addEventListener('DOMContentLoaded', () => {
-      // Vérifie si on arrive avec #alerts dans l'URL
-      if(window.location.hash === '#alerts') {
-        switchTab('alerts');
-      } else {
-        switchTab('diffusion');
-      }
-      
-      // Charge les alertes en temps réel
-      loadAlertsData();
-    });
-
-    function switchTab(tabName) {
-      // Boutons
-      document.getElementById('tabBtnDiffusion').classList.toggle('active', tabName === 'diffusion');
-      document.getElementById('tabBtnAlerts').classList.toggle('active', tabName === 'alerts');
-      
-      // Panneaux
-      document.getElementById('panelDiffusion').style.display = (tabName === 'diffusion') ? 'block' : 'none';
-      document.getElementById('panelAlerts').style.display = (tabName === 'alerts') ? 'block' : 'none';
-      
-      // Update URL hash sans scroll
-      history.replaceState(null, null, tabName === 'alerts' ? '#alerts' : '#diffusion');
-    }
-
-    // Chargement des alertes avec système de validation
-    // --- NOUVELLE LOGIQUE GESTION INCIDENT ---
-
-    function loadAlertsData() {
-      const container = document.getElementById('alertsList');
-      
-      // On charge les 50 dernières alertes
-      firebase.database().ref('alerts').orderByChild('date').limitToLast(50).on('value', (snap) => {
-        const data = snap.val();
-        container.innerHTML = "";
-        
-        if(!data) {
-          container.innerHTML = `<div class="alert-empty">Aucun incident enregistré.</div>`;
-          return;
-        }
-
-        // Tri : plus récent en haut
-        const list = Object.keys(data).map(k => ({id: k, ...data[k]})).sort((a,b) => b.date - a.date);
-
-        list.forEach(item => {
-          const d = new Date(item.date);
-          const dateStr = d.toLocaleDateString('fr-FR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
-          const cleanBody = (item.body || '').replace(/<[^>]+>/g, ' ').substring(0, 200);
-
-          // Est-ce que le problème est réglé ?
-          // On regarde s'il y a un champ "resolvedBy" dans l'objet alerte
-          const isResolved = !!item.resolvedBy;
-          
-          let footerHtml = '';
-          let cardClass = 'alert-card';
-          let badgeText = item.source || 'INCIDENT';
-
-          if (isResolved) {
-             // CAS 1 : C'EST RÉGLÉ (Par n'importe qui)
-             cardClass += ' resolved';
-             badgeText = 'RÉSOLU';
-             
-             const resolverName = item.resolvedByName || 'Un membre';
-             const resolvedTime = item.resolvedAt ? new Date(item.resolvedAt).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}) : '';
-             
-             footerHtml = `
-               <div class="resolved-info">
-                 <div class="resolved-by">✅ Réglé par ${escapeHtml(resolverName)}</div>
-                 <div style="font-size:11px; opacity:0.8;">à ${resolvedTime}</div>
-               </div>
-             `;
-             
-          } else {
-             // CAS 2 : PAS ENCORE RÉGLÉ (Urgence)
-             // On affiche le gros bouton vert
-             footerHtml = `
-               <button class="btn-resolve" onclick="solveIssue('${item.id}')">
-                 <span>✅</span> J'ai réglé le problème
-               </button>
-             `;
-          }
-          // Fonction de TEST pour générer une fausse alerte
-    function simulateAlert() {
-      if(!confirm("Créer une fausse alerte pour tester l'affichage ?")) return;
-      
-      const fakeIssues = [
-        "Température Frigo Positif (+12°C)",
-        "Coupure Courant Zone Cuisine",
-        "Sonde Congélateur HS",
-        "Porte Chambre Froide Ouverte"
-      ];
-      const randomIssue = fakeIssues[Math.floor(Math.random() * fakeIssues.length)];
-
-      firebase.database().ref('alerts').push({
-        title: "TEST: " + randomIssue,
-        body: "Ceci est une simulation pour vérifier le système d'alerte. Aucune action requise sur le matériel.",
-        date: Date.now(),
-        source: "SIMULATION"
-      }).then(() => {
-        window.showToast("🧪 Alerte de test envoyée !");
-      });
-    }
-
-          const card = document.createElement('div');
-          card.className = cardClass;
-          card.innerHTML = `
-            <div class="alert-header">
-               <span class="alert-badge">${badgeText}</span>
-               <span class="alert-date">${dateStr}</span>
-            </div>
-            <div class="alert-title">${item.title}</div>
-            <div class="alert-snippet">${cleanBody}</div>
-            <div class="alert-footer">
-               ${footerHtml}
-            </div>
-          `;
-          container.appendChild(card);
-        });
-      });
-    }
-
-    // Fonction appelée quand on clique sur le bouton
-    function solveIssue(alertId) {
-      if(!window.currentUser) return alert("Erreur: Tu dois être connecté.");
-      
-      const name = window.currentUser.name || "Équipe";
-
-      if(confirm("Confirmes-tu avoir réglé ce problème ?")) {
-        // On met à jour l'alerte pour dire "C'est fini"
-        // Une seule écriture suffit pour bloquer tout le monde ensuite
-        firebase.database().ref(`alerts/${alertId}`).update({
-          resolvedBy: window.currentUser.uid,
-          resolvedByName: name,
-          resolvedAt: Date.now()
-        }).then(() => {
-          window.showToast("✅ Incident clos !");
-          // Pas besoin de recharger, le .on('value') mettra à jour l'affichage tout seul
-        }).catch(e => {
-          alert("Erreur: " + e.message);
-        });
-      }
-    }
-    
-    // Petite fonction utilitaire pour éviter les failles XSS
-    function escapeHtml(text) {
-      if (!text) return text;
-      return text.replace(/[&<>"']/g, function(m) {
-        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
-      });
-    }
-    // --- COPIE DES SCRIPTS EMAIL.JS / APP.JS POUR LA PAGE ---
-    // (Le reste du JS gère l'auth et la partie Diffusion via email.js inclus plus haut)
-    
-    // Auth Check & Theme
-    if(localStorage.getItem('heiko:darkmode') === 'true') document.body.classList.add('dark-mode');
     function toggleDarkMode() {
       document.body.classList.toggle('dark-mode');
-      localStorage.setItem('heiko:darkmode', document.body.classList.contains('dark-mode'));
-      const icon = document.querySelector('.toggle-icon'); if(icon) icon.textContent = document.body.classList.contains('dark-mode') ? '🌙' : '☀️';
+      localStorage.setItem('heiko_dark_mode', document.body.classList.contains('dark-mode'));
+      const icon = document.querySelector('.toggle-icon'); 
+      if(icon) icon.textContent = document.body.classList.contains('dark-mode') ? '🌙' : '☀️';
     }
 
+    function showToast(m) { 
+        const t=document.getElementById('toast'); 
+        if(t){ t.textContent=m; t.className='show'; setTimeout(()=>t.className='hide',3000); }
+    }
+    window.showToast = showToast;
+
+    // --- 2. AUTHENTIFICATION ---
     firebase.auth().onAuthStateChanged(user => {
       if(user) {
         document.getElementById('loginOverlay').style.display = 'none';
@@ -469,17 +322,17 @@
             window.currentUser.uid = user.uid;
             
             document.getElementById('userName').textContent = u.name || 'Membre';
-            document.getElementById('userHours').textContent = (u.hours || 35) + 'h';
+            const hours = u.hours || 35;
+            document.getElementById('userHours').textContent = hours + 'h';
             
             const isAdmin = (u.role === 'admin' || u.role === 'superadmin');
             
-            // Gestion visibilité onglet Diffusion
             if(isAdmin) {
               document.getElementById('adminOnlyContent').style.display = 'block';
               document.getElementById('nonAdminMessage').style.display = 'none';
               document.getElementById('btnAdmin').style.display = 'inline-block';
               
-              // Chargement données mail
+              // Chargement données mail (Admin seulement)
               firebase.database().ref('mailGroups').on('value', s => { window.mailGroups = s.val() || {}; renderDiffusionUI(); });
               firebase.database().ref('users').on('value', s => { window.allUsers = s.val() || {}; renderDiffusionUI(); });
               firebase.database().ref('settings').on('value', s => { window.globalSettings = s.val() || {}; renderDiffusionUI(); });
@@ -490,6 +343,10 @@
             }
           }
         });
+        
+        // Charger les alertes dès qu'on est connecté
+        loadAlertsData();
+
       } else {
         document.getElementById('loginOverlay').style.display = 'flex';
         document.getElementById('appContent').style.display = 'none';
@@ -502,13 +359,139 @@
       firebase.auth().signInWithEmailAndPassword(email, pass).catch(() => alert('Erreur mot de passe'));
     };
 
-    function logout() { firebase.auth().signOut(); location.reload(); }
-    function clearLoginError() {} 
-    function togglePass() { const x = document.getElementById('loginPass'); x.type = x.type==='password'?'text':'password'; }
-    function showToast(m) { const t=document.getElementById('toast'); t.textContent=m; t.className='show'; setTimeout(()=>t.className='hide',3000); }
-    window.showToast = showToast;
+    window.logout = function() { firebase.auth().signOut(); location.reload(); }
+    window.togglePass = function() { const x = document.getElementById('loginPass'); x.type = x.type==='password'?'text':'password'; }
+    window.clearLoginError = function() {} 
 
-    // Bridge vers email.js
+    // --- 3. GESTION ONGLETS ---
+    window.switchTab = function(tabName) {
+      document.getElementById('tabBtnDiffusion').classList.toggle('active', tabName === 'diffusion');
+      document.getElementById('tabBtnAlerts').classList.toggle('active', tabName === 'alerts');
+      document.getElementById('panelDiffusion').style.display = (tabName === 'diffusion') ? 'block' : 'none';
+      document.getElementById('panelAlerts').style.display = (tabName === 'alerts') ? 'block' : 'none';
+    }
+
+    // Init Onglets
+    if(window.location.hash === '#alerts') switchTab('alerts'); else switchTab('diffusion');
+
+
+    // --- 4. LOGIQUE ALERTES (INCIDENTS) ---
+    function loadAlertsData() {
+      const container = document.getElementById('alertsList');
+      if(!container) return;
+
+      firebase.database().ref('alerts').orderByChild('date').limitToLast(50).on('value', (snap) => {
+        const data = snap.val();
+        container.innerHTML = "";
+        
+        if(!data) {
+          container.innerHTML = `<div class="alert-empty">Aucun incident enregistré.</div>`;
+          return;
+        }
+
+        const list = Object.keys(data).map(k => ({id: k, ...data[k]})).sort((a,b) => b.date - a.date);
+
+        list.forEach(item => {
+          const d = new Date(item.date);
+          const dateStr = d.toLocaleDateString('fr-FR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+          const cleanBody = (item.body || '').replace(/<[^>]+>/g, ' ').substring(0, 200);
+
+          const isResolved = !!item.resolvedBy;
+          
+          let footerHtml = '';
+          let cardClass = 'alert-card';
+          let badgeText = item.source || 'INCIDENT';
+
+          if (isResolved) {
+             cardClass += ' resolved';
+             badgeText = 'RÉSOLU';
+             const resolverName = item.resolvedByName || 'Un membre';
+             const resolvedTime = item.resolvedAt ? new Date(item.resolvedAt).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}) : '';
+             
+             footerHtml = `
+               <div class="resolved-info">
+                 <div class="resolved-by">✅ Réglé par ${escapeHtml(resolverName)}</div>
+                 <div style="font-size:11px; opacity:0.8;">à ${resolvedTime}</div>
+               </div>
+             `;
+          } else {
+             footerHtml = `
+               <button class="btn-resolve" onclick="solveIssue('${item.id}')">
+                 <span>✅</span> J'ai réglé le problème
+               </button>
+             `;
+          }
+
+          const card = document.createElement('div');
+          card.className = cardClass;
+          card.innerHTML = `
+            <div class="alert-header">
+               <span class="alert-badge">${badgeText}</span>
+               <span class="alert-date">${dateStr}</span>
+            </div>
+            <div class="alert-title">${escapeHtml(item.title)}</div>
+            <div class="alert-snippet">${escapeHtml(cleanBody)}</div>
+            <div class="alert-footer">
+               ${footerHtml}
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      });
+    }
+
+    window.solveIssue = function(alertId) {
+      if(!window.currentUser) return alert("Erreur: Tu dois être connecté.");
+      const name = window.currentUser.name || "Équipe";
+      if(confirm("Confirmes-tu avoir réglé ce problème ?")) {
+        firebase.database().ref(`alerts/${alertId}`).update({
+          resolvedBy: window.currentUser.uid,
+          resolvedByName: name,
+          resolvedAt: Date.now()
+        }).then(() => {
+          showToast("✅ Incident clos !");
+        }).catch(e => {
+          alert("Erreur: " + e.message);
+        });
+      }
+    }
+
+    // --- 5. FONCTION DE SIMULATION (CORRIGÉE) ---
+    window.simulateAlert = function() {
+      console.log("Tentative de simulation...");
+      if(!firebase.apps.length) return alert("Erreur: Firebase non connecté");
+      
+      if(!confirm("Créer une fausse alerte pour tester l'affichage ?")) return;
+      
+      const fakeIssues = [
+        "Température Frigo Positif (+12°C)",
+        "Coupure Courant Zone Cuisine",
+        "Sonde Congélateur HS",
+        "Porte Chambre Froide Ouverte"
+      ];
+      const randomIssue = fakeIssues[Math.floor(Math.random() * fakeIssues.length)];
+
+      firebase.database().ref('alerts').push({
+        title: "TEST: " + randomIssue,
+        body: "Ceci est une simulation pour vérifier le système. Aucune action requise.",
+        date: Date.now(),
+        source: "SIMULATION"
+      }).then(() => {
+        showToast("🧪 Alerte de test envoyée !");
+      }).catch(err => {
+        alert("Erreur: " + err.message);
+        console.error(err);
+      });
+    }
+
+    // Helpers
+    function escapeHtml(text) {
+      if (!text) return text;
+      return String(text).replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+      });
+    }
+
     function renderDiffusionUI() {
       if(typeof window.renderQuickGroups === 'function') window.renderQuickGroups();
       if(typeof window.renderUsersGrid === 'function') window.renderUsersGrid();
@@ -520,10 +503,10 @@
       if(fromName && window.globalSettings?.mailFromName) fromName.value = window.globalSettings.mailFromName;
     }
     
-    // Menu mobile
-    function toggleGlobalMenu(force) {
+    window.toggleGlobalMenu = function(force) {
       const menu = document.getElementById('globalMenu');
       const backdrop = document.getElementById('globalMenuBackdrop');
+      if(!menu || !backdrop) return;
       const isOpen = menu.classList.contains('open');
       const shouldOpen = typeof force === 'boolean' ? force : !isOpen;
       if(shouldOpen) { menu.classList.add('open'); backdrop.classList.add('open'); }
