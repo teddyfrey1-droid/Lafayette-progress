@@ -1233,7 +1233,6 @@ async function enableNotifications() {
   } catch (error) {
     console.error("Erreur notifs:", error);
   }
-}
 
 // --- EXPORTS POUR L'INDEX ---
 window.clearLoginError = clearLoginError;
