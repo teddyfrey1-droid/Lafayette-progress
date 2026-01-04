@@ -159,3 +159,58 @@ exports.sendSmartBroadcast = onCall(
     return { successCount, details: { emails: emailTargets.size, pushes: pushTokens.length } };
   }
 );
+const { onRequest } = require('firebase-functions/v2/https');
+
+// --- WEBHOOK ALERTE EATPILOT ---
+exports.receiveExternalAlert = onRequest(
+  { region: 'us-central1' },
+  async (req, res) => {
+    // 1. Sécurité simple
+    if (req.query.secret !== 'SUPER_SECRET_LAFAYETTE_99') {
+      return res.status(403).send('Forbidden');
+    }
+
+    const data = req.body || {};
+    const subject = data.subject || 'Alerte Technique';
+    const bodyHtml = data.bodyHtml || '';
+    const timestamp = Date.now();
+
+    try {
+      // 2. Sauvegarde en base
+      await admin.database().ref('alerts').push({
+        title: subject,
+        body: bodyHtml,
+        date: timestamp,
+        source: 'EatPilot'
+      });
+
+      // 3. Envoi Push à l'équipe
+      const snap = await admin.database().ref('users').once('value');
+      const users = snap.val() || {};
+      const tokens = [];
+
+      Object.values(users).forEach(u => {
+        const t = u.fcmToken || u.pushToken || (u.fcm ? u.fcm.token : null);
+        if (t) tokens.push(t);
+      });
+
+      if (tokens.length > 0) {
+        await admin.messaging().sendEachForMulticast({
+          tokens: tokens,
+          notification: {
+            title: '⚠️ ' + subject,
+            body: 'Nouvelle alerte reçue. Voir le détail.'
+          },
+          data: { 
+            url: '/diffusion.html#alerts' // Redirection vers l'onglet Alertes
+          }
+        });
+      }
+
+      res.status(200).send('OK');
+    } catch (e) {
+      logger.error(e);
+      res.status(500).send('Error');
+    }
+  }
+);
