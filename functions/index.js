@@ -161,23 +161,23 @@ exports.sendSmartBroadcast = onCall(
 );
 const { onRequest } = require('firebase-functions/v2/https');
 
-// --- WEBHOOK ALERTE EATPILOT (Version avec CORS MANUEL) ---
+// --- WEBHOOK ALERTE EATPILOT (CORS MANUEL) ---
 exports.receiveExternalAlert = onRequest(
-  { region: 'us-central1' }, // On retire "cors: true" pour le gérer nous-mêmes
+  { region: 'us-central1' }, // On retire "cors: true" ici, on le gère en bas
   async (req, res) => {
     
-    // 1. DÉBLOCAGE SÉCURITÉ (CORS) - On ouvre les portes manuellement
+    // 1. FORCER LES AUTORISATIONS (CORS)
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
 
-    // Si le navigateur demande "Est-ce que je peux venir ?", on répond OUI tout de suite
+    // Si le navigateur demande l'autorisation (OPTIONS), on dit OUI tout de suite
     if (req.method === 'OPTIONS') {
       res.status(204).send('');
       return;
     }
 
-    // 2. VÉRIFICATION DU SECRET
+    // 2. VÉRIFICATION SECRET
     if (req.query.secret !== 'SUPER_SECRET_LAFAYETTE_99') {
       return res.status(403).send('Forbidden');
     }
@@ -188,7 +188,7 @@ exports.receiveExternalAlert = onRequest(
     const timestamp = Date.now();
 
     try {
-      // 3. Sauvegarde en base
+      // 3. SAUVEGARDE
       await admin.database().ref('alerts').push({
         title: subject,
         body: bodyHtml,
@@ -196,7 +196,7 @@ exports.receiveExternalAlert = onRequest(
         source: 'EatPilot'
       });
 
-      // 4. Envoi Push
+      // 4. NOTIFICATION PUSH
       const snap = await admin.database().ref('users').once('value');
       const users = snap.val() || {};
       const tokens = [];
@@ -213,9 +213,7 @@ exports.receiveExternalAlert = onRequest(
             title: '⚠️ ' + subject,
             body: 'Nouvelle alerte reçue. Voir le détail.'
           },
-          data: { 
-            url: '/diffusion.html#alerts'
-          }
+          data: { url: '/diffusion.html#alerts' }
         });
       }
 
