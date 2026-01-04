@@ -372,7 +372,6 @@ auth.onAuthStateChanged(user => {
   if (user) {
     document.getElementById("loginOverlay").style.display = "none";
     document.getElementById("appContent").style.display = "block";
-    // Lance la bannière 2 secondes après l'arrivée sur le dashboard
     setTimeout(checkNotificationStatus, 1000);
     db.ref('users/' + user.uid).on('value', snap => {
       const val = snap.val();
