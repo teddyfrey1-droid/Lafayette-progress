@@ -947,77 +947,59 @@ function saveObj() {
 function deleteObj(id) { if(confirm("🗑️ Supprimer ?")) { db.ref("objectives/"+id).remove().then(() => showToast("🗑️ Supprimé")); logAction("Suppression", `Objectif ${id}`); } }
 function togglePub(id, v) { db.ref("objectives/"+id+"/published").set(v); logAction("Publication", `Objectif ${id}: ${v}`); }
 
-function renderAdminUsers() {
-  const d = document.getElementById("usersList");
-  if(!d) return;
-  d.innerHTML = "";
-  let totalToPay = 0;
+/* NOUVELLES CARTES EQUIPE */
+.user-card-new {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.uc-top { display: flex; align-items: center; gap: 12px; }
+.uc-avatar { 
+  width: 44px; height: 44px; border-radius: 12px; 
+  background: var(--primary); color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 18px;
+}
+.uc-main-info { flex: 1; min-width: 0; }
+.uc-name-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.uc-name { font-weight: 800; font-size: 15px; color: var(--text-main); }
+.uc-admin-badge { 
+  background: #f59e0b; color: white; font-size: 9px; font-weight: 900; 
+  padding: 2px 8px; border-radius: 6px; letter-spacing: 0.5px;
+}
+.uc-email { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  // 1) Préparation des données (hors super-admin)
-  const entries = Object.keys(allUsers || {})
-    .map(uid => ({ uid, u: (allUsers[uid] || {}) }))
-    .filter(e => !(e.u.email && String(e.u.email).toLowerCase() === String(SUPER_ADMIN_EMAIL || '').toLowerCase()));
+.uc-stats { 
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; 
+  background: rgba(0,0,0,0.02); padding: 10px; border-radius: 12px;
+}
+body.dark-mode .uc-stats { background: rgba(255,255,255,0.03); }
+.uc-stat { display: flex; flex-direction: column; }
+.uc-stat-label { font-size: 9px; font-weight: 800; color: var(--text-muted); }
+.uc-stat-value { font-size: 13px; font-weight: 900; }
+.uc-stat-value.highlight { color: var(--success); }
 
-  const eligibleEntries = [];
-  const ineligibleEntries = [];
-  entries.forEach(e => {
-    const isEligible = (e.u.primeEligible !== false);
-    (isEligible ? eligibleEntries : ineligibleEntries).push(e);
-  });
+.uc-actions-row { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-color); pt: 10px; }
+.uc-prime-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; cursor: pointer; }
+.uc-btns { display: flex; gap: 8px; }
+.uc-btn-round { 
+  width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--border-color); 
+  background: var(--card-bg); cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.uc-btn-round.danger { color: var(--danger); }
 
-  const nameSort = (a,b) => {
-    const an = (a.u.name || a.u.email || a.uid || '').toString();
-    const bn = (b.u.name || b.u.email || b.uid || '').toString();
-    return an.localeCompare(bn, 'fr', { sensitivity: 'base' });
-  };
-  eligibleEntries.sort(nameSort);
-  ineligibleEntries.sort(nameSort);
-
-  // 2) Calcul du bonus (si inclus primes)
-  function computeUserBonus(u){
-    const userRatio = ((u.hours || 35) / BASE_HOURS);
-    let userBonus = 0;
-
-    const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published);
-    let primOk = true;
-    if(prims.length > 0) {
-      primOk = prims.every(o => {
-        let threshold = 100;
-        if(o.isFixed) threshold = 100;
-        else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold;
-        if(o.isNumeric) return parseFloat(o.current) >= threshold;
-        const pct = getPct(o.current, o.target, o.isInverse);
-        return pct >= threshold;
-      });
-    }
-
-    Object.values(allObjs).forEach(o => {
-      if(!o.published) return;
-      const isLocked = !o.isPrimary && !primOk;
-      if(isLocked) return;
-
-      const pct = getPct(o.current, o.target, o.isInverse);
-      let g = 0;
-
-      if(o.isFixed) {
-        let win = false;
-        if(o.isNumeric) win = parseFloat(o.current) >= o.target;
-        else win = pct >= 100;
-        if(win && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize);
-      } else {
-        (o.paliers || []).forEach(p => {
-          let unlocked = false;
-          if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold;
-          else unlocked = pct >= p.threshold;
-          if(unlocked) g += parse(p.prize);
-        });
-      }
-
-      userBonus += (g * userRatio);
-    });
-
-    return userBonus;
-  }
+.total-payout-card {
+  background: var(--text-main); color: var(--card-bg);
+  padding: 20px; border-radius: 20px; text-align: center;
+  display: flex; justify-content: space-between; align-items: center;
+  margin: 20px 0; font-weight: 900;
+}
 
   function safeHours(u){
     const h = (u && u.hours != null) ? parseFloat(String(u.hours).replace(',', '.')) : NaN;
@@ -1336,9 +1318,20 @@ async function enableNotifications() {
 
   try {
     const permission = await Notification.requestPermission();
+    
     if (permission === 'granted') {
+        // --- MODIFICATION ICI ---
+        // On ferme la bannière immédiatement après le clic positif
+        dismissPushBanner(); 
+        
+        // Optionnel : on cache aussi le bouton dans le menu latéral s'il est présent
+        const btnMenu = document.getElementById('btnEnablePush');
+        if(btnMenu) btnMenu.style.display = 'none';
+        // -------------------------
+
         const messaging = firebase.messaging();
         const token = await messaging.getToken({ vapidKey: VAPID_KEY });
+        
         if (token && currentUser && currentUser.uid) {
             await db.ref('users/' + currentUser.uid).update({ 
                 fcmToken: token,
@@ -1347,11 +1340,14 @@ async function enableNotifications() {
             });
             showToast("✅ Notifications activées !");
         }
+    } else {
+        // Si l'utilisateur refuse, on ferme aussi pour ne pas polluer l'écran
+        dismissPushBanner();
     }
   } catch (error) {
-    console.error("Erreur notifs:", error);
+    console.error("Erreur notifications:", error);
+    dismissPushBanner(); // Fermeture en cas d'erreur
   }
-
 }
 
 // --- EXPORTS POUR L'INDEX ---
