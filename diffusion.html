@@ -4,21 +4,38 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#2563eb">
-  <title>Diffusion - Lafayette</title>
+  <title>Diffusion & Alertes - Lafayette</title>
   
-  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
   
-  <!-- Styles -->
   <link rel="stylesheet" href="assets/css/styles.css">
   
-  <!-- Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    /* Styles spécifiques pour les cartes d'alerte */
+    .alert-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-left: 4px solid #ef4444;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+    }
+    .alert-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .alert-badge { font-size: 10px; font-weight: 900; text-transform: uppercase; padding: 4px 8px; border-radius: 6px; background: #fee2e2; color: #991b1b; }
+    body.dark-mode .alert-badge { background: rgba(239,68,68,0.2); color: #fca5a5; }
+    .alert-date { font-size: 11px; font-weight: 700; color: var(--text-muted); }
+    .alert-title { font-size: 15px; font-weight: 900; color: var(--text-main); margin-bottom: 6px; line-height: 1.3; }
+    .alert-snippet { font-size: 13px; color: var(--text-main); opacity: 0.8; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .alert-empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-style: italic; }
+  </style>
 </head>
 <body>
   
@@ -26,13 +43,11 @@
     <div class="theme-toggle-slider"><span class="toggle-icon"></span></div>
   </div>
 
-  <!-- Toast -->
   <div id="toast">Action effectuée avec succès !</div>
 
-  <!-- Login Overlay -->
   <div id="loginOverlay">
     <h1 style="font-size: 28px; font-weight: 900; color: var(--text-main); margin-bottom: 25px; text-transform: uppercase; text-align: center; line-height: 1.4;">
-      DIFFUSION<br>LAFAYETTE
+      DIFFUSION<br>& ALERTES
     </h1>
     <div class="login-box">
       <h2 class="login-title">Connexion Membre</h2>
@@ -47,10 +62,8 @@
     </div>
   </div>
 
-  <!-- App Content -->
   <div id="appContent">
     
-    <!-- Top Bar -->
     <div class="top-bar">
       <div class="user-welcome">
         <span id="userName">--</span>
@@ -69,7 +82,6 @@
       </div>
     </div>
 
-    <!-- Global Menu -->
     <div class="global-menu-backdrop" id="globalMenuBackdrop" onclick="toggleGlobalMenu(false)"></div>
     <aside class="global-menu" id="globalMenu" aria-label="Menu">
       <div class="global-menu-head">
@@ -84,136 +96,120 @@
           <span>📇 Sites & Contacts</span>
         </a>
         <a class="global-menu-link" href="diffusion.html" onclick="toggleGlobalMenu(false)" style="background:rgba(37,99,235,0.1); color:#2563eb; font-weight:700;">
-          <span>📧 Diffusion</span>
+          <span>📧 Diffusion / Alertes</span>
         </a>
       </nav>
     </aside>
 
-    <!-- Main Container -->
     <div class="container" style="max-width:900px;">
       
-      <header style="margin-bottom:30px;">
+      <header style="margin-bottom:20px;">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px;">
           <a href="index.html" class="btn" style="width:auto; padding:8px 16px; background:var(--border-color); color:var(--text-main);">
             ← Retour
           </a>
-          <h1 style="margin:0;">📧 DIFFUSION</h1>
+          <h1 style="margin:0;">📢 COMMUNICATION</h1>
         </div>
-        <p style="color:var(--text-muted); font-size:14px; margin:0;">
-          Envoi d'emails groupés à ton équipe
-        </p>
       </header>
 
-      <!-- Admin Only Content -->
-      <div id="adminOnlyContent" style="display:none;">
-        
-        <!-- Mail Settings -->
-        <div class="admin-section">
-          <h3 class="section-header-large">⚙ Configuration</h3>
-          <div class="mail-settings-row">
-            <div class="mail-settings-field">
-              <label class="mail-label">Région Firebase Functions (optionnel)</label>
-              <input type="text" id="mailFunctionsRegion" placeholder="Ex: us-central1 ou europe-west1">
-              <div class="mail-hint">Si ton Cloud Function est déployée dans une région spécifique, renseigne-la ici. Sinon laisse vide.</div>
-            </div>
-            <div class="mail-settings-field">
-              <label class="mail-label">Nom affiché (optionnel)</label>
-              <input type="text" id="mailFromName" placeholder="Ex: Heiko La Fayette">
-              <div class="mail-hint">Utilisé uniquement si ta function le supporte.</div>
-            </div>
-          </div>
-          <div class="mail-settings-actions">
-            <button class="btn" onclick="saveMailSettings()">Enregistrer</button>
-          </div>
-        </div>
-
-        <!-- Quick Groups -->
-        <div style="margin-top:30px;">
-          <div class="mail-label" style="margin-bottom:8px;">Groupes rapides</div>
-          <div id="mailQuickGroups" class="mail-quick-groups"></div>
-        </div>
-
-        <!-- Recipients -->
-        <div style="margin-top:30px;">
-          <div class="mail-label" style="margin-bottom:8px;">Destinataires</div>
-          <div id="mailUsersGrid" class="mail-users-grid"></div>
-          <div id="mailSelectedCount" class="mail-selected-count">0 destinataire(s) sélectionné(s)</div>
-        </div>
-
-        <!-- Email Form -->
-        <div style="margin-top:30px;">
-          <label class="mail-label">Sujet</label>
-          <input type="text" id="mailSubject" placeholder="Ex: Planning de la semaine">
-          
-          <label class="mail-label" style="margin-top:10px;">Message</label>
-          <textarea id="mailMessage" rows="8" placeholder="Écris ton message (HTML accepté)"></textarea>
-          
-          <div class="mail-actions">
-            <button class="btn" onclick="sendManualEmail()">✉ Envoyer</button>
-            <button class="btn" onclick="clearMailSelection()" style="background:#e2e8f0; color:#475569; border:1px solid #cbd5e1;">
-              Réinitialiser
-            </button>
-          </div>
-          
-          <div class="mail-hint" style="margin-top:10px;">
-            Pour l'envoi réel, il faut déployer une Cloud Function. Le dossier <code>functions</code> est inclus dans ce projet.
-          </div>
-        </div>
-
-        <!-- Groups Management -->
-        <div class="admin-section" style="margin-top:40px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-            <h3 class="section-header-large" style="margin:0;">👥 Groupes mail</h3>
-            <button class="btn" onclick="openMailGroupModal()" style="width:auto;">+ Nouveau groupe</button>
-          </div>
-          <div id="mailGroupsList" style="margin-top:12px;"></div>
-        </div>
-
-        <!-- Info Automation -->
-        <div class="admin-section" style="border-left:4px solid #f59e0b; margin-top:40px;">
-          <h3 class="section-header-large" style="color:#b45309;">⚡ Automatisation préparé</h3>
-          <div class="mail-hint">
-            Le système est prêt pour des envois automatiques (ex: quand le planning change) via une Function trigger.
-            Le schéma du planning n'est pas défini dans ce projet, donc le trigger est fourni en modèle dans <code>functions/index.js</code> à adapter à ta structure.
-          </div>
-        </div>
-
+      <div class="dir-tabs" role="tablist" style="margin-bottom:25px;">
+        <button class="dir-tab active" id="tabBtnDiffusion" onclick="switchTab('diffusion')">📧 Diffusion</button>
+        <button class="dir-tab" id="tabBtnAlerts" onclick="switchTab('alerts')">⚠️ Historique Alertes</button>
       </div>
 
-      <!-- Non-Admin Message -->
-      <div id="nonAdminMessage" style="display:none; text-align:center; padding:60px 20px; color:var(--text-muted);">
-        <div style="font-size:48px; margin-bottom:20px;">🔒</div>
-        <h2 style="color:var(--text-main); margin-bottom:10px;">Accès Admin requis</h2>
-        <p>Cette page est réservée aux administrateurs.</p>
-        <a href="index.html" class="btn" style="margin-top:20px; width:auto; padding:12px 24px;">← Retour au Dashboard</a>
-      </div>
+      <section id="panelDiffusion">
+        <div id="adminOnlyContent" style="display:none;">
+          <div class="admin-section">
+            <h3 class="section-header-large">⚙ Configuration</h3>
+            <div class="mail-settings-row">
+              <div class="mail-settings-field">
+                <label class="mail-label">Région Functions</label>
+                <input type="text" id="mailFunctionsRegion" placeholder="Ex: us-central1">
+              </div>
+              <div class="mail-settings-field">
+                <label class="mail-label">Nom affiché</label>
+                <input type="text" id="mailFromName" placeholder="Ex: Heiko La Fayette">
+              </div>
+            </div>
+            <div class="mail-settings-actions">
+              <button class="btn" onclick="saveMailSettings()">Enregistrer</button>
+            </div>
+          </div>
+
+          <div style="margin-top:30px;">
+            <div class="mail-label" style="margin-bottom:8px;">Groupes rapides</div>
+            <div id="mailQuickGroups" class="mail-quick-groups"></div>
+          </div>
+
+          <div style="margin-top:30px;">
+            <div class="mail-label" style="margin-bottom:8px;">Destinataires</div>
+            <div id="mailUsersGrid" class="mail-users-grid"></div>
+            <div id="mailSelectedCount" class="mail-selected-count">0 destinataire(s) sélectionné(s)</div>
+          </div>
+
+          <div style="margin-top:30px;">
+            <label class="mail-label">Sujet</label>
+            <input type="text" id="mailSubject" placeholder="Ex: Planning de la semaine">
+            
+            <label class="mail-label" style="margin-top:10px;">Message</label>
+            <textarea id="mailMessage" rows="8" placeholder="Écris ton message (HTML accepté)"></textarea>
+            
+            <div class="mail-actions">
+              <button class="btn" onclick="sendManualEmail()">✉ Envoyer</button>
+              <button class="btn" onclick="clearMailSelection()" style="background:#e2e8f0; color:#475569; border:1px solid #cbd5e1;">Réinitialiser</button>
+            </div>
+          </div>
+
+          <div class="admin-section" style="margin-top:40px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+              <h3 class="section-header-large" style="margin:0;">👥 Groupes mail</h3>
+              <button class="btn" onclick="openMailGroupModal()" style="width:auto;">+ Nouveau groupe</button>
+            </div>
+            <div id="mailGroupsList" style="margin-top:12px;"></div>
+          </div>
+        </div>
+
+        <div id="nonAdminMessage" style="display:none; text-align:center; padding:60px 20px; color:var(--text-muted);">
+          <div style="font-size:48px; margin-bottom:20px;">🔒</div>
+          <h2 style="color:var(--text-main); margin-bottom:10px;">Accès Diffusion restreint</h2>
+          <p>Seuls les administrateurs peuvent envoyer des messages.</p>
+        </div>
+      </section>
+
+      <section id="panelAlerts" style="display:none;">
+         <div class="admin-section" style="border-left:4px solid #ef4444; background: rgba(254,226,226,0.1);">
+            <div style="display:flex; gap:15px; align-items:center;">
+               <div style="font-size:24px;">🚨</div>
+               <div>
+                 <h3 style="margin:0; font-size:16px; color:#b91c1c;">Surveillance Automatique</h3>
+                 <p style="margin:4px 0 0 0; font-size:13px; color:#7f1d1d;">Connecté à EatPilot. Les alertes critiques (froid, technique) apparaissent ici en temps réel.</p>
+               </div>
+            </div>
+         </div>
+         
+         <div id="alertsList" style="margin-top:20px;">
+            <div class="alert-empty">Chargement...</div>
+         </div>
+      </section>
 
     </div>
-
   </div>
 
-  <!-- Modal: Mail Group -->
   <div id="mailGroupModal" class="modal-overlay" style="display:none; z-index: 4000;">
     <div class="modal-box" style="max-width:520px;">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;">
         <div>
           <div id="mailGroupModalTitle" style="font-weight:950; font-size:18px;">Groupe Mail</div>
-          <div class="mail-hint">Créer / modifier un groupe de destinataires.</div>
         </div>
         <button class="icon-btn" onclick="closeMailGroupModal()" aria-label="Fermer">✕</button>
       </div>
-      
       <input type="hidden" id="mailGroupId">
-      
       <label class="mail-label">Nom du groupe</label>
       <input type="text" id="mailGroupName" placeholder="Ex: Équipe du soir">
-      
       <label class="mail-label" style="margin-top:10px;">Couleur</label>
       <input type="color" id="mailGroupColor" value="#3b82f6" class="mail-color-input">
-      
       <label class="mail-label" style="margin-top:12px;">Membres</label>
       <div id="mailGroupMembers" class="mail-members-list"></div>
-      
       <div style="display:flex; gap:10px; margin-top:14px;">
         <button class="btn" id="mailGroupSaveBtn" onclick="saveMailGroup()" style="flex:1;">Enregistrer</button>
         <button class="btn" onclick="closeMailGroupModal()" style="background:#e2e8f0; color:#475569; border:1px solid #cbd5e1;">Annuler</button>
@@ -221,32 +217,85 @@
     </div>
   </div>
 
-  <!-- Scripts -->
   <script src="assets/js/app.js"></script>
   <script src="assets/js/email.js"></script>
   
   <script>
-    // Init theme
-    if(localStorage.getItem('heiko:darkmode') === null) {
-      localStorage.setItem('heiko:darkmode', 'true');
-    }
-    if(localStorage.getItem('heiko:darkmode') === 'true') {
-      document.body.classList.add('dark-mode');
-    }
-    window.addEventListener('DOMContentLoaded', function() {
-      const icon = document.querySelector('.toggle-icon');
-      if(icon) icon.textContent = document.body.classList.contains('dark-mode') ? '🌙' : '☀️';
-    });
+    // --- GESTION DES ONGLETS & ALERTES ---
     
+    // Initialisation
+    window.addEventListener('DOMContentLoaded', () => {
+      // Vérifie si on arrive avec #alerts dans l'URL
+      if(window.location.hash === '#alerts') {
+        switchTab('alerts');
+      } else {
+        switchTab('diffusion');
+      }
+      
+      // Charge les alertes en temps réel
+      loadAlertsData();
+    });
+
+    function switchTab(tabName) {
+      // Boutons
+      document.getElementById('tabBtnDiffusion').classList.toggle('active', tabName === 'diffusion');
+      document.getElementById('tabBtnAlerts').classList.toggle('active', tabName === 'alerts');
+      
+      // Panneaux
+      document.getElementById('panelDiffusion').style.display = (tabName === 'diffusion') ? 'block' : 'none';
+      document.getElementById('panelAlerts').style.display = (tabName === 'alerts') ? 'block' : 'none';
+      
+      // Update URL hash sans scroll
+      history.replaceState(null, null, tabName === 'alerts' ? '#alerts' : '#diffusion');
+    }
+
+    function loadAlertsData() {
+      const container = document.getElementById('alertsList');
+      // On écoute Firebase : alerts (limitToLast 50)
+      firebase.database().ref('alerts').orderByChild('date').limitToLast(50).on('value', (snap) => {
+        const data = snap.val();
+        container.innerHTML = "";
+        
+        if(!data) {
+          container.innerHTML = `<div class="alert-empty">Aucune alerte enregistrée.</div>`;
+          return;
+        }
+
+        // Tri : plus récent en haut
+        const list = Object.keys(data).map(k => ({...data[k]})).sort((a,b) => b.date - a.date);
+
+        list.forEach(item => {
+          const d = new Date(item.date);
+          const dateStr = d.toLocaleDateString('fr-FR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+          // Nettoyage HTML pour snippet
+          const cleanBody = (item.body || '').replace(/<[^>]+>/g, ' ').substring(0, 180) + '...';
+
+          const card = document.createElement('div');
+          card.className = 'alert-card';
+          card.innerHTML = `
+            <div class="alert-header">
+               <span class="alert-badge">${item.source || 'ALERTE'}</span>
+               <span class="alert-date">${dateStr}</span>
+            </div>
+            <div class="alert-title">${item.title}</div>
+            <div class="alert-snippet">${cleanBody}</div>
+          `;
+          container.appendChild(card);
+        });
+      });
+    }
+
+    // --- COPIE DES SCRIPTS EMAIL.JS / APP.JS POUR LA PAGE ---
+    // (Le reste du JS gère l'auth et la partie Diffusion via email.js inclus plus haut)
+    
+    // Auth Check & Theme
+    if(localStorage.getItem('heiko:darkmode') === 'true') document.body.classList.add('dark-mode');
     function toggleDarkMode() {
       document.body.classList.toggle('dark-mode');
-      const isDark = document.body.classList.contains('dark-mode');
-      localStorage.setItem('heiko:darkmode', isDark);
-      const icon = document.querySelector('.toggle-icon');
-      if(icon) icon.textContent = isDark ? '🌙' : '☀️';
+      localStorage.setItem('heiko:darkmode', document.body.classList.contains('dark-mode'));
+      const icon = document.querySelector('.toggle-icon'); if(icon) icon.textContent = document.body.classList.contains('dark-mode') ? '🌙' : '☀️';
     }
-    
-    // Check admin access after auth
+
     firebase.auth().onAuthStateChanged(user => {
       if(user) {
         document.getElementById('loginOverlay').style.display = 'none';
@@ -257,35 +306,23 @@
           if(u) {
             window.currentUser = u;
             window.currentUser.uid = user.uid;
-            window.currentUser.email = user.email;
             
-            document.getElementById('userName').textContent = u.name || 'Utilisateur';
+            document.getElementById('userName').textContent = u.name || 'Membre';
             document.getElementById('userHours').textContent = (u.hours || 35) + 'h';
             
-            const role = (u.role || '').toLowerCase();
-            const isAdmin = (role === 'admin' || role === 'superadmin');
+            const isAdmin = (u.role === 'admin' || u.role === 'superadmin');
             
+            // Gestion visibilité onglet Diffusion
             if(isAdmin) {
               document.getElementById('adminOnlyContent').style.display = 'block';
               document.getElementById('nonAdminMessage').style.display = 'none';
               document.getElementById('btnAdmin').style.display = 'inline-block';
               
-              // Charge les données Firebase pour le mail
-              firebase.database().ref('mailGroups').on('value', (snap) => {
-                window.mailGroups = snap.val() || {};
-                renderDiffusionUI();
-              });
+              // Chargement données mail
+              firebase.database().ref('mailGroups').on('value', s => { window.mailGroups = s.val() || {}; renderDiffusionUI(); });
+              firebase.database().ref('users').on('value', s => { window.allUsers = s.val() || {}; renderDiffusionUI(); });
+              firebase.database().ref('settings').on('value', s => { window.globalSettings = s.val() || {}; renderDiffusionUI(); });
 
-              firebase.database().ref('users').on('value', (snap) => {
-                window.allUsers = snap.val() || {};
-                renderDiffusionUI();
-              });
-
-              firebase.database().ref('settings').on('value', (snap) => {
-                window.globalSettings = snap.val() || {};
-                renderDiffusionUI();
-              });
-              
             } else {
               document.getElementById('adminOnlyContent').style.display = 'none';
               document.getElementById('nonAdminMessage').style.display = 'block';
@@ -297,89 +334,40 @@
         document.getElementById('appContent').style.display = 'none';
       }
     });
-    
-    function renderDiffusionUI() {
-      try {
-        // Appelle les fonctions de rendu depuis email.js
-        if(typeof window.renderQuickGroups === 'function') window.renderQuickGroups();
-        if(typeof window.renderUsersGrid === 'function') window.renderUsersGrid();
-        if(typeof window.renderGroupsList === 'function') window.renderGroupsList();
-        
-        // Synchronise les settings
-        const reg = document.getElementById('mailFunctionsRegion');
-        const fromName = document.getElementById('mailFromName');
-        if(reg && window.globalSettings && window.globalSettings.functionsRegion) {
-          reg.value = window.globalSettings.functionsRegion;
-        }
-        if(fromName && window.globalSettings && window.globalSettings.mailFromName) {
-          fromName.value = window.globalSettings.mailFromName;
-        }
-      } catch(e) {
-        console.error('Erreur rendu diffusion:', e);
-      }
-    }
-    
+
     document.getElementById('btnLogin').onclick = function() {
       const email = document.getElementById('loginEmail').value.trim();
       const pass = document.getElementById('loginPass').value;
-      firebase.auth().signInWithEmailAndPassword(email, pass).catch(e => {
-        document.getElementById('loginPass').classList.add('error');
-        document.getElementById('loginEmail').classList.add('error');
-        setTimeout(() => {
-          document.getElementById('loginPass').classList.remove('error');
-          document.getElementById('loginEmail').classList.remove('error');
-        }, 1000);
-        alert('Mot de passe incorrect !');
-      });
+      firebase.auth().signInWithEmailAndPassword(email, pass).catch(() => alert('Erreur mot de passe'));
     };
-    
-    function clearLoginError() {
-      document.getElementById('loginPass').classList.remove('error');
-      document.getElementById('loginEmail').classList.remove('error');
+
+    function logout() { firebase.auth().signOut(); location.reload(); }
+    function clearLoginError() {} 
+    function togglePass() { const x = document.getElementById('loginPass'); x.type = x.type==='password'?'text':'password'; }
+    function showToast(m) { const t=document.getElementById('toast'); t.textContent=m; t.className='show'; setTimeout(()=>t.className='hide',3000); }
+    window.showToast = showToast;
+
+    // Bridge vers email.js
+    function renderDiffusionUI() {
+      if(typeof window.renderQuickGroups === 'function') window.renderQuickGroups();
+      if(typeof window.renderUsersGrid === 'function') window.renderUsersGrid();
+      if(typeof window.renderGroupsList === 'function') window.renderGroupsList();
+      
+      const reg = document.getElementById('mailFunctionsRegion');
+      const fromName = document.getElementById('mailFromName');
+      if(reg && window.globalSettings?.functionsRegion) reg.value = window.globalSettings.functionsRegion;
+      if(fromName && window.globalSettings?.mailFromName) fromName.value = window.globalSettings.mailFromName;
     }
     
-    function togglePass() {
-      const x = document.getElementById('loginPass');
-      x.type = x.type === 'password' ? 'text' : 'password';
-    }
-    
-    function logout() {
-      firebase.auth().signOut();
-      location.reload();
-    }
-    
+    // Menu mobile
     function toggleGlobalMenu(force) {
       const menu = document.getElementById('globalMenu');
       const backdrop = document.getElementById('globalMenuBackdrop');
-      if(!menu || !backdrop) return;
       const isOpen = menu.classList.contains('open');
       const shouldOpen = typeof force === 'boolean' ? force : !isOpen;
-      if(shouldOpen) {
-        menu.classList.add('open');
-        backdrop.classList.add('open');
-        document.body.style.overflow = 'hidden';
-      } else {
-        menu.classList.remove('open');
-        backdrop.classList.remove('open');
-        document.body.style.overflow = '';
-      }
+      if(shouldOpen) { menu.classList.add('open'); backdrop.classList.add('open'); }
+      else { menu.classList.remove('open'); backdrop.classList.remove('open'); }
     }
-    
-    document.addEventListener('keydown', e => {
-      if(e.key === 'Escape') toggleGlobalMenu(false);
-    });
-    
-    function showToast(message) {
-      const toast = document.getElementById('toast');
-      toast.textContent = message;
-      toast.className = 'show';
-      setTimeout(() => { toast.className = 'hide'; }, 3000);
-    }
-    window.showToast = showToast;
   </script>
-
 </body>
 </html>
-ENDOFFILE
-
-echo "✅ Fichier diffusion.html créé avec chargement des données !"
