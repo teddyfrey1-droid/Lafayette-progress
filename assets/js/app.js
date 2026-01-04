@@ -958,6 +958,44 @@ function renderAdminUsers() {
       const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); let primOk = true; if(prims.length > 0) { primOk = prims.every(o => { let threshold = 100; if(o.isFixed) threshold = 100; else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold; if(o.isNumeric) return parseFloat(o.current) >= threshold; const pct = getPct(o.current, o.target, o.isInverse); return pct >= threshold; }); } 
       Object.values(allObjs).forEach(o => { if(!o.published) return; const pct = getPct(o.current, o.target, o.isInverse); const isLocked = !o.isPrimary && !primOk; let g = 0; if(o.isFixed) { let win = false; if(o.isNumeric) win = parseFloat(o.current) >= o.target; else win = pct >= 100; if(win && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); } else { if(o.paliers) o.paliers.forEach(p => { let unlocked = false; if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold; else unlocked = pct >= p.threshold; if(unlocked) g += parse(p.prize); }); } if(!isLocked) userBonus += (g * userRatio); }); return userBonus;
     }
+  function renderUser(uid, u, isEligible){
+      const userBonus = isEligible ? computeUserBonus(u) : 0; if(isEligible) totalToPay += userBonus;
+      const div = document.createElement("div"); div.className = "user-item"; 
+      const statusClass = (u.status === 'active') ? 'active' : 'pending'; 
+      const gain = isEligible ? userBonus.toFixed(2) + '€' : '—';
+
+      div.innerHTML = `
+        <div class="user-info">
+          <div class="user-header">
+            <span class="user-name">${u.name || ''}</span>
+            <span class="status-dot ${statusClass}"></span>
+          </div>
+          <div class="user-email-sub">${u.email || ''}</div>
+        </div>
+        <div class="user-actions">
+          <div class="user-gain">${gain}</div>
+          <div class="btn-group"></div>
+        </div>`;
+
+      const btnGroup = div.querySelector('.btn-group');
+      const btnReset = document.createElement('button');
+      btnReset.innerHTML = '🔑';
+      btnReset.className = 'action-btn';
+      btnReset.onclick = () => {
+          if(confirm(`Renvoyer le mail à ${u.email} ?`)) {
+              auth.sendPasswordResetEmail(u.email).then(() => showToast("✅ Envoyé !"));
+          }
+      };
+      const btnDel = document.createElement('button');
+      btnDel.innerHTML = '🗑️';
+      btnDel.className = 'action-btn delete';
+      btnDel.onclick = () => { if(confirm("Supprimer ?")) db.ref('users/'+uid).remove(); };
+
+      btnGroup.appendChild(btnReset);
+      btnGroup.appendChild(btnDel);
+      d.appendChild(div); 
+    }
+  
     function renderUser(uid, u, isEligible){
       const userBonus = isEligible ? computeUserBonus(u) : 0; if(isEligible) totalToPay += userBonus;
       const div = document.createElement("div"); div.className = "user-item"; 
