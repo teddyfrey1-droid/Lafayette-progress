@@ -12,11 +12,55 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.database();
 
-async function _maybeAutoNotify(kind, payload){
-  // Notifications push désactivées pour l’instant.
-  return;
-}
+// ============================================================
+// AUTOMATISATION DES NOTIFICATIONS (Le Cerveau 🧠)
+// ============================================================
+async function _maybeAutoNotify(kind, payload) {
+    console.log("🤖 Auto-Notify :", kind);
+    let subject = "", message = "", icon = "🔔";
 
+    if (kind === 'update') {
+        subject = payload.title || "Nouvelle annonce";
+        message = payload.body || "Une mise à jour a été publiée.";
+        icon = "📢";
+    } else if (kind === 'objective') {
+        if (globalSettings.notifications && !globalSettings.notifications.autoOnObjChange) return;
+        subject = payload.title || "Objectif mis à jour";
+        message = payload.body || "Les objectifs ont changé.";
+        icon = "🎯";
+    } else if (kind === 'pilotage') {
+        subject = "📡 Nouveaux Objectifs & Primes";
+        message = "Le pilotage a été mis à jour !";
+        icon = "💰";
+    } else { return; }
+
+    // Récupérer destinataires (Actifs)
+    const recipientIds = Object.keys(window.allUsers || {}).filter(uid => {
+        const u = window.allUsers[uid];
+        return u && u.status === 'active';
+    });
+
+    if (recipientIds.length === 0) return;
+
+    // Envoi via Cloud Function
+    try {
+        const functions = firebase.app().functions('us-central1');
+        const sendSmartBroadcast = functions.httpsCallable('sendSmartBroadcast');
+        
+        // Petit toast discret pour l'admin
+        showToast("🚀 Envoi notif auto...");
+        
+        await sendSmartBroadcast({
+            recipientIds: recipientIds,
+            subject: `${icon} ${subject}`,
+            html: `<div style="font-family:sans-serif;"><h2 style="color:#2563eb;">${icon} ${subject}</h2><p>${message}</p><br><a href="https://objectif-restaurant.web.app" style="background:#2563eb;color:white;padding:10px 15px;text-decoration:none;border-radius:5px;">Voir l'app</a></div>`,
+            fromName: "Lafayette Auto",
+            channels: { email: true, push: true }
+        });
+    } catch (error) {
+        console.error("Erreur Auto-Notify :", error);
+    }
+}
 let currentUser = null;
 let allUsers = {};
 let allObjs = {};
