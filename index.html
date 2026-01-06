@@ -575,6 +575,51 @@
     </div>
   </div>
 
+
+  <div id="userEditModal" class="modal-overlay" style="display:none; z-index: 4500;">
+    <div class="modal-box user-edit-modal" style="max-width:460px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;">
+        <div>
+          <div style="font-weight:950; font-size:18px;">✏️ Modifier membre</div>
+          <div class="mail-hint">Modifier nom, email et heures. (L'email sert aussi au reset mot de passe.)</div>
+        </div>
+        <button class="icon-btn" onclick="closeUserEditModal()" aria-label="Fermer">✕</button>
+      </div>
+      <input type="hidden" id="uemUid">
+      <div class="user-edit-grid">
+        <div class="user-edit-field">
+          <label class="mail-label">Nom</label>
+          <input type="text" id="uemName" placeholder="Prénom / Nom">
+        </div>
+        <div class="user-edit-field">
+          <label class="mail-label">Email</label>
+          <input type="email" id="uemEmail" placeholder="email@domaine.com">
+        </div>
+        <div class="user-edit-field" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div>
+            <label class="mail-label">Heures / semaine</label>
+            <input type="number" id="uemHours" min="1" step="0.5">
+          </div>
+          <div style="display:flex; align-items:flex-end;">
+            <label class="check-label" style="width:100%; justify-content:flex-start;">
+              <input type="checkbox" id="uemAdmin">
+              👑 Admin
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="user-edit-meta">
+        <div class="user-edit-chip"><span style="opacity:.8;">Statut</span> <strong id="uemStatus">—</strong></div>
+        <div class="user-edit-chip"><span style="opacity:.8;">Notifications</span> <strong id="uemPush">—</strong></div>
+      </div>
+      <div style="display:flex; gap:10px; margin-top:14px;">
+        <button class="btn" onclick="saveUserEditModal()" style="flex:1;">💾 Enregistrer</button>
+        <button class="btn" onclick="closeUserEditModal()" style="background:#e2e8f0; color:#475569; border:1px solid #cbd5e1;">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+
   <div id="pushPermissionBanner" class="push-banner" style="display:none;">
     <div class="push-icon-box">🔔</div>
     <div class="push-content">

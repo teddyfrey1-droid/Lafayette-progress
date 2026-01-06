@@ -542,9 +542,6 @@ function updateUI() {
   const isAdmin = isAdminUser();
 
   document.getElementById("btnAdmin").style.display = isAdmin ? 'block' : 'none';
-
-  // Menu : état des notifications push
-  try{ _setPushMenuState(!!(currentUser && (currentUser.pushEnabled || currentUser.fcmToken))); }catch(e){}
   
   // --- GESTION EXCLUSIVE SUPER ADMIN ---
   if (isSuperUser) {
@@ -949,308 +946,31 @@ function saveObj() {
 
 function deleteObj(id) { if(confirm("🗑️ Supprimer ?")) { db.ref("objectives/"+id).remove().then(() => showToast("🗑️ Supprimé")); logAction("Suppression", `Objectif ${id}`); } }
 function togglePub(id, v) { db.ref("objectives/"+id+"/published").set(v); logAction("Publication", `Objectif ${id}: ${v}`); }
+function createUser() { 
+    const email = (document.getElementById("nuEmail") || {}).value || ""; const name = (document.getElementById("nuName") || {}).value || ""; const hours = parseFloat((document.getElementById("nuHours") || {}).value) || 35; const isAdmin = !!((document.getElementById("nuAdmin") || {}).checked); const cleanEmail = String(email).trim(); if(!cleanEmail){ showToast("⚠️ Email requis."); return; } const TEMP_PASSWORD = "Temp1234!"; const sec = firebase.initializeApp(firebaseConfig, "Sec"); 
+    sec.auth().createUserWithEmailAndPassword(cleanEmail, TEMP_PASSWORD).then(c => { db.ref('users/'+c.user.uid).set({ name: String(name).trim() || "Utilisateur", hours: hours, role: isAdmin ? 'admin' : 'staff', email: cleanEmail, status: 'active', primeEligible: true }); sec.delete(); showToast("✅ Membre créé (mot de passe temporaire : " + TEMP_PASSWORD + ")"); }).catch(e => { if(e && e.code === 'auth/email-already-in-use') { showToast("⚠️ Ce membre existe déjà."); sec.delete(); } else { alert(e && e.message ? e.message : String(e)); sec.delete(); } }); 
+}
 
-function renderAdminUsers() {
-  const d = document.getElementById("usersList");
-  if(!d) return;
-  d.innerHTML = "";
-  let totalToPay = 0;
-
-  // 1) Préparation des données (hors super-admin)
-  const entries = Object.keys(allUsers || {})
-    .map(uid => ({ uid, u: (allUsers[uid] || {}) }))
-    .filter(e => !(e.u.email && String(e.u.email).toLowerCase() === String(SUPER_ADMIN_EMAIL || '').toLowerCase()));
-
-  const eligibleEntries = [];
-  const ineligibleEntries = [];
-  entries.forEach(e => {
-    const isEligible = (e.u.primeEligible !== false);
-    (isEligible ? eligibleEntries : ineligibleEntries).push(e);
-  });
-
-  const nameSort = (a,b) => {
-    const an = (a.u.name || a.u.email || a.uid || '').toString();
-    const bn = (b.u.name || b.u.email || b.uid || '').toString();
-    return an.localeCompare(bn, 'fr', { sensitivity: 'base' });
-  };
-  eligibleEntries.sort(nameSort);
-  ineligibleEntries.sort(nameSort);
-
-  // 2) Calcul du bonus (si inclus primes)
-  function computeUserBonus(u){
-    const userRatio = ((u.hours || 35) / BASE_HOURS);
-    let userBonus = 0;
-
-    const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published);
-    let primOk = true;
-    if(prims.length > 0) {
-      primOk = prims.every(o => {
-        let threshold = 100;
-        if(o.isFixed) threshold = 100;
-        else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold;
-        if(o.isNumeric) return parseFloat(o.current) >= threshold;
-        const pct = getPct(o.current, o.target, o.isInverse);
-        return pct >= threshold;
-      });
+function renderAdminUsers() { 
+    const d = document.getElementById("usersList"); if(!d) return; d.innerHTML = ""; let totalToPay = 0;
+    const entries = Object.keys(allUsers || {}).map(uid => ({ uid, u: (allUsers[uid] || {}) })).filter(e => !(e.u.email && String(e.u.email).toLowerCase() === String(SUPER_ADMIN_EMAIL||'').toLowerCase()));
+    const eligibleEntries = []; const ineligibleEntries = []; entries.forEach(e => { const isEligible = (e.u.primeEligible !== false); (isEligible ? eligibleEntries : ineligibleEntries).push(e); });
+    const nameSort = (a,b) => { const an = (a.u.name || a.u.email || a.uid || '').toString(); const bn = (b.u.name || b.u.email || b.uid || '').toString(); return an.localeCompare(bn, 'fr', { sensitivity: 'base' }); };
+    eligibleEntries.sort(nameSort); ineligibleEntries.sort(nameSort);
+    function computeUserBonus(u){
+      const userRatio = (u.hours || 35) / BASE_HOURS; let userBonus = 0;
+      const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); let primOk = true; if(prims.length > 0) { primOk = prims.every(o => { let threshold = 100; if(o.isFixed) threshold = 100; else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold; if(o.isNumeric) return parseFloat(o.current) >= threshold; const pct = getPct(o.current, o.target, o.isInverse); return pct >= threshold; }); } 
+      Object.values(allObjs).forEach(o => { if(!o.published) return; const pct = getPct(o.current, o.target, o.isInverse); const isLocked = !o.isPrimary && !primOk; let g = 0; if(o.isFixed) { let win = false; if(o.isNumeric) win = parseFloat(o.current) >= o.target; else win = pct >= 100; if(win && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); } else { if(o.paliers) o.paliers.forEach(p => { let unlocked = false; if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold; else unlocked = pct >= p.threshold; if(unlocked) g += parse(p.prize); }); } if(!isLocked) userBonus += (g * userRatio); }); return userBonus;
     }
-
-    Object.values(allObjs).forEach(o => {
-      if(!o.published) return;
-      const isLocked = !o.isPrimary && !primOk;
-      if(isLocked) return;
-
-      const pct = getPct(o.current, o.target, o.isInverse);
-      let g = 0;
-
-      if(o.isFixed) {
-        let win = false;
-        if(o.isNumeric) win = parseFloat(o.current) >= o.target;
-        else win = pct >= 100;
-        if(win && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize);
-      } else {
-        (o.paliers || []).forEach(p => {
-          let unlocked = false;
-          if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold;
-          else unlocked = pct >= p.threshold;
-          if(unlocked) g += parse(p.prize);
-        });
-      }
-
-      userBonus += (g * userRatio);
-    });
-
-    return userBonus;
-  }
-
-  function safeHours(u){
-    const h = (u && u.hours != null) ? parseFloat(String(u.hours).replace(',', '.')) : NaN;
-    if(!isFinite(h) || h <= 0) return 35;
-    return Math.round(h * 10) / 10;
-  }
-  // 3) Rendu d'un utilisateur
-  function renderUserRow(uid, u, isEligible){
-    const status = (u.status === 'active') ? 'active' : 'pending';
-    const statusLabel = (status === 'active') ? 'Actif' : 'En attente';
-    const hours = safeHours(u);
-    const isAdminFlag = (u.role === 'admin') || (u.email && String(u.email).toLowerCase() === String(SUPER_ADMIN_EMAIL || '').toLowerCase());
-    const hasPush = !!(u && (u.fcmToken || u.pushToken || (u.fcm && u.fcm.token)));
-    const pushLabel = hasPush ? '🔔 ON' : '🔕 OFF';
-
-    const userBonus = isEligible ? computeUserBonus(u) : 0;
-    if(isEligible) totalToPay += userBonus;
-    const gain = isEligible ? (userBonus.toFixed(2) + '€') : '—';
-    const gainClass = isEligible ? '' : 'muted';
-
-    const div = document.createElement('div');
-    div.className = 'user-item team-row';
-
-    div.innerHTML = `
-      <div class="team-left">
-        <div class="team-name-row">
-          <span class="user-name">${escapeHtml(u.name || '')}</span>
-        </div>
-        <div class="team-meta">
-          <span class="team-status-chip" title="${statusLabel}">
-            <span class="status-dot ${status}"></span>
-            <span>${statusLabel}</span>
-          </span>
-          <span class="team-email">${escapeHtml(u.email || '')}</span>
-          <span class="team-hours-chip">⏱️ ${hours}h</span>
-          <span class="team-push-chip ${hasPush ? 'on' : 'off'}" title="Notifications push">${pushLabel}</span>
-        </div>
-      </div>
-
-      <div class="team-right">
-        <div class="team-right-top">
-          ${isAdminFlag ? `<span class="team-pill">ADMIN</span>` : ``}
-          <div class="user-gain ${gainClass}">${gain}</div>
-        </div>
-
-        <div class="team-right-actions">
-          <label class="team-prime-toggle" title="Inclure / exclure du calcul des primes">
-            <input type="checkbox" ${isEligible ? 'checked' : ''}>
-            <span>Primes</span>
-          </label>
-          <div class="btn-group team-btn-group"></div>
-        </div>
-      </div>`;
-
-    const chk = div.querySelector('.team-prime-toggle input');
-    chk.onchange = () => setUserPrimeEligible(uid, chk.checked);
-
-    const btnGroup = div.querySelector('.team-btn-group');
-
-    // Modifier (nom / email / heures)
-    const btnEdit = document.createElement('button');
-    btnEdit.innerHTML = '✏️';
-    btnEdit.className = 'action-btn';
-    btnEdit.title = 'Modifier (nom, email, heures)';
-    btnEdit.onclick = () => {
-      if(typeof openUserEditModal === 'function') openUserEditModal(uid);
-      else quickEditUser(uid);
-    };
-
-    // Renvoyer l'invitation (reset mdp)
-    const btnReset = document.createElement('button');
-    btnReset.innerHTML = '🔑';
-    btnReset.className = 'action-btn';
-    btnReset.title = "Renvoyer l'email de configuration du mot de passe";
-    btnReset.onclick = () => {
-      if(!u.email) { alert('Email manquant.'); return; }
-      if(confirm(`Renvoyer un lien de configuration de mot de passe à ${u.email} ?`)) {
-        auth.sendPasswordResetEmail(u.email)
-          .then(() => showToast('✅ Email envoyé !'))
-          .catch(err => alert('Erreur : ' + err.message));
-      }
-    };
-
-    // Supprimer
-    const btnDel = document.createElement('button');
-    btnDel.innerHTML = '🗑️';
-    btnDel.className = 'action-btn delete';
-    btnDel.title = "Supprimer l'utilisateur";
-    btnDel.onclick = () => { if(confirm('Supprimer ?')) db.ref('users/'+uid).remove(); };
-
-    btnGroup.appendChild(btnEdit);
-    btnGroup.appendChild(btnReset);
-    btnGroup.appendChild(btnDel);
-
-    d.appendChild(div);
-  }
-
-  // 4) Affichage : inclus primes, total, puis hors primes
-  eligibleEntries.forEach(e => renderUserRow(e.uid, e.u, true));
-
-  const totalDiv = document.createElement('div');
-  totalDiv.className = 'total-row';
-  totalDiv.innerHTML = `<span>TOTAL À PAYER</span><strong>${totalToPay.toFixed(2)} €</strong>`;
-  d.appendChild(totalDiv);
-
-  if(ineligibleEntries.length > 0) {
-    const sep = document.createElement('div');
-    sep.className = 'users-sep';
-    sep.textContent = 'Hors primes';
-    d.appendChild(sep);
-    ineligibleEntries.forEach(e => renderUserRow(e.uid, e.u, false));
-  }
-}
-
-function quickEditUser(uid){
-  if(!isAdminUser()) return;
-  // UI moderne (petite fenêtre)
-  try{
-    if(document.getElementById('userEditModal') && typeof openUserEditModal === 'function'){
-      openUserEditModal(uid);
-      return;
+    function renderUser(uid, u, isEligible){
+      const userBonus = isEligible ? computeUserBonus(u) : 0; if(isEligible) totalToPay += userBonus;
+      const div = document.createElement("div"); div.className = "user-item"; const statusClass = (u.status === 'active') ? 'active' : 'pending'; const statusLabel = (u.status === 'active') ? 'ACTIF' : 'EN ATTENTE'; let adminBadge = ""; if(u.role === 'admin') adminBadge = `<span class="admin-tag">ADMIN</span>`; const checked = isEligible ? 'checked' : ''; const gain = isEligible ? userBonus.toFixed(2) + '€' : '—';
+      div.innerHTML = `<div class="user-info"><div class="user-header"><span class="user-name">${u.name || ''} ${adminBadge}</span><div style="display:flex; align-items:center;"><span class="status-dot ${statusClass}"></span><span class="status-text">${statusLabel}</span></div></div><div class="user-email-sub">${u.email || ''}</div><div class="user-meta">${u.hours || 35}h</div><label class="check-label" style="margin-top:6px; font-size:11px; opacity:.95;"><input type="checkbox" ${checked} onchange="setUserPrimeEligible('${uid}', this.checked)"> 💶 Compte dans les primes</label></div><div class="user-actions"><div class="user-gain">${gain}</div><div class="btn-group"><button onclick="openTeamArchive('${uid}')" class="action-btn" title="Archive mensuelle">📄</button><button onclick="editUser('${uid}')" class="action-btn" title="Modifier">✏️</button><button onclick="deleteUser('${uid}')" class="action-btn delete" title="Supprimer">🗑️</button></div></div>`; d.appendChild(div); 
     }
-  }catch(e){}
-  const u = (allUsers && allUsers[uid]) ? (allUsers[uid] || {}) : {};
-
-  const name = prompt('Nom', (u.name || '').toString());
-  if(name === null) return;
-
-  const email = prompt('Email (affichage / reset mdp)', (u.email || '').toString());
-  if(email === null) return;
-
-  const hoursStr = prompt('Heures / semaine', (u.hours != null ? String(u.hours) : '35'));
-  if(hoursStr === null) return;
-
-  const hours = parseFloat(String(hoursStr).replace(',', '.'));
-  if(!isFinite(hours) || hours <= 0){
-    alert('Heures invalides.');
-    return;
-  }
-
-  const updates = {
-    name: String(name).trim(),
-    email: String(email).trim(),
-    hours: Math.round(hours * 10) / 10
-  };
-
-  db.ref('users/'+uid).update(updates).then(() => {
-    showToast('✅ Modifié');
-    try{ logAction('Équipe', `Modif user ${uid}`); }catch(e){}
-  }).catch(err => alert('Erreur : ' + (err && err.message ? err.message : err)));
+    eligibleEntries.forEach(e => renderUser(e.uid, e.u, true));
+    const totalRow = document.createElement("div"); totalRow.className = "total-row"; totalRow.innerHTML = `<span>Total à payer</span><span>${totalToPay.toFixed(2)} €</span>`; d.appendChild(totalRow);
+    if(ineligibleEntries.length){ const sep = document.createElement("div"); sep.className = "users-sep"; sep.textContent = "Non comptés dans les primes"; d.appendChild(sep); ineligibleEntries.forEach(e => renderUser(e.uid, e.u, false)); }
 }
-window.quickEditUser = quickEditUser;
-
-
-function openUserEditModal(uid){
-  if(!isAdminUser()) return;
-  const u = (allUsers && allUsers[uid]) ? (allUsers[uid] || {}) : {};
-  const modal = document.getElementById('userEditModal');
-  if(!modal) return;
-
-  const uidEl = document.getElementById('uemUid');
-  const nameEl = document.getElementById('uemName');
-  const emailEl = document.getElementById('uemEmail');
-  const hoursEl = document.getElementById('uemHours');
-  const adminEl = document.getElementById('uemAdmin');
-
-  if(uidEl) uidEl.value = uid;
-  if(nameEl) nameEl.value = (u.name || '').toString();
-  if(emailEl) emailEl.value = (u.email || '').toString();
-  if(hoursEl) hoursEl.value = (u.hours != null ? String(u.hours) : '35');
-
-  const isAdminFlag = (u.role === 'admin') || (u.email && String(u.email).toLowerCase() === String(SUPER_ADMIN_EMAIL || '').toLowerCase());
-  if(adminEl) adminEl.checked = !!isAdminFlag;
-
-  const stEl = document.getElementById('uemStatus');
-  if(stEl) stEl.textContent = (u.status === 'active') ? 'Actif' : 'En attente';
-
-  const hasPush = !!(u && (u.fcmToken || u.pushToken || (u.fcm && u.fcm.token)));
-  const pushEl = document.getElementById('uemPush');
-  if(pushEl) pushEl.textContent = hasPush ? 'Activées' : 'Non activées';
-
-  modal.style.display = 'flex';
-
-  // click backdrop to close
-  modal.onclick = (ev) => { if(ev && ev.target === modal) closeUserEditModal(); };
-
-  setTimeout(() => { try{ if(nameEl) nameEl.focus(); }catch(e){} }, 50);
-}
-window.openUserEditModal = openUserEditModal;
-
-function closeUserEditModal(){
-  const modal = document.getElementById('userEditModal');
-  if(modal) modal.style.display = 'none';
-}
-window.closeUserEditModal = closeUserEditModal;
-
-async function saveUserEditModal(){
-  if(!isAdminUser()) return;
-
-  const uid = (document.getElementById('uemUid') || {}).value;
-  if(!uid) return;
-
-  const name = ((document.getElementById('uemName') || {}).value || '').toString().trim();
-  const email = ((document.getElementById('uemEmail') || {}).value || '').toString().trim();
-  const hoursStr = ((document.getElementById('uemHours') || {}).value || '').toString();
-  const hours = parseFloat(String(hoursStr).replace(',', '.'));
-  const isAdmin = !!((document.getElementById('uemAdmin') || {}).checked);
-
-  if(!name){ alert('Nom requis.'); return; }
-  if(!email || !email.includes('@')){ alert('Email invalide.'); return; }
-  if(!isFinite(hours) || hours <= 0){ alert('Heures invalides.'); return; }
-
-  const updates = {
-    name,
-    email,
-    hours: Math.round(hours * 10) / 10,
-    role: isAdmin ? 'admin' : 'staff'
-  };
-
-  try{
-    await db.ref('users/' + uid).update(updates);
-    showToast('✅ Modifié');
-    try{ logAction('Équipe', `Modif user ${uid}`); }catch(e){}
-    closeUserEditModal();
-  }catch(err){
-    alert('Erreur : ' + (err && err.message ? err.message : err));
-  }
-}
-window.saveUserEditModal = saveUserEditModal;
-
 
 function setUserPrimeEligible(uid, isEligible){
   if(!isAdminUser()) return; const val = !!isEligible; const prev = (allUsers && allUsers[uid]) ? (allUsers[uid].primeEligible !== false) : true;
@@ -1378,23 +1098,6 @@ if('serviceWorker' in navigator){
 
 const VAPID_KEY = "BHItjKUG0Dz7jagVmfULxS7B_qQcT0DM7O_11fKdERKFzxP3QiWisJoD3agcV22VYFhtpVw-9YuUzrRmCZIawyo";
 
-function _setPushMenuState(enabled){
-  const btn = document.getElementById('btnEnablePush');
-  if(!btn) return;
-  if(enabled){
-    btn.textContent = '✅ Notifications activées';
-    btn.disabled = true;
-    btn.style.opacity = '0.65';
-    btn.style.cursor = 'not-allowed';
-  }else{
-    btn.textContent = '🔔 Activer notifications';
-    btn.disabled = false;
-    btn.style.opacity = '';
-    btn.style.cursor = '';
-  }
-}
-
-
 function checkNotificationStatus() {
     // Si le navigateur ne gère pas les notifs, on arrête
     if (!('Notification' in window)) return;
@@ -1434,22 +1137,31 @@ function dismissPushBanner() {
 
 async function enableNotifications() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    alert("Ton téléphone ne supporte pas les notifications.");
     return;
   }
   
+  // Détection iOS
   const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
+  // Sur iPhone, il faut l'app sur l'écran d'accueil
   if (isIos && !isStandalone) {
-    alert("📢 Pour activer les notifs sur iPhone :\n1. Clique sur Partager\n2. 'Sur l'écran d'accueil'\n3. Ouvre l'app depuis l'accueil.");
+    alert("📢 Pour activer les notifs sur iPhone :\n1. Clique sur Partager (carré avec flèche)\n2. Choisis 'Sur l'écran d'accueil'\n3. Ouvre l'app depuis l'accueil et réessaie.");
     return;
   }
 
   try {
     const permission = await Notification.requestPermission();
+    
     if (permission === 'granted') {
+        // Cache la bannière immédiatement
+        const banner = document.getElementById('pushPermissionBanner');
+        if (banner) banner.style.display = 'none';
+
         const messaging = firebase.messaging();
         const token = await messaging.getToken({ vapidKey: VAPID_KEY });
+        
         if (token && currentUser && currentUser.uid) {
             await db.ref('users/' + currentUser.uid).update({ 
                 fcmToken: token,
@@ -1457,23 +1169,20 @@ async function enableNotifications() {
                 lastTokenUpdate: Date.now()
             });
             showToast("✅ Notifications activées !");
-            try{ dismissPushBanner(); }catch(e){}
-            try{ _setPushMenuState(true); }catch(e){}
-            try{ if(typeof toggleGlobalMenu === "function") toggleGlobalMenu(false); }catch(e){}
+            
+            // Met à jour le bouton du menu si présent
+            const btn = document.getElementById('btnEnablePush');
+            if(btn) { btn.innerHTML = "<span>🔔 Notifs actives</span>"; btn.style.opacity = "0.5"; }
         }
+    } else {
+        alert("Tu as refusé les notifications. Tu peux les activer dans les réglages de ton téléphone.");
+        dismissPushBanner();
     }
   } catch (error) {
     console.error("Erreur notifs:", error);
   }
-
 }
 
-// --- EXPORTS POUR L'INDEX ---
-window.clearLoginError = clearLoginError;
-window.createUser = createUser;
-window.logout = logout;
+// Exposer les fonctions pour qu'elles soient accessibles depuis le HTML
 window.enableNotifications = enableNotifications;
 window.dismissPushBanner = dismissPushBanner;
-window.switchTab = switchTab;
-window.toggleAdmin = toggleAdmin;
-window.setUserPrimeEligible = setUserPrimeEligible;
