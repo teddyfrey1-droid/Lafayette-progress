@@ -685,6 +685,78 @@ body.dark-mode .history-row { background: rgba(2, 6, 23, 0.30); border-color: rg
 .cockpit-gauge-fill { height: 100%; width: 0; background: #3b82f6; transition: width 0.3s; }
 .cockpit-gauge-fill.danger { background: #ef4444; animation: pulse 1s infinite; }
 .cockpit-info { display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #64748b; }
+
+/* --- Progression du mois : pill-bars (style capture) --- */
+.month-pills-wrap{
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(148,163,184,0.22);
+  border-radius: 18px;
+  background: rgba(255,255,255,0.55);
+}
+body.dark-mode .month-pills-wrap{ background: rgba(15,23,42,0.55); border-color: rgba(148,163,184,0.16); }
+.month-pills-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom: 10px; }
+.month-pills-bar{
+  display:flex;
+  align-items:flex-end;
+  gap: 10px;
+  width:100%;
+  overflow-x:auto;
+  padding: 6px 2px 2px;
+}
+.month-pill{
+  position: relative;
+  width: 22px;
+  min-width: 22px;
+  border-radius: 999px;
+  background: rgba(148,163,184,0.22);
+  box-shadow: inset 0 6px 12px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+body.dark-mode .month-pill{ background: rgba(148,163,184,0.18); box-shadow: inset 0 8px 18px rgba(0,0,0,0.35); }
+.month-pill .fill{
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:0;
+  height:0%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(248,113,113,0.95) 0%, rgba(139,92,246,0.95) 70%, rgba(59,130,246,0.95) 100%);
+  transition: height .25s ease;
+}
+.month-pills-sub{ margin-top: 10px; font-size: 12px; font-weight: 850; color: var(--text-muted); }
+
+/* --- Mise à jour rapide (Pilotage) --- */
+#quickUpdateList{ display:flex; flex-direction:column; gap:10px; }
+.quick-update-row{
+  border: 1px solid rgba(148,163,184,0.22);
+  background: rgba(255,255,255,0.60);
+  border-radius: 16px;
+  padding: 12px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 12px;
+}
+body.dark-mode .quick-update-row{ background: rgba(15,23,42,0.55); border-color: rgba(148,163,184,0.16); }
+.quick-update-left{ min-width: 0; }
+.quick-update-name{ font-weight: 950; font-size: 13px; color: var(--text-main); }
+.quick-update-sub{ margin-top: 4px; font-size: 11px; font-weight: 850; color: var(--text-muted); display:flex; flex-wrap:wrap; gap: 8px; }
+.quick-update-pill{ padding: 4px 8px; border-radius: 999px; border: 1px solid rgba(148,163,184,0.18); background: rgba(148,163,184,0.10); }
+.quick-update-right{ display:flex; align-items:center; gap:8px; }
+.quick-update-right input{ width: 110px; margin: 0; }
+.quick-update-btn{ border:none; background: rgba(59,130,246,0.14); color: var(--primary); padding: 10px 12px; border-radius: 12px; font-weight: 950; cursor:pointer; }
+.quick-update-btn:hover{ filter: brightness(1.02); }
+@media (max-width: 560px){
+  .quick-update-row{ flex-direction:column; align-items:stretch; }
+  .quick-update-right{ justify-content:space-between; }
+  .quick-update-right input{ width: 100%; }
+  .quick-update-btn{ width: 100%; }
+}
+
+@media (max-width: 520px){
+  .month-pill{ width: 20px; min-width: 20px; }
+}
 .sim-total-box { margin-top: 20px; padding: 15px; border: 2px solid #2563eb; border-radius: 12px; background: var(--card-bg); text-align: center; box-shadow:0 4px 15px rgba(37,99,235,0.1); margin-bottom: 10px; }
 .sim-total-label { font-size: 13px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
 .sim-total-value { font-size: 24px; font-weight: 900; color: var(--text-main); }
@@ -861,6 +933,99 @@ body.dark-mode .objprog-tooltip { background: rgba(2,6,23,0.92); border: 1px sol
 .mail-user-email { font-size:12px; font-weight:700; color:#64748b; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .mail-actions { display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap; }
 @media (max-width: 720px){ .mail-settings-row{grid-template-columns:1fr;} .mail-settings-actions .btn{width:100%;} }
+
+/* --- ALERTES : Équipes programmées (routing EatPilot) --- */
+.alert-teams-list{ display:flex; flex-direction:column; gap:10px; }
+.alert-team-card{
+  border: 2px solid rgba(15,23,42,0.08);
+  background: rgba(255,255,255,0.75);
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: 0 6px 18px rgba(2,6,23,0.06);
+}
+body.dark-mode .alert-team-card{
+  background: rgba(2,6,23,0.28);
+  border-color: rgba(148,163,184,0.16);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.28);
+}
+.alert-team-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.alert-team-name{ display:flex; align-items:center; gap:10px; font-weight: 950; font-size: 14px; }
+.alert-team-dot{
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  position: relative;
+  box-shadow: 0 0 0 4px rgba(148,163,184,0.12);
+}
+/* Halo doux (pas bling-bling). La couleur vient de --dot quand disponible. */
+.alert-team-dot::after{
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: 999px;
+  background: var(--dot, rgba(139,92,246,1));
+  filter: blur(10px);
+  opacity: 0.06;
+  pointer-events: none;
+}
+body.dark-mode .alert-team-dot{ box-shadow: 0 0 0 4px rgba(148,163,184,0.16); }
+body.dark-mode .alert-team-dot::after{ opacity: 0.18; }
+.alert-team-live{ font-size: 10px; font-weight: 950; letter-spacing: .10em; text-transform: uppercase; padding: 4px 8px; border-radius: 999px; background: rgba(16,185,129,0.16); border: 1px solid rgba(16,185,129,0.28); color: #065f46; }
+body.dark-mode .alert-team-live{ color: #ecfdf5; background: rgba(16,185,129,0.22); border-color: rgba(16,185,129,0.38); }
+
+.alert-team-meta{ display:flex; flex-wrap:wrap; gap:8px 10px; margin-top: 6px; }
+.alert-team-hours{
+  display:inline-flex; align-items:center; gap:6px;
+  padding: 6px 10px; border-radius: 999px;
+  border: 1px solid rgba(139,92,246,0.35);
+  background: rgba(139,92,246,0.14);
+  color: #4c1d95;
+  font-size: 11px; font-weight: 950;
+}
+body.dark-mode .alert-team-hours{
+  color:#f5f3ff;
+  border-color: rgba(139,92,246,0.55);
+  background: rgba(139,92,246,0.22);
+  box-shadow: 0 0 14px rgba(139,92,246,0.14);
+}
+.alert-team-days, .alert-team-members{
+  display:inline-flex; align-items:center; gap:6px;
+  padding: 6px 10px; border-radius: 999px;
+  border: 1px solid rgba(148,163,184,0.22);
+  background: rgba(148,163,184,0.10);
+  color: var(--text-muted);
+  font-size: 11px; font-weight: 900;
+}
+body.dark-mode .alert-team-days, body.dark-mode .alert-team-members{ border-color: rgba(148,163,184,0.16); background: rgba(148,163,184,0.10); }
+.alert-team-actions{ display:flex; gap: 8px; align-items:center; }
+
+/* Chips jours (modal équipe) */
+.day-chip{
+  display:flex;
+  align-items:center;
+  gap: 6px;
+  padding: 10px 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(148,163,184,.22);
+  background: rgba(255,255,255,.60);
+  font-weight: 950;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+body.dark-mode .day-chip{ background: rgba(2,6,23,.28); border-color: rgba(148,163,184,.16); }
+.day-chip input{ width:auto; height:auto; }
+.day-chip:has(input:checked){ border-color: rgba(16,185,129,.35); background: rgba(16,185,129,.12); }
+body.dark-mode .day-chip:has(input:checked){ background: rgba(16,185,129,.18); }
+
+/* Liste membres (modal équipe) */
+.mail-members-list{ display:flex; flex-direction:column; gap:8px; max-height: 260px; overflow:auto; padding-right: 4px; }
+.mail-member-row{ display:flex; align-items:flex-start; gap:10px; padding:10px; border-radius:14px; border:1px solid rgba(148,163,184,.22); background: rgba(255,255,255,.60); cursor:pointer; }
+body.dark-mode .mail-member-row{ background: rgba(2, 6, 23, 0.25); border-color: rgba(148,163,184,.16); }
+.mail-member-row input{ margin-top:4px; }
+.mail-member-name{ font-weight:950; }
+.mail-member-sub{ font-size:11px; opacity:.8; }
+
 /* --- BANNIÈRE PUSH (VERSION POP-UP CENTRALE) --- */
 .push-banner {
   position: fixed;

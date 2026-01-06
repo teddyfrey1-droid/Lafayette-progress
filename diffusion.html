@@ -34,6 +34,19 @@
     .alert-date { font-size: 11px; font-weight: 700; color: var(--text-muted); }
     .alert-title { font-size: 15px; font-weight: 900; color: var(--text-main); margin-bottom: 6px; line-height: 1.3; }
     .alert-snippet { font-size: 13px; color: var(--text-main); opacity: 0.8; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .alert-routing-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.22);
+      background: rgba(148,163,184,0.10);
+      font-size: 11px;
+      font-weight: 900;
+      color: var(--text-muted);
+    }
+    body.dark-mode .alert-routing-chip{ border-color: rgba(148,163,184,0.16); background: rgba(148,163,184,0.10); }
     .alert-empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-style: italic; }
   </style>
 </head>
@@ -186,6 +199,42 @@
                </div>
             </div>
          </div>
+
+         <!-- Admin: Routage des alertes (équipes programmées + canaux) -->
+         <div id="alertRoutingAdmin" class="admin-section" style="margin-top:14px; display:none;">
+           <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+             <div style="min-width:220px;">
+               <h3 style="margin:0; font-size:16px;">⏱️ Routage des alertes</h3>
+               <p style="margin:6px 0 0 0; font-size:13px; opacity:0.85;">Heure France (Europe/Paris). Les chevauchements sont autorisés : si 2 équipes couvrent la même heure, les 2 reçoivent l'alerte.</p>
+             </div>
+             <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+               <div class="field">
+                 <label style="font-size:12px; opacity:0.8;">Canal</label>
+                 <select id="alertRoutingMode" class="input" style="min-width:240px;">
+                   <option value="push_fallback">🔔 Push + 📧 Email si Push OFF</option>
+                   <option value="both">🔔 Push + 📧 Email (à tous)</option>
+                   <option value="push_only">🔔 Push uniquement</option>
+                 </select>
+               </div>
+               <div class="field">
+                 <label style="font-size:12px; opacity:0.8;">Si aucune équipe active</label>
+                 <select id="alertRoutingFallbackNoTeam" class="input" style="min-width:190px;">
+                   <option value="all">Prévenir tout le monde</option>
+                   <option value="admins">Admins seulement</option>
+                   <option value="none">Personne</option>
+                 </select>
+               </div>
+               <button class="btn" id="btnSaveAlertRouting" onclick="saveAlertRoutingSettings()" style="white-space:nowrap;">💾 Sauver</button>
+             </div>
+           </div>
+
+           <div style="margin-top:14px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+             <div style="font-weight:800;">Équipes programmées</div>
+             <button class="btn" onclick="openAlertTeamModal(null)" style="white-space:nowrap;">➕ Nouvelle équipe</button>
+           </div>
+
+           <div id="alertTeamsList" class="alert-teams-list" style="margin-top:12px;"></div>
+         </div>
          
          <div id="alertsList" style="margin-top:20px;">
             <div class="alert-empty">Chargement...</div>
@@ -213,6 +262,62 @@
       <div style="display:flex; gap:10px; margin-top:14px;">
         <button class="btn" id="mailGroupSaveBtn" onclick="saveMailGroup()" style="flex:1;">Enregistrer</button>
         <button class="btn" onclick="closeMailGroupModal()" style="background:#e2e8f0; color:#475569; border:1px solid #cbd5e1;">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Équipe programmée (alertTeams) -->
+  <div id="alertTeamModal" class="modal-overlay" style="display:none; z-index: 4100;">
+    <div class="modal-box" style="max-width:560px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;">
+        <div>
+          <div id="alertTeamModalTitle" style="font-weight:950; font-size:18px;">Équipe programmée</div>
+          <div style="font-size:12px; opacity:0.75; margin-top:2px;">Heure France (Europe/Paris). Chevauchements autorisés.</div>
+        </div>
+        <button class="icon-btn" onclick="closeAlertTeamModal()" aria-label="Fermer">✕</button>
+      </div>
+      <input type="hidden" id="alertTeamId">
+
+      <div style="display:grid; grid-template-columns: 1fr 120px; gap:10px;">
+        <div>
+          <label class="mail-label">Nom de l'équipe</label>
+          <input type="text" id="alertTeamName" placeholder="Ex: Équipe du matin">
+        </div>
+        <div>
+          <label class="mail-label">Couleur</label>
+          <input type="color" id="alertTeamColor" value="#8b5cf6" class="mail-color-input">
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
+        <div>
+          <label class="mail-label">Début</label>
+          <input type="time" id="alertTeamStart" value="09:00" class="input">
+        </div>
+        <div>
+          <label class="mail-label">Fin</label>
+          <input type="time" id="alertTeamEnd" value="18:00" class="input">
+        </div>
+      </div>
+
+      <label class="mail-label" style="margin-top:12px;">Jours actifs</label>
+      <div id="alertTeamDays" class="days-chips" style="display:flex; gap:8px; flex-wrap:wrap;">
+        <label class="day-chip"><input type="checkbox" value="1" checked> Lun</label>
+        <label class="day-chip"><input type="checkbox" value="2" checked> Mar</label>
+        <label class="day-chip"><input type="checkbox" value="3" checked> Mer</label>
+        <label class="day-chip"><input type="checkbox" value="4" checked> Jeu</label>
+        <label class="day-chip"><input type="checkbox" value="5" checked> Ven</label>
+        <label class="day-chip"><input type="checkbox" value="6"> Sam</label>
+        <label class="day-chip"><input type="checkbox" value="7"> Dim</label>
+      </div>
+
+      <label class="mail-label" style="margin-top:12px;">Membres</label>
+      <input type="text" id="alertTeamMemberSearch" class="input" placeholder="Rechercher un membre..." oninput="renderAlertTeamModalMembers()" style="margin-bottom:10px;">
+      <div id="alertTeamMembers" class="mail-members-list"></div>
+
+      <div style="display:flex; gap:10px; margin-top:14px;">
+        <button class="btn" onclick="saveAlertTeam()" style="flex:1;">Enregistrer</button>
+        <button class="btn" onclick="closeAlertTeamModal()" style="background:#e2e8f0; color:#475569; border:1px solid #cbd5e1;">Annuler</button>
       </div>
     </div>
   </div>
@@ -270,6 +375,14 @@
           // Nettoyage HTML pour snippet
           const cleanBody = (item.body || '').replace(/<[^>]+>/g, ' ').substring(0, 180) + '...';
 
+          // Routage (si dispo)
+          const routing = item.routing || null;
+          const teamsLabel = routing?.teamNames?.length ? routing.teamNames.join(' · ') : (routing?.teams?.length ? routing.teams.join(' · ') : '—');
+          const modeLabel = routing?.mode ? routing.mode : '—';
+          const pushCount = routing?.recipients?.push ?? null;
+          const emailCount = routing?.recipients?.email ?? null;
+          const showRouting = !!routing;
+
           const card = document.createElement('div');
           card.className = 'alert-card';
           card.innerHTML = `
@@ -278,6 +391,14 @@
                <span class="alert-date">${dateStr}</span>
             </div>
             <div class="alert-title">${item.title}</div>
+            ${showRouting ? `
+              <div class="alert-routing" style="margin:8px 0 6px; display:flex; flex-wrap:wrap; gap:8px 10px;">
+                <span class="alert-routing-chip">🎯 ${teamsLabel}</span>
+                <span class="alert-routing-chip">⚙️ ${modeLabel}</span>
+                ${(pushCount !== null) ? `<span class="alert-routing-chip">🔔 ${pushCount}</span>` : ''}
+                ${(emailCount !== null) ? `<span class="alert-routing-chip">📧 ${emailCount}</span>` : ''}
+              </div>
+            ` : ''}
             <div class="alert-snippet">${cleanBody}</div>
           `;
           container.appendChild(card);
@@ -352,6 +473,8 @@
       if(typeof window.renderQuickGroups === 'function') window.renderQuickGroups();
       if(typeof window.renderUsersGrid === 'function') window.renderUsersGrid();
       if(typeof window.renderGroupsList === 'function') window.renderGroupsList();
+      if(typeof window.renderAlertRoutingUI === 'function') window.renderAlertRoutingUI();
+      if(typeof window.renderAlertTeamsList === 'function') window.renderAlertTeamsList();
       
       const reg = document.getElementById('mailFunctionsRegion');
       const fromName = document.getElementById('mailFromName');

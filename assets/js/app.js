@@ -349,6 +349,7 @@ auth.onAuthStateChanged(user => {
       currentUser.email = user.email;
       try{ _setupPushUI(); }catch(e){}
       try{ setupPushNotifications(); }catch(e){}
+      try{ flushPendingFcmToken(); }catch(e){}
       const newLogRef = db.ref("logs").push();
       newLogRef.set({ user: currentUser.name, action: "Connexion", type: "session", startTime: Date.now(), lastSeen: Date.now() });
       setInterval(() => { newLogRef.update({ lastSeen: Date.now() }); }, 60000);
@@ -698,6 +699,9 @@ function buildSimulatorUI() {
     });
     document.getElementById("simTotalPerUser").innerText = `${totalPotential35h.toFixed(0)}€`;
     updateSim();
+    // Pilotage (admin) : widgets complémentaires (safe-guard si la section n'existe pas)
+    try{ renderMonthPillsProgress(); }catch(e){}
+    try{ renderPilotageQuickUpdate(); }catch(e){}
 }
 function updateObjVal(objId, tierIdx, val) { document.getElementById(`val-${objId}-${tierIdx}`).innerText = val + "€"; if(simObjs[objId].paliers && simObjs[objId].paliers[tierIdx]) { simObjs[objId].paliers[tierIdx].prize = val; } updateSim(); }
 function toggleCockpitObj(btn){ try{ const row = btn.closest('.cockpit-obj-row'); if(!row) return; row.classList.toggle('open'); }catch(e){} }
@@ -735,6 +739,142 @@ function publishSim() {
         db.ref().update(updates).then(async () => { showToast("✅ Pilotage Appliqué !"); logAction("Pilotage", "Mise à jour globale budget & primes"); try{ await _maybeAutoNotify('pilotage', { title: "📡 Pilotage publié", body: "Les primes & paliers ont été mis à jour.", link: "/index.html#dashboard" }); }catch(e){} });
     }
 }
+
+// ------------------------------------------------------------
+// PILOTAGE (ADMIN) : Progression du mois (style "pills")
+// ------------------------------------------------------------
+
+let __monthPillsTimer = null;
+
+function renderMonthPillsProgress(){
+  const bar = document.getElementById('monthPillsBar');
+  if(!bar) return; // section non présente
+
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const today = now.getDate();
+  const mins = now.getHours()*60 + now.getMinutes();
+  const dayFraction = Math.max(0, Math.min(1, mins / (24*60)));
+
+  // Construire la grille 1xN (scrollable)
+  bar.innerHTML = '';
+  for(let d=1; d<=daysInMonth; d++){
+    const pill = document.createElement('div');
+    pill.className = 'month-pill';
+    const fill = document.createElement('div');
+    fill.className = 'month-pill-fill';
+
+    let pct = 0;
+    if(d < today) pct = 1;
+    else if(d === today) pct = dayFraction;
+    else pct = 0;
+
+    fill.style.height = (pct * 100).toFixed(0) + '%';
+    pill.title = `Jour ${d}/${daysInMonth}`;
+    pill.appendChild(fill);
+    bar.appendChild(pill);
+  }
+
+  const txt = document.getElementById('monthPillsText');
+  const sub = document.getElementById('monthPillsSub');
+  const progress = ((today - 1) + dayFraction) / daysInMonth;
+  const pctMonth = Math.max(0, Math.min(1, progress)) * 100;
+  if(txt) txt.textContent = `Jour ${today}/${daysInMonth} • ${pctMonth.toFixed(0)}% du mois`;
+  if(sub){
+    const remainingDays = Math.max(0, daysInMonth - today);
+    sub.textContent = remainingDays === 0 ? `Dernier jour du mois` : `Il reste ${remainingDays} jour${remainingDays>1?'s':''}`;
+  }
+
+  // auto-refresh (1 min) pour que la barre bouge toute seule
+  if(!__monthPillsTimer){
+    __monthPillsTimer = setInterval(() => {
+      try{ renderMonthPillsProgress(); }catch(e){}
+    }, 60*1000);
+  }
+}
+
+// ------------------------------------------------------------
+// PILOTAGE (ADMIN) : Mise à jour rapide des objectifs (current/target)
+// ------------------------------------------------------------
+
+function renderPilotageQuickUpdate(){
+  const list = document.getElementById('quickUpdateList');
+  if(!list) return;
+  if(!isAdminUser()){
+    list.innerHTML = '<div class="mail-hint">Réservé aux admins.</div>';
+    return;
+  }
+
+  const objs = allObjs || {};
+  const ids = Object.keys(objs).filter(id => objs[id] && objs[id].published);
+  ids.sort((a,b) => String(objs[a].name||a).localeCompare(String(objs[b].name||b), 'fr', {sensitivity:'base'}));
+
+  if(ids.length === 0){
+    list.innerHTML = '<div class="mail-hint">Aucun objectif publié.</div>';
+    return;
+  }
+
+  const fmtType = (o) => {
+    if(o.isFixed) return 'Fixe';
+    if(o.isNumeric) return 'Numérique';
+    return '%';
+  };
+
+  list.innerHTML = '';
+  ids.forEach(id => {
+    const o = objs[id];
+    const row = document.createElement('div');
+    row.className = 'quick-update-row';
+    const isPrimary = !!o.isPrimary;
+    const t1 = isPrimary ? 'Priorité' : 'Bonus';
+    const t2 = fmtType(o);
+    const cur = (o.current ?? '');
+    const tar = (o.target ?? '');
+    row.innerHTML = `
+      <div class="quick-update-left">
+        <div class="quick-update-name">${(o.name||'Objectif')}</div>
+        <div class="quick-update-sub">
+          <span class="quick-update-pill">${t1}</span>
+          <span class="quick-update-pill">${t2}</span>
+          <span class="quick-update-pill">ID: ${id}</span>
+        </div>
+      </div>
+      <div class="quick-update-right">
+        <input class="input" inputmode="decimal" placeholder="Actuel" value="${String(cur)}" id="qu-cur-${id}">
+        <input class="input" inputmode="decimal" placeholder="Cible" value="${String(tar)}" id="qu-tar-${id}">
+        <button class="quick-update-btn" type="button" onclick="quickSaveObjective('${id}')">💾</button>
+      </div>
+    `;
+    list.appendChild(row);
+  });
+
+  // Hint
+  const hint = document.getElementById('quickUpdateHint');
+  if(hint) hint.textContent = 'Astuce : tu peux modifier plusieurs lignes puis cliquer 💾 (une ligne) pour envoyer en 1 seconde.';
+}
+
+async function quickSaveObjective(id){
+  if(!isAdminUser()) return;
+  if(!id) return;
+  const curEl = document.getElementById('qu-cur-' + id);
+  const tarEl = document.getElementById('qu-tar-' + id);
+  if(!curEl || !tarEl) return;
+  const current = curEl.value;
+  const target = tarEl.value;
+
+  try{
+    await db.ref('objectives/' + id).update({ current, target, updatedAt: Date.now() });
+    showToast('✅ Objectif mis à jour');
+    logAction('Pilotage', `Maj rapide objectif ${id}`);
+  }catch(e){
+    console.error(e);
+    alert('Erreur lors de la mise à jour.');
+  }
+}
+
+window.quickSaveObjective = quickSaveObjective;
 
 function renderNativeCalendar() {
     const m = currentCalDate.getMonth(); const y = currentCalDate.getFullYear();
@@ -1432,6 +1572,25 @@ function dismissPushBanner() {
     localStorage.setItem('heiko_push_banner_dismissed', 'true');
 }
 
+// Si l'utilisateur a activé les notifs avant que l'auth soit prête, on récupère
+// le token stocké localement et on le pousse en base dès que possible.
+async function flushPendingFcmToken(){
+  try{
+    const token = localStorage.getItem('heiko_pending_fcm_token');
+    if(!token) return;
+    if(!currentUser || !currentUser.uid) return;
+    await db.ref('users/' + currentUser.uid).update({
+      fcmToken: token,
+      pushEnabled: true,
+      lastTokenUpdate: Date.now(),
+    });
+    localStorage.removeItem('heiko_pending_fcm_token');
+    try{ _setPushMenuState(true); }catch(e){}
+  }catch(e){
+    console.error(e);
+  }
+}
+
 async function enableNotifications() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     return;
@@ -1450,6 +1609,18 @@ async function enableNotifications() {
     if (permission === 'granted') {
         const messaging = firebase.messaging();
         const token = await messaging.getToken({ vapidKey: VAPID_KEY });
+        // IMPORTANT : lors du 1er lancement (PWA), l'utilisateur peut activer les notifs
+        // avant que l'auth n'ait fini de charger. On ferme quand même l'UI, puis on
+        // sauvegarde le token dès que currentUser est disponible.
+        if (token && (!currentUser || !currentUser.uid)) {
+            try{ localStorage.setItem('heiko_pending_fcm_token', token); }catch(e){}
+            showToast("✅ Notifications activées !");
+            try{ dismissPushBanner(); }catch(e){}
+            try{ _setPushMenuState(true); }catch(e){}
+            try{ if(typeof toggleGlobalMenu === "function") toggleGlobalMenu(false); }catch(e){}
+            return;
+        }
+
         if (token && currentUser && currentUser.uid) {
             await db.ref('users/' + currentUser.uid).update({ 
                 fcmToken: token,

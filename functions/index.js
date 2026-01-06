@@ -3,7 +3,7 @@
  * Gère l'envoi intelligent : Email, Push, ou les deux.
  */
 
-const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { logger } = require('firebase-functions');
 const { defineSecret, defineString, defineInt } = require('firebase-functions/params');
 const admin = require('firebase-admin');
@@ -36,6 +36,72 @@ function buildTransporter() {
 
 function stripHtml(html) {
   return (html || '').replace(/<[^>]*>?/gm, '').trim();
+}
+
+function parseHHMM(value){
+  const s = String(value || '').trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})$/);
+  if(!m) return NaN;
+  const h = Number(m[1]);
+  const mm = Number(m[2]);
+  if(!Number.isFinite(h) || !Number.isFinite(mm)) return NaN;
+  if(h < 0 || h > 23 || mm < 0 || mm > 59) return NaN;
+  return (h * 60) + mm;
+}
+
+function getParisTimeInfo(ts){
+  const d = new Date(Number(ts) || Date.now());
+  // weekday (Mon..Sun) and hh/mm in Europe/Paris
+  const dtf = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Paris',
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const parts = dtf.formatToParts(d);
+  const byType = {};
+  parts.forEach(p => { if(p && p.type) byType[p.type] = p.value; });
+  const wd = String(byType.weekday || '').slice(0,3);
+  const map = { Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6, Sun:7 };
+  const dow = map[wd] || 0;
+  const h = Number(byType.hour);
+  const m = Number(byType.minute);
+  const minutes = (Number.isFinite(h) && Number.isFinite(m)) ? (h*60+m) : NaN;
+  return { dow, minutes };
+}
+
+function isTeamActiveAt(team, nowMinutes, nowDow){
+  if(!team) return false;
+  if(team.enabled === false) return false;
+  const start = parseHHMM(team.start || team.startTime || team.from);
+  const end = parseHHMM(team.end || team.endTime || team.to);
+  if(!Number.isFinite(start) || !Number.isFinite(end)) return false;
+
+  // start == end => considéré comme 24h/24
+  const crossesMidnight = start > end;
+  let dayToCheck = nowDow;
+  if(crossesMidnight && Number.isFinite(nowMinutes)){
+    // Pour la tranche "après minuit", rattacher à la veille.
+    if(nowMinutes < end){
+      dayToCheck = (nowDow === 1) ? 7 : (nowDow - 1);
+    }
+  }
+
+  const days = Array.isArray(team.days) ? team.days.map(n=>Number(n)).filter(n=>n>=1 && n<=7) : [];
+  if(days.length > 0 && !days.includes(dayToCheck)) return false;
+
+  if(start === end) return true;
+  if(!crossesMidnight){
+    return nowMinutes >= start && nowMinutes < end;
+  }
+  return (nowMinutes >= start) || (nowMinutes < end);
+}
+
+function chunk(arr, size){
+  const out = [];
+  for(let i=0; i<arr.length; i+=size){ out.push(arr.slice(i, i+size)); }
+  return out;
 }
 
 async function assertIsAdmin(uid) {
@@ -83,7 +149,8 @@ exports.sendSmartBroadcast = onCall(
 
       const userEmail = user.email;
       const userPushToken = user.fcmToken || user.pushToken || (user.fcm ? user.fcm.token : null);
-      const isPushable = !!userPushToken;
+      const pushAllowed = (user.pushEnabled !== false);
+      const isPushable = pushAllowed && !!userPushToken;
       const isEmailable = (userEmail && userEmail.includes('@'));
 
       let willReceivePush = false;
@@ -159,53 +226,163 @@ exports.sendSmartBroadcast = onCall(
     return { successCount, details: { emails: emailTargets.size, pushes: pushTokens.length } };
   }
 );
-const { onRequest } = require('firebase-functions/v2/https');
-
-// --- WEBHOOK ALERTE EATPILOT ---
+// --- WEBHOOK ALERTE EATPILOT (Routage par équipes + canaux) ---
 exports.receiveExternalAlert = onRequest(
-  { region: 'us-central1' },
+  {
+    region: 'us-central1',
+    secrets: [SMTP_USER, SMTP_PASS],
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
   async (req, res) => {
-    // 1. Sécurité simple
-    if (req.query.secret !== 'SUPER_SECRET_LAFAYETTE_99') {
-      return res.status(403).send('Forbidden');
-    }
+    // 1) Sécurité simple (ne pas casser l'intégration existante)
+    const provided = String(req.query.secret || req.get('x-secret') || '');
+    if (provided !== 'SUPER_SECRET_LAFAYETTE_99') return res.status(403).send('Forbidden');
 
     const data = req.body || {};
-    const subject = data.subject || 'Alerte Technique';
-    const bodyHtml = data.bodyHtml || '';
-    const timestamp = Date.now();
+    const subject = (data.subject || data.title || 'Alerte Technique').toString();
+    const bodyHtml = (data.bodyHtml || data.html || data.body || '').toString();
+    const ts = Number(data.timestamp || Date.now());
 
     try {
-      // 2. Sauvegarde en base
+      // 2) Chargement settings + users + équipes
+      const [usersSnap, teamsSnap, routingSnap] = await Promise.all([
+        admin.database().ref('users').once('value'),
+        admin.database().ref('alertTeams').once('value'),
+        admin.database().ref('settings/alertRouting').once('value'),
+      ]);
+
+      const users = usersSnap.val() || {};
+      const teams = teamsSnap.val() || {};
+      const routing = routingSnap.val() || {};
+
+      const mode = String(routing.mode || 'push_fallback');
+      const fallbackNoTeam = String(routing.fallbackNoTeam || 'all');
+
+      // 3) Détermination équipes actives (heure FR) + destinataires
+      const { dow, minutes } = getParisTimeInfo(ts);
+      const activeTeamIds = [];
+      const activeTeamNames = [];
+      const recipientUids = new Set();
+
+      Object.keys(teams).forEach(teamId => {
+        const t = teams[teamId] || {};
+        if(isTeamActiveAt(t, minutes, dow)){
+          activeTeamIds.push(teamId);
+          activeTeamNames.push(String(t.name || teamId));
+          const uids = Array.isArray(t.userIds) ? t.userIds
+            : (Array.isArray(t.members) ? t.members
+            : (t.memberUids && typeof t.memberUids === 'object' ? Object.keys(t.memberUids)
+            : []));
+          uids.forEach(uid => { if(uid) recipientUids.add(String(uid)); });
+        }
+      });
+
+      if(recipientUids.size === 0){
+        if(fallbackNoTeam === 'admins'){
+          Object.keys(users).forEach(uid => {
+            const u = users[uid] || {};
+            const r = String(u.role || '').toLowerCase();
+            if(r === 'admin' || r === 'superadmin') recipientUids.add(uid);
+          });
+        } else if(fallbackNoTeam === 'none'){
+          // aucun destinataire
+        } else {
+          // all (par défaut) : ne pas rater une alerte
+          Object.keys(users).forEach(uid => recipientUids.add(uid));
+        }
+      }
+
+      // 4) Build targets (push/email) selon le mode
+      const emailTargets = new Set();
+      const pushTokens = new Set();
+
+      recipientUids.forEach(uid => {
+        const u = users[uid] || {};
+        const email = (u.email && String(u.email).includes('@')) ? String(u.email).trim() : '';
+        const token = u.fcmToken || u.pushToken || (u.fcm ? u.fcm.token : null);
+        const pushAllowed = (u.pushEnabled !== false);
+
+        if(mode === 'email_only'){
+          if(email) emailTargets.add(email);
+          return;
+        }
+        if(mode === 'push_only'){
+          if(pushAllowed && token) pushTokens.add(String(token));
+          return;
+        }
+        if(mode === 'both'){
+          if(email) emailTargets.add(email);
+          if(pushAllowed && token) pushTokens.add(String(token));
+          return;
+        }
+
+        // push_fallback (par défaut)
+        if(pushAllowed && token) pushTokens.add(String(token));
+        else if(email) emailTargets.add(email);
+      });
+
+      // 5) Envoi
+      let pushSuccess = 0;
+      let emailSuccess = 0;
+
+      // Push (FCM)
+      const tokensArr = Array.from(pushTokens);
+      if(tokensArr.length > 0){
+        const chunks = chunk(tokensArr, 500);
+        for(const c of chunks){
+          const resp = await admin.messaging().sendEachForMulticast({
+            tokens: c,
+            notification: {
+              title: '⚠️ ' + subject,
+              body: 'Nouvelle alerte reçue. Voir le détail.'
+            },
+            data: { url: '/diffusion.html#alerts' }
+          });
+          pushSuccess += (resp.successCount || 0);
+        }
+      }
+
+      // Email (BCC)
+      const emailsArr = Array.from(emailTargets);
+      if(emailsArr.length > 0){
+        const transporter = buildTransporter();
+        const fromEmail = MAIL_FROM_EMAIL.value() || SMTP_USER.value();
+        const fromName = MAIL_FROM_NAME_DEFAULT.value() || 'Lafayette';
+        const from = `${fromName} <${fromEmail}>`;
+
+        const html = bodyHtml || `<p>${stripHtml(bodyHtml || '')}</p>`;
+        const bccChunks = chunk(emailsArr, 50);
+        for(const bcc of bccChunks){
+          await transporter.sendMail({
+            from,
+            to: from,
+            bcc,
+            subject: '⚠️ ' + subject,
+            html,
+            text: stripHtml(html),
+          });
+          emailSuccess += bcc.length;
+        }
+      }
+
+      // 6) Sauvegarde en base (historique)
       await admin.database().ref('alerts').push({
         title: subject,
         body: bodyHtml,
-        date: timestamp,
-        source: 'EatPilot'
-      });
-
-      // 3. Envoi Push à l'équipe
-      const snap = await admin.database().ref('users').once('value');
-      const users = snap.val() || {};
-      const tokens = [];
-
-      Object.values(users).forEach(u => {
-        const t = u.fcmToken || u.pushToken || (u.fcm ? u.fcm.token : null);
-        if (t) tokens.push(t);
-      });
-
-      if (tokens.length > 0) {
-        await admin.messaging().sendEachForMulticast({
-          tokens: tokens,
-          notification: {
-            title: '⚠️ ' + subject,
-            body: 'Nouvelle alerte reçue. Voir le détail.'
-          },
-          data: { 
-            url: '/diffusion.html#alerts' // Redirection vers l'onglet Alertes
+        date: ts,
+        source: 'EatPilot',
+        routing: {
+          mode,
+          fallbackNoTeam,
+          teams: activeTeamIds,
+          teamNames: activeTeamNames,
+          recipients: {
+            push: pushTokens.size,
+            email: emailTargets.size,
           }
-        });
-      }
+        }
+      });
 
       res.status(200).send('OK');
     } catch (e) {

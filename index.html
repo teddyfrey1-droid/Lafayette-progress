@@ -441,6 +441,16 @@
                 <span id="simUsed">0€ Engagés</span>
                 <span id="simLeft">Reste : 0€</span>
             </div>
+
+            <!-- Progression du mois (style pill-bars) -->
+            <div class="month-pills-wrap">
+              <div class="month-pills-head">
+                <label class="budget-label-small" style="margin:0;">PROGRESSION DU MOIS</label>
+                <div class="user-badge" id="monthPillsText" style="background:rgba(139,92,246,.12); color:#6d28d9; border:1px solid rgba(139,92,246,.25);">—</div>
+              </div>
+              <div id="monthPillsBar" class="month-pills-bar" aria-label="Progression du mois"></div>
+              <div class="month-pills-sub" id="monthPillsSub">—</div>
+            </div>
             <div class="cockpit-top" style="margin-top:14px;">
               <label class="budget-label-small">SIMULATION CA MENSUEL (€)</label>
               <div style="display:flex; align-items:center; gap:8px;">
@@ -477,6 +487,14 @@
       <div class="admin-section">
         <h3 style="font-size:14px; margin-bottom:10px;">📢 Publication</h3>
         <div id="pubList"></div>
+      </div>
+
+      <div class="admin-section" id="quickUpdateSection">
+        <h3 style="font-size:14px; margin-bottom:10px;">⚡ Mise à jour rapide</h3>
+        <div class="mail-hint" style="margin-bottom:12px;">
+          Modifie les valeurs <b>en ligne</b> (entrée + Entrée/OK) sans ouvrir les panneaux d'édition.
+        </div>
+        <div id="quickUpdateList"></div>
       </div>
       
       <div class="admin-section">
