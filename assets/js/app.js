@@ -115,7 +115,20 @@ function getRoleKeyFromUser(u){
   return 'user';
 }
 
+function _getAuthEmailLower(){
+  try{
+    const au = (firebase && firebase.auth) ? firebase.auth().currentUser : null;
+    return (au && au.email) ? String(au.email).toLowerCase() : '';
+  }catch(e){
+    return '';
+  }
+}
+
 function getRoleKey(){
+  // Force super_admin if the authenticated email matches the super admin fallback email
+  const authEmail = _getAuthEmailLower();
+  if(authEmail && authEmail === String(SUPER_ADMIN_EMAIL).toLowerCase()) return 'super_admin';
+  if(currentUser && currentUser.isSuperAdmin === true) return 'super_admin';
   return getRoleKeyFromUser(currentUser);
 }
 
@@ -169,12 +182,12 @@ function getGuardrailMaxPctOfCA(){
 }
 
 function isSuperAdmin() {
-  if(!currentUser) return false;
-  const emailOk = !!(currentUser.email && String(currentUser.email).toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
-  const rk = getRoleKeyFromUser(currentUser);
-  return !!(emailOk || currentUser.isSuperAdmin === true || rk === 'super_admin');
+  const authEmail = _getAuthEmailLower();
+  const email = (currentUser && currentUser.email) ? String(currentUser.email).toLowerCase() : authEmail;
+  const emailOk = !!((email && email === String(SUPER_ADMIN_EMAIL).toLowerCase()) || (authEmail && authEmail === String(SUPER_ADMIN_EMAIL).toLowerCase()));
+  const rk = getRoleKey();
+  return !!(emailOk || (currentUser && currentUser.isSuperAdmin === true) || rk === 'super_admin');
 }
-
 function isAdminUser() {
   // Respecte les permissions (désactivable depuis Centre de contrôle)
   if(!currentUser) return false;
