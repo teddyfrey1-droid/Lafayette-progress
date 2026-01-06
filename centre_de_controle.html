@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+  <title>Heiko — Centre de contrôle</title>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <link rel="stylesheet" href="assets/css/styles.css">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    .cc-wrap{max-width:980px;margin:0 auto;padding:18px;}
+    .cc-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0 14px;}
+    .cc-title{font-size:18px;font-weight:900;color:var(--text-main);letter-spacing:.4px;}
+    .cc-sub{font-size:12px;color:var(--text-muted);font-weight:700;}
+    .cc-card{background:var(--card-bg);border:1px solid var(--border-color);border-radius:18px;padding:14px 14px 12px;margin:10px 0;box-shadow:0 6px 18px rgba(0,0,0,0.06);}
+    .cc-card h3{margin:0 0 10px;font-size:13px;font-weight:900;color:var(--text-main);}
+    .cc-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;}
+    @media (max-width:860px){.cc-grid{grid-template-columns:1fr 1fr;}}
+    .cc-field label{display:block;font-size:11px;font-weight:900;color:var(--text-muted);margin:0 0 6px;}
+    .cc-field input{width:100%;}
+    .cc-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;}
+    .cc-matrix{width:100%;border-collapse:separate;border-spacing:0 8px;}
+    .cc-matrix th{font-size:11px;color:var(--text-muted);font-weight:900;text-align:left;padding:0 8px;}
+    .cc-matrix td{background:rgba(0,0,0,0.02);border:1px solid var(--border-color);padding:10px 8px;border-radius:12px;}
+    body.dark-mode .cc-matrix td{background:rgba(255,255,255,0.03);}
+    .cc-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:14px;border:1px solid var(--border-color);background:rgba(16,185,129,0.08);color:var(--text-main);font-size:12px;font-weight:900;}
+    .cc-users{display:flex;flex-direction:column;gap:10px;}
+    .cc-user{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;border:1px solid var(--border-color);border-radius:16px;background:rgba(0,0,0,0.02);}
+    body.dark-mode .cc-user{background:rgba(255,255,255,0.03);}
+    .cc-user-main{min-width:0;}
+    .cc-user-name{font-weight:900;color:var(--text-main);font-size:13px;}
+    .cc-user-email{font-size:11px;color:var(--text-muted);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:420px;}
+    .cc-user-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;}
+    .cc-user-right select{max-width:220px;}
+    .cc-search{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+    .cc-search input{flex:1;min-width:220px;}
+    .cc-denied{max-width:520px;margin:18vh auto 0;text-align:center;padding:20px;border-radius:18px;border:1px solid var(--border-color);background:var(--card-bg);}
+    .cc-denied h2{margin:0 0 10px;font-size:18px;font-weight:900;color:var(--text-main);}
+    .cc-denied p{margin:0;color:var(--text-muted);font-weight:700;}
+  </style>
+</head>
+
+<body>
+
+  <div class="theme-toggle" onclick="toggleDarkModeCC()">
+    <div class="theme-toggle-slider"><span class="toggle-icon">☀️</span></div>
+  </div>
+
+  <div id="loginOverlay" style="display:none;">
+    <div class="login-box">
+      <h2 class="login-title">Connexion Super Admin</h2>
+      <div class="input-group">
+        <input type="email" id="loginEmail" placeholder="Email">
+      </div>
+      <div class="input-group">
+        <input type="password" id="loginPass" placeholder="Mot de passe">
+        <span class="toggle-password" onclick="togglePassCC()">👁️</span>
+      </div>
+      <button class="btn" id="btnLogin">Connexion</button>
+      <div class="section-muted" style="margin-top:10px; font-size:11px;">Cette page est réservée au Super Admin.</div>
+    </div>
+  </div>
+
+  <div id="denied" class="cc-denied" style="display:none;">
+    <h2>Accès refusé</h2>
+    <p>Cette page est réservée au Super Admin.</p>
+    <div style="height:14px;"></div>
+    <a class="btn" href="index.html" style="display:inline-flex; width:auto; padding:12px 16px;">Retour au dashboard</a>
+  </div>
+
+  <div id="app" style="display:none;">
+    <div class="cc-wrap">
+      <div class="cc-head">
+        <div>
+          <div class="cc-title">🛡️ Centre de contrôle</div>
+          <div class="cc-sub">Rôles, titres et accès par groupe · visible uniquement Super Admin</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+          <div class="cc-badge" id="ccMe">—</div>
+          <button class="btn" style="width:auto; padding:10px 14px; background:var(--card-bg); color:#ef4444; border:1px solid #fca5a5;" onclick="logoutCC()">🚪 Déconnexion</button>
+        </div>
+      </div>
+
+      <div class="cc-card">
+        <h3>🏷️ Titres (modifiable à tout moment)</h3>
+        <div class="cc-grid" id="roleLabelsGrid"></div>
+        <div style="height:12px;"></div>
+        <div class="cc-actions">
+          <button class="btn" style="width:auto; padding:12px 16px;" onclick="saveRoleLabels()">💾 Enregistrer les titres</button>
+        </div>
+      </div>
+
+      <div class="cc-card">
+        <h3>🧩 Fonctions activables/désactivables par rôle</h3>
+        <div class="section-muted" style="margin-bottom:10px; font-size:11px;">
+          Exemple : tu peux laisser <b>Pilotage</b> ON pour "Gérant" et OFF pour "Manager". Les changements s'appliquent à tout le groupe.
+        </div>
+        <div style="overflow:auto;">
+          <table class="cc-matrix" id="permTable"></table>
+        </div>
+        <div style="height:12px;"></div>
+        <div class="cc-actions">
+          <button class="btn" style="width:auto; padding:12px 16px;" onclick="saveRolePermissions()">💾 Enregistrer les accès</button>
+        </div>
+      </div>
+
+      <div class="cc-card">
+        <h3>👥 Utilisateurs</h3>
+        <div class="cc-search">
+          <input type="text" id="userSearch" placeholder="Rechercher (nom / email)" oninput="renderUsers()">
+          <button class="btn" style="width:auto; padding:12px 16px;" onclick="refreshUsers()">🔄 Rafraîchir</button>
+        </div>
+        <div style="height:10px;"></div>
+        <div class="cc-users" id="usersBox">
+          <div style="text-align:center;color:#999;">Chargement...</div>
+        </div>
+        <div style="height:12px;"></div>
+        <div class="section-muted" style="font-size:11px;">
+          Note : l'onglet Équipe garde seulement "Admin ?" pour créer vite. Ensuite, tu ajustes ici le rôle et les droits.
+        </div>
+      </div>
+
+      <div style="height:12px;"></div>
+      <div class="cc-actions">
+        <a class="btn" href="index.html" style="width:auto; padding:12px 16px; background:rgba(37,99,235,0.08); color:#2563eb; font-weight:800;">← Retour au dashboard</a>
+      </div>
+
+      <div style="height:30px;"></div>
+    </div>
+  </div>
+
+  <script src="assets/js/control_center.js"></script>
+</body>
+</html>

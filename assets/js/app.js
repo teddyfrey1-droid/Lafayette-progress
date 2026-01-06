@@ -29,6 +29,127 @@ let globalSettings = { budget: 0 };
 const BASE_HOURS = 35;
 const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
 
+// --- Access Control (roles + feature flags) ---
+// Rôles internes (stables, utilisés par le code). Les libellés affichés sont modifiables depuis le Centre de contrôle.
+const ROLE_KEYS = ['user','manager','director','owner','super_admin'];
+const DEFAULT_ROLE_LABELS = {
+  user: 'Utilisateur',
+  manager: 'Manager',
+  director: 'Directeur',
+  owner: 'Gérant',
+  super_admin: 'Super Admin'
+};
+// Permissions par défaut (peuvent être surchargées en DB: settings/accessControl/rolePermissions)
+const DEFAULT_ROLE_PERMISSIONS = {
+  user: {
+    features: {
+      dashboard: true,
+      personalHistory: true,
+      diffusion: true,
+      adminPanel: false,
+      pilotage: false,
+      logs: false,
+      feedbacks: false,
+      controlCenter: false
+    }
+  },
+  manager: {
+    features: {
+      dashboard: true,
+      personalHistory: true,
+      diffusion: true,
+      adminPanel: true,
+      pilotage: true,
+      logs: false,
+      feedbacks: false,
+      controlCenter: false
+    }
+  },
+  director: {
+    features: {
+      dashboard: true,
+      personalHistory: true,
+      diffusion: true,
+      adminPanel: true,
+      pilotage: true,
+      logs: true,
+      feedbacks: true,
+      controlCenter: false
+    }
+  },
+  owner: {
+    features: {
+      dashboard: true,
+      personalHistory: true,
+      diffusion: true,
+      adminPanel: true,
+      pilotage: true,
+      logs: true,
+      feedbacks: true,
+      controlCenter: false
+    }
+  },
+  super_admin: {
+    features: {
+      dashboard: true,
+      personalHistory: true,
+      diffusion: true,
+      adminPanel: true,
+      pilotage: true,
+      logs: true,
+      feedbacks: true,
+      controlCenter: true
+    }
+  }
+};
+
+function _safeObj(v){ return (v && typeof v === 'object') ? v : {}; }
+
+function getRoleKeyFromUser(u){
+  if(!u) return 'user';
+  // 1) Champ explicite
+  if(typeof u.roleKey === 'string' && ROLE_KEYS.includes(u.roleKey)) return u.roleKey;
+  // 2) Backward-compat
+  if(u.isSuperAdmin) return 'super_admin';
+  if(u.role === 'admin') return 'manager';
+  return 'user';
+}
+
+function getRoleKey(){
+  return getRoleKeyFromUser(currentUser);
+}
+
+function getAccessControlConfig(){
+  const ac = _safeObj(globalSettings && globalSettings.accessControl);
+  return {
+    roleLabels: _safeObj(ac.roleLabels),
+    rolePermissions: _safeObj(ac.rolePermissions)
+  };
+}
+
+function getRoleLabel(roleKey){
+  const ac = getAccessControlConfig();
+  return (ac.roleLabels && typeof ac.roleLabels[roleKey] === 'string' && ac.roleLabels[roleKey].trim())
+    ? ac.roleLabels[roleKey].trim()
+    : (DEFAULT_ROLE_LABELS[roleKey] || roleKey);
+}
+
+function getRolePermissions(roleKey){
+  const ac = getAccessControlConfig();
+  const def = _safeObj(DEFAULT_ROLE_PERMISSIONS[roleKey]);
+  const over = _safeObj(ac.rolePermissions && ac.rolePermissions[roleKey]);
+  // Merge shallow: features
+  const merged = { ...def, ...over };
+  merged.features = { ..._safeObj(def.features), ..._safeObj(over.features) };
+  return merged;
+}
+
+function hasFeature(featureKey){
+  const rk = getRoleKey();
+  const perms = getRolePermissions(rk);
+  return !!(perms && perms.features && perms.features[featureKey] !== false);
+}
+
 // Seuil d'alerte (en %) pour "coût primes / CA" en simulation.
 const DEFAULT_GUARDRAIL_MAX_PCT_OF_CA = 20;
 
@@ -48,11 +169,16 @@ function getGuardrailMaxPctOfCA(){
 }
 
 function isSuperAdmin() {
-  return !!(currentUser && currentUser.email && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
+  if(!currentUser) return false;
+  const emailOk = !!(currentUser.email && String(currentUser.email).toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
+  const rk = getRoleKeyFromUser(currentUser);
+  return !!(emailOk || currentUser.isSuperAdmin === true || rk === 'super_admin');
 }
 
 function isAdminUser() {
-  return !!(currentUser && (currentUser.role === 'admin' || isSuperAdmin()));
+  // Respecte les permissions (désactivable depuis Centre de contrôle)
+  if(!currentUser) return false;
+  return hasFeature('adminPanel');
 }
 
 // CALENDAR DATA
@@ -502,20 +628,20 @@ function loadData() {
   db.ref('directory/contacts').on('value', s => { window.__contactsData = s.val() || {}; try{ renderMenuDirectoryPreview(); }catch(e){} });
   db.ref('directory/suppliers').on('value', s => { window.__suppliersData = s.val() || {}; try{ renderMenuDirectoryPreview(); }catch(e){} });
 
-  // --- MODIFICATION: Chargement des logs/feedbacks/updates pour Super Admin ---
-  db.ref('logs').limitToLast(2000).on('value', s => { 
-      window.allLogs = s.val() || {}; 
-      if(isSuperAdmin()) renderLogs(window.allLogs); 
+  // --- Logs / feedbacks (affichage contrôlé via permissions) ---
+  db.ref('logs').limitToLast(2000).on('value', s => {
+      window.allLogs = s.val() || {};
+      try{ if(hasFeature('logs')) renderLogs(window.allLogs); }catch(e){}
   });
-  db.ref('feedbacks').on('value', s => { 
-      window.allFeedbacks = s.val() || {}; 
-      if(isSuperAdmin()) renderFeedbacks(window.allFeedbacks); 
+  db.ref('feedbacks').on('value', s => {
+      window.allFeedbacks = s.val() || {};
+      try{ if(hasFeature('feedbacks')) renderFeedbacks(window.allFeedbacks); }catch(e){}
   });
   db.ref('updates').on('value', s => { 
       window.allUpdates = s.val() || {}; 
       renderUpdatesPublic();
       checkNewUpdates(window.allUpdates);
-      if(isSuperAdmin()) renderUpdatesAdmin();
+      try{ if(hasFeature('feedbacks')) renderUpdatesAdmin(); }catch(e){}
   });
 }
 
@@ -542,23 +668,34 @@ function updateUI() {
   const isSuperUser = isSuperAdmin();
   const isAdmin = isAdminUser();
 
-  document.getElementById("btnAdmin").style.display = isAdmin ? 'block' : 'none';
+  const btnAdmin = document.getElementById("btnAdmin");
+  if(btnAdmin) btnAdmin.style.display = isAdmin ? 'block' : 'none';
+
+  // --- Menu (feature flags) ---
+  const menuHistoryBtn = document.getElementById('menuHistoryBtn');
+  if(menuHistoryBtn) menuHistoryBtn.style.display = hasFeature('personalHistory') ? 'flex' : 'none';
+
+  const menuDiff = document.getElementById('menuDiffusionLink');
+  if(menuDiff) menuDiff.style.display = hasFeature('diffusion') ? 'flex' : 'none';
+
+  const menuCC = document.getElementById('menuControlCenterLink');
+  if(menuCC) menuCC.style.display = (isSuperUser && hasFeature('controlCenter')) ? 'flex' : 'none';
 
   // Menu : état des notifications push
   try{ _setPushMenuState(!!(currentUser && (currentUser.pushEnabled || currentUser.fcmToken))); }catch(e){}
   
-  // --- GESTION EXCLUSIVE SUPER ADMIN ---
-  if (isSuperUser) {
-      document.getElementById("btnTabLogs").style.display = 'block';
-      document.getElementById("btnTabFeedbacks").style.display = 'block';
-      // Force refresh data view
-      if (window.allLogs) renderLogs(window.allLogs);
-      if (window.allFeedbacks) renderFeedbacks(window.allFeedbacks);
-      if (window.allUpdates) renderUpdatesAdmin();
-  } else {
-      document.getElementById("btnTabLogs").style.display = 'none';
-      document.getElementById("btnTabFeedbacks").style.display = 'none';
-  }
+  // --- Tabs admin (contrôlés par permissions) ---
+  const btnTabObjs = document.getElementById("btnTabObjs");
+  if(btnTabObjs) btnTabObjs.style.display = (isAdmin && hasFeature('pilotage')) ? 'block' : 'none';
+  const btnTabLogs = document.getElementById("btnTabLogs");
+  if(btnTabLogs) btnTabLogs.style.display = (isAdmin && hasFeature('logs')) ? 'block' : 'none';
+  const btnTabFeedbacks = document.getElementById("btnTabFeedbacks");
+  if(btnTabFeedbacks) btnTabFeedbacks.style.display = (isAdmin && hasFeature('feedbacks')) ? 'block' : 'none';
+
+  // Force refresh data view si onglets visibles
+  try{ if(hasFeature('logs') && window.allLogs) renderLogs(window.allLogs); }catch(e){}
+  try{ if(hasFeature('feedbacks') && window.allFeedbacks) renderFeedbacks(window.allFeedbacks); }catch(e){}
+  try{ if(hasFeature('feedbacks') && window.allUpdates) renderUpdatesAdmin(); }catch(e){}
 
   const btnEmails = document.getElementById("btnTabEmails");
   if(btnEmails) btnEmails.style.display = isAdmin ? 'block' : 'none';
@@ -568,13 +705,13 @@ function updateUI() {
   const simCAInput = document.getElementById('simMonthlyCA');
   const superAdminBlock = document.getElementById('superAdminBudget');
   
-  const pilotageAllowed = isAdmin;
+  const pilotageAllowed = (isAdmin && hasFeature('pilotage'));
   if(superAdminBlock) superAdminBlock.style.display = pilotageAllowed ? 'block' : 'none';
   if(globalBudgetInput) globalBudgetInput.disabled = !pilotageAllowed;
   if(saveBudgetBtn) saveBudgetBtn.style.display = pilotageAllowed ? 'inline-block' : 'none';
   if(simCAInput) simCAInput.disabled = !pilotageAllowed;
   
-  if(isAdmin) { renderAdminObjs(); renderSimulator(); }
+  if(isAdmin && hasFeature('pilotage')) { renderAdminObjs(); renderSimulator(); }
   renderDashboard();
 }
 

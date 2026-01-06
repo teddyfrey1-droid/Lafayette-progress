@@ -161,7 +161,7 @@
           <span style="opacity:.55; font-weight:900;">›</span>
         </button>
 
-        <button class="global-menu-link" type="button" onclick="openHistoryModalFromMenu()">
+        <button class="global-menu-link" id="menuHistoryBtn" type="button" onclick="openHistoryModalFromMenu()">
           <span>🕒 Mon historique</span>
           <span style="opacity:.55; font-weight:900;">›</span>
         </button>
@@ -211,8 +211,12 @@
 
         <div class="global-menu-sep" aria-hidden="true"></div>
         
-        <a class="global-menu-link" href="diffusion.html" onclick="toggleGlobalMenu(false)" style="background:rgba(37,99,235,0.08); color:#2563eb; font-weight:700;">
+        <a class="global-menu-link" id="menuDiffusionLink" href="diffusion.html" onclick="toggleGlobalMenu(false)" style="background:rgba(37,99,235,0.08); color:#2563eb; font-weight:700;">
           <span>📧 Diffusion / Alertes</span>
+        </a>
+
+        <a class="global-menu-link" id="menuControlCenterLink" href="centre_de_controle.html" onclick="toggleGlobalMenu(false)" style="display:none; background:rgba(16,185,129,0.10); color:#10b981; font-weight:800;">
+          <span>🛡️ Centre de contrôle</span>
         </a>
       </nav>
       
