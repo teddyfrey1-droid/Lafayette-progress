@@ -1122,3 +1122,94 @@ body.dark-mode .push-icon-box { background: rgba(37,99,235,0.2); }
   cursor: pointer;
 }
 body.dark-mode .close-push { background: rgba(255,255,255,0.1); }
+
+
+/* ===========================
+   UI POLISH (mobile friendly)
+   =========================== */
+
+/* Team actions: keep icons on the right on mobile */
+.team-btn-group{ margin-left:auto; }
+.action-btn.mp{
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: .10em;
+}
+@media (max-width: 520px){
+  .team-right-actions{
+    justify-content: space-between;
+    overflow: visible;
+    padding-bottom: 0;
+  }
+  .team-btn-group{
+    margin-left: auto;
+    justify-content: flex-end;
+  }
+  .team-btn-group .action-btn{
+    width: 30px;
+    height: 30px;
+    font-size: 15px;
+    border-radius: 10px;
+  }
+  .team-btn-group .action-btn.mp{ font-size: 11px; }
+}
+
+/* Pilotage: less bulky on mobile (no logic changes) */
+@media (max-width: 520px){
+  .section-header-large{ font-size: 13px; }
+  .cockpit-container{
+    padding: 14px;
+    border-width: 2px;
+    border-radius: 18px;
+  }
+  .cockpit-top{
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .cockpit-gauge-container{ height: 22px; }
+  .cockpit-info{ font-size: 12px; }
+  .month-pills-wrap{ padding: 10px; border-radius: 16px; }
+  .month-pills-bar{ gap: 8px; }
+  .month-pill{ width: 18px; min-width: 18px; }
+  .month-pills-sub{ font-size: 11px; }
+  .sim-total-box{ padding: 12px; border-radius: 16px; }
+}
+
+/* Page header row: centered title with back button */
+.page-head-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.page-head-title{
+  flex:1;
+  text-align:center;
+  margin:0;
+}
+.page-head-spacer{ width: 92px; } /* keeps title centered (matches back btn width) */
+@media (max-width: 520px){
+  .page-head-spacer{ width: 64px; }
+}
+
+/* Easy exit button (bottom-left) — avoids theme toggle (bottom-right) */
+.fab-back{
+  position: fixed;
+  left: 18px;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  z-index: 9998;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size: 18px;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--text-main);
+}
+.fab-back:active{ transform: translateY(1px); }

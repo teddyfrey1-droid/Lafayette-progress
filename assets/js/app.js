@@ -1382,7 +1382,9 @@ function renderAdminUsers() {
 
     // Renvoyer l'invitation (reset mdp)
     const btnReset = document.createElement('button');
-    btnReset.innerHTML = '🔑';
+    // Icône "enveloppe" pour l'action mot de passe / message (mobile-friendly)
+    btnReset.innerHTML = '✉️';
+    btnReset.classList.add('mp');
     btnReset.className = 'action-btn';
     btnReset.title = "Renvoyer l'email de configuration du mot de passe";
     btnReset.onclick = () => {
