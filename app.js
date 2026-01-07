@@ -29,140 +29,6 @@ let globalSettings = { budget: 0 };
 const BASE_HOURS = 35;
 const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
 
-// --- Access Control (roles + feature flags) ---
-// Rôles internes (stables, utilisés par le code). Les libellés affichés sont modifiables depuis le Centre de contrôle.
-const ROLE_KEYS = ['user','manager','director','owner','super_admin'];
-const DEFAULT_ROLE_LABELS = {
-  user: 'Utilisateur',
-  manager: 'Manager',
-  director: 'Directeur',
-  owner: 'Gérant',
-  super_admin: 'Super Admin'
-};
-// Permissions par défaut (peuvent être surchargées en DB: settings/accessControl/rolePermissions)
-const DEFAULT_ROLE_PERMISSIONS = {
-  user: {
-    features: {
-      dashboard: true,
-      personalHistory: true,
-      diffusion: true,
-      adminPanel: false,
-      pilotage: false,
-      logs: false,
-      feedbacks: false,
-      controlCenter: false
-    }
-  },
-  manager: {
-    features: {
-      dashboard: true,
-      personalHistory: true,
-      diffusion: true,
-      adminPanel: true,
-      pilotage: true,
-      logs: false,
-      feedbacks: false,
-      controlCenter: false
-    }
-  },
-  director: {
-    features: {
-      dashboard: true,
-      personalHistory: true,
-      diffusion: true,
-      adminPanel: true,
-      pilotage: true,
-      logs: true,
-      feedbacks: true,
-      controlCenter: false
-    }
-  },
-  owner: {
-    features: {
-      dashboard: true,
-      personalHistory: true,
-      diffusion: true,
-      adminPanel: true,
-      pilotage: true,
-      logs: true,
-      feedbacks: true,
-      controlCenter: false
-    }
-  },
-  super_admin: {
-    features: {
-      dashboard: true,
-      personalHistory: true,
-      diffusion: true,
-      adminPanel: true,
-      pilotage: true,
-      logs: true,
-      feedbacks: true,
-      controlCenter: true
-    }
-  }
-};
-
-function _safeObj(v){ return (v && typeof v === 'object') ? v : {}; }
-
-function getRoleKeyFromUser(u){
-  if(!u) return 'user';
-  // 1) Champ explicite
-  if(typeof u.roleKey === 'string' && ROLE_KEYS.includes(u.roleKey)) return u.roleKey;
-  // 2) Backward-compat
-  if(u.isSuperAdmin) return 'super_admin';
-  if(u.role === 'admin') return 'manager';
-  return 'user';
-}
-
-function _getAuthEmailLower(){
-  try{
-    const au = (firebase && firebase.auth) ? firebase.auth().currentUser : null;
-    return (au && au.email) ? String(au.email).toLowerCase() : '';
-  }catch(e){
-    return '';
-  }
-}
-
-function getRoleKey(){
-  // Force super_admin if the authenticated email matches the super admin fallback email
-  const authEmail = _getAuthEmailLower();
-  if(authEmail && authEmail === String(SUPER_ADMIN_EMAIL).toLowerCase()) return 'super_admin';
-  if(currentUser && currentUser.isSuperAdmin === true) return 'super_admin';
-  return getRoleKeyFromUser(currentUser);
-}
-
-function getAccessControlConfig(){
-  const ac = _safeObj(globalSettings && globalSettings.accessControl);
-  return {
-    roleLabels: _safeObj(ac.roleLabels),
-    rolePermissions: _safeObj(ac.rolePermissions)
-  };
-}
-
-function getRoleLabel(roleKey){
-  const ac = getAccessControlConfig();
-  return (ac.roleLabels && typeof ac.roleLabels[roleKey] === 'string' && ac.roleLabels[roleKey].trim())
-    ? ac.roleLabels[roleKey].trim()
-    : (DEFAULT_ROLE_LABELS[roleKey] || roleKey);
-}
-
-function getRolePermissions(roleKey){
-  const ac = getAccessControlConfig();
-  const def = _safeObj(DEFAULT_ROLE_PERMISSIONS[roleKey]);
-  const over = _safeObj(ac.rolePermissions && ac.rolePermissions[roleKey]);
-  // Merge shallow: features
-  const merged = { ...def, ...over };
-  merged.features = { ..._safeObj(def.features), ..._safeObj(over.features) };
-  return merged;
-}
-
-function hasFeature(featureKey){
-  const rk = getRoleKey();
-  const perms = getRolePermissions(rk);
-  return !!(perms && perms.features && perms.features[featureKey] !== false);
-}
-
 // Seuil d'alerte (en %) pour "coût primes / CA" en simulation.
 const DEFAULT_GUARDRAIL_MAX_PCT_OF_CA = 20;
 
@@ -182,16 +48,11 @@ function getGuardrailMaxPctOfCA(){
 }
 
 function isSuperAdmin() {
-  const authEmail = _getAuthEmailLower();
-  const email = (currentUser && currentUser.email) ? String(currentUser.email).toLowerCase() : authEmail;
-  const emailOk = !!((email && email === String(SUPER_ADMIN_EMAIL).toLowerCase()) || (authEmail && authEmail === String(SUPER_ADMIN_EMAIL).toLowerCase()));
-  const rk = getRoleKey();
-  return !!(emailOk || (currentUser && currentUser.isSuperAdmin === true) || rk === 'super_admin');
+  return !!(currentUser && currentUser.email && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
 }
+
 function isAdminUser() {
-  // Respecte les permissions (désactivable depuis Centre de contrôle)
-  if(!currentUser) return false;
-  return hasFeature('adminPanel');
+  return !!(currentUser && (currentUser.role === 'admin' || isSuperAdmin()));
 }
 
 // CALENDAR DATA
@@ -488,7 +349,6 @@ auth.onAuthStateChanged(user => {
       currentUser.email = user.email;
       try{ _setupPushUI(); }catch(e){}
       try{ setupPushNotifications(); }catch(e){}
-      try{ flushPendingFcmToken(); }catch(e){}
       const newLogRef = db.ref("logs").push();
       newLogRef.set({ user: currentUser.name, action: "Connexion", type: "session", startTime: Date.now(), lastSeen: Date.now() });
       setInterval(() => { newLogRef.update({ lastSeen: Date.now() }); }, 60000);
@@ -641,20 +501,20 @@ function loadData() {
   db.ref('directory/contacts').on('value', s => { window.__contactsData = s.val() || {}; try{ renderMenuDirectoryPreview(); }catch(e){} });
   db.ref('directory/suppliers').on('value', s => { window.__suppliersData = s.val() || {}; try{ renderMenuDirectoryPreview(); }catch(e){} });
 
-  // --- Logs / feedbacks (affichage contrôlé via permissions) ---
-  db.ref('logs').limitToLast(2000).on('value', s => {
-      window.allLogs = s.val() || {};
-      try{ if(hasFeature('logs')) renderLogs(window.allLogs); }catch(e){}
+  // --- MODIFICATION: Chargement des logs/feedbacks/updates pour Super Admin ---
+  db.ref('logs').limitToLast(2000).on('value', s => { 
+      window.allLogs = s.val() || {}; 
+      if(isSuperAdmin()) renderLogs(window.allLogs); 
   });
-  db.ref('feedbacks').on('value', s => {
-      window.allFeedbacks = s.val() || {};
-      try{ if(hasFeature('feedbacks')) renderFeedbacks(window.allFeedbacks); }catch(e){}
+  db.ref('feedbacks').on('value', s => { 
+      window.allFeedbacks = s.val() || {}; 
+      if(isSuperAdmin()) renderFeedbacks(window.allFeedbacks); 
   });
   db.ref('updates').on('value', s => { 
       window.allUpdates = s.val() || {}; 
       renderUpdatesPublic();
       checkNewUpdates(window.allUpdates);
-      try{ if(hasFeature('feedbacks')) renderUpdatesAdmin(); }catch(e){}
+      if(isSuperAdmin()) renderUpdatesAdmin();
   });
 }
 
@@ -681,34 +541,20 @@ function updateUI() {
   const isSuperUser = isSuperAdmin();
   const isAdmin = isAdminUser();
 
-  const btnAdmin = document.getElementById("btnAdmin");
-  if(btnAdmin) btnAdmin.style.display = isAdmin ? 'block' : 'none';
-
-  // --- Menu (feature flags) ---
-  const menuHistoryBtn = document.getElementById('menuHistoryBtn');
-  if(menuHistoryBtn) menuHistoryBtn.style.display = hasFeature('personalHistory') ? 'flex' : 'none';
-
-  const menuDiff = document.getElementById('menuDiffusionLink');
-  if(menuDiff) menuDiff.style.display = hasFeature('diffusion') ? 'flex' : 'none';
-
-  const menuCC = document.getElementById('menuControlCenterLink');
-  if(menuCC) menuCC.style.display = (isSuperUser && hasFeature('controlCenter')) ? 'flex' : 'none';
-
-  // Menu : état des notifications push
-  try{ _setPushMenuState(!!(currentUser && (currentUser.pushEnabled || currentUser.fcmToken))); }catch(e){}
+  document.getElementById("btnAdmin").style.display = isAdmin ? 'block' : 'none';
   
-  // --- Tabs admin (contrôlés par permissions) ---
-  const btnTabObjs = document.getElementById("btnTabObjs");
-  if(btnTabObjs) btnTabObjs.style.display = (isAdmin && hasFeature('pilotage')) ? 'block' : 'none';
-  const btnTabLogs = document.getElementById("btnTabLogs");
-  if(btnTabLogs) btnTabLogs.style.display = (isAdmin && hasFeature('logs')) ? 'block' : 'none';
-  const btnTabFeedbacks = document.getElementById("btnTabFeedbacks");
-  if(btnTabFeedbacks) btnTabFeedbacks.style.display = (isAdmin && hasFeature('feedbacks')) ? 'block' : 'none';
-
-  // Force refresh data view si onglets visibles
-  try{ if(hasFeature('logs') && window.allLogs) renderLogs(window.allLogs); }catch(e){}
-  try{ if(hasFeature('feedbacks') && window.allFeedbacks) renderFeedbacks(window.allFeedbacks); }catch(e){}
-  try{ if(hasFeature('feedbacks') && window.allUpdates) renderUpdatesAdmin(); }catch(e){}
+  // --- GESTION EXCLUSIVE SUPER ADMIN ---
+  if (isSuperUser) {
+      document.getElementById("btnTabLogs").style.display = 'block';
+      document.getElementById("btnTabFeedbacks").style.display = 'block';
+      // Force refresh data view
+      if (window.allLogs) renderLogs(window.allLogs);
+      if (window.allFeedbacks) renderFeedbacks(window.allFeedbacks);
+      if (window.allUpdates) renderUpdatesAdmin();
+  } else {
+      document.getElementById("btnTabLogs").style.display = 'none';
+      document.getElementById("btnTabFeedbacks").style.display = 'none';
+  }
 
   const btnEmails = document.getElementById("btnTabEmails");
   if(btnEmails) btnEmails.style.display = isAdmin ? 'block' : 'none';
@@ -718,13 +564,13 @@ function updateUI() {
   const simCAInput = document.getElementById('simMonthlyCA');
   const superAdminBlock = document.getElementById('superAdminBudget');
   
-  const pilotageAllowed = (isAdmin && hasFeature('pilotage'));
+  const pilotageAllowed = isAdmin;
   if(superAdminBlock) superAdminBlock.style.display = pilotageAllowed ? 'block' : 'none';
   if(globalBudgetInput) globalBudgetInput.disabled = !pilotageAllowed;
   if(saveBudgetBtn) saveBudgetBtn.style.display = pilotageAllowed ? 'inline-block' : 'none';
   if(simCAInput) simCAInput.disabled = !pilotageAllowed;
   
-  if(isAdmin && hasFeature('pilotage')) { renderAdminObjs(); renderSimulator(); }
+  if(isAdmin) { renderAdminObjs(); renderSimulator(); }
   renderDashboard();
 }
 
@@ -849,9 +695,6 @@ function buildSimulatorUI() {
     });
     document.getElementById("simTotalPerUser").innerText = `${totalPotential35h.toFixed(0)}€`;
     updateSim();
-    // Pilotage (admin) : widgets complémentaires (safe-guard si la section n'existe pas)
-    try{ renderMonthPillsProgress(); }catch(e){}
-    try{ renderPilotageQuickUpdate(); }catch(e){}
 }
 function updateObjVal(objId, tierIdx, val) { document.getElementById(`val-${objId}-${tierIdx}`).innerText = val + "€"; if(simObjs[objId].paliers && simObjs[objId].paliers[tierIdx]) { simObjs[objId].paliers[tierIdx].prize = val; } updateSim(); }
 function toggleCockpitObj(btn){ try{ const row = btn.closest('.cockpit-obj-row'); if(!row) return; row.classList.toggle('open'); }catch(e){} }
@@ -889,142 +732,6 @@ function publishSim() {
         db.ref().update(updates).then(async () => { showToast("✅ Pilotage Appliqué !"); logAction("Pilotage", "Mise à jour globale budget & primes"); try{ await _maybeAutoNotify('pilotage', { title: "📡 Pilotage publié", body: "Les primes & paliers ont été mis à jour.", link: "/index.html#dashboard" }); }catch(e){} });
     }
 }
-
-// ------------------------------------------------------------
-// PILOTAGE (ADMIN) : Progression du mois (style "pills")
-// ------------------------------------------------------------
-
-let __monthPillsTimer = null;
-
-function renderMonthPillsProgress(){
-  const bar = document.getElementById('monthPillsBar');
-  if(!bar) return; // section non présente
-
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
-  const daysInMonth = new Date(y, m + 1, 0).getDate();
-  const today = now.getDate();
-  const mins = now.getHours()*60 + now.getMinutes();
-  const dayFraction = Math.max(0, Math.min(1, mins / (24*60)));
-
-  // Construire la grille 1xN (scrollable)
-  bar.innerHTML = '';
-  for(let d=1; d<=daysInMonth; d++){
-    const pill = document.createElement('div');
-    pill.className = 'month-pill';
-    const fill = document.createElement('div');
-    fill.className = 'month-pill-fill';
-
-    let pct = 0;
-    if(d < today) pct = 1;
-    else if(d === today) pct = dayFraction;
-    else pct = 0;
-
-    fill.style.height = (pct * 100).toFixed(0) + '%';
-    pill.title = `Jour ${d}/${daysInMonth}`;
-    pill.appendChild(fill);
-    bar.appendChild(pill);
-  }
-
-  const txt = document.getElementById('monthPillsText');
-  const sub = document.getElementById('monthPillsSub');
-  const progress = ((today - 1) + dayFraction) / daysInMonth;
-  const pctMonth = Math.max(0, Math.min(1, progress)) * 100;
-  if(txt) txt.textContent = `Jour ${today}/${daysInMonth} • ${pctMonth.toFixed(0)}% du mois`;
-  if(sub){
-    const remainingDays = Math.max(0, daysInMonth - today);
-    sub.textContent = remainingDays === 0 ? `Dernier jour du mois` : `Il reste ${remainingDays} jour${remainingDays>1?'s':''}`;
-  }
-
-  // auto-refresh (1 min) pour que la barre bouge toute seule
-  if(!__monthPillsTimer){
-    __monthPillsTimer = setInterval(() => {
-      try{ renderMonthPillsProgress(); }catch(e){}
-    }, 60*1000);
-  }
-}
-
-// ------------------------------------------------------------
-// PILOTAGE (ADMIN) : Mise à jour rapide des objectifs (current/target)
-// ------------------------------------------------------------
-
-function renderPilotageQuickUpdate(){
-  const list = document.getElementById('quickUpdateList');
-  if(!list) return;
-  if(!isAdminUser()){
-    list.innerHTML = '<div class="mail-hint">Réservé aux admins.</div>';
-    return;
-  }
-
-  const objs = allObjs || {};
-  const ids = Object.keys(objs).filter(id => objs[id] && objs[id].published);
-  ids.sort((a,b) => String(objs[a].name||a).localeCompare(String(objs[b].name||b), 'fr', {sensitivity:'base'}));
-
-  if(ids.length === 0){
-    list.innerHTML = '<div class="mail-hint">Aucun objectif publié.</div>';
-    return;
-  }
-
-  const fmtType = (o) => {
-    if(o.isFixed) return 'Fixe';
-    if(o.isNumeric) return 'Numérique';
-    return '%';
-  };
-
-  list.innerHTML = '';
-  ids.forEach(id => {
-    const o = objs[id];
-    const row = document.createElement('div');
-    row.className = 'quick-update-row';
-    const isPrimary = !!o.isPrimary;
-    const t1 = isPrimary ? 'Priorité' : 'Bonus';
-    const t2 = fmtType(o);
-    const cur = (o.current ?? '');
-    const tar = (o.target ?? '');
-    row.innerHTML = `
-      <div class="quick-update-left">
-        <div class="quick-update-name">${(o.name||'Objectif')}</div>
-        <div class="quick-update-sub">
-          <span class="quick-update-pill">${t1}</span>
-          <span class="quick-update-pill">${t2}</span>
-          <span class="quick-update-pill">ID: ${id}</span>
-        </div>
-      </div>
-      <div class="quick-update-right">
-        <input class="input" inputmode="decimal" placeholder="Actuel" value="${String(cur)}" id="qu-cur-${id}">
-        <input class="input" inputmode="decimal" placeholder="Cible" value="${String(tar)}" id="qu-tar-${id}">
-        <button class="quick-update-btn" type="button" onclick="quickSaveObjective('${id}')">💾</button>
-      </div>
-    `;
-    list.appendChild(row);
-  });
-
-  // Hint
-  const hint = document.getElementById('quickUpdateHint');
-  if(hint) hint.textContent = 'Astuce : tu peux modifier plusieurs lignes puis cliquer 💾 (une ligne) pour envoyer en 1 seconde.';
-}
-
-async function quickSaveObjective(id){
-  if(!isAdminUser()) return;
-  if(!id) return;
-  const curEl = document.getElementById('qu-cur-' + id);
-  const tarEl = document.getElementById('qu-tar-' + id);
-  if(!curEl || !tarEl) return;
-  const current = curEl.value;
-  const target = tarEl.value;
-
-  try{
-    await db.ref('objectives/' + id).update({ current, target, updatedAt: Date.now() });
-    showToast('✅ Objectif mis à jour');
-    logAction('Pilotage', `Maj rapide objectif ${id}`);
-  }catch(e){
-    console.error(e);
-    alert('Erreur lors de la mise à jour.');
-  }
-}
-
-window.quickSaveObjective = quickSaveObjective;
 
 function renderNativeCalendar() {
     const m = currentCalDate.getMonth(); const y = currentCalDate.getFullYear();
@@ -1239,309 +946,31 @@ function saveObj() {
 
 function deleteObj(id) { if(confirm("🗑️ Supprimer ?")) { db.ref("objectives/"+id).remove().then(() => showToast("🗑️ Supprimé")); logAction("Suppression", `Objectif ${id}`); } }
 function togglePub(id, v) { db.ref("objectives/"+id+"/published").set(v); logAction("Publication", `Objectif ${id}: ${v}`); }
+function createUser() { 
+    const email = (document.getElementById("nuEmail") || {}).value || ""; const name = (document.getElementById("nuName") || {}).value || ""; const hours = parseFloat((document.getElementById("nuHours") || {}).value) || 35; const isAdmin = !!((document.getElementById("nuAdmin") || {}).checked); const cleanEmail = String(email).trim(); if(!cleanEmail){ showToast("⚠️ Email requis."); return; } const TEMP_PASSWORD = "Temp1234!"; const sec = firebase.initializeApp(firebaseConfig, "Sec"); 
+    sec.auth().createUserWithEmailAndPassword(cleanEmail, TEMP_PASSWORD).then(c => { db.ref('users/'+c.user.uid).set({ name: String(name).trim() || "Utilisateur", hours: hours, role: isAdmin ? 'admin' : 'staff', email: cleanEmail, status: 'active', primeEligible: true }); sec.delete(); showToast("✅ Membre créé (mot de passe temporaire : " + TEMP_PASSWORD + ")"); }).catch(e => { if(e && e.code === 'auth/email-already-in-use') { showToast("⚠️ Ce membre existe déjà."); sec.delete(); } else { alert(e && e.message ? e.message : String(e)); sec.delete(); } }); 
+}
 
-function renderAdminUsers() {
-  const d = document.getElementById("usersList");
-  if(!d) return;
-  d.innerHTML = "";
-  let totalToPay = 0;
-
-  // 1) Préparation des données (hors super-admin)
-  const entries = Object.keys(allUsers || {})
-    .map(uid => ({ uid, u: (allUsers[uid] || {}) }))
-    .filter(e => !(e.u.email && String(e.u.email).toLowerCase() === String(SUPER_ADMIN_EMAIL || '').toLowerCase()));
-
-  const eligibleEntries = [];
-  const ineligibleEntries = [];
-  entries.forEach(e => {
-    const isEligible = (e.u.primeEligible !== false);
-    (isEligible ? eligibleEntries : ineligibleEntries).push(e);
-  });
-
-  const nameSort = (a,b) => {
-    const an = (a.u.name || a.u.email || a.uid || '').toString();
-    const bn = (b.u.name || b.u.email || b.uid || '').toString();
-    return an.localeCompare(bn, 'fr', { sensitivity: 'base' });
-  };
-  eligibleEntries.sort(nameSort);
-  ineligibleEntries.sort(nameSort);
-
-  // 2) Calcul du bonus (si inclus primes)
-  function computeUserBonus(u){
-    const userRatio = ((u.hours || 35) / BASE_HOURS);
-    let userBonus = 0;
-
-    const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published);
-    let primOk = true;
-    if(prims.length > 0) {
-      primOk = prims.every(o => {
-        let threshold = 100;
-        if(o.isFixed) threshold = 100;
-        else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold;
-        if(o.isNumeric) return parseFloat(o.current) >= threshold;
-        const pct = getPct(o.current, o.target, o.isInverse);
-        return pct >= threshold;
-      });
+function renderAdminUsers() { 
+    const d = document.getElementById("usersList"); if(!d) return; d.innerHTML = ""; let totalToPay = 0;
+    const entries = Object.keys(allUsers || {}).map(uid => ({ uid, u: (allUsers[uid] || {}) })).filter(e => !(e.u.email && String(e.u.email).toLowerCase() === String(SUPER_ADMIN_EMAIL||'').toLowerCase()));
+    const eligibleEntries = []; const ineligibleEntries = []; entries.forEach(e => { const isEligible = (e.u.primeEligible !== false); (isEligible ? eligibleEntries : ineligibleEntries).push(e); });
+    const nameSort = (a,b) => { const an = (a.u.name || a.u.email || a.uid || '').toString(); const bn = (b.u.name || b.u.email || b.uid || '').toString(); return an.localeCompare(bn, 'fr', { sensitivity: 'base' }); };
+    eligibleEntries.sort(nameSort); ineligibleEntries.sort(nameSort);
+    function computeUserBonus(u){
+      const userRatio = (u.hours || 35) / BASE_HOURS; let userBonus = 0;
+      const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published); let primOk = true; if(prims.length > 0) { primOk = prims.every(o => { let threshold = 100; if(o.isFixed) threshold = 100; else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold; if(o.isNumeric) return parseFloat(o.current) >= threshold; const pct = getPct(o.current, o.target, o.isInverse); return pct >= threshold; }); } 
+      Object.values(allObjs).forEach(o => { if(!o.published) return; const pct = getPct(o.current, o.target, o.isInverse); const isLocked = !o.isPrimary && !primOk; let g = 0; if(o.isFixed) { let win = false; if(o.isNumeric) win = parseFloat(o.current) >= o.target; else win = pct >= 100; if(win && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize); } else { if(o.paliers) o.paliers.forEach(p => { let unlocked = false; if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold; else unlocked = pct >= p.threshold; if(unlocked) g += parse(p.prize); }); } if(!isLocked) userBonus += (g * userRatio); }); return userBonus;
     }
-
-    Object.values(allObjs).forEach(o => {
-      if(!o.published) return;
-      const isLocked = !o.isPrimary && !primOk;
-      if(isLocked) return;
-
-      const pct = getPct(o.current, o.target, o.isInverse);
-      let g = 0;
-
-      if(o.isFixed) {
-        let win = false;
-        if(o.isNumeric) win = parseFloat(o.current) >= o.target;
-        else win = pct >= 100;
-        if(win && o.paliers && o.paliers[0]) g = parse(o.paliers[0].prize);
-      } else {
-        (o.paliers || []).forEach(p => {
-          let unlocked = false;
-          if(o.isNumeric) unlocked = parseFloat(o.current) >= p.threshold;
-          else unlocked = pct >= p.threshold;
-          if(unlocked) g += parse(p.prize);
-        });
-      }
-
-      userBonus += (g * userRatio);
-    });
-
-    return userBonus;
-  }
-
-  function safeHours(u){
-    const h = (u && u.hours != null) ? parseFloat(String(u.hours).replace(',', '.')) : NaN;
-    if(!isFinite(h) || h <= 0) return 35;
-    return Math.round(h * 10) / 10;
-  }
-  // 3) Rendu d'un utilisateur
-  function renderUserRow(uid, u, isEligible){
-    const status = (u.status === 'active') ? 'active' : 'pending';
-    const statusLabel = (status === 'active') ? 'Actif' : 'En attente';
-    const hours = safeHours(u);
-    const isAdminFlag = (u.role === 'admin') || (u.email && String(u.email).toLowerCase() === String(SUPER_ADMIN_EMAIL || '').toLowerCase());
-    const hasPush = !!(u && (u.fcmToken || u.pushToken || (u.fcm && u.fcm.token)));
-    const pushLabel = hasPush ? '🔔 ON' : '🔕 OFF';
-
-    const userBonus = isEligible ? computeUserBonus(u) : 0;
-    if(isEligible) totalToPay += userBonus;
-    const gain = isEligible ? (userBonus.toFixed(2) + '€') : '—';
-    const gainClass = isEligible ? '' : 'muted';
-
-    const div = document.createElement('div');
-    div.className = 'user-item team-row';
-
-    div.innerHTML = `
-      <div class="team-left">
-        <div class="team-name-row">
-          <span class="user-name">${escapeHtml(u.name || '')}</span>
-        </div>
-        <div class="team-meta">
-          <span class="team-status-chip" title="${statusLabel}">
-            <span class="status-dot ${status}"></span>
-            <span>${statusLabel}</span>
-          </span>
-          <span class="team-email">${escapeHtml(u.email || '')}</span>
-          <span class="team-hours-chip">⏱️ ${hours}h</span>
-          <span class="team-push-chip ${hasPush ? 'on' : 'off'}" title="Notifications push">${pushLabel}</span>
-        </div>
-      </div>
-
-      <div class="team-right">
-        <div class="team-right-top">
-          ${isAdminFlag ? `<span class="team-pill">ADMIN</span>` : ``}
-          <div class="user-gain ${gainClass}">${gain}</div>
-        </div>
-
-        <div class="team-right-actions">
-          <label class="team-prime-toggle" title="Inclure / exclure du calcul des primes">
-            <input type="checkbox" ${isEligible ? 'checked' : ''}>
-            <span>Primes</span>
-          </label>
-          <div class="btn-group team-btn-group"></div>
-        </div>
-      </div>`;
-
-    const chk = div.querySelector('.team-prime-toggle input');
-    chk.onchange = () => setUserPrimeEligible(uid, chk.checked);
-
-    const btnGroup = div.querySelector('.team-btn-group');
-
-    // Modifier (nom / email / heures)
-    const btnEdit = document.createElement('button');
-    btnEdit.innerHTML = '✏️';
-    btnEdit.className = 'action-btn';
-    btnEdit.title = 'Modifier (nom, email, heures)';
-    btnEdit.onclick = () => {
-      if(typeof openUserEditModal === 'function') openUserEditModal(uid);
-      else quickEditUser(uid);
-    };
-
-    // Renvoyer l'invitation (reset mdp)
-    const btnReset = document.createElement('button');
-    btnReset.innerHTML = 'MP';
-    btnReset.classList.add('mp');
-    btnReset.className = 'action-btn';
-    btnReset.title = "Renvoyer l'email de configuration du mot de passe";
-    btnReset.onclick = () => {
-      if(!u.email) { alert('Email manquant.'); return; }
-      if(confirm(`Renvoyer un lien de configuration de mot de passe à ${u.email} ?`)) {
-        auth.sendPasswordResetEmail(u.email)
-          .then(() => showToast('✅ Email envoyé !'))
-          .catch(err => alert('Erreur : ' + err.message));
-      }
-    };
-
-    // Supprimer
-    const btnDel = document.createElement('button');
-    btnDel.innerHTML = '🗑️';
-    btnDel.className = 'action-btn delete';
-    btnDel.title = "Supprimer l'utilisateur";
-    btnDel.onclick = () => { if(confirm('Supprimer ?')) db.ref('users/'+uid).remove(); };
-
-    btnGroup.appendChild(btnEdit);
-    btnGroup.appendChild(btnReset);
-    btnGroup.appendChild(btnDel);
-
-    d.appendChild(div);
-  }
-
-  // 4) Affichage : inclus primes, total, puis hors primes
-  eligibleEntries.forEach(e => renderUserRow(e.uid, e.u, true));
-
-  const totalDiv = document.createElement('div');
-  totalDiv.className = 'total-row';
-  totalDiv.innerHTML = `<span>TOTAL À PAYER</span><strong>${totalToPay.toFixed(2)} €</strong>`;
-  d.appendChild(totalDiv);
-
-  if(ineligibleEntries.length > 0) {
-    const sep = document.createElement('div');
-    sep.className = 'users-sep';
-    sep.textContent = 'Hors primes';
-    d.appendChild(sep);
-    ineligibleEntries.forEach(e => renderUserRow(e.uid, e.u, false));
-  }
-}
-
-function quickEditUser(uid){
-  if(!isAdminUser()) return;
-  // UI moderne (petite fenêtre)
-  try{
-    if(document.getElementById('userEditModal') && typeof openUserEditModal === 'function'){
-      openUserEditModal(uid);
-      return;
+    function renderUser(uid, u, isEligible){
+      const userBonus = isEligible ? computeUserBonus(u) : 0; if(isEligible) totalToPay += userBonus;
+      const div = document.createElement("div"); div.className = "user-item"; const statusClass = (u.status === 'active') ? 'active' : 'pending'; const statusLabel = (u.status === 'active') ? 'ACTIF' : 'EN ATTENTE'; let adminBadge = ""; if(u.role === 'admin') adminBadge = `<span class="admin-tag">ADMIN</span>`; const checked = isEligible ? 'checked' : ''; const gain = isEligible ? userBonus.toFixed(2) + '€' : '—';
+      div.innerHTML = `<div class="user-info"><div class="user-header"><span class="user-name">${u.name || ''} ${adminBadge}</span><div style="display:flex; align-items:center;"><span class="status-dot ${statusClass}"></span><span class="status-text">${statusLabel}</span></div></div><div class="user-email-sub">${u.email || ''}</div><div class="user-meta">${u.hours || 35}h</div><label class="check-label" style="margin-top:6px; font-size:11px; opacity:.95;"><input type="checkbox" ${checked} onchange="setUserPrimeEligible('${uid}', this.checked)"> 💶 Compte dans les primes</label></div><div class="user-actions"><div class="user-gain">${gain}</div><div class="btn-group"><button onclick="openTeamArchive('${uid}')" class="action-btn" title="Archive mensuelle">📄</button><button onclick="editUser('${uid}')" class="action-btn" title="Modifier">✏️</button><button onclick="deleteUser('${uid}')" class="action-btn delete" title="Supprimer">🗑️</button></div></div>`; d.appendChild(div); 
     }
-  }catch(e){}
-  const u = (allUsers && allUsers[uid]) ? (allUsers[uid] || {}) : {};
-
-  const name = prompt('Nom', (u.name || '').toString());
-  if(name === null) return;
-
-  const email = prompt('Email (affichage / reset mdp)', (u.email || '').toString());
-  if(email === null) return;
-
-  const hoursStr = prompt('Heures / semaine', (u.hours != null ? String(u.hours) : '35'));
-  if(hoursStr === null) return;
-
-  const hours = parseFloat(String(hoursStr).replace(',', '.'));
-  if(!isFinite(hours) || hours <= 0){
-    alert('Heures invalides.');
-    return;
-  }
-
-  const updates = {
-    name: String(name).trim(),
-    email: String(email).trim(),
-    hours: Math.round(hours * 10) / 10
-  };
-
-  db.ref('users/'+uid).update(updates).then(() => {
-    showToast('✅ Modifié');
-    try{ logAction('Équipe', `Modif user ${uid}`); }catch(e){}
-  }).catch(err => alert('Erreur : ' + (err && err.message ? err.message : err)));
+    eligibleEntries.forEach(e => renderUser(e.uid, e.u, true));
+    const totalRow = document.createElement("div"); totalRow.className = "total-row"; totalRow.innerHTML = `<span>Total à payer</span><span>${totalToPay.toFixed(2)} €</span>`; d.appendChild(totalRow);
+    if(ineligibleEntries.length){ const sep = document.createElement("div"); sep.className = "users-sep"; sep.textContent = "Non comptés dans les primes"; d.appendChild(sep); ineligibleEntries.forEach(e => renderUser(e.uid, e.u, false)); }
 }
-window.quickEditUser = quickEditUser;
-
-
-function openUserEditModal(uid){
-  if(!isAdminUser()) return;
-  const u = (allUsers && allUsers[uid]) ? (allUsers[uid] || {}) : {};
-  const modal = document.getElementById('userEditModal');
-  if(!modal) return;
-
-  const uidEl = document.getElementById('uemUid');
-  const nameEl = document.getElementById('uemName');
-  const emailEl = document.getElementById('uemEmail');
-  const hoursEl = document.getElementById('uemHours');
-  const adminEl = document.getElementById('uemAdmin');
-
-  if(uidEl) uidEl.value = uid;
-  if(nameEl) nameEl.value = (u.name || '').toString();
-  if(emailEl) emailEl.value = (u.email || '').toString();
-  if(hoursEl) hoursEl.value = (u.hours != null ? String(u.hours) : '35');
-
-  const isAdminFlag = (u.role === 'admin') || (u.email && String(u.email).toLowerCase() === String(SUPER_ADMIN_EMAIL || '').toLowerCase());
-  if(adminEl) adminEl.checked = !!isAdminFlag;
-
-  const stEl = document.getElementById('uemStatus');
-  if(stEl) stEl.textContent = (u.status === 'active') ? 'Actif' : 'En attente';
-
-  const hasPush = !!(u && (u.fcmToken || u.pushToken || (u.fcm && u.fcm.token)));
-  const pushEl = document.getElementById('uemPush');
-  if(pushEl) pushEl.textContent = hasPush ? 'Activées' : 'Non activées';
-
-  modal.style.display = 'flex';
-
-  // click backdrop to close
-  modal.onclick = (ev) => { if(ev && ev.target === modal) closeUserEditModal(); };
-
-  setTimeout(() => { try{ if(nameEl) nameEl.focus(); }catch(e){} }, 50);
-}
-window.openUserEditModal = openUserEditModal;
-
-function closeUserEditModal(){
-  const modal = document.getElementById('userEditModal');
-  if(modal) modal.style.display = 'none';
-}
-window.closeUserEditModal = closeUserEditModal;
-
-async function saveUserEditModal(){
-  if(!isAdminUser()) return;
-
-  const uid = (document.getElementById('uemUid') || {}).value;
-  if(!uid) return;
-
-  const name = ((document.getElementById('uemName') || {}).value || '').toString().trim();
-  const email = ((document.getElementById('uemEmail') || {}).value || '').toString().trim();
-  const hoursStr = ((document.getElementById('uemHours') || {}).value || '').toString();
-  const hours = parseFloat(String(hoursStr).replace(',', '.'));
-  const isAdmin = !!((document.getElementById('uemAdmin') || {}).checked);
-
-  if(!name){ alert('Nom requis.'); return; }
-  if(!email || !email.includes('@')){ alert('Email invalide.'); return; }
-  if(!isFinite(hours) || hours <= 0){ alert('Heures invalides.'); return; }
-
-  const updates = {
-    name,
-    email,
-    hours: Math.round(hours * 10) / 10,
-    role: isAdmin ? 'admin' : 'staff'
-  };
-
-  try{
-    await db.ref('users/' + uid).update(updates);
-    showToast('✅ Modifié');
-    try{ logAction('Équipe', `Modif user ${uid}`); }catch(e){}
-    closeUserEditModal();
-  }catch(err){
-    alert('Erreur : ' + (err && err.message ? err.message : err));
-  }
-}
-window.saveUserEditModal = saveUserEditModal;
-
 
 function setUserPrimeEligible(uid, isEligible){
   if(!isAdminUser()) return; const val = !!isEligible; const prev = (allUsers && allUsers[uid]) ? (allUsers[uid].primeEligible !== false) : true;
@@ -1669,23 +1098,6 @@ if('serviceWorker' in navigator){
 
 const VAPID_KEY = "BHItjKUG0Dz7jagVmfULxS7B_qQcT0DM7O_11fKdERKFzxP3QiWisJoD3agcV22VYFhtpVw-9YuUzrRmCZIawyo";
 
-function _setPushMenuState(enabled){
-  const btn = document.getElementById('btnEnablePush');
-  if(!btn) return;
-  if(enabled){
-    btn.textContent = '✅ Notifications activées';
-    btn.disabled = true;
-    btn.style.opacity = '0.65';
-    btn.style.cursor = 'not-allowed';
-  }else{
-    btn.textContent = '🔔 Activer notifications';
-    btn.disabled = false;
-    btn.style.opacity = '';
-    btn.style.cursor = '';
-  }
-}
-
-
 function checkNotificationStatus() {
     // Si le navigateur ne gère pas les notifs, on arrête
     if (!('Notification' in window)) return;
@@ -1723,55 +1135,33 @@ function dismissPushBanner() {
     localStorage.setItem('heiko_push_banner_dismissed', 'true');
 }
 
-// Si l'utilisateur a activé les notifs avant que l'auth soit prête, on récupère
-// le token stocké localement et on le pousse en base dès que possible.
-async function flushPendingFcmToken(){
-  try{
-    const token = localStorage.getItem('heiko_pending_fcm_token');
-    if(!token) return;
-    if(!currentUser || !currentUser.uid) return;
-    await db.ref('users/' + currentUser.uid).update({
-      fcmToken: token,
-      pushEnabled: true,
-      lastTokenUpdate: Date.now(),
-    });
-    localStorage.removeItem('heiko_pending_fcm_token');
-    try{ _setPushMenuState(true); }catch(e){}
-  }catch(e){
-    console.error(e);
-  }
-}
-
 async function enableNotifications() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    alert("Ton téléphone ne supporte pas les notifications.");
     return;
   }
   
+  // Détection iOS
   const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
+  // Sur iPhone, il faut l'app sur l'écran d'accueil
   if (isIos && !isStandalone) {
-    alert("📢 Pour activer les notifs sur iPhone :\n1. Clique sur Partager\n2. 'Sur l'écran d'accueil'\n3. Ouvre l'app depuis l'accueil.");
+    alert("📢 Pour activer les notifs sur iPhone :\n1. Clique sur Partager (carré avec flèche)\n2. Choisis 'Sur l'écran d'accueil'\n3. Ouvre l'app depuis l'accueil et réessaie.");
     return;
   }
 
   try {
     const permission = await Notification.requestPermission();
+    
     if (permission === 'granted') {
+        // Cache la bannière immédiatement
+        const banner = document.getElementById('pushPermissionBanner');
+        if (banner) banner.style.display = 'none';
+
         const messaging = firebase.messaging();
         const token = await messaging.getToken({ vapidKey: VAPID_KEY });
-        // IMPORTANT : lors du 1er lancement (PWA), l'utilisateur peut activer les notifs
-        // avant que l'auth n'ait fini de charger. On ferme quand même l'UI, puis on
-        // sauvegarde le token dès que currentUser est disponible.
-        if (token && (!currentUser || !currentUser.uid)) {
-            try{ localStorage.setItem('heiko_pending_fcm_token', token); }catch(e){}
-            showToast("✅ Notifications activées !");
-            try{ dismissPushBanner(); }catch(e){}
-            try{ _setPushMenuState(true); }catch(e){}
-            try{ if(typeof toggleGlobalMenu === "function") toggleGlobalMenu(false); }catch(e){}
-            return;
-        }
-
+        
         if (token && currentUser && currentUser.uid) {
             await db.ref('users/' + currentUser.uid).update({ 
                 fcmToken: token,
@@ -1779,23 +1169,20 @@ async function enableNotifications() {
                 lastTokenUpdate: Date.now()
             });
             showToast("✅ Notifications activées !");
-            try{ dismissPushBanner(); }catch(e){}
-            try{ _setPushMenuState(true); }catch(e){}
-            try{ if(typeof toggleGlobalMenu === "function") toggleGlobalMenu(false); }catch(e){}
+            
+            // Met à jour le bouton du menu si présent
+            const btn = document.getElementById('btnEnablePush');
+            if(btn) { btn.innerHTML = "<span>🔔 Notifs actives</span>"; btn.style.opacity = "0.5"; }
         }
+    } else {
+        alert("Tu as refusé les notifications. Tu peux les activer dans les réglages de ton téléphone.");
+        dismissPushBanner();
     }
   } catch (error) {
     console.error("Erreur notifs:", error);
   }
-
 }
 
-// --- EXPORTS POUR L'INDEX ---
-window.clearLoginError = clearLoginError;
-window.createUser = createUser;
-window.logout = logout;
+// Exposer les fonctions pour qu'elles soient accessibles depuis le HTML
 window.enableNotifications = enableNotifications;
 window.dismissPushBanner = dismissPushBanner;
-window.switchTab = switchTab;
-window.toggleAdmin = toggleAdmin;
-window.setUserPrimeEligible = setUserPrimeEligible;
