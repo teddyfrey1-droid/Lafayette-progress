@@ -681,8 +681,28 @@ body.dark-mode .history-row { background: rgba(2, 6, 23, 0.30); border-color: rg
 /* --- COCKPIT & SIMULATOR (CORRIGÉ : TEXTES PLUS FINS) --- */
 .cockpit-container { padding: 25px; border: 3px solid var(--border-color); border-radius: 20px; background: var(--input-bg); margin-bottom: 20px; }
 .cockpit-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-.cockpit-gauge-container { height: 28px; background: var(--border-color); border-radius: 99px; overflow: hidden; position: relative; margin-bottom: 10px; border:1px solid #cbd5e1; }
-.cockpit-gauge-fill { height: 100%; width: 0; background: #3b82f6; transition: width 0.3s; }
+.cockpit-gauge-container { 
+  height: 28px; 
+  background: var(--border-color); 
+  border-radius: 99px; 
+  overflow: hidden; 
+  position: relative; 
+  margin-bottom: 10px; 
+  border:1px solid #cbd5e1;
+  padding: 0; /* évite un "inset" visuel sur mobile */
+}
+.cockpit-gauge-fill { 
+  position:absolute;
+  left:0;
+  top:0;
+  bottom:0;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: #3b82f6; 
+  transition: width 0.3s;
+  will-change: width;
+}
 .cockpit-gauge-fill.danger { background: #ef4444; animation: pulse 1s infinite; }
 .cockpit-info { display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #64748b; }
 
@@ -1131,19 +1151,28 @@ body.dark-mode .close-push { background: rgba(255,255,255,0.1); }
 /* Team actions: keep icons on the right on mobile */
 .team-btn-group{ margin-left:auto; }
 .action-btn.mp{
-  font-size: 12px;
-  font-weight: 950;
-  letter-spacing: .10em;
+  /* MP = enveloppe */
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0;
 }
 @media (max-width: 520px){
   .team-right-actions{
-    justify-content: space-between;
+    /* Sur iPhone, on évite que les icônes "mangent" le texte :
+       prime toggle à gauche, actions bien collées à droite */
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 10px;
+    justify-content: unset;
     overflow: visible;
     padding-bottom: 0;
   }
+  .team-prime-toggle{ justify-self: start; }
   .team-btn-group{
-    margin-left: auto;
+    margin-left: 0;
     justify-content: flex-end;
+    justify-self: end;
   }
   .team-btn-group .action-btn{
     width: 30px;
@@ -1151,7 +1180,8 @@ body.dark-mode .close-push { background: rgba(255,255,255,0.1); }
     font-size: 15px;
     border-radius: 10px;
   }
-  .team-btn-group .action-btn.mp{ font-size: 11px; }
+  .team-btn-group .action-btn.mp{ font-size: 15px; }
+  .team-btn-group .action-btn.resend{ font-size: 15px; }
 }
 
 /* Pilotage: less bulky on mobile (no logic changes) */
@@ -1169,6 +1199,21 @@ body.dark-mode .close-push { background: rgba(255,255,255,0.1); }
   }
   .cockpit-gauge-container{ height: 22px; }
   .cockpit-info{ font-size: 12px; }
+  /* inputs/boutons plus compacts, sans toucher la logique */
+  #superAdminBudget input,
+  #superAdminBudget select{ padding: 10px; font-size: 12px; border-radius: 12px; }
+  #btnSaveGlobalBudget,
+  #btnSaveGuardrailPct{ padding: 7px 10px !important; font-size: 11px !important; border-radius: 12px !important; }
+
+  .cockpit-obj-head{ padding: 12px 12px; border-radius: 16px; }
+  .cockpit-obj-title{ gap: 10px; }
+  .cockpit-obj-title span:first-child{ font-size: 12px; }
+  .cockpit-obj-title .cost{ font-size: 11px; padding: 5px 10px; }
+  .cockpit-obj-body{ padding: 10px 12px 12px; }
+  .slider-row{ margin: 10px 0; }
+  .slider-label{ font-size: 12px; }
+  .slider-val{ font-size: 11px; padding: 4px 10px; }
+
   .month-pills-wrap{ padding: 10px; border-radius: 16px; }
   .month-pills-bar{ gap: 8px; }
   .month-pill{ width: 18px; min-width: 18px; }
@@ -1176,20 +1221,29 @@ body.dark-mode .close-push { background: rgba(255,255,255,0.1); }
   .sim-total-box{ padding: 12px; border-radius: 16px; }
 }
 
-/* Page header row: centered title with back button */
+/* Page header row: titre parfaitement centré, quel que soit le bloc à gauche */
 .page-head-row{
-  display:flex;
-  align-items:center;
-  gap:12px;
+  display: grid;
+  grid-template-columns: 104px 1fr 104px;
+  align-items: center;
+  gap: 12px;
 }
 .page-head-title{
-  flex:1;
-  text-align:center;
-  margin:0;
+  grid-column: 2;
+  justify-self: center;
+  text-align: center;
+  margin: 0;
 }
-.page-head-spacer{ width: 92px; } /* keeps title centered (matches back btn width) */
+.page-head-spacer{ width: 104px; }
+.page-head-row .btn-back{
+  width: 104px;
+  justify-self: start;
+  text-align: center;
+}
 @media (max-width: 520px){
-  .page-head-spacer{ width: 64px; }
+  .page-head-row{ grid-template-columns: 88px 1fr 88px; }
+  .page-head-spacer{ width: 88px; }
+  .page-head-row .btn-back{ width: 88px; padding-left: 0 !important; padding-right: 0 !important; }
 }
 
 /* Easy exit button (bottom-left) — avoids theme toggle (bottom-right) */
@@ -1197,7 +1251,7 @@ body.dark-mode .close-push { background: rgba(255,255,255,0.1); }
   position: fixed;
   left: 18px;
   bottom: calc(18px + env(safe-area-inset-bottom));
-  z-index: 9998;
+  z-index: 10002;
   width: 48px;
   height: 48px;
   border-radius: 16px;

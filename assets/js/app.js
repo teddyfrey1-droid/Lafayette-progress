@@ -844,7 +844,9 @@ function buildSimulatorUI() {
                 slidersHtml += `<div class="slider-row"><div class="slider-label-line"><span class="slider-label">${label}</span><span class="slider-val" id="val-${k}-${i}">${prize}€</span></div><input type="range" min="0" max="30" step="5" value="${prize}" oninput="updateObjVal('${k}', ${i}, this.value)"></div>`;
             });
         }
-        div.innerHTML = `<button class="cockpit-obj-head" type="button" onclick="toggleCockpitObj(this)"><div class="cockpit-obj-title"><span>${o.name}</span><span class="cost">Coût équipe : ${objTotalCost.toFixed(0)}€</span></div><span class="cockpit-chevron">▾</span></button><div class="cockpit-obj-body">${slidersHtml}</div>`; 
+        // NOTE: le coût équipe doit se mettre à jour en temps réel via updateSim().
+        // updateSim() cherche un élément #cost-<id>, donc on ajoute l'id ici.
+        div.innerHTML = `<button class="cockpit-obj-head" type="button" onclick="toggleCockpitObj(this)"><div class="cockpit-obj-title"><span>${o.name}</span><span class="cost" id="cost-${k}">Coût équipe : ${objTotalCost.toFixed(0)}€</span></div><span class="cockpit-chevron">▾</span></button><div class="cockpit-obj-body">${slidersHtml}</div>`; 
         container.appendChild(div);
     });
     document.getElementById("simTotalPerUser").innerText = `${totalPotential35h.toFixed(0)}€`;
@@ -1380,17 +1382,26 @@ function renderAdminUsers() {
       else quickEditUser(uid);
     };
 
-    // Renvoyer l'invitation (reset mdp)
+    // MP (ouvrir la messagerie)
+    const btnMsg = document.createElement('button');
+    btnMsg.innerHTML = '✉️';
+    btnMsg.className = 'action-btn mp';
+    btnMsg.title = "Envoyer un message (mail)";
+    btnMsg.onclick = () => {
+      if(!u.email) { alert('Email manquant.'); return; }
+      window.location.href = `mailto:${u.email}`;
+    };
+
+    // Renvoyer (reset mdp)
     const btnReset = document.createElement('button');
-    btnReset.innerHTML = 'MP';
-    btnReset.classList.add('mp');
-    btnReset.className = 'action-btn';
-    btnReset.title = "Renvoyer l'email de configuration du mot de passe";
+    btnReset.innerHTML = '🔁';
+    btnReset.className = 'action-btn resend';
+    btnReset.title = "Renvoyer le lien de configuration du mot de passe";
     btnReset.onclick = () => {
       if(!u.email) { alert('Email manquant.'); return; }
       if(confirm(`Renvoyer un lien de configuration de mot de passe à ${u.email} ?`)) {
         auth.sendPasswordResetEmail(u.email)
-          .then(() => showToast('✅ Email envoyé !'))
+          .then(() => showToast('✅ Lien renvoyé !'))
           .catch(err => alert('Erreur : ' + err.message));
       }
     };
@@ -1403,6 +1414,7 @@ function renderAdminUsers() {
     btnDel.onclick = () => { if(confirm('Supprimer ?')) db.ref('users/'+uid).remove(); };
 
     btnGroup.appendChild(btnEdit);
+    btnGroup.appendChild(btnMsg);
     btnGroup.appendChild(btnReset);
     btnGroup.appendChild(btnDel);
 
