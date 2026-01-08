@@ -29,6 +29,113 @@ let globalSettings = { budget: 0 };
 const BASE_HOURS = 35;
 const SUPER_ADMIN_EMAIL = "teddy.frey1@gmail.com";
 
+// --- Create user (admin panel) ---
+// index.html déclenche createUser() via onclick. Sur certaines itérations, la fonction existait uniquement
+// dans app.js à la racine (non chargé). On la définit ici pour garantir le fonctionnement.
+function createUser() {
+  try {
+    if (!isAdminUser()) {
+      showToast("⛔ Accès refusé");
+      return;
+    }
+
+    const email = (document.getElementById("nuEmail") || {}).value || "";
+    const name = (document.getElementById("nuName") || {}).value || "";
+    const hoursRaw = (document.getElementById("nuHours") || {}).value;
+    const hours = parseFloat(hoursRaw);
+    const isAdmin = !!((document.getElementById("nuAdmin") || {}).checked);
+    const cleanEmail = String(email).trim().toLowerCase();
+
+    if (!cleanEmail) {
+      showToast("⚠️ Email requis");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      showToast("⚠️ Email invalide");
+      return;
+    }
+
+    const displayName = String(name).trim() || "Utilisateur";
+    const safeHours = Number.isFinite(hours) ? hours : 35;
+
+    // Mot de passe temporaire
+    const TEMP_PASSWORD = "Temp1234!";
+
+    // Firebase Auth n'autorise pas la création d'un autre user depuis la même session.
+    // On utilise une app secondaire "Sec" (pattern déjà présent dans l'ancien app.js).
+    let secApp = null;
+    try {
+      secApp = firebase.app("Sec");
+      // Si elle existe déjà, on la supprime avant de réinitialiser.
+      secApp.delete();
+    } catch (e) {
+      // ignore
+    }
+
+    secApp = firebase.initializeApp(firebaseConfig, "Sec");
+    secApp
+      .auth()
+      .createUserWithEmailAndPassword(cleanEmail, TEMP_PASSWORD)
+      .then((cred) => {
+        const uid = cred && cred.user ? cred.user.uid : null;
+        if (!uid) throw new Error("UID manquant");
+
+        // Écriture DB (compat legacy + nouveau roleKey si présent)
+        const payload = {
+          name: displayName,
+          hours: safeHours,
+          role: isAdmin ? "admin" : "staff",
+          // roleKey est géré par le Centre de contrôle ; par défaut on mappe Admin -> manager, sinon user.
+          roleKey: isAdmin ? "manager" : "user",
+          email: cleanEmail,
+          status: "active",
+          primeEligible: true,
+        };
+
+        return db
+          .ref("users/" + uid)
+          .set(payload)
+          .then(() => uid);
+      })
+      .then(() => {
+        try {
+          secApp.delete();
+        } catch (e) {
+          // ignore
+        }
+        showToast("✅ Membre créé (mdp temporaire : " + TEMP_PASSWORD + ")");
+        // reset champs
+        try {
+          const e = document.getElementById("nuEmail");
+          const n = document.getElementById("nuName");
+          const h = document.getElementById("nuHours");
+          const a = document.getElementById("nuAdmin");
+          if (e) e.value = "";
+          if (n) n.value = "";
+          if (h) h.value = "";
+          if (a) a.checked = false;
+        } catch (e) {}
+      })
+      .catch((err) => {
+        try {
+          secApp && secApp.delete();
+        } catch (e) {
+          // ignore
+        }
+        if (err && err.code === "auth/email-already-in-use") {
+          showToast("⚠️ Ce membre existe déjà");
+          return;
+        }
+        console.error(err);
+        alert(err && err.message ? err.message : String(err));
+      });
+  } catch (e) {
+    console.error(e);
+    alert(String(e));
+  }
+}
+
+
 // --- Access Control (roles + feature flags) ---
 // Rôles internes (stables, utilisés par le code). Les libellés affichés sont modifiables depuis le Centre de contrôle.
 const ROLE_KEYS = ['user','manager','director','owner','super_admin'];
