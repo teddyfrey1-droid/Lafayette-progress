@@ -488,40 +488,52 @@
          <button class="btn" onclick="publishSim()" style="background:var(--success); margin-top:5px; font-size:13px; padding:12px;">📡 PUBLIER</button>
       </div>
 
-      <div class="admin-section">
-        <h3 style="font-size:14px; margin-bottom:10px;">📢 Publication</h3>
-        <div id="pubList"></div>
+      <div class="admin-section fold-section" id="foldPublication">
+        <button class="fold-head" type="button" onclick="toggleFoldSection('foldPublication')">
+          <span>📢 Publication</span><span class="fold-chevron">▾</span>
+        </button>
+        <div class="fold-body">
+          <div id="pubList"></div>
+        </div>
       </div>
 
-      <div class="admin-section" id="quickUpdateSection">
-        <h3 style="font-size:14px; margin-bottom:10px;">⚡ Mise à jour rapide</h3>
-        <div class="mail-hint" style="margin-bottom:12px;">
-          Modifie les valeurs <b>en ligne</b> (entrée + Entrée/OK) sans ouvrir les panneaux d'édition.
+      <div class="admin-section fold-section" id="quickUpdateSection">
+        <button class="fold-head" type="button" onclick="toggleFoldSection('quickUpdateSection')">
+          <span>⚡ Mise à jour rapide</span><span class="fold-chevron">▾</span>
+        </button>
+        <div class="fold-body">
+          <div class="mail-hint" style="margin-bottom:12px;">
+            Modifie les valeurs <b>en ligne</b> (entrée + Entrée/OK) sans ouvrir les panneaux d'édition.
+          </div>
+          <div id="quickUpdateList"></div>
         </div>
-        <div id="quickUpdateList"></div>
       </div>
       
-      <div class="admin-section">
-        <h3 class="section-header-large" style="font-size:14px;">➕ AJOUTER UN OBJECTIF</h3>
-        <input type="text" id="noName" placeholder="Nom">
-        <input type="text" id="noTarget" placeholder="Cible">
-        <div class="options-row">
-            <label class="check-label"><input type="checkbox" id="noPrimary" checked> ⚡ Principal</label>
-            <label class="check-label"><input type="checkbox" id="noInverse"> 📉 Inversé</label>
-            <label class="check-label"><input type="checkbox" id="noNumeric"> 🔢 Nombre</label>
-            <label class="check-label"><input type="checkbox" id="noFixed" onchange="toggleCreateInputs()"> 🎁 Fixe</label>
+      <div class="admin-section fold-section" id="addObjectiveSection">
+        <button class="fold-head" type="button" onclick="toggleFoldSection('addObjectiveSection')">
+          <span>➕ Ajouter un objectif</span><span class="fold-chevron">▾</span>
+        </button>
+        <div class="fold-body">
+          <input type="text" id="noName" placeholder="Nom">
+          <input type="text" id="noTarget" placeholder="Cible">
+          <div class="options-row">
+              <label class="check-label"><input type="checkbox" id="noPrimary" checked> ⚡ Principal</label>
+              <label class="check-label"><input type="checkbox" id="noInverse"> 📉 Inversé</label>
+              <label class="check-label"><input type="checkbox" id="noNumeric"> 🔢 Nombre</label>
+              <label class="check-label"><input type="checkbox" id="noFixed" onchange="toggleCreateInputs()"> 🎁 Fixe</label>
+          </div>
+          <div id="createTiersBlock">
+              <div style="display:grid; grid-template-columns:1fr; gap:5px; margin-bottom:5px;">
+                  <label style="font-size:13px;font-weight:900; margin-bottom:5px; color:#1e293b;">Seuils (Montants définis dans Pilotage)</label>
+                  <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+                      <input type="number" id="c_p1t" placeholder="% P1">
+                      <input type="number" id="c_p2t" placeholder="% P2">
+                      <input type="number" id="c_p3t" placeholder="% P3">
+                  </div>
+              </div>
+          </div>
+          <button class="btn" onclick="addObj()" style="margin-top:10px;">Ajouter</button>
         </div>
-        <div id="createTiersBlock">
-            <div style="display:grid; grid-template-columns:1fr; gap:5px; margin-bottom:5px;">
-                <label style="font-size:13px;font-weight:900; margin-bottom:5px; color:#1e293b;">Seuils (Montants définis dans Pilotage)</label>
-                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
-                    <input type="number" id="c_p1t" placeholder="% P1">
-                    <input type="number" id="c_p2t" placeholder="% P2">
-                    <input type="number" id="c_p3t" placeholder="% P3">
-                </div>
-            </div>
-        </div>
-        <button class="btn" onclick="addObj()" style="margin-top:10px;">Ajouter</button>
       </div>
     </div>
   </div>
@@ -623,9 +635,10 @@
             <input type="number" id="uemHours" min="1" step="0.5">
           </div>
           <div style="display:flex; align-items:flex-end;">
-            <label class="check-label" style="width:100%; justify-content:flex-start;">
+            <label class="check-label admin-toggle" style="width:100%; justify-content:space-between;">
               <input type="checkbox" id="uemAdmin">
-              👑 Admin
+              <span class="admin-toggle-text">Admin</span>
+              <span class="admin-toggle-icon">👑</span>
             </label>
           </div>
         </div>

@@ -1267,3 +1267,117 @@ body.dark-mode .close-push { background: rgba(255,255,255,0.1); }
   color: var(--text-main);
 }
 .fab-back:active{ transform: translateY(1px); }
+
+/* ============================================================
+   UI polish v3 (mobile-first tweaks)
+   - Pilotage: smaller, foldable sections, full-width gauges
+   - Équipe: actions aligned right, reset icon envelope
+   - Diffusion: title centered on mobile with back button
+   ============================================================ */
+
+/* Fold sections (Pilotage) */
+.fold-section{
+  border:1px solid rgba(148,163,184,0.14);
+}
+.fold-section .fold-head{
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:14px 14px;
+  background:transparent;
+  border:none;
+  color:var(--text-main);
+  font-weight:900;
+  font-size:13px;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  cursor:pointer;
+}
+.fold-section .fold-chevron{
+  font-size:14px;
+  opacity:.85;
+  transition:transform .18s ease;
+}
+.fold-section .fold-body{
+  padding:0 14px 14px;
+  display:none;
+}
+.fold-section.open .fold-body{ display:block; }
+.fold-section.open .fold-chevron{ transform:rotate(180deg); }
+
+/* Admin toggle in edit modal: keep centered + crown on right */
+.check-label.admin-toggle{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid rgba(148,163,184,0.18);
+  background:rgba(148,163,184,0.08);
+}
+.check-label.admin-toggle input{ margin:0; }
+.check-label.admin-toggle .admin-toggle-text{ flex:1; font-weight:900; }
+.check-label.admin-toggle .admin-toggle-icon{ opacity:.95; }
+
+/* Diffusion: avoid overlap (Back on top line, title centered below on mobile) */
+.page-head-row.diffusion-head{ align-items:start; }
+@media (max-width: 650px){
+  .page-head-row.diffusion-head{
+    grid-template-rows:auto auto;
+    row-gap:10px;
+  }
+  .page-head-row.diffusion-head .btn-back{ grid-row:1; grid-column:1 / 2; justify-self:start; }
+  .page-head-row.diffusion-head .page-head-title{ grid-row:2; grid-column:1 / 4; justify-self:center; text-align:center; }
+  .page-head-row.diffusion-head .page-head-spacer{ display:none; }
+}
+.diffusion-title{ font-size:clamp(28px, 8vw, 56px); letter-spacing:.04em; line-height:1.02; }
+
+/* Pilotage gauge: use full width (no visible inner margins) */
+.cockpit-gauge-container{
+  border:none;
+  box-shadow: inset 0 0 0 1px rgba(148,163,184,0.25);
+  background: rgba(148,163,184,0.10);
+}
+
+/* Options in "Ajouter un objectif" */
+@media (max-width: 520px){
+  .options-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-top:10px;
+  }
+  .options-row .check-label{
+    justify-content:flex-start;
+  }
+}
+
+/* Pilotage: make it smaller + less chunky on mobile */
+@media (max-width: 520px){
+  #tab-objs .admin-section{ padding:14px; border-radius:18px; }
+  #tab-objs .section-header-large{ font-size:12px; }
+  #tab-objs h3{ font-size:13px; }
+  #tab-objs .cockpit-container{ padding:16px 14px; border-radius:18px; border-width:2px; }
+  #tab-objs .cockpit-row{ gap:10px; }
+  #tab-objs .cockpit-row label{ font-size:11px; letter-spacing:.10em; }
+  #tab-objs .cockpit-row input{ padding:10px 12px; border-radius:12px; }
+  #tab-objs .btn{ padding:10px 12px; font-size:13px; }
+  #tab-objs .sim-total-box{ padding:12px; }
+  #tab-objs .sim-total-label{ font-size:10px; }
+  #tab-objs .sim-total-value{ font-size:20px; }
+}
+
+/* Équipe: keep action buttons to the far right on mobile */
+.team-right-actions{ justify-content:space-between; overflow:visible; }
+.team-btn-group{ margin-left:auto; display:flex; gap:6px; align-items:center; }
+@media (max-width: 520px){
+  .team-right-actions{ flex-wrap:nowrap; }
+  .team-btn-group .action-btn{ width:34px; height:34px; font-size:15px; }
+}
+
+/* Total row: more elegant */
+.total-row{ gap:10px; }
+.total-row .total-label{ font-weight:900; letter-spacing:.08em; font-size:11px; opacity:.8; }

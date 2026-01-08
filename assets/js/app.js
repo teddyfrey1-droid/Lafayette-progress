@@ -849,7 +849,7 @@ function buildSimulatorUI() {
         div.innerHTML = `<button class="cockpit-obj-head" type="button" onclick="toggleCockpitObj(this)"><div class="cockpit-obj-title"><span>${o.name}</span><span class="cost" id="cost-${k}">Coût équipe : ${objTotalCost.toFixed(0)}€</span></div><span class="cockpit-chevron">▾</span></button><div class="cockpit-obj-body">${slidersHtml}</div>`; 
         container.appendChild(div);
     });
-    document.getElementById("simTotalPerUser").innerText = `${totalPotential35h.toFixed(0)}€`;
+    (document.getElementById("simTotalPerUser")||{}).innerText = `${totalPotential35h.toFixed(0)}€`;
     updateSim();
     // Pilotage (admin) : widgets complémentaires (safe-guard si la section n'existe pas)
     try{ renderMonthPillsProgress(); }catch(e){}
@@ -858,30 +858,122 @@ function buildSimulatorUI() {
 function updateObjVal(objId, tierIdx, val) { document.getElementById(`val-${objId}-${tierIdx}`).innerText = val + "€"; if(simObjs[objId].paliers && simObjs[objId].paliers[tierIdx]) { simObjs[objId].paliers[tierIdx].prize = val; } updateSim(); }
 function toggleCockpitObj(btn){ try{ const row = btn.closest('.cockpit-obj-row'); if(!row) return; row.classList.toggle('open'); }catch(e){} }
 
+// Fold sections (Pilotage)
+function toggleFoldSection(sectionId){
+  try{
+    const el = document.getElementById(sectionId);
+    if(!el) return;
+    el.classList.toggle('open');
+  }catch(e){}
+}
+window.toggleFoldSection = toggleFoldSection;
+
 function updateSim() {
-   const budget = parseFloat(document.getElementById("simGlobalBudget").value) || 0;
-   const simCAEl = document.getElementById('simMonthlyCA'); const simCA = simCAEl ? (parseFloat(simCAEl.value) || 0) : 0; if(simCAEl) localStorage.setItem('heiko_sim_monthly_ca', simCAEl.value || '');
-   let totalUserRatio = 0;
-   Object.values(allUsers).forEach(u => { if(u && u.email && String(u.email).toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return; if(u && u.primeEligible === false) return; totalUserRatio += ((u.hours || 35) / BASE_HOURS); });
-   let maxLiability = 0; let totalPotential35h = 0;
-   Object.keys(simObjs).forEach(k => {
-       const o = simObjs[k]; if(!o.published) return;
-       let maxP = 0; if(o.isFixed) { maxP = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0; } else { if(o.paliers) o.paliers.forEach(p => maxP += parse(p.prize)); }
-       const objCost = maxP * totalUserRatio;
-       const costLabel = document.getElementById(`cost-${k}`); if(costLabel) costLabel.innerText = `Coût équipe : ${objCost.toFixed(0)}€`;
-       maxLiability += objCost; totalPotential35h += maxP;
-   });
-   const pct = (budget > 0) ? (maxLiability / budget) * 100 : 0; const bar = document.getElementById("simGauge"); bar.style.width = Math.min(pct, 100) + "%";
-   if(maxLiability > budget) { bar.classList.add("danger"); document.getElementById("simUsed").style.color = "#ef4444"; } else { bar.classList.remove("danger"); document.getElementById("simUsed").style.color = "#3b82f6"; }
-   document.getElementById("simUsed").innerText = `${maxLiability.toFixed(0)}€ Engagés`; document.getElementById("simLeft").innerText = `Reste : ${(budget - maxLiability).toFixed(0)}€`;
-   document.getElementById("simTotalPerUser").innerText = `${totalPotential35h.toFixed(0)}€`;
-   const pctEl = document.getElementById('simPctCA');
-   if(pctEl) { if(simCA > 0) { const pctCA = (maxLiability / simCA) * 100; pctEl.textContent = `${pctCA.toFixed(1)}% du CA`; } else { pctEl.textContent = '—'; } }
-   const guardBox = document.getElementById('guardrailBox'); const guardText = document.getElementById('guardrailText'); const warnings = [];
-   if(budget <= 0) { warnings.push("Budget max non défini : impossible d'évaluer le dépassement."); } else if(maxLiability > budget) { warnings.push(`Dépassement budget : ${(maxLiability - budget).toFixed(0)}€ au-dessus du budget max.`); }
-   if(simCA > 0) { const pctCA = (maxLiability / simCA) * 100; const seuil = getGuardrailMaxPctOfCA(); if(pctCA > seuil) { warnings.push(`Coût primes élevé : ${pctCA.toFixed(1)}% du CA (seuil ${seuil}%).`); } }
-   Object.keys(simObjs).forEach(k => { const o = simObjs[k]; if(!o || !o.published) return; if(!o.paliers || !Array.isArray(o.paliers) || o.paliers.length === 0) { warnings.push(`Objectif "${o.name || 'Sans nom'}" publié sans paliers.`); } });
-   if(guardBox && guardText) { if(warnings.length > 0) { guardText.innerHTML = warnings.map(w => `• ${w}`).join('<br>'); guardBox.style.display = 'block'; } else { guardBox.style.display = 'none'; } }
+  const budgetEl = document.getElementById("simGlobalBudget");
+  const bar = document.getElementById("simGauge");
+  const usedEl = document.getElementById("simUsed");
+  const leftEl = document.getElementById("simLeft");
+  const totalEl = document.getElementById("simTotalPerUser");
+  if(!budgetEl || !bar || !usedEl || !leftEl) return;
+
+  const budget = parseFloat(budgetEl.value) || 0;
+
+  const simCAEl = document.getElementById('simMonthlyCA');
+  const simCA = simCAEl ? (parseFloat(simCAEl.value) || 0) : 0;
+  if(simCAEl) localStorage.setItem('heiko_sim_monthly_ca', simCAEl.value || '');
+
+  let totalUserRatio = 0;
+  if(allUsers){
+    Object.values(allUsers).forEach(u => {
+      if(!u) return;
+      if(u.email && String(u.email).toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return;
+      if(u.primeEligible === false) return;
+      totalUserRatio += ((u.hours || 35) / BASE_HOURS);
+    });
+  }
+
+  let maxLiability = 0;
+  let totalPotential35h = 0;
+
+  if(simObjs){
+    Object.keys(simObjs).forEach(k => {
+      const o = simObjs[k];
+      if(!o || !o.published) return;
+      let maxP = 0;
+      if(o.isFixed){
+        maxP = (o.paliers && o.paliers[0]) ? parse(o.paliers[0].prize) : 0;
+      } else {
+        if(o.paliers) o.paliers.forEach(p => { maxP += parse(p.prize); });
+      }
+      const objCost = maxP * totalUserRatio;
+      const costLabel = document.getElementById(`cost-${k}`);
+      if(costLabel) costLabel.innerText = `Coût équipe : ${objCost.toFixed(0)}€`;
+      maxLiability += objCost;
+      totalPotential35h += maxP;
+    });
+  }
+
+  const pct = (budget > 0) ? (maxLiability / budget) * 100 : 0;
+  bar.style.width = Math.min(pct, 100) + "%";
+
+  if(maxLiability > budget) {
+    bar.classList.add("danger");
+    usedEl.style.color = "#ef4444";
+  } else {
+    bar.classList.remove("danger");
+    usedEl.style.color = "var(--primary)";
+  }
+
+  usedEl.innerText = `${maxLiability.toFixed(0)}€ Engagés`;
+  leftEl.innerText = `Reste : ${(budget - maxLiability).toFixed(0)}€`;
+  if(totalEl) totalEl.innerText = `${totalPotential35h.toFixed(0)}€`;
+
+  const pctEl = document.getElementById('simPctCA');
+  if(pctEl) {
+    if(simCA > 0) {
+      const pctCA = (maxLiability / simCA) * 100;
+      pctEl.textContent = `${pctCA.toFixed(1)}% du CA`;
+    } else {
+      pctEl.textContent = '—';
+    }
+  }
+
+  const guardBox = document.getElementById('guardrailBox');
+  const guardText = document.getElementById('guardrailText');
+  const warnings = [];
+
+  if(budget <= 0) {
+    warnings.push("Budget max non défini : impossible d'évaluer le dépassement.");
+  } else if(maxLiability > budget) {
+    warnings.push(`Dépassement budget : ${(maxLiability - budget).toFixed(0)}€ au-dessus du budget max.`);
+  }
+
+  if(simCA > 0) {
+    const pctCA = (maxLiability / simCA) * 100;
+    const seuil = getGuardrailMaxPctOfCA();
+    if(pctCA > seuil) {
+      warnings.push(`Coût primes élevé : ${pctCA.toFixed(1)}% du CA (seuil ${seuil}%).`);
+    }
+  }
+
+  if(simObjs) {
+    Object.keys(simObjs).forEach(k => {
+      const o = simObjs[k];
+      if(!o || !o.published) return;
+      if(!o.paliers || !Array.isArray(o.paliers) || o.paliers.length === 0) {
+        warnings.push(`Objectif "${o.name || 'Sans nom'}" publié sans paliers.`);
+      }
+    });
+  }
+
+  if(guardBox && guardText) {
+    if(warnings.length > 0) {
+      guardText.innerHTML = warnings.map(w => `• ${w}`).join('<br>');
+      guardBox.style.display = 'block';
+    } else {
+      guardBox.style.display = 'none';
+    }
+  }
 }
 function publishSim() {
     if(!isSuperAdmin()) return;
@@ -1394,7 +1486,7 @@ function renderAdminUsers() {
 
     // Renvoyer (reset mdp)
     const btnReset = document.createElement('button');
-    btnReset.innerHTML = '🔁';
+    btnReset.innerHTML = '📩';
     btnReset.className = 'action-btn resend';
     btnReset.title = "Renvoyer le lien de configuration du mot de passe";
     btnReset.onclick = () => {
@@ -1426,7 +1518,7 @@ function renderAdminUsers() {
 
   const totalDiv = document.createElement('div');
   totalDiv.className = 'total-row';
-  totalDiv.innerHTML = `<span>TOTAL À PAYER</span><strong>${totalToPay.toFixed(2)} €</strong>`;
+  totalDiv.innerHTML = `<span class="total-label">Total primes à payer</span><strong>${totalToPay.toFixed(2)} €</strong>`;
   d.appendChild(totalDiv);
 
   if(ineligibleEntries.length > 0) {
@@ -1545,6 +1637,9 @@ async function saveUserEditModal(){
 
   try{
     await db.ref('users/' + uid).update(updates);
+    try{ if(window.allUsers && window.allUsers[uid]) Object.assign(window.allUsers[uid], updates); }catch(e){}
+    try{ renderAdminUsers(); }catch(e){}
+    try{ updateSim(); }catch(e){}
     showToast('✅ Modifié');
     try{ logAction('Équipe', `Modif user ${uid}`); }catch(e){}
     closeUserEditModal();
@@ -1556,9 +1651,26 @@ window.saveUserEditModal = saveUserEditModal;
 
 
 function setUserPrimeEligible(uid, isEligible){
-  if(!isAdminUser()) return; const val = !!isEligible; const prev = (allUsers && allUsers[uid]) ? (allUsers[uid].primeEligible !== false) : true;
-  try{ if(allUsers && allUsers[uid]) allUsers[uid].primeEligible = val; renderAdminUsers(); }catch(e){}
-  db.ref('users/' + uid + '/primeEligible').set(val).then(() => { try{ logAction('Équipe', `PrimeEligible ${uid} -> ${val}`); }catch(e){} try{ showToast(val ? '✅ Compte inclus dans les primes' : '🚫 Compte exclu des primes'); }catch(e){} }).catch(() => { try{ if(allUsers && allUsers[uid]) allUsers[uid].primeEligible = prev; renderAdminUsers(); }catch(e){} try{ showToast('Erreur mise à jour.'); }catch(e){} });
+  if(!isAdminUser()) return;
+  const val = !!isEligible;
+  const prev = (allUsers && allUsers[uid]) ? (allUsers[uid].primeEligible !== false) : true;
+
+  // Optimiste : on met à jour l'UI tout de suite (et on recalcule le Pilotage)
+  try{ if(allUsers && allUsers[uid]) allUsers[uid].primeEligible = val; }catch(e){}
+  try{ renderAdminUsers(); }catch(e){}
+  try{ updateSim(); }catch(e){}
+
+  db.ref('users/' + uid + '/primeEligible').set(val)
+    .then(() => {
+      try{ logAction('Équipe', `PrimeEligible ${uid} -> ${val}`); }catch(e){}
+      try{ showToast(val ? '✅ Compte inclus dans les primes' : '🚫 Compte exclu des primes'); }catch(e){}
+    })
+    .catch(() => {
+      try{ if(allUsers && allUsers[uid]) allUsers[uid].primeEligible = prev; }catch(e){}
+      try{ renderAdminUsers(); }catch(e){}
+      try{ updateSim(); }catch(e){}
+      try{ showToast('Erreur mise à jour.'); }catch(e){}
+    });
 }
 window.setUserPrimeEligible = setUserPrimeEligible;
 
