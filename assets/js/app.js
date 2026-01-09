@@ -1581,16 +1581,6 @@ function renderAdminUsers() {
       else quickEditUser(uid);
     };
 
-    // MP (ouvrir la messagerie)
-    const btnMsg = document.createElement('button');
-    btnMsg.innerHTML = '✉️';
-    btnMsg.className = 'action-btn mp';
-    btnMsg.title = "Envoyer un message (mail)";
-    btnMsg.onclick = () => {
-      if(!u.email) { alert('Email manquant.'); return; }
-      window.location.href = `mailto:${u.email}`;
-    };
-
     // Renvoyer (reset mdp)
     const btnReset = document.createElement('button');
     btnReset.innerHTML = '📩';
@@ -1613,7 +1603,6 @@ function renderAdminUsers() {
     btnDel.onclick = () => { if(confirm('Supprimer ?')) db.ref('users/'+uid).remove(); };
 
     btnGroup.appendChild(btnEdit);
-    btnGroup.appendChild(btnMsg);
     btnGroup.appendChild(btnReset);
     btnGroup.appendChild(btnDel);
 
