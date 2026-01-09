@@ -38,6 +38,57 @@ function stripHtml(html) {
   return (html || '').replace(/<[^>]*>?/gm, '').trim();
 }
 
+function escapeHtml(str){
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
+ * Normalise le payload d'alerte.
+ * - Format "Lafayette" attendu: {subject|title, bodyHtml|html|body, timestamp}
+ * - Format Brevo Inbound Parse: { items: [ { Subject, RawHtmlBody, RawTextBody, ExtractedMarkdownMessage, SentAtDate, From, To, ... } ] }
+ *
+ * Retourne: { subject, bodyHtml, ts, meta }
+ */
+function normalizeAlertPayload(rawBody){
+  let body = rawBody;
+
+  // Certains proxies envoient un body string JSON.
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch (_) { body = { bodyHtml: `<pre>${escapeHtml(body)}</pre>` }; }
+  }
+
+  body = body && typeof body === 'object' ? body : {};
+
+  // Brevo Inbound Parse
+  if (Array.isArray(body.items) && body.items[0] && typeof body.items[0] === 'object') {
+    const item = body.items[0];
+    const fallbackText = item.RawTextBody || item.ExtractedMarkdownMessage || '';
+    const html = item.RawHtmlBody || (fallbackText ? `<pre>${escapeHtml(fallbackText)}</pre>` : '');
+    const sentAt = Date.parse(item.SentAtDate || '') || Date.now();
+    return {
+      subject: String(item.Subject || 'Alerte'),
+      bodyHtml: String(html || ''),
+      ts: Number(sentAt),
+      meta: {
+        provider: 'brevo_inbound',
+        from: item.From || null,
+        to: item.To || null,
+      }
+    };
+  }
+
+  // Format historique / webhook custom
+  const subject = String(body.subject || body.title || 'Alerte Technique');
+  const bodyHtml = String(body.bodyHtml || body.html || body.body || '');
+  const ts = Number(body.timestamp || Date.now());
+  return { subject, bodyHtml, ts, meta: { provider: 'custom' } };
+}
+
 function parseHHMM(value){
   const s = String(value || '').trim();
   const m = s.match(/^(\d{1,2}):(\d{2})$/);
@@ -239,10 +290,13 @@ exports.receiveExternalAlert = onRequest(
     const provided = String(req.query.secret || req.get('x-secret') || '');
     if (provided !== 'SUPER_SECRET_LAFAYETTE_99') return res.status(403).send('Forbidden');
 
-    const data = req.body || {};
-    const subject = (data.subject || data.title || 'Alerte Technique').toString();
-    const bodyHtml = (data.bodyHtml || data.html || data.body || '').toString();
-    const ts = Number(data.timestamp || Date.now());
+    // 1.1) Supporte 2 formats:
+    //  - Payload "custom" historique: {subject|title, bodyHtml|html|body, timestamp}
+    //  - Payload Brevo inbound parsing: { items: [ { Subject, RawHtmlBody, RawTextBody, SentAtDate, ... } ] }
+    const normalized = normalizeAlertPayload(req.body);
+    const subject = normalized.subject;
+    const bodyHtml = normalized.bodyHtml;
+    const ts = normalized.ts;
 
     try {
       // 2) Chargement settings + users + équipes
