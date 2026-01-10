@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
   <title>Heiko — Centre de contrôle</title>
 
@@ -17,7 +17,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&amp;display=swap" rel="stylesheet">
 
   <style>
     .cc-wrap{max-width:980px;margin:0 auto;padding:18px;}
@@ -58,34 +58,98 @@
     <div class="theme-toggle-slider"><span class="toggle-icon">☀️</span></div>
   </div>
 
-  <div id="loginOverlay" style="display:none;">
-    <div class="pulse-login-brand"><span class="pulse-logo-inline pulse-logo-login" aria-label="Pulse"><svg width="140" height="32" viewBox="0 0 140 32" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pulse">
-  <defs>
-    <linearGradient id="pulseGrad_login_cc" x1="0" y1="0" x2="34" y2="0" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#D10FA8"/>
-      <stop offset="1" stop-color="#7A2FF0"/>
-    </linearGradient>
-  </defs>
-  <path d="M4 16H11.5L15.5 9.5L19.5 23L23.5 16H34"
-        stroke="url(#pulseGrad_login_cc)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="44" y="22" font-family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial"
-        font-size="18" font-weight="600" fill="currentColor">Pulse</text>
-</svg></span></div>
-    <div class="login-box">
-      <h2 class="login-title">Connexion Super Admin</h2>
-      <div class="input-group">
-        <input type="email" id="loginEmail" placeholder="Email">
+  <div id="loginOverlay" class="auth-overlay">
+  <div class="auth-wrap">
+    <div class="auth-hero">
+      <div class="auth-brand">
+        <div class="auth-logo">
+          <span class="pulse-mark" aria-hidden="true"></span>
+          <span class="auth-logo-text">Pulse</span>
+        </div>
+        <h1 class="auth-title">Lafayette Progress</h1>
+        <p class="auth-sub">Objectifs, primes et infos équipe — en un coup d’œil.</p>
       </div>
-      <div class="input-group">
-        <input type="password" id="loginPass" placeholder="Mot de passe">
-        <span class="toggle-password" onclick="togglePassCC()">👁️</span>
+
+      <div class="auth-mini-grid" aria-hidden="true">
+        <div class="auth-mini-card">
+          <div class="k">Suivi</div>
+          <div class="v">Simple &amp; clair</div>
+        </div>
+        <div class="auth-mini-card">
+          <div class="k">Objectifs</div>
+          <div class="v">En temps réel</div>
+        </div>
+        <div class="auth-mini-card">
+          <div class="k">Primes</div>
+          <div class="v">Motivantes</div>
+        </div>
+        <div class="auth-mini-card">
+          <div class="k">Équipe</div>
+          <div class="v">Alignée</div>
+        </div>
       </div>
-      <button class="btn" id="btnLogin">Connexion</button>
-      <div class="section-muted" style="margin-top:10px; font-size:11px;">Cette page est réservée au Super Admin.</div>
+    </div>
+
+    <div class="auth-card" role="region" aria-label="Connexion">
+      <div class="auth-tabs" role="tablist" aria-label="Authentification">
+        <button type="button" id="authTabLogin" class="auth-tab is-active" role="tab" aria-controls="authPaneLogin" aria-selected="true">Connexion</button>
+        <button type="button" id="authTabSignup" class="auth-tab" role="tab" aria-controls="authPaneSignup" aria-selected="false">Créer un compte</button>
+      </div>
+
+      <div id="authPaneLogin" class="auth-pane is-active" role="tabpanel" aria-labelledby="authTabLogin">
+        <div class="auth-field">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" placeholder="nom@exemple.com" oninput="clearLoginError()" autocomplete="email">
+        </div>
+
+        <div class="auth-field">
+          <label for="loginPass">Mot de passe</label>
+          <div class="auth-pass">
+            <input type="password" id="loginPass" placeholder="••••••••" oninput="clearLoginError()" autocomplete="current-password">
+            <button type="button" class="auth-eye" data-toggle="loginPass" aria-label="Afficher/masquer le mot de passe">👁️</button>
+          </div>
+        </div>
+
+        <button class="btn auth-primary" id="btnLogin">Se connecter</button>
+        <button type="button" class="auth-link" id="btnForgotPassword">Mot de passe oublié ?</button>
+        <div class="auth-hint" id="authLoginHint" aria-live="polite"></div>
+      </div>
+
+      <div id="authPaneSignup" class="auth-pane" role="tabpanel" aria-labelledby="authTabSignup">
+        <div class="auth-field">
+          <label for="signupName">Nom / Prénom</label>
+          <input type="text" id="signupName" placeholder="Votre nom" maxlength="60" autocomplete="name">
+        </div>
+
+        <div class="auth-field">
+          <label for="signupEmail">Email</label>
+          <input type="email" id="signupEmail" placeholder="nom@exemple.com" autocomplete="email">
+        </div>
+
+        <div class="auth-field">
+          <label for="signupPass">Mot de passe</label>
+          <div class="auth-pass">
+            <input type="password" id="signupPass" placeholder="6 caractères minimum" autocomplete="new-password">
+            <button type="button" class="auth-eye" data-toggle="signupPass" aria-label="Afficher/masquer le mot de passe">👁️</button>
+          </div>
+        </div>
+
+        <div class="auth-field">
+          <label for="signupPass2">Confirmer</label>
+          <div class="auth-pass">
+            <input type="password" id="signupPass2" placeholder="Répéter le mot de passe" autocomplete="new-password">
+            <button type="button" class="auth-eye" data-toggle="signupPass2" aria-label="Afficher/masquer le mot de passe">👁️</button>
+          </div>
+        </div>
+
+        <button class="btn auth-primary" id="btnSignup">Créer mon compte</button>
+        <div class="auth-hint" id="authSignupHint" aria-live="polite"></div>
+      </div>
     </div>
   </div>
 
-  <div id="denied" class="cc-denied" style="display:none;">
+  <div class="auth-footer">© <span id="authYear"></span> Pulse — Lafayette Progress</div>
+</div><div id="denied" class="cc-denied" style="display:none;">
     <h2>Accès refusé</h2>
     <p>Cette page est réservée au Super Admin.</p>
     <div style="height:14px;"></div>
@@ -95,23 +159,9 @@
   <div id="app" style="display:none;">
     <div class="cc-wrap">
       <div class="cc-head">
-        <div class="cc-left" style="display:flex;align-items:center;gap:12px;">
-          <a href="index.html" class="pulse-logo-inline pulse-logo-page" aria-label="Pulse"><svg width="140" height="32" viewBox="0 0 140 32" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pulse">
-  <defs>
-    <linearGradient id="pulseGrad_top_cc" x1="0" y1="0" x2="34" y2="0" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#D10FA8"/>
-      <stop offset="1" stop-color="#7A2FF0"/>
-    </linearGradient>
-  </defs>
-  <path d="M4 16H11.5L15.5 9.5L19.5 23L23.5 16H34"
-        stroke="url(#pulseGrad_top_cc)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="44" y="22" font-family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial"
-        font-size="18" font-weight="600" fill="currentColor">Pulse</text>
-</svg></a>
-          <div>
+        <div>
           <div class="cc-title">🛡️ Centre de contrôle</div>
           <div class="cc-sub">Rôles, titres et accès par groupe · visible uniquement Super Admin</div>
-        </div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
           <div class="cc-badge" id="ccMe">—</div>

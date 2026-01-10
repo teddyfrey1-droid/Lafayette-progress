@@ -840,26 +840,6 @@ function renderDashboard() {
   updateMonthCountdown();
   const pending = Math.max(0, totalPotential - totalMyGain);
   const pendingEl = document.getElementById('pendingGain'); if(pendingEl){ if(eligible){ pendingEl.style.display = ''; pendingEl.textContent = `⏳ ${pending.toFixed(2)}€ en attente`; } else { pendingEl.style.display = 'none'; pendingEl.textContent = ''; } }
-
-  // Pulse ring progress = total primes débloquées vs target (potentiel total)
-  try{
-    const wrap = document.getElementById('scoreCircle');
-    const prog = document.querySelector('#scoreCircle .pulse-ring-progress');
-    if(wrap && prog){
-      const r = parseFloat(prog.getAttribute('r') || '0');
-      const circ = 2 * Math.PI * r;
-      const target = Number(totalPotential || 0);
-      const val = Number(totalMyGain || 0);
-      const pct = (target > 0) ? Math.max(0, Math.min(1, val / target)) : 0;
-      wrap.style.setProperty('--ring-circum', circ.toFixed(2));
-      wrap.style.setProperty('--ring-offset', (circ * (1 - pct)).toFixed(2));
-      // restart animation
-      prog.style.animation = 'none';
-      prog.getBoundingClientRect();
-      prog.style.animation = '';
-    }
-  }catch(e){}
-
   renderTrajectoryIndicator(); renderDailyMicro(primOk, pending);
   const microEl = document.getElementById('microMotiv'); if(microEl){ let msg = ""; if(!eligible){ msg = "Compte hors primes."; } else if(!prims.length){ msg = "📝 Publie les objectifs pour activer les primes."; } else if(!primOk){ msg = ""; } else if(pending < 0.01){ msg = "✅ Tout est débloqué pour ce mois. Maintiens le niveau."; } else { msg = "🎯 Prochain palier : focus sur le +1 aujourd’hui."; } microEl.textContent = msg; microEl.style.display = msg ? "block" : "none"; }
   const rainContainer = document.getElementById("moneyRain"); if(rainContainer) rainContainer.innerHTML = "";
