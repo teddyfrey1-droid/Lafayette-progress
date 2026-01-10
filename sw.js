@@ -4,7 +4,6 @@
    - garde le SW uniquement pour les critères d'installation PWA
 */
 
-
 /* --- Firebase Messaging (background) --- 
    Nécessaire pour afficher les notifications push en arrière-plan.
    (FCM + Safari iOS PWA)
@@ -29,21 +28,29 @@ try{
   const messaging = firebase.messaging();
 
   messaging.onBackgroundMessage((payload) => {
-    const title = payload?.notification?.title || 'Heiko';
-    const body = payload?.notification?.body || '';
-    const dataUrl = (payload?.fcmOptions && payload.fcmOptions.link) || (payload?.data && payload.data.link) || '/';
+    // MODIFICATION IMPORTANTE : 
+    // On regarde d'abord dans 'data' (nouveau format), sinon fallback sur 'notification'
+    const title = payload.data?.title || payload.notification?.title || 'Heiko';
+    const body = payload.data?.body || payload.notification?.body || '';
+    
+    // Récupération de l'URL (data.url est prioritaire)
+    const dataUrl = payload.data?.url || (payload.fcmOptions && payload.fcmOptions.link) || '/';
+    
     const icon = '/assets/icons/icon-192.png';
+    
     self.registration.showNotification(title, {
-      body,
-      icon,
+      body: body,
+      icon: icon,
       badge: icon,
-      data: { url: dataUrl }
+      data: { url: dataUrl } // On passe l'URL au clic
     });
   });
 
   self.addEventListener('notificationclick', (event) => {
     event.notification.close();
-    const urlToOpen = (event.notification && event.notification.data && event.notification.data.url) ? event.notification.data.url : '/';
+    // Récupère l'URL stockée dans les data de la notification affichée
+    const urlToOpen = (event.notification.data && event.notification.data.url) ? event.notification.data.url : '/';
+    
     event.waitUntil((async () => {
       const allClients = await clients.matchAll({ type: 'window', includeUncontrolled: true });
       for (const client of allClients) {
@@ -61,7 +68,7 @@ try{
   // ignore (push disabled)
 }
 
-const SW_VERSION = 'v3-nocache-' + Date.now();
+const SW_VERSION = 'v4-nocache-' + Date.now();
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

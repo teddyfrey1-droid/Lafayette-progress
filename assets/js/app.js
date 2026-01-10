@@ -1333,6 +1333,26 @@ function renderDashboard() {
   if(eligible){ updateGainToday(totalMyGain); computeNextMilestone(ratio, primOk); } else { const gt = document.getElementById('gainToday'); if(gt) gt.textContent = ''; const nm = document.getElementById('nextMilestone'); if(nm) nm.textContent = ''; }
   updateMonthCountdown();
   const pending = Math.max(0, totalPotential - totalMyGain);
+
+  // Progress ring = Objectif total (primes débloquées) vs Target (potentiel total)
+  try{
+    const sc2 = document.getElementById("scoreCircle");
+    if(sc2){
+      let pct = 0;
+      if(eligible && totalPotential > 0.0001){ pct = totalMyGain / totalPotential; }
+      if(!isFinite(pct)) pct = 0;
+      pct = Math.max(0, Math.min(1, pct));
+      sc2.style.setProperty("--ring-pct", pct.toFixed(4));
+
+      const prog = sc2.querySelector('.pulse-ring-progress');
+      if(prog){
+        // Relancer l'animation à chaque refresh
+        prog.style.animation = 'none';
+        prog.getBoundingClientRect();
+        prog.style.animation = 'pulseRingFill 1.05s ease-out forwards';
+      }
+    }
+  }catch(e){}
   const pendingEl = document.getElementById('pendingGain'); if(pendingEl){ if(eligible){ pendingEl.style.display = ''; pendingEl.textContent = `⏳ ${pending.toFixed(2)}€ en attente`; } else { pendingEl.style.display = 'none'; pendingEl.textContent = ''; } }
   renderTrajectoryIndicator(); renderDailyMicro(primOk, pending);
   const microEl = document.getElementById('microMotiv'); if(microEl){ let msg = ""; if(!eligible){ msg = "Compte hors primes."; } else if(!prims.length){ msg = "📝 Publie les objectifs pour activer les primes."; } else if(!primOk){ msg = ""; } else if(pending < 0.01){ msg = "✅ Tout est débloqué pour ce mois. Maintiens le niveau."; } else { msg = "🎯 Prochain palier : focus sur le +1 aujourd’hui."; } microEl.textContent = msg; microEl.style.display = msg ? "block" : "none"; }

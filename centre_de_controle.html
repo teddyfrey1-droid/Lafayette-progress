@@ -59,6 +59,18 @@
   </div>
 
   <div id="loginOverlay" style="display:none;">
+    <div class="pulse-login-brand"><span class="pulse-logo-inline pulse-logo-login" aria-label="Pulse"><svg width="140" height="32" viewBox="0 0 140 32" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pulse">
+  <defs>
+    <linearGradient id="pulseGrad_login_cc" x1="0" y1="0" x2="34" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D10FA8"/>
+      <stop offset="1" stop-color="#7A2FF0"/>
+    </linearGradient>
+  </defs>
+  <path d="M4 16H11.5L15.5 9.5L19.5 23L23.5 16H34"
+        stroke="url(#pulseGrad_login_cc)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="44" y="22" font-family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial"
+        font-size="18" font-weight="600" fill="currentColor">Pulse</text>
+</svg></span></div>
     <div class="login-box">
       <h2 class="login-title">Connexion Super Admin</h2>
       <div class="input-group">
@@ -83,9 +95,23 @@
   <div id="app" style="display:none;">
     <div class="cc-wrap">
       <div class="cc-head">
-        <div>
+        <div class="cc-left" style="display:flex;align-items:center;gap:12px;">
+          <a href="index.html" class="pulse-logo-inline pulse-logo-page" aria-label="Pulse"><svg width="140" height="32" viewBox="0 0 140 32" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pulse">
+  <defs>
+    <linearGradient id="pulseGrad_top_cc" x1="0" y1="0" x2="34" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D10FA8"/>
+      <stop offset="1" stop-color="#7A2FF0"/>
+    </linearGradient>
+  </defs>
+  <path d="M4 16H11.5L15.5 9.5L19.5 23L23.5 16H34"
+        stroke="url(#pulseGrad_top_cc)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="44" y="22" font-family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial"
+        font-size="18" font-weight="600" fill="currentColor">Pulse</text>
+</svg></a>
+          <div>
           <div class="cc-title">🛡️ Centre de contrôle</div>
           <div class="cc-sub">Rôles, titres et accès par groupe · visible uniquement Super Admin</div>
+        </div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
           <div class="cc-badge" id="ccMe">—</div>

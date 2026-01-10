@@ -117,7 +117,20 @@
   <div id="toast">✅ Action effectuée avec succès !</div>
 
   <div id="loginOverlay">
-    <h1 style="font-size: 28px; font-weight: 900; color: var(--text-main); margin-bottom: 25px; text-transform: uppercase; text-align: center; line-height: 1.4;">🚀 DASHBOARD SUIVI 🚀<br>LAFAYETTE</h1>
+    
+    <div class="pulse-login-brand"><span class="pulse-logo-inline pulse-logo-login" aria-label="Pulse"><svg width="140" height="32" viewBox="0 0 140 32" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pulse">
+  <defs>
+    <linearGradient id="pulseGrad_login_index" x1="0" y1="0" x2="34" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D10FA8"/>
+      <stop offset="1" stop-color="#7A2FF0"/>
+    </linearGradient>
+  </defs>
+  <path d="M4 16H11.5L15.5 9.5L19.5 23L23.5 16H34"
+        stroke="url(#pulseGrad_login_index)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="44" y="22" font-family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial"
+        font-size="18" font-weight="600" fill="currentColor">Pulse</text>
+</svg></span></div>
+<h1 style="font-size: 28px; font-weight: 900; color: var(--text-main); margin-bottom: 25px; text-transform: uppercase; text-align: center; line-height: 1.4;">🚀 DASHBOARD SUIVI 🚀<br>LAFAYETTE</h1>
     <div class="login-box">
       <h2 class="login-title">Connexion Membre</h2>
       <div class="input-group">
@@ -226,48 +239,91 @@
     </aside>
 
     <div class="container">
-      <header id="dashboard">
-        <div class="header-pill">🚀 Dashboard Live</div>
-        <h1>OBJECTIFS HEIKO LAFAYETTE</h1>
-        <div class="last-update" id="lastUpdate">Chargement...</div>
-        
-        <div class="global-score-container" id="scoreCircle">
-          <div class="money-rain" id="moneyRain"></div>
-          <div class="global-score-value" id="myTotalGain">0€</div>
-          <div class="global-score-label" id="globalScoreLabel">MES PRIMES<br>DÉBLOQUÉES</div>
-          <div class="global-score-pills">
-            <div class="global-score-pill" id="pendingGain">⏳ 0€ en attente</div>
-          </div>
-          <div class="global-score-micro" id="microMotiv">—</div>
+      
+<header id="dashboard" class="pulse-dash">
+  <div class="pulse-summary-card" aria-label="Résumé primes et objectifs">
+    <div class="pulse-brand" aria-label="Pulse">
+      <span class="pulse-logo-inline" aria-label="Pulse"><svg width="140" height="32" viewBox="0 0 140 32" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pulse">
+  <defs>
+    <linearGradient id="pulseGrad_dash" x1="0" y1="0" x2="34" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D10FA8"/>
+      <stop offset="1" stop-color="#7A2FF0"/>
+    </linearGradient>
+  </defs>
+  <path d="M4 16H11.5L15.5 9.5L19.5 23L23.5 16H34"
+        stroke="url(#pulseGrad_dash)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="44" y="22" font-family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial"
+        font-size="18" font-weight="600" fill="currentColor">Pulse</text>
+</svg></span>
+    </div>
+
+    <div class="pulse-summary-grid">
+      <!-- Colonne gauche -->
+      <div class="pulse-col">
+        <div class="pulse-tile pulse-tile-primary" aria-label="Mes primes">
+          <div class="pulse-tile-label">MES PRIMES</div>
+          <div class="pulse-tile-value" id="kpiMyGain">0€</div>
         </div>
 
-        <div class="trajectory-indicator" id="trajectoryIndicator" aria-label="Trajectoire du mois">—</div>
-        <div class="daily-micro" id="dailyMicro" aria-label="Message du jour">—</div>
-        <div class="month-countdown" id="monthCountdown" aria-label="Temps restant avant la fin du mois">—</div>
-      </header>
-      
-      <section class="kpi-strip" id="kpiStrip" aria-label="Indicateurs clés">
-        <div class="kpi-card">
-          <div class="kpi-label">Mes primes</div>
-          <div class="kpi-value" id="kpiMyGain">0€</div>
-          <div class="kpi-sub">Débloquées</div>
+        <div class="pulse-tile" aria-label="Bonus">
+          <div class="pulse-tile-label">BONUS</div>
+          <div class="pulse-tile-value pulse-tile-muted" id="kpiBonusState">—</div>
+          <div class="pulse-tile-sub" id="kpiBonusSub" style="display:none;">—</div>
         </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Objectifs actifs</div>
-          <div class="kpi-value" id="kpiActiveObjs">0</div>
-          <div class="kpi-sub">Publiés</div>
+      </div>
+
+      <!-- Centre -->
+      <div class="pulse-center" id="scoreCircle" aria-label="Mes primes débloquées">
+        <div class="money-rain" id="moneyRain" aria-hidden="true"></div>
+
+        <svg class="pulse-ring" viewBox="0 0 220 220" aria-hidden="true">
+          <defs>
+            <linearGradient id="pulseRingGrad" x1="0" y1="0" x2="220" y2="0" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#D10FA8"/>
+              <stop offset="1" stop-color="#7A2FF0"/>
+            </linearGradient>
+          </defs>
+          <circle class="pulse-ring-track" cx="110" cy="110" r="96" />
+          <circle class="pulse-ring-progress" cx="110" cy="110" r="96" />
+        </svg>
+
+        <div class="pulse-center-content">
+          <div class="pulse-center-value" id="myTotalGain">0€</div>
+          <div class="pulse-center-label" id="globalScoreLabel">MES PRIMES DÉBLOQUÉES</div>
+          <div class="pulse-center-pending" id="pendingGain">⏳ 0€ en attente</div>
         </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Bonus</div>
-          <div class="kpi-value" id="kpiBonusState">—</div>
-          <div class="kpi-sub" id="kpiBonusSub">—</div>
+      </div>
+
+      <!-- Colonne droite -->
+      <div class="pulse-col">
+        <div class="pulse-tile" aria-label="Objectifs actifs">
+          <div class="pulse-tile-label">OBJECTIFS ACTIFS</div>
+          <div class="pulse-tile-value" id="kpiActiveObjs">0</div>
         </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Mise à jour</div>
-          <div class="kpi-value" id="kpiUpdated">—</div>
-          <div class="kpi-sub">Aujourd'hui</div>
+
+        <div class="pulse-tile" aria-label="Mise à jour">
+          <div class="pulse-tile-row">
+            <div class="pulse-tile-label">MISE À JOUR</div>
+            <span class="pulse-switch is-on" aria-hidden="true"></span>
+          </div>
+          <div class="pulse-tile-value" id="kpiUpdated">—</div>
+          <div class="pulse-tile-sub">Aujourd'hui</div>
         </div>
-      </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Infos secondaires (on garde ton fonctionnement) -->
+  <div class="pulse-micro-wrap" aria-label="Infos du jour">
+    <div class="pulse-micro" id="trajectoryIndicator">—</div>
+    <div class="pulse-micro" id="dailyMicro">—</div>
+  </div>
+
+  <div class="pulse-countdown-wrap" aria-label="Temps restant">
+    <div class="month-countdown" id="monthCountdown">—</div>
+  </div>
+</header>
+
 
       <div class="focus-pill" id="focusPill" aria-label="Focus du jour">
         <span class="focus-emoji" id="focusEmoji">🔥</span>
