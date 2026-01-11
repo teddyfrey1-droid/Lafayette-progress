@@ -543,7 +543,14 @@ function updateUI() {
 
   document.getElementById("btnAdmin").style.display = isAdmin ? 'block' : 'none';
   
-  // --- GESTION EXCLUSIVE SUPER ADMIN ---
+  
+  const menuTeamLink = document.getElementById('menuTeamLink');
+  const menuControlLink = document.getElementById('menuControlLink');
+  const menuAdminLink = document.getElementById('menuAdminLink');
+  if(menuTeamLink) menuTeamLink.style.display = isAdmin ? 'flex' : 'none';
+  if(menuControlLink) menuControlLink.style.display = isAdmin ? 'flex' : 'none';
+  if(menuAdminLink) menuAdminLink.style.display = isAdmin ? 'flex' : 'none';
+// --- GESTION EXCLUSIVE SUPER ADMIN ---
   if (isSuperUser) {
       document.getElementById("btnTabLogs").style.display = 'block';
       document.getElementById("btnTabFeedbacks").style.display = 'block';
@@ -796,6 +803,57 @@ function computeNextMilestone(userRatio, primOk){
   try { localStorage.setItem(key, String(unlockedCount)); } catch(e){}
 }
 
+
+function updateRingProgress(percent){
+  const wrap = document.getElementById("scoreCircle");
+  if(!wrap) return;
+  const track = wrap.querySelector(".pulse-ring-track");
+  const prog = wrap.querySelector(".pulse-ring-progress");
+  if(!track || !prog) return;
+
+  const pct = Math.max(0, Math.min(100, Number(percent) || 0));
+  const r = 50;
+  const C = 2 * Math.PI * r;
+  const arc = C * 0.78;  // portion visible (style Pulse)
+  const gap = C - arc;
+  const start = C * 0.10; // décale l'ouverture
+
+  track.style.strokeDasharray = `${arc} ${gap}`;
+  track.style.strokeDashoffset = `${start}`;
+
+  const dash = arc * (pct / 100);
+  prog.style.strokeDasharray = `${dash} ${C - dash}`;
+  prog.style.strokeDashoffset = `${start}`;
+}
+
+function updateHierarchyUI(primOk, primaryName){
+  const stepP = document.getElementById("hierStepPrimary");
+  const stepS = document.getElementById("hierStepSecondary");
+  const hint = document.getElementById("hierarchyHint");
+  if(!stepP || !stepS || !hint) return;
+
+  stepP.classList.remove("is-locked", "is-unlocked", "is-active");
+  stepS.classList.remove("is-locked", "is-unlocked", "is-active");
+
+  if(primOk){
+    stepP.classList.add("is-unlocked");
+    stepS.classList.add("is-unlocked");
+    hint.textContent = "✅ Objectif principal débloqué : les objectifs secondaires sont maintenant actifs.";
+  }else{
+    stepP.classList.add("is-active");
+    stepS.classList.add("is-locked");
+    const n = primaryName ? ` “${primaryName}”` : "";
+    hint.textContent = `🔒 Pour activer les objectifs secondaires, débloque d’abord l’objectif principal${n}.`;
+  }
+}
+
+function createSecondaryGrid(objs, primOk, ratio){
+  const wrap = document.createElement("div");
+  wrap.className = "secondary-grid";
+  (objs || []).forEach(o => wrap.appendChild(createCard(o, !primOk, ratio, false)));
+  return wrap;
+}
+
 function createSecondaryCarousel(objs, primOk, ratio){
   const wrap = document.createElement("div"); wrap.className = "secondary-carousel";
   const btnPrev = document.createElement("button"); btnPrev.className = "carousel-btn prev"; btnPrev.innerHTML = "<span>❮</span>"; btnPrev.style.display="none";
@@ -824,7 +882,7 @@ function renderDashboard() {
   prims.forEach(o => container.appendChild(createCard(o, false, ratio, true)));
   const secs = Object.values(allObjs).filter(o => !o.isPrimary && o.published);
   if(secs.length > 0) container.innerHTML += `<div class="category-title secondary">💎&nbsp;<span>Bonus Déblocables</span></div>`;
-  container.appendChild(createSecondaryCarousel(secs, primOk, ratio));
+  container.appendChild(createSecondaryGrid(secs, primOk, ratio));
   Object.keys(allObjs).forEach(key => {
     const o = allObjs[key]; if(!o.published) return;
     const pct = getPct(o.current, o.target, o.isInverse); const isLocked = !o.isPrimary && !primOk;
@@ -886,6 +944,30 @@ function createCard(obj, isLocked, userRatio, isPrimary) {
 }
 
 function toggleAdmin(show) { document.getElementById("adminPanel").classList.toggle("active", show); if(show) { renderAdminUsers(); renderSimulator(); } }
+
+
+function handleHashNavigation(){
+  const h = (location.hash || '').toLowerCase();
+  if(!h.startsWith('#admin')) return;
+
+  // Admin panel is only visible for admins
+  if(!isAdminUser()) return;
+
+  toggleAdmin(true);
+
+  if(h.includes('team')) switchTab('team');
+  else if(h.includes('objs')) switchTab('objs');
+  else if(h.includes('logs')) switchTab('logs');
+  else if(h.includes('feedback')) switchTab('feedbacks');
+  else if(h.includes('emails')) switchTab('emails');
+
+  const panel = document.getElementById('adminPanel');
+  if(panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+window.addEventListener('hashchange', () => {
+  try{ handleHashNavigation(); }catch(e){}
+});
 document.getElementById("btnAdmin").onclick = () => toggleAdmin(true);
 function switchTab(t) {
    document.querySelectorAll('.btn-tab').forEach(b => b.classList.remove('active'));

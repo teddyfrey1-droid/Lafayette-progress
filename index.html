@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#2563eb">
+  <meta name="theme-color" content="#C018A7">
   <meta name="mobile-web-app-capable" content="yes">
 
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Cdefs%3E%3ClinearGradient%20id='g'%20x1='0%25'%20y1='0%25'%20x2='100%25'%20y2='100%25'%3E%3Cstop%20offset='0%25'%20style='stop-color:%232563eb'/%3E%3Cstop%20offset='50%25'%20style='stop-color:%238b5cf6'/%3E%3Cstop%20offset='100%25'%20style='stop-color:%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width='100'%20height='100'%20rx='20'%20fill='url(%23g)'/%3E%3Ctext%20x='50'%20y='70'%20font-family='Arial,sans-serif'%20font-size='55'%20fill='white'%20text-anchor='middle'%3E%F0%9F%9A%80%3C/text%3E%3C/svg%3E">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%232563eb'/%3E%3Cstop offset='50%25' style='stop-color:%238b5cf6'/%3E%3Cstop offset='100%25' style='stop-color:%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23g)'/%3E%3Ctext x='50' y='70' font-family='Arial,sans-serif' font-size='55' fill='white' text-anchor='middle'%3E🚀%3C/text%3E%3C/svg%3E">
   <link rel="manifest" href="manifest.webmanifest">
   
   <title>Heiko - Budget Master V61</title>
@@ -28,7 +28,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -101,11 +101,11 @@
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
         <div style="flex:1; min-width:160px;">
           <div style="font-size:11px; font-weight:900; color:var(--text-muted); margin-bottom:6px;">DATE</div>
-          <input type="date" id="objProgDate">
+          <input type="date" id="objProgDate" />
         </div>
         <div style="flex:1; min-width:160px;">
           <div id="objProgValueLabel" style="font-size:11px; font-weight:900; color:var(--text-muted); margin-bottom:6px;">PROGRESSION (%)</div>
-          <input type="number" id="objProgValue" placeholder="ex: 22" step="0.1">
+          <input type="number" id="objProgValue" placeholder="ex: 22" step="0.1" />
         </div>
         <button class="btn" style="width:auto; padding:12px 16px;" onclick="addObjectiveProgressPoint()">➕ Ajouter</button>
       </div>
@@ -116,98 +116,22 @@
 
   <div id="toast">✅ Action effectuée avec succès !</div>
 
-  <div id="loginOverlay" class="auth-overlay">
-  <div class="auth-wrap">
-    <div class="auth-hero">
-      <div class="auth-brand">
-        <div class="auth-logo">
-          <span class="pulse-mark" aria-hidden="true"></span>
-          <span class="auth-logo-text">Pulse</span>
-        </div>
-        <h1 class="auth-title">Lafayette Progress</h1>
-        <p class="auth-sub">Objectifs, primes et infos équipe — en un coup d’œil.</p>
+  <div id="loginOverlay">
+    <h1 style="font-size: 28px; font-weight: 900; color: var(--text-main); margin-bottom: 25px; text-transform: uppercase; text-align: center; line-height: 1.4;">🚀 DASHBOARD SUIVI 🚀<br>LAFAYETTE</h1>
+    <div class="login-box">
+      <h2 class="login-title">Connexion Membre</h2>
+      <div class="input-group">
+          <input type="email" id="loginEmail" placeholder="Email" oninput="clearLoginError()">
       </div>
-
-      <div class="auth-mini-grid" aria-hidden="true">
-        <div class="auth-mini-card">
-          <div class="k">Suivi</div>
-          <div class="v">Simple &amp; clair</div>
-        </div>
-        <div class="auth-mini-card">
-          <div class="k">Objectifs</div>
-          <div class="v">En temps réel</div>
-        </div>
-        <div class="auth-mini-card">
-          <div class="k">Primes</div>
-          <div class="v">Motivantes</div>
-        </div>
-        <div class="auth-mini-card">
-          <div class="k">Équipe</div>
-          <div class="v">Alignée</div>
-        </div>
+      <div class="input-group">
+          <input type="password" id="loginPass" placeholder="Mot de passe" oninput="clearLoginError()">
+          <span class="toggle-password" onclick="togglePass()">👁️</span>
       </div>
-    </div>
-
-    <div class="auth-card" role="region" aria-label="Connexion">
-      <div class="auth-tabs" role="tablist" aria-label="Authentification">
-        <button type="button" id="authTabLogin" class="auth-tab is-active" role="tab" aria-controls="authPaneLogin" aria-selected="true">Connexion</button>
-        <button type="button" id="authTabSignup" class="auth-tab" role="tab" aria-controls="authPaneSignup" aria-selected="false">Créer un compte</button>
-      </div>
-
-      <div id="authPaneLogin" class="auth-pane is-active" role="tabpanel" aria-labelledby="authTabLogin">
-        <div class="auth-field">
-          <label for="loginEmail">Email</label>
-          <input type="email" id="loginEmail" placeholder="nom@exemple.com" oninput="clearLoginError()" autocomplete="email">
-        </div>
-
-        <div class="auth-field">
-          <label for="loginPass">Mot de passe</label>
-          <div class="auth-pass">
-            <input type="password" id="loginPass" placeholder="••••••••" oninput="clearLoginError()" autocomplete="current-password">
-            <button type="button" class="auth-eye" data-toggle="loginPass" aria-label="Afficher/masquer le mot de passe">👁️</button>
-          </div>
-        </div>
-
-        <button class="btn auth-primary" id="btnLogin">Se connecter</button>
-        <button type="button" class="auth-link" id="btnForgotPassword">Mot de passe oublié ?</button>
-        <div class="auth-hint" id="authLoginHint" aria-live="polite"></div>
-      </div>
-
-      <div id="authPaneSignup" class="auth-pane" role="tabpanel" aria-labelledby="authTabSignup">
-        <div class="auth-field">
-          <label for="signupName">Nom / Prénom</label>
-          <input type="text" id="signupName" placeholder="Votre nom" maxlength="60" autocomplete="name">
-        </div>
-
-        <div class="auth-field">
-          <label for="signupEmail">Email</label>
-          <input type="email" id="signupEmail" placeholder="nom@exemple.com" autocomplete="email">
-        </div>
-
-        <div class="auth-field">
-          <label for="signupPass">Mot de passe</label>
-          <div class="auth-pass">
-            <input type="password" id="signupPass" placeholder="6 caractères minimum" autocomplete="new-password">
-            <button type="button" class="auth-eye" data-toggle="signupPass" aria-label="Afficher/masquer le mot de passe">👁️</button>
-          </div>
-        </div>
-
-        <div class="auth-field">
-          <label for="signupPass2">Confirmer</label>
-          <div class="auth-pass">
-            <input type="password" id="signupPass2" placeholder="Répéter le mot de passe" autocomplete="new-password">
-            <button type="button" class="auth-eye" data-toggle="signupPass2" aria-label="Afficher/masquer le mot de passe">👁️</button>
-          </div>
-        </div>
-
-        <button class="btn auth-primary" id="btnSignup">Créer mon compte</button>
-        <div class="auth-hint" id="authSignupHint" aria-live="polite"></div>
-      </div>
+      <button class="btn" id="btnLogin">Connexion</button>
     </div>
   </div>
 
-  <div class="auth-footer">© <span id="authYear"></span> Pulse — Lafayette Progress</div>
-</div><div id="appContent">
+  <div id="appContent">
     <div class="top-bar">
       <div class="user-welcome">
         👤 <span id="userName">--</span> 
@@ -287,7 +211,15 @@
 
         <div class="global-menu-sep" aria-hidden="true"></div>
         
-        <a class="global-menu-link" id="menuDiffusionLink" href="diffusion.html" onclick="toggleGlobalMenu(false)" style="background:rgba(37,99,235,0.08); color:#2563eb; font-weight:700;">
+                <a class="global-menu-link" id="menuTeamAdminLink" href="index.html#admin-team" onclick="toggleGlobalMenu(false)" style="display:none;">
+          <span>👥 Équipe</span>
+        </a>
+
+        <a class="global-menu-link" id="menuPilotageAdminLink" href="index.html#admin-objs" onclick="toggleGlobalMenu(false)" style="display:none;">
+          <span>🎯 Pilotage</span>
+        </a>
+
+<a class="global-menu-link" id="menuDiffusionLink" href="diffusion.html" onclick="toggleGlobalMenu(false)" style="background:rgba(192,24,167,0.10); color:var(--primary); font-weight:800;">
           <span>📧 Diffusion / Alertes</span>
         </a>
 
@@ -302,52 +234,88 @@
     </aside>
 
     <div class="container">
-      <header id="dashboard">
-        <div class="header-pill">🚀 Dashboard Live</div>
-        <h1>OBJECTIFS HEIKO LAFAYETTE</h1>
-        <div class="last-update" id="lastUpdate">Chargement...</div>
-        
-        <div class="global-score-container" id="scoreCircle">
-          <div class="money-rain" id="moneyRain"></div>
-          <div class="global-score-value" id="myTotalGain">0€</div>
-          <div class="global-score-label" id="globalScoreLabel">MES PRIMES<br>DÉBLOQUÉES</div>
-          <div class="global-score-pills">
-            <div class="global-score-pill" id="pendingGain">⏳ 0€ en attente</div>
+      <header id="dashboard" class="pulse-dashboard">
+        <div class="pulse-hero-card" aria-label="Résumé primes &amp; objectifs">
+          <div class="pulse-hero-head">
+            <div class="pulse-brand" aria-label="Pulse">
+              <img class="pulse-logo logo-light" src="assets/brand/pulse-light.png" alt="Pulse">
+              <img class="pulse-logo logo-dark" src="assets/brand/pulse-dark.png" alt="Pulse">
+            </div>
+            <div class="pulse-head-meta">
+              <div class="pulse-head-title">Dashboard</div>
+              <div class="last-update" id="lastUpdate">Chargement...</div>
+            </div>
           </div>
-          <div class="global-score-micro" id="microMotiv">—</div>
+
+          <div class="pulse-hero-grid">
+            <div class="pulse-metric-col">
+              <div class="pulse-tile">
+                <div class="tile-label">Mes primes</div>
+                <div class="tile-value" id="kpiMyGain">0€</div>
+                <div class="tile-sub">Débloquées</div>
+              </div>
+              <div class="pulse-tile">
+                <div class="tile-label">Bonus</div>
+                <div class="tile-value" id="kpiBonusState">—</div>
+                <div class="tile-sub" id="kpiBonusSub">—</div>
+              </div>
+            </div>
+
+            <div class="global-score-container" id="scoreCircle" aria-label="Mes primes débloquées">
+              <div class="money-rain" id="moneyRain"></div>
+              <svg class="pulse-ring-svg" viewBox="0 0 120 120" aria-hidden="true">
+                <defs>
+                  <linearGradient id="pulseGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#C018A7"></stop>
+                    <stop offset="100%" stop-color="#7C3AED"></stop>
+                  </linearGradient>
+                </defs>
+                <circle class="pulse-ring-track" cx="60" cy="60" r="50"></circle>
+                <circle class="pulse-ring-progress" cx="60" cy="60" r="50"></circle>
+              </svg>
+
+              <div class="pulse-ring-center">
+                <div class="global-score-value" id="myTotalGain">0€</div>
+                <div class="global-score-label" id="globalScoreLabel">Mes primes débloquées</div>
+                <div class="pulse-ring-sub" id="pendingGain">0€ en attente</div>
+              </div>
+            </div>
+
+            <div class="pulse-metric-col">
+              <div class="pulse-tile">
+                <div class="tile-label">Objectifs actifs</div>
+                <div class="tile-value" id="kpiActiveObjs">0</div>
+                <div class="tile-sub">Publiés</div>
+              </div>
+              <div class="pulse-tile">
+                <div class="tile-label">Mise à jour</div>
+                <div class="tile-value" id="kpiUpdated">—</div>
+                <div class="tile-sub">Aujourd’hui</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pulse-hero-foot">
+            <div class="global-score-micro" id="microMotiv">—</div>
+          </div>
         </div>
 
         <div class="trajectory-indicator" id="trajectoryIndicator" aria-label="Trajectoire du mois">—</div>
         <div class="daily-micro" id="dailyMicro" aria-label="Message du jour">—</div>
         <div class="month-countdown" id="monthCountdown" aria-label="Temps restant avant la fin du mois">—</div>
       </header>
-      
-      <section class="kpi-strip" id="kpiStrip" aria-label="Indicateurs clés">
-        <div class="kpi-card">
-          <div class="kpi-label">Mes primes</div>
-          <div class="kpi-value" id="kpiMyGain">0€</div>
-          <div class="kpi-sub">Débloquées</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Objectifs actifs</div>
-          <div class="kpi-value" id="kpiActiveObjs">0</div>
-          <div class="kpi-sub">Publiés</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Bonus</div>
-          <div class="kpi-value" id="kpiBonusState">—</div>
-          <div class="kpi-sub" id="kpiBonusSub">—</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Mise à jour</div>
-          <div class="kpi-value" id="kpiUpdated">—</div>
-          <div class="kpi-sub">Aujourd'hui</div>
-        </div>
-      </section>
 
-      <div class="focus-pill" id="focusPill" aria-label="Focus du jour">
+<div class="focus-pill" id="focusPill" aria-label="Focus du jour">
         <span class="focus-emoji" id="focusEmoji">🔥</span>
         <span class="focus-text" id="focusText">Chargement...</span>
+      </div>
+
+      <div class="objective-hierarchy" aria-label="Hiérarchie des objectifs">
+        <div class="hierarchy-steps">
+          <div class="hier-step" id="hierStepPrimary"><span class="hs-num">1</span><span class="hs-label">Objectif principal</span></div>
+          <div class="hier-step" id="hierStepSecondary"><span class="hs-num">2</span><span class="hs-label">Objectifs secondaires</span></div>
+        </div>
+        <div class="hierarchy-hint" id="hierarchyHint">—</div>
       </div>
 
       <div class="objectives-wrapper" id="cardsContainer">
@@ -400,7 +368,7 @@
       <button id="btnTabTeam" onclick="switchTab('team')" class="btn-tab active">👥 Équipe</button>
       <button id="btnTabObjs" onclick="switchTab('objs')" class="btn-tab">🎯 Pilotage</button>
       <button id="btnTabLogs" onclick="switchTab('logs')" class="btn-tab" style="display:none;">🕒 Historique</button>
-      <button id="btnTabFeedbacks" onclick="switchTab('feedbacks')" class="btn-tab" style="display:none;">💬 Avis &amp; Nouveautés</button>
+      <button id="btnTabFeedbacks" onclick="switchTab('feedbacks')" class="btn-tab" style="display:none;">💬 Avis & Nouveautés</button>
     </div>
 
     <div id="tab-team">
@@ -415,7 +383,7 @@
         <button class="btn" onclick="createUser()">Créer le membre</button>
       </div>
       <div class="admin-section">
-        <h3 class="section-header-large">Effectif &amp; Primes</h3>
+        <h3 class="section-header-large">Effectif & Primes</h3>
         <div id="usersList"></div>
       </div>
     </div>
@@ -505,7 +473,7 @@
 
     <div id="tab-objs" style="display:none;">
       <div class="admin-section" id="superAdminBudget" style="border: 2px solid var(--primary); display:block;">
-         <h3 class="section-header-large">🎛️ PILOTAGE BUDGET &amp; PRIMES</h3>
+         <h3 class="section-header-large">🎛️ PILOTAGE BUDGET & PRIMES</h3>
          <div class="cockpit-container">
             <div class="cockpit-top">
                 <label class="budget-label-small">BUDGET MAX (€)</label>

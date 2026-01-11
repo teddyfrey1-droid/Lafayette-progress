@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="140" height="32" viewBox="0 0 140 32" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pulse">
+  <defs>
+    <linearGradient id="pulseGrad" x1="0" y1="0" x2="34" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D10FA8"/>
+      <stop offset="1" stop-color="#7A2FF0"/>
+    </linearGradient>
+  </defs>
+  <path d="M4 16H11.5L15.5 9.5L19.5 23L23.5 16H34"
+        stroke="url(#pulseGrad)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="44" y="22" font-family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial"
+        font-size="18" font-weight="600" fill="currentColor">Pulse</text>
+</svg>

@@ -218,7 +218,9 @@ function getRoleKeyFromUser(u){
   if(typeof u.roleKey === 'string' && ROLE_KEYS.includes(u.roleKey)) return u.roleKey;
   // 2) Backward-compat
   if(u.isSuperAdmin) return 'super_admin';
-  if(u.role === 'admin') return 'manager';
+  const r = (u.role || '').toString().toLowerCase();
+  if(r === 'superadmin' || r === 'super_admin') return 'super_admin';
+  if(r === 'admin') return 'manager';
   return 'user';
 }
 
@@ -801,6 +803,38 @@ function updateUI() {
   const menuCC = document.getElementById('menuControlCenterLink');
   if(menuCC) menuCC.style.display = (isSuperUser && hasFeature('controlCenter')) ? 'flex' : 'none';
 
+
+  const menuTeam = document.getElementById('menuTeamAdminLink');
+  if(menuTeam){
+    if(isAdmin){
+      menuTeam.style.display = 'flex';
+      menuTeam.classList.remove('locked');
+      menuTeam.href = 'index.html#admin-team';
+      menuTeam.onclick = null;
+    }else{
+      // On laisse visible (pour comprendre que ça existe), mais verrouillé
+      menuTeam.style.display = 'flex';
+      menuTeam.classList.add('locked');
+      menuTeam.removeAttribute('href');
+      menuTeam.onclick = (e) => { e && e.preventDefault && e.preventDefault(); showToast('🔒 Accès réservé aux admins'); };
+    }
+  }
+
+  const menuPilot = document.getElementById('menuPilotageAdminLink');
+  if(menuPilot){
+    const allowed = (isAdmin && hasFeature('pilotage'));
+    if(allowed){
+      menuPilot.style.display = 'flex';
+      menuPilot.classList.remove('locked');
+      menuPilot.href = 'index.html#admin-objs';
+      menuPilot.onclick = null;
+    }else{
+      menuPilot.style.display = 'flex';
+      menuPilot.classList.add('locked');
+      menuPilot.removeAttribute('href');
+      menuPilot.onclick = (e) => { e && e.preventDefault && e.preventDefault(); showToast('🔒 Pilotage réservé aux rôles autorisés'); };
+    }
+  }
   // Menu : état des notifications push
   try{ _setPushMenuState(!!(currentUser && (currentUser.pushEnabled || currentUser.fcmToken))); }catch(e){}
   
@@ -833,6 +867,7 @@ function updateUI() {
   
   if(isAdmin && hasFeature('pilotage')) { renderAdminObjs(); renderSimulator(); }
   renderDashboard();
+  try{ handleHashNavigation(); }catch(e){}
 }
 
 function saveUpdate() {
@@ -1247,6 +1282,51 @@ function prevMonth() { currentCalDate.setMonth(currentCalDate.getMonth()-1); ren
 function nextMonth() { currentCalDate.setMonth(currentCalDate.getMonth()+1); renderNativeCalendar(); }
 
 function formatEuro(v){ const n = Number(v||0); return (isFinite(n)? n.toFixed(2): "0.00") + "€"; }
+
+function updateRingProgress(percent){
+  try{
+    const circle = document.querySelector('.pulse-ring-progress');
+    if(!circle) return;
+    const r = parseFloat(circle.getAttribute('r') || '50');
+    const circumference = 2 * Math.PI * r;
+    circle.style.strokeDasharray = `${circumference} ${circumference}`;
+    const p = Math.max(0, Math.min(100, Number(percent)||0));
+    const offset = circumference - (p / 100) * circumference;
+    circle.style.strokeDashoffset = `${offset}`;
+  }catch(e){}
+}
+
+function updateHierarchyUI(primaryUnlocked){
+  try{
+    const s1 = document.getElementById('hierStepPrimary');
+    const s2 = document.getElementById('hierStepSecondary');
+    const hint = document.getElementById('hierarchyHint');
+    if(s1){ s1.classList.add('is-unlocked'); s1.classList.remove('is-locked'); }
+    if(s2){
+      if(primaryUnlocked){
+        s2.classList.add('is-unlocked'); s2.classList.remove('is-locked');
+      }else{
+        s2.classList.remove('is-unlocked'); s2.classList.add('is-locked');
+      }
+    }
+    if(hint){
+      hint.textContent = primaryUnlocked
+        ? "✅ Objectif principal validé : les bonus secondaires sont ouverts."
+        : "🔒 Étape 1 : valide l’objectif principal pour débloquer tous les bonus secondaires.";
+    }
+  }catch(e){}
+}
+
+function createSecondaryGrid(objs, primaryUnlocked, ratio){
+  const wrap = document.createElement('div');
+  wrap.className = 'secondary-grid';
+  objs.forEach(o => {
+    wrap.appendChild(createCard(o, !primaryUnlocked, ratio, false));
+  });
+  return wrap;
+}
+
+
 function updateGainToday(totalMyGain){
   if(!currentUser) return;
   const el = document.getElementById("gainToday"); if(!el) return;
@@ -1314,11 +1394,18 @@ function renderDashboard() {
   const prims = Object.values(allObjs).filter(o => o.isPrimary && o.published);
   let primOk = true;
   if(prims.length > 0) { primOk = prims.every(o => { let threshold = 100; if(o.isFixed) threshold = 100; else if(o.paliers && o.paliers[0]) threshold = o.paliers[0].threshold; if(o.isNumeric) return parseFloat(o.current) >= threshold; else { const pct = getPct(o.current, o.target, o.isInverse); return pct >= threshold; } }); }
+  try{ updateHierarchyUI(primOk); }catch(e){}
   if(prims.length > 0) container.innerHTML += `<div class="category-title">🔥&nbsp;<span>Priorité Absolue</span></div>`;
   prims.forEach(o => container.appendChild(createCard(o, false, ratio, true)));
   const secs = Object.values(allObjs).filter(o => !o.isPrimary && o.published);
-  if(secs.length > 0) container.innerHTML += `<div class="category-title secondary">💎&nbsp;<span>Bonus Déblocables</span></div>`;
-  container.appendChild(createSecondaryCarousel(secs, primOk, ratio));
+  if(secs.length > 0){
+    const lockLabel = primOk ? "" : " <span style=\"opacity:.75; font-weight:900;\">(Verrouillés)</span>";
+    container.innerHTML += `<div class="category-title secondary">💎&nbsp;<span>Bonus secondaires</span>${lockLabel}</div>`;
+    if(!primOk){
+      container.innerHTML += `<div class="hierarchy-hint" style="margin-top:-6px; margin-bottom:12px;">🔒 Termine l’objectif principal pour activer ces bonus.</div>`;
+    }
+    container.appendChild(createSecondaryGrid(secs, primOk, ratio));
+  }
   Object.keys(allObjs).forEach(key => {
     const o = allObjs[key]; if(!o.published) return;
     const pct = getPct(o.current, o.target, o.isInverse); const isLocked = !o.isPrimary && !primOk;
@@ -1333,6 +1420,14 @@ function renderDashboard() {
   if(eligible){ updateGainToday(totalMyGain); computeNextMilestone(ratio, primOk); } else { const gt = document.getElementById('gainToday'); if(gt) gt.textContent = ''; const nm = document.getElementById('nextMilestone'); if(nm) nm.textContent = ''; }
   updateMonthCountdown();
   const pending = Math.max(0, totalPotential - totalMyGain);
+  try{
+    if(eligible){
+      const ringPct = totalPotential > 0 ? (totalMyGain / totalPotential) * 100 : 0;
+      updateRingProgress(ringPct);
+    }else{
+      updateRingProgress(0);
+    }
+  }catch(e){}
   const pendingEl = document.getElementById('pendingGain'); if(pendingEl){ if(eligible){ pendingEl.style.display = ''; pendingEl.textContent = `⏳ ${pending.toFixed(2)}€ en attente`; } else { pendingEl.style.display = 'none'; pendingEl.textContent = ''; } }
   renderTrajectoryIndicator(); renderDailyMicro(primOk, pending);
   const microEl = document.getElementById('microMotiv'); if(microEl){ let msg = ""; if(!eligible){ msg = "Compte hors primes."; } else if(!prims.length){ msg = "📝 Publie les objectifs pour activer les primes."; } else if(!primOk){ msg = ""; } else if(pending < 0.01){ msg = "✅ Tout est débloqué pour ce mois. Maintiens le niveau."; } else { msg = "🎯 Prochain palier : focus sur le +1 aujourd’hui."; } microEl.textContent = msg; microEl.style.display = msg ? "block" : "none"; }
@@ -1395,6 +1490,24 @@ function switchTab(t) {
    const emailsTab = document.getElementById('tab-emails'); if(emailsTab) emailsTab.style.display = t==='emails'?'block':'none';
    if(t==='emails'){ try{ if(window.renderMailUI) window.renderMailUI(); }catch(e){} }
 }
+
+// --- Hash navigation (ex: index.html#admin-team) ---
+function handleHashNavigation(){
+  const h = (location.hash || '').toLowerCase();
+  if(!h.startsWith('#admin')) return;
+  if(!isAdminUser()) { try{ showToast('🔒 Accès réservé aux admins'); }catch(e){}; return; }
+  toggleAdmin(true);
+  if(h.includes('team')) switchTab('team');
+  else if(h.includes('pilotage') || h.includes('objs')) switchTab('objs');
+  else if(h.includes('logs')) switchTab('logs');
+  else if(h.includes('feedback')) switchTab('feedbacks');
+  else if(h.includes('emails')) switchTab('emails');
+  const panel = document.getElementById('adminPanel');
+  if(panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+window.addEventListener('hashchange', () => { try{ handleHashNavigation(); }catch(e){} });
+
 function toggleCreateInputs() { document.getElementById("createTiersBlock").style.display = document.getElementById("noFixed").checked ? 'none' : 'block'; }
 function toggleEditInputs() { document.getElementById("editTiersBlock").style.display = document.getElementById("eoFixed").checked ? 'none' : 'block'; }
 
@@ -2019,156 +2132,3 @@ window.dismissPushBanner = dismissPushBanner;
 window.switchTab = switchTab;
 window.toggleAdmin = toggleAdmin;
 window.setUserPrimeEligible = setUserPrimeEligible;
-
-
-// --- Pulse Auth UI (login + création de compte) ---
-(function initPulseAuthUI(){
-  try{
-    const $ = (id) => document.getElementById(id);
-
-    // Year in footer (optional)
-    const y = $('authYear');
-    if (y) y.textContent = String(new Date().getFullYear());
-
-    function setHint(id, msg, isError){
-      const el = $(id);
-      if(!el) return;
-      el.textContent = msg || '';
-      if(isError){
-        try{ el.style.color = 'var(--danger)'; }catch(e){}
-      } else {
-        try{ el.style.color = 'var(--text-muted)'; }catch(e){}
-      }
-    }
-
-    function friendlyAuthError(e){
-      const code = (e && e.code) ? String(e.code) : '';
-      if(code.includes('auth/email-already-in-use')) return "Cet email est déjà utilisé.";
-      if(code.includes('auth/invalid-email')) return "Email invalide.";
-      if(code.includes('auth/weak-password')) return "Mot de passe trop faible (6 caractères minimum).";
-      if(code.includes('auth/wrong-password')) return "Mot de passe incorrect.";
-      if(code.includes('auth/user-not-found')) return "Compte introuvable.";
-      if(code.includes('auth/too-many-requests')) return "Trop de tentatives. Réessaie plus tard.";
-      if(code.includes('auth/network-request-failed')) return "Problème réseau. Vérifie ta connexion.";
-      return (e && e.message) ? String(e.message) : "Erreur d'authentification.";
-    }
-
-    function switchAuthTab(mode){
-      const tabLogin = $('authTabLogin');
-      const tabSignup = $('authTabSignup');
-      const paneLogin = $('authPaneLogin');
-      const paneSignup = $('authPaneSignup');
-
-      const isLogin = (mode === 'login');
-
-      if(tabLogin){
-        tabLogin.classList.toggle('is-active', isLogin);
-        tabLogin.setAttribute('aria-selected', isLogin ? 'true' : 'false');
-      }
-      if(tabSignup){
-        tabSignup.classList.toggle('is-active', !isLogin);
-        tabSignup.setAttribute('aria-selected', !isLogin ? 'true' : 'false');
-      }
-      if(paneLogin) paneLogin.classList.toggle('is-active', isLogin);
-      if(paneSignup) paneSignup.classList.toggle('is-active', !isLogin);
-
-      setHint('authLoginHint', '');
-      setHint('authSignupHint', '');
-    }
-
-    const tabLogin = $('authTabLogin');
-    const tabSignup = $('authTabSignup');
-    if(tabLogin) tabLogin.addEventListener('click', () => switchAuthTab('login'));
-    if(tabSignup) tabSignup.addEventListener('click', () => switchAuthTab('signup'));
-
-    // Password toggles
-    document.querySelectorAll('#loginOverlay .auth-eye[data-toggle]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const target = btn.getAttribute('data-toggle');
-        if(!target) return;
-        const inp = $(target);
-        if(!inp) return;
-        inp.type = (inp.type === 'password') ? 'text' : 'password';
-      });
-    });
-
-    // Forgot password
-    const btnForgot = $('btnForgotPassword');
-    if(btnForgot){
-      btnForgot.addEventListener('click', async () => {
-        const email = ($('loginEmail') && $('loginEmail').value) ? $('loginEmail').value.trim() : '';
-        if(!email){
-          setHint('authLoginHint', "Entre ton email puis clique à nouveau pour recevoir le lien de réinitialisation.", true);
-          return;
-        }
-        try{
-          setHint('authLoginHint', "Envoi du lien de réinitialisation…");
-          await auth.sendPasswordResetEmail(email);
-          setHint('authLoginHint', "✅ Email envoyé. Vérifie ta boîte de réception (et les spams).");
-        }catch(e){
-          setHint('authLoginHint', "❌ " + friendlyAuthError(e), true);
-        }
-      });
-    }
-
-    // Sign up
-    const btnSignup = $('btnSignup');
-    if(btnSignup){
-      btnSignup.addEventListener('click', async () => {
-        const name = ($('signupName') && $('signupName').value) ? $('signupName').value.trim() : '';
-        const email = ($('signupEmail') && $('signupEmail').value) ? $('signupEmail').value.trim() : '';
-        const p1 = ($('signupPass') && $('signupPass').value) ? $('signupPass').value : '';
-        const p2 = ($('signupPass2') && $('signupPass2').value) ? $('signupPass2').value : '';
-
-        if(!email){
-          setHint('authSignupHint', "Email requis.", true);
-          return;
-        }
-        if(!p1 || p1.length < 6){
-          setHint('authSignupHint', "Mot de passe : 6 caractères minimum.", true);
-          return;
-        }
-        if(p1 !== p2){
-          setHint('authSignupHint', "Les mots de passe ne correspondent pas.", true);
-          return;
-        }
-
-        const prevText = btnSignup.textContent;
-        btnSignup.disabled = true;
-        btnSignup.textContent = "Création…";
-        setHint('authSignupHint', "Création du compte…");
-
-        try{
-          const cred = await auth.createUserWithEmailAndPassword(email, p1);
-          const uid = cred && cred.user ? cred.user.uid : null;
-          if(uid){
-            const payload = {
-              name: name || "Utilisateur",
-              hours: 35,
-              role: "staff",
-              email: email,
-              status: "pending",
-              createdAt: Date.now()
-            };
-            try{ await db.ref('users/' + uid).set(payload); }catch(e){}
-            try{
-              if(auth.currentUser && auth.currentUser.updateProfile){
-                await auth.currentUser.updateProfile({ displayName: payload.name });
-              }
-            }catch(e){}
-          }
-          setHint('authSignupHint', "✅ Compte créé. Connexion en cours…");
-          // authStateChanged affichera automatiquement l'app
-        }catch(e){
-          setHint('authSignupHint', "❌ " + friendlyAuthError(e), true);
-        }finally{
-          btnSignup.disabled = false;
-          btnSignup.textContent = prevText || "Créer mon compte";
-        }
-      });
-    }
-
-  }catch(e){
-    // silent
-  }
-})();
