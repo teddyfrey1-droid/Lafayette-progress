@@ -779,3 +779,169 @@ function moveSupplierRow(key, dir){
   }catch(e){}
 }
 window.moveSupplierRow = moveSupplierRow;
+
+
+// --- Pulse Auth UI (login + création de compte) ---
+(function initPulseAuthUI(){
+  try{
+    const $ = (id) => document.getElementById(id);
+
+    
+
+    // Safe helpers (in case the page JS doesn't define them)
+    if (typeof window.clearLoginError !== 'function'){
+      window.clearLoginError = function(){
+        try{
+          const a = $('loginEmail'); const b = $('loginPass');
+          if(a) a.classList.remove('error');
+          if(b) b.classList.remove('error');
+        }catch(e){}
+      };
+    }
+
+// Year in footer (optional)
+    const y = $('authYear');
+    if (y) y.textContent = String(new Date().getFullYear());
+
+    function setHint(id, msg, isError){
+      const el = $(id);
+      if(!el) return;
+      el.textContent = msg || '';
+      if(isError){
+        try{ el.style.color = 'var(--danger)'; }catch(e){}
+      } else {
+        try{ el.style.color = 'var(--text-muted)'; }catch(e){}
+      }
+    }
+
+    function friendlyAuthError(e){
+      const code = (e && e.code) ? String(e.code) : '';
+      if(code.includes('auth/email-already-in-use')) return "Cet email est déjà utilisé.";
+      if(code.includes('auth/invalid-email')) return "Email invalide.";
+      if(code.includes('auth/weak-password')) return "Mot de passe trop faible (6 caractères minimum).";
+      if(code.includes('auth/wrong-password')) return "Mot de passe incorrect.";
+      if(code.includes('auth/user-not-found')) return "Compte introuvable.";
+      if(code.includes('auth/too-many-requests')) return "Trop de tentatives. Réessaie plus tard.";
+      if(code.includes('auth/network-request-failed')) return "Problème réseau. Vérifie ta connexion.";
+      return (e && e.message) ? String(e.message) : "Erreur d'authentification.";
+    }
+
+    function switchAuthTab(mode){
+      const tabLogin = $('authTabLogin');
+      const tabSignup = $('authTabSignup');
+      const paneLogin = $('authPaneLogin');
+      const paneSignup = $('authPaneSignup');
+
+      const isLogin = (mode === 'login');
+
+      if(tabLogin){
+        tabLogin.classList.toggle('is-active', isLogin);
+        tabLogin.setAttribute('aria-selected', isLogin ? 'true' : 'false');
+      }
+      if(tabSignup){
+        tabSignup.classList.toggle('is-active', !isLogin);
+        tabSignup.setAttribute('aria-selected', !isLogin ? 'true' : 'false');
+      }
+      if(paneLogin) paneLogin.classList.toggle('is-active', isLogin);
+      if(paneSignup) paneSignup.classList.toggle('is-active', !isLogin);
+
+      setHint('authLoginHint', '');
+      setHint('authSignupHint', '');
+    }
+
+    const tabLogin = $('authTabLogin');
+    const tabSignup = $('authTabSignup');
+    if(tabLogin) tabLogin.addEventListener('click', () => switchAuthTab('login'));
+    if(tabSignup) tabSignup.addEventListener('click', () => switchAuthTab('signup'));
+
+    // Password toggles
+    document.querySelectorAll('#loginOverlay .auth-eye[data-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.getAttribute('data-toggle');
+        if(!target) return;
+        const inp = $(target);
+        if(!inp) return;
+        inp.type = (inp.type === 'password') ? 'text' : 'password';
+      });
+    });
+
+    // Forgot password
+    const btnForgot = $('btnForgotPassword');
+    if(btnForgot){
+      btnForgot.addEventListener('click', async () => {
+        const email = ($('loginEmail') && $('loginEmail').value) ? $('loginEmail').value.trim() : '';
+        if(!email){
+          setHint('authLoginHint', "Entre ton email puis clique à nouveau pour recevoir le lien de réinitialisation.", true);
+          return;
+        }
+        try{
+          setHint('authLoginHint', "Envoi du lien de réinitialisation…");
+          await auth.sendPasswordResetEmail(email);
+          setHint('authLoginHint', "✅ Email envoyé. Vérifie ta boîte de réception (et les spams).");
+        }catch(e){
+          setHint('authLoginHint', "❌ " + friendlyAuthError(e), true);
+        }
+      });
+    }
+
+    // Sign up
+    const btnSignup = $('btnSignup');
+    if(btnSignup){
+      btnSignup.addEventListener('click', async () => {
+        const name = ($('signupName') && $('signupName').value) ? $('signupName').value.trim() : '';
+        const email = ($('signupEmail') && $('signupEmail').value) ? $('signupEmail').value.trim() : '';
+        const p1 = ($('signupPass') && $('signupPass').value) ? $('signupPass').value : '';
+        const p2 = ($('signupPass2') && $('signupPass2').value) ? $('signupPass2').value : '';
+
+        if(!email){
+          setHint('authSignupHint', "Email requis.", true);
+          return;
+        }
+        if(!p1 || p1.length < 6){
+          setHint('authSignupHint', "Mot de passe : 6 caractères minimum.", true);
+          return;
+        }
+        if(p1 !== p2){
+          setHint('authSignupHint', "Les mots de passe ne correspondent pas.", true);
+          return;
+        }
+
+        const prevText = btnSignup.textContent;
+        btnSignup.disabled = true;
+        btnSignup.textContent = "Création…";
+        setHint('authSignupHint', "Création du compte…");
+
+        try{
+          const cred = await auth.createUserWithEmailAndPassword(email, p1);
+          const uid = cred && cred.user ? cred.user.uid : null;
+          if(uid){
+            const payload = {
+              name: name || "Utilisateur",
+              hours: 35,
+              role: "staff",
+              email: email,
+              status: "pending",
+              createdAt: Date.now()
+            };
+            try{ await db.ref('users/' + uid).set(payload); }catch(e){}
+            try{
+              if(auth.currentUser && auth.currentUser.updateProfile){
+                await auth.currentUser.updateProfile({ displayName: payload.name });
+              }
+            }catch(e){}
+          }
+          setHint('authSignupHint', "✅ Compte créé. Connexion en cours…");
+          // authStateChanged affichera automatiquement l'app
+        }catch(e){
+          setHint('authSignupHint', "❌ " + friendlyAuthError(e), true);
+        }finally{
+          btnSignup.disabled = false;
+          btnSignup.textContent = prevText || "Créer mon compte";
+        }
+      });
+    }
+
+  }catch(e){
+    // silent
+  }
+})();

@@ -228,12 +228,11 @@ exports.sendSmartBroadcast = onCall(
       try {
         const message = {
           tokens: pushTokens,
-          // CORRECTION: Utilisation de 'data' uniquement pour éviter les doublons système
-          data: {
+          notification: {
             title: subject || 'Nouvelle annonce',
-            body: stripHtml(html).substring(0, 140),
-            url: '/index.html#dashboard'
-          }
+            body: stripHtml(html).substring(0, 140)
+          },
+          data: { url: '/index.html#dashboard' }
         };
         const batchResponse = await admin.messaging().sendEachForMulticast(message);
         successCount += batchResponse.successCount;
@@ -278,7 +277,6 @@ exports.sendSmartBroadcast = onCall(
     return { successCount, details: { emails: emailTargets.size, pushes: pushTokens.length } };
   }
 );
-
 // --- WEBHOOK ALERTE EATPILOT (Routage par équipes + canaux) ---
 exports.receiveExternalAlert = onRequest(
   {
@@ -389,12 +387,11 @@ exports.receiveExternalAlert = onRequest(
         for(const c of chunks){
           const resp = await admin.messaging().sendEachForMulticast({
             tokens: c,
-            // CORRECTION: Utilisation de 'data' uniquement pour éviter les doublons système
-            data: {
+            notification: {
               title: '⚠️ ' + subject,
-              body: 'Nouvelle alerte reçue. Voir le détail.',
-              url: '/diffusion.html#alerts'
-            }
+              body: 'Nouvelle alerte reçue. Voir le détail.'
+            },
+            data: { url: '/diffusion.html#alerts' }
           });
           pushSuccess += (resp.successCount || 0);
         }
