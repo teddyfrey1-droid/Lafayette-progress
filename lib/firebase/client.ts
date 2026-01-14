@@ -63,7 +63,7 @@ export function getFirebaseAuth(): Auth {
 
 export function getFirebaseDb(): Firestore {
   if (_db) return _db
-  _db = getFirestore(getFirebaseApp())
+  _db = getFirestore(getFirebaseApp(), '(default)') 
   return _db
 }
 
