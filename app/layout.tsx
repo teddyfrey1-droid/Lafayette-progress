@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import type React from "react"
 import type { Metadata, Viewport } from "next"
 import { Inter, Geist_Mono } from "next/font/google"
