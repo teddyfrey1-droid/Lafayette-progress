@@ -2,7 +2,7 @@
 // Values must be provided via NEXT_PUBLIC_* env vars.
 import { FirebaseApp, getApp, getApps, initializeApp } from "firebase/app"
 import { Auth, getAuth } from "firebase/auth"
-import { Firestore, initializeFirestore } from "firebase/firestore"
+import { Firestore, initializeFirestore, getFirestore } from "firebase/firestore"
 
 // Default Firebase config (from Lafayette-progress).
 // You can still override with NEXT_PUBLIC_FIREBASE_* env vars on Render.
@@ -66,11 +66,18 @@ export function getFirebaseDb(): Firestore {
   
   const app = getFirebaseApp()
   
-  // Force le Long Polling pour contourner les problèmes WebSocket sur Render
-  _db = initializeFirestore(app, {
-    experimentalForceLongPolling: true,
-    experimentalAutoDetectLongPolling: false
-  })
+  try {
+    // Tente de récupérer une instance existante d'abord
+    _db = getFirestore(app)
+    console.log('✅ Firestore instance trouvée')
+  } catch (error) {
+    // Si ça échoue, initialise avec Long Polling
+    console.log('🔄 Initialisation Firestore avec Long Polling')
+    _db = initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+      experimentalAutoDetectLongPolling: false
+    })
+  }
   
   return _db
 }
