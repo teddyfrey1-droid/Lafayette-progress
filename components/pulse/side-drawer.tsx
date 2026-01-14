@@ -61,9 +61,6 @@ export function SideDrawer({ open, onClose }: SideDrawerProps) {
   const firstName = displayName.split(" ")[0]
   const isAdmin = profile?.role === "admin"
 
-const firstName = displayName.split(" ")[0]
-  const isAdmin = profile?.role === "admin"
-
   return (
     <>
       {/* Backdrop */}
