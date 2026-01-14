@@ -2,7 +2,7 @@
 // Values must be provided via NEXT_PUBLIC_* env vars.
 import { FirebaseApp, getApp, getApps, initializeApp } from "firebase/app"
 import { Auth, getAuth } from "firebase/auth"
-import { Firestore, initializeFirestore } from "firebase/firestore"
+import { Firestore, initializeFirestore, getFirestore } from "firebase/firestore"
 
 // Default Firebase config (from Lafayette-progress).
 // You can still override with NEXT_PUBLIC_FIREBASE_* env vars on Render.
@@ -66,12 +66,19 @@ export function getFirebaseDb(): Firestore {
   
   const app = getFirebaseApp()
   
-  // Force TOUJOURS le Long Polling pour Render
-  console.log('🔄 Initialisation Firestore avec Long Polling')
-  _db = initializeFirestore(app, {
-    experimentalForceLongPolling: true,
-    experimentalAutoDetectLongPolling: false
-  })
+  try {
+    // Tente d'initialiser avec Long Polling forcé pour contourner les problèmes de réseau (Render/Proxies)
+    console.log('🔄 Tentative initialisation Firestore (Long Polling)...')
+    _db = initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+    })
+    console.log('✅ Firestore initialisé avec succès')
+  } catch (error) {
+    // Si Firestore est déjà initialisé (ex: navigation rapide ou hot-reload), on récupère l'instance existante
+    // pour éviter le crash "Firestore has already been started"
+    console.log('⚠️ Firestore déjà actif, récupération de l\'instance existante.')
+    _db = getFirestore(app)
+  }
   
   return _db
 }
