@@ -1,5 +1,5 @@
 // CONFIG
-const firebaseConfig = {
+const firebaseConfig = {f
   apiKey: "AIzaSyAGaitqmFwExvJ9ZUpkdUdCKAqqDOP2cdQ",
   authDomain: "objectif-restaurant.firebaseapp.com",
   databaseURL: "https://objectif-restaurant-default-rtdb.europe-west1.firebasedatabase.app",
