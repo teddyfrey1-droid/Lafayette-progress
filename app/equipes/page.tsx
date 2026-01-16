@@ -6,7 +6,7 @@ import { BottomNav } from "@/components/pulse/bottom-nav"
 import { calculateProRataPrime, calculateTotalPotentialPrime } from "@/lib/demo-data"
 import { useAuth } from "@/components/auth/auth-provider"
 import { db, auth } from "@/lib/firebase/client"
-import { inviteUser } from "@/lib/firebase/auth"
+// RETIRÉ : import { inviteUser } from "@/lib/firebase/auth" (car on passe par l'API maintenant)
 import { sendPasswordResetEmail } from "firebase/auth"
 import { collection, doc, updateDoc, onSnapshot, query, orderBy } from "firebase/firestore"
 import {
@@ -535,32 +535,45 @@ function InviteDrawer({ onClose, onSuccess }: { onClose: () => void, onSuccess: 
   const [isLoading, setIsLoading] = useState(false)
 
   const handleInvite = async () => {
-    if(!email) return
-    setIsLoading(true)
+    if (!email) return;
+    setIsLoading(true);
 
     try {
-      // On passe maintenant 4 arguments : email, role, hours, company
-      await inviteUser(email, role, parseInt(hours) || 35, company)
-      
+      // APPEL DIRECT DE L'API RENDER (Côté Serveur)
+      const response = await fetch("/api/admin/invite-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          displayName: email.split("@")[0], // Nom par défaut basé sur l'email
+          role,
+          contractHours: parseInt(hours) || 35,
+          company: company || "Heiko",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Impossible d'envoyer l'invitation.");
+      }
+
       toast({
         title: "Invitation envoyée",
-        description: `Un email a été envoyé à ${email} pour définir son mot de passe.`
-      })
-      onSuccess()
+        description: `Un email a été envoyé à ${email} pour définir son mot de passe via Brevo.`,
+      });
+      onSuccess();
     } catch (error: any) {
-      console.error(error)
-      let msg = "Impossible d'envoyer l'invitation."
-      if (error.code === 'auth/email-already-in-use') msg = "Cet email est déjà utilisé."
-      
+      console.error(error);
       toast({
         title: "Erreur",
-        description: msg,
-        variant: "destructive"
-      })
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <>
