@@ -16,7 +16,7 @@ export async function POST(req: Request) {
       displayName,
       emailVerified: true,
     });
-    console.log(`✅ [API] Utilisateur créé dans Auth (UID: ${userRecord.uid})`);
+    console.log(`✅ [API] Utilisateur créé (UID: ${userRecord.uid})`);
 
     // 2. Création Firestore
     await adminDb.collection("users").doc(userRecord.uid).set({
@@ -30,59 +30,52 @@ export async function POST(req: Request) {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
-    console.log("✅ [API] Profil Firestore créé");
 
     // 3. Génération lien
     const actionLink = await adminAuth.generatePasswordResetLink(email);
-    console.log("✅ [API] Lien de reset généré");
+    console.log("✅ [API] Lien généré");
 
-    // 4. Configuration Nodemailer (Mode Debug activé)
-    // NOTE : Assurez-vous que ces identifiants sont EXACTEMENT ceux de votre fichier test-brevo.js qui marchait
+    // 4. Configuration Nodemailer (Port 2525 pour éviter le blocage)
     const transporter = nodemailer.createTransport({
       host: "smtp-relay.brevo.com",
-      port: 587,
+      port: 2525, // <--- CHANGEMENT ICI (était 587)
       secure: false,
       auth: {
         user: "9f9c88001@smtp-brevo.com", 
         pass: "bskRITXqoGxtW0X",          
       },
-      debug: true, // Affiche les logs SMTP détaillés
-      logger: true // Log dans la console
+      // Timeout plus court pour ne pas attendre indéfiniment en cas de problème
+      connectionTimeout: 10000, 
     });
 
-    // 5. Vérification de la connexion AVANT l'envoi
-    try {
-      await transporter.verify();
-      console.log("🔌 [API] Connexion SMTP Brevo : OK");
-    } catch (verifyError: any) {
-      console.error("❌ [API] Erreur connexion SMTP :", verifyError.message);
-      throw new Error("Impossible de se connecter à Brevo: " + verifyError.message);
-    }
-
-    // 6. Envoi de l'email
-    console.log("📨 [API] Tentative d'envoi du mail...");
-    const info = await transporter.sendMail({
-      from: '"Lafayette Progress" <teddy.frey1@gmail.com>',
+    // 5. Envoi de l'email
+    console.log("📨 [API] Envoi en cours via le port 2525...");
+    
+    await transporter.sendMail({
+      from: '"Lafayette Progress" <no-reply@pulseapp.ovh>', // Mettez une adresse pro, pas gmail
       to: email,
       subject: "Bienvenue sur Lafayette Progress - Activez votre compte",
       html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Bienvenue ${displayName} !</h2>
-          <p>Cliquez ci-dessous pour définir votre mot de passe :</p>
-          <a href="${actionLink}" style="background-color: #000; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
-            Activer mon compte
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <h2 style="color: #333;">Bienvenue ${displayName} !</h2>
+          <p>Un compte a été créé pour vous.</p>
+          <p>Cliquez ci-dessous pour définir votre mot de passe et accéder à l'espace :</p>
+          <br>
+          <a href="${actionLink}" style="background-color: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+            Activer mon compte maintenant
           </a>
+          <br><br>
+          <p style="font-size: 12px; color: #888;">Si le bouton ne fonctionne pas, copiez ce lien : ${actionLink}</p>
         </div>
       `,
     });
     
-    console.log("🚀 [API] Mail envoyé ! MessageID:", info.messageId);
+    console.log("🚀 [API] SUCCÈS : Mail envoyé !");
 
     return NextResponse.json({ success: true, uid: userRecord.uid });
 
   } catch (error: any) {
-    console.error("❌ [API] ERREUR CRITIQUE:", error);
-    // On renvoie une erreur 500 pour que le frontend affiche "Erreur" au lieu de "Succès"
+    console.error("❌ [API] ERREUR:", error);
     return NextResponse.json(
       { error: error.message || "Erreur interne" },
       { status: 500 }
