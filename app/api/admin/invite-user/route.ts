@@ -1,56 +1,91 @@
 import { NextResponse } from "next/server";
-import * as admin from "firebase-admin";
+import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import nodemailer from "nodemailer";
 
 export async function POST(req: Request) {
-  console.log("🚀 DÉMARRAGE: Tentative d'envoi d'email...");
-
-  const transporter = nodemailer.createTransport({
-    host: "smtp-relay.brevo.com",
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env.BREVO_USER,
-      pass: process.env.BREVO_PASS,
-    },
-  });
-
-  if (!admin.apps.length) {
-    try {
-      const keyString = (process.env.FIREBASE_SERVICE_ACCOUNT_KEY || "").replace(/\\n/g, '\n');
-      const serviceAccount = JSON.parse(Buffer.from(keyString, "base64").toString("utf-8"));
-      admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-      console.log("✅ Firebase Admin connecté.");
-    } catch (error) {
-      console.error("❌ ERREUR Firebase Admin:", error);
-    }
-  }
-
+  console.log("🚀 [API] Début de la procédure d'invitation");
+  
   try {
     const body = await req.json();
-    const { email, name, role, companyName, contractHours } = body;
-    console.log(`👤 Traitement pour: ${email}`);
+    const { email, displayName, role, contractHours, company } = body;
+    console.log(`👤 [API] Données reçues pour: ${email}`);
 
-    // Création Firebase
-    const userRecord = await admin.auth().createUser({ email, displayName: name });
-    await admin.firestore().collection("users").doc(userRecord.uid).set({
-      displayName: name, email, role, companyName, contractHours, createdAt: admin.firestore.FieldValue.serverTimestamp(), disabled: false
+    // 1. Création Auth
+    const userRecord = await adminAuth.createUser({
+      email,
+      displayName,
+      emailVerified: true,
+    });
+    console.log(`✅ [API] Utilisateur créé dans Auth (UID: ${userRecord.uid})`);
+
+    // 2. Création Firestore
+    await adminDb.collection("users").doc(userRecord.uid).set({
+      uid: userRecord.uid,
+      email,
+      displayName,
+      role,
+      contractHours: Number(contractHours),
+      company: company || "Heiko",
+      disabled: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    console.log("✅ [API] Profil Firestore créé");
+
+    // 3. Génération lien
+    const actionLink = await adminAuth.generatePasswordResetLink(email);
+    console.log("✅ [API] Lien de reset généré");
+
+    // 4. Configuration Nodemailer (Mode Debug activé)
+    // NOTE : Assurez-vous que ces identifiants sont EXACTEMENT ceux de votre fichier test-brevo.js qui marchait
+    const transporter = nodemailer.createTransport({
+      host: "smtp-relay.brevo.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: "9f9c88001@smtp-brevo.com", 
+        pass: "bskRITXqoGxtW0X",          
+      },
+      debug: true, // Affiche les logs SMTP détaillés
+      logger: true // Log dans la console
     });
 
-    const link = await admin.auth().generatePasswordResetLink(email);
-    console.log(`📨 Envoi via Brevo vers ${email}...`);
-    
-    await transporter.sendMail({
-      from: "teddy.frey1@gmail.com",
+    // 5. Vérification de la connexion AVANT l'envoi
+    try {
+      await transporter.verify();
+      console.log("🔌 [API] Connexion SMTP Brevo : OK");
+    } catch (verifyError: any) {
+      console.error("❌ [API] Erreur connexion SMTP :", verifyError.message);
+      throw new Error("Impossible de se connecter à Brevo: " + verifyError.message);
+    }
+
+    // 6. Envoi de l'email
+    console.log("📨 [API] Tentative d'envoi du mail...");
+    const info = await transporter.sendMail({
+      from: '"Lafayette Progress" <teddy.frey1@gmail.com>',
       to: email,
-      subject: "Bienvenue sur Pulse App",
-      html: `<div style="font-family:sans-serif;padding:20px;"><h2>Bienvenue ${name} !</h2><p>Cliquez ici pour choisir votre mot de passe :</p><a href="${link}" style="background:#ea580c;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">Activer mon compte</a></div>`,
+      subject: "Bienvenue sur Lafayette Progress - Activez votre compte",
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>Bienvenue ${displayName} !</h2>
+          <p>Cliquez ci-dessous pour définir votre mot de passe :</p>
+          <a href="${actionLink}" style="background-color: #000; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+            Activer mon compte
+          </a>
+        </div>
+      `,
     });
+    
+    console.log("🚀 [API] Mail envoyé ! MessageID:", info.messageId);
 
-    console.log("✅ SUCCÈS : Email envoyé !");
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, uid: userRecord.uid });
+
   } catch (error: any) {
-    console.error("❌ ERREUR FATALE:", error.message);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error("❌ [API] ERREUR CRITIQUE:", error);
+    // On renvoie une erreur 500 pour que le frontend affiche "Erreur" au lieu de "Succès"
+    return NextResponse.json(
+      { error: error.message || "Erreur interne" },
+      { status: 500 }
+    );
   }
 }
