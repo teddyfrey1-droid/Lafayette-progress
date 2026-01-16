@@ -1,0 +1,13 @@
+# --- FICHIERS SYSTÈME (A ignorer absolument) ---
+node_modules/
+.next/
+build/
+dist/
+.DS_Store
+*.log
+
+# --- FICHIERS D'ENVIRONNEMENT ---
+# D'habitude on ignore ces fichiers, mais j'ai mis un # devant 
+# pour que VOUS puissiez les envoyer sur GitHub comme demandé :
+# .env*.local
+# .env
