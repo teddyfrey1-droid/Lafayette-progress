@@ -1,47 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation" // Ajout pour la redirection
 import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
 import {
-  Shield,
-  Users,
-  Search,
-  Building2,
-  ChevronRight,
-  Edit3,
-  CheckCircle2,
-  XCircle,
-  Activity,
-  TrendingUp,
-  LogIn,
-  Monitor,
-  Smartphone,
-  MapPin,
-  Calendar,
-  Mail,
-  Phone,
-  ArrowLeft,
-  Settings,
-  History,
-  BarChart3,
-  Globe,
-  Truck,
-  Target,
-  Coins,
-  FileText,
-  Plus,
-  Trash2,
-  Briefcase,
-  AlertCircle,
-  PieChart,
-  UserX,
-  MoreHorizontal,
-  ChevronDown,
-  KeyRound,
-  Send,
-  Loader2,
-  User
+  Shield, Users, Search, Building2, ChevronRight, Edit3, CheckCircle2,
+  XCircle, Activity, TrendingUp, LogIn, Monitor, Smartphone, MapPin,
+  Calendar, Mail, Phone, ArrowLeft, Settings, History, BarChart3, Globe,
+  Truck, Target, Coins, FileText, Plus, Trash2, Briefcase, AlertCircle,
+  PieChart, UserX, MoreHorizontal, ChevronDown, KeyRound, Send, Loader2,
+  User, Lock
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -59,7 +28,7 @@ import { useToast } from "@/hooks/use-toast"
 
 // Imports Firebase
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, deleteDoc, serverTimestamp } from "firebase/firestore"
-import { sendPasswordResetEmail } from "firebase/auth"
+import { signInWithCustomToken, signOut } from "firebase/auth" // Ajout pour impersonate
 import { db, auth } from "@/lib/firebase/client"
 
 // --- TYPES ---
@@ -97,7 +66,7 @@ interface User {
   companyId: string
   companyName: string
   status: "active" | "inactive" | "suspended"
-  lastLogin: string
+  lastLogin: any
   createdAt: string
 }
 
@@ -129,6 +98,7 @@ type TabType = "overview" | "companies" | "users" | "logs"
 
 export default function CentreControlePage() {
   const { toast } = useToast()
+  const router = useRouter() // Pour redirection après connexion
   const [activeTab, setActiveTab] = useState<TabType>("overview")
   const [searchQuery, setSearchQuery] = useState("")
   
@@ -186,7 +156,49 @@ export default function CentreControlePage() {
     }
   }
 
-  // --- ACTIONS FIREBASE ---
+  // --- ACTIONS SUPER ADMIN (NOUVEAU) ---
+
+  // 1. Se connecter en tant que (Impersonate)
+  const handleImpersonate = async (uid: string) => {
+    if (!confirm("⚠️ ATTENTION : Vous allez être déconnecté de votre compte Admin et connecté en tant que cet utilisateur.")) return;
+    
+    try {
+        const res = await fetch("/api/admin/user-actions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "impersonate", uid })
+        });
+        const data = await res.json();
+        
+        if (data.success && data.token) {
+            await signOut(auth); // Déconnexion Admin
+            await signInWithCustomToken(auth, data.token); // Connexion User
+            router.push("/dashboard"); 
+            toast({ title: "Mode Incarnation", description: "Vous êtes connecté sur le compte utilisateur." });
+        } else {
+            throw new Error(data.error);
+        }
+    } catch (e: any) {
+        toast({ title: "Erreur", description: "Impossible de se connecter au compte.", variant: "destructive" });
+    }
+  }
+
+  // 2. Reset Mot de Passe (Via API Brevo)
+  const handleSendResetEmail = async (email: string, name: string) => {
+    if (!email) return;
+    try {
+        await fetch("/api/admin/user-actions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "reset_password", email, name })
+        });
+        toast({ title: "Email envoyé", description: `Lien de réinitialisation envoyé à ${email}.` });
+    } catch (e) {
+        toast({ title: "Erreur", description: "Échec de l'envoi du mail.", variant: "destructive" });
+    }
+  }
+
+  // --- ACTIONS FIREBASE EXISTANTES ---
 
   const handleCreateCompany = async () => {
     try {
@@ -237,7 +249,6 @@ export default function CentreControlePage() {
 
   const handleUpdateUser = async (userId: string, data: any) => {
     try {
-      // Gestion changement d'entreprise
       if (data.companyId) {
         const targetCompany = companiesState.find(c => c.id === data.companyId)
         if (targetCompany) {
@@ -267,20 +278,10 @@ export default function CentreControlePage() {
     if (!confirm("Voulez-vous vraiment supprimer cet utilisateur définitivement ?")) return;
     try {
         await fetch(`/api/admin/invite-user?uid=${uid}`, { method: "DELETE" });
+        if (selectedUser?.id === uid) setSelectedUser(null);
         toast({ title: "Utilisateur supprimé" });
-        // L'écouteur temps réel mettra à jour la liste
     } catch (e) {
         toast({ title: "Erreur", description: "Impossible de supprimer le compte.", variant: "destructive" });
-    }
-  }
-
-  const handleSendResetEmail = async (email: string) => {
-    if (!email) return;
-    try {
-      await sendPasswordResetEmail(auth, email)
-      toast({ title: "Email envoyé !", description: `Lien envoyé à ${email}.` })
-    } catch (error: any) {
-      toast({ title: "Erreur d'envoi", variant: "destructive" })
     }
   }
 
@@ -351,8 +352,9 @@ export default function CentreControlePage() {
   // Stats & Filtres
   const activeCompanies = companiesState.filter(c => c.status === "active").length
   const activeUsers = usersState.filter(u => u.status === "active").length
-  // On considère "orphelin" si pas de companyId ou si companyName est vide/non assigné
-  const orphanedUsers = usersState.filter(u => !u.companyId || u.companyId === "" || u.companyName === "Non assigné" || !u.companyName)
+  
+  // Orphelins (exclure le super admin s'il n'a pas de boite)
+  const orphanedUsers = usersState.filter(u => (!u.companyId || u.companyId === "" || u.companyName === "Non assigné") && u.role !== 'super_admin')
 
   const filteredCompanies = companiesState.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
   const filteredUsers = usersState.filter(u => u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -424,12 +426,14 @@ export default function CentreControlePage() {
                             <div className="flex items-center gap-2"><p className="text-sm font-medium">{u.name}</p>{getStatusBadge(u.status)}</div>
                             <p className="text-xs text-muted-foreground">{u.email}</p>
                         </div>
+                        {/* MENU ACTION UTILISATEUR (Dans liste entreprise) */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="w-4 h-4 text-muted-foreground" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                 <DropdownMenuItem onClick={() => { setSelectedCompany(null); setSelectedUser(u); }}><Edit3 className="w-4 h-4 mr-2" /> Détails</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleSendResetEmail(u.email)}><KeyRound className="w-4 h-4 mr-2" /> Reset MDP</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleSendResetEmail(u.email, u.name)}><KeyRound className="w-4 h-4 mr-2" /> Reset MDP</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleImpersonate(u.id)}><LogIn className="w-4 h-4 mr-2" /> Se connecter en tant que</DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
@@ -476,9 +480,14 @@ export default function CentreControlePage() {
                             <Button variant="outline" size="icon" className="rounded-xl"><MoreHorizontal className="w-5 h-5 text-muted-foreground" /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleSendResetEmail(selectedUser.email)}>
+                            <DropdownMenuLabel>Administration</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => handleImpersonate(selectedUser.id)}>
+                                <LogIn className="w-4 h-4 mr-2" /> Se connecter en tant que
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleSendResetEmail(selectedUser.email, selectedUser.name)}>
                                 <KeyRound className="w-4 h-4 mr-2" /> Envoyer reset MDP
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handleDeleteUser(selectedUser.id)} className="text-red-600 focus:text-red-600 focus:bg-red-50">
                                 <Trash2 className="w-4 h-4 mr-2" /> Supprimer compte
                             </DropdownMenuItem>
@@ -581,7 +590,7 @@ export default function CentreControlePage() {
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center"><Shield className="w-6 h-6 text-white" /></div>
-          <div><h1 className="text-2xl font-bold tracking-tight">Centre de contrôle</h1><p className="text-sm text-muted-foreground">Administration globale</p></div>
+          <div><h1 className="text-2xl font-bold tracking-tight">Centre de contrôle</h1><p className="text-sm text-muted-foreground">Super Admin</p></div>
         </div>
 
         {/* Tabs */}
@@ -627,47 +636,57 @@ export default function CentreControlePage() {
             </Dialog>
             {filteredCompanies.map((company) => (
               <div key={company.id} className="pulse-card p-4 cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setSelectedCompany(company)}>
-                <div className="flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/80 to-accent/80 flex items-center justify-center shrink-0"><span className="text-sm font-bold text-white">{company.logo}</span></div><div className="flex-1 min-w-0"><div className="flex items-center gap-2"><h3 className="font-semibold text-sm truncate">{company.name}</h3>{getStatusBadge(company.status)}</div><div className="flex items-center gap-2 mt-1"><span className="text-xs text-muted-foreground">{company.industry}</span><span className="text-muted-foreground">•</span><span className="text-xs text-muted-foreground">{company.usersCount} utilisateurs</span></div><div className="mt-2">{getPlanBadge(company.plan)}</div></div><ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" /></div>
+                <div className="flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/80 to-accent/80 flex items-center justify-center shrink-0"><span className="text-sm font-bold text-white">{company.logo}</span></div><div className="flex-1 min-w-0"><div className="flex items-center gap-2"><h3 className="font-semibold text-sm truncate">{company.name}</h3>{getStatusBadge(company.status)}</div><div className="flex items-center gap-2 mt-1"><span className="text-xs text-muted-foreground">{company.industry}</span><span className="text-muted-foreground">•</span><span className="text-xs text-muted-foreground">{company.usersCount} utilisateurs</span></div></div><ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" /></div>
               </div>
             ))}
           </div>
         )}
 
-        {/* ONGLETS UTILISATEURS (Refondu avec Accordéons et couleurs douces) */}
+        {/* ONGLETS UTILISATEURS */}
         {activeTab === "users" && (
           <div className="space-y-6">
             
-            {/* SECTION ORPHELINS (Design "Soft") */}
+            {/* SECTION ORPHELINS (ACCORDÉON COMPACT) */}
             {orphanedUsers.length > 0 && (
-                <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-slate-500 flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4" /> En attente d'affectation ({orphanedUsers.length})
-                    </h3>
-                    <div className="grid gap-2">
-                        {orphanedUsers.map(user => (
-                            <div key={user.id} className="bg-slate-50 p-3 rounded-xl flex items-center justify-between border border-slate-100">
-                                <div className="flex items-center gap-3 overflow-hidden">
-                                    <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-xs">{user.avatar}</div>
-                                    <div className="min-w-0">
-                                        <p className="font-medium text-sm text-slate-700 truncate">{user.name}</p>
-                                        <p className="text-xs text-slate-400 truncate">{user.email}</p>
-                                    </div>
-                                </div>
-                                <div className="flex gap-2">
-                                    <Button size="sm" variant="outline" className="h-7 text-xs bg-white" onClick={() => setSelectedUser(user)}>Assigner</Button>
-                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full" onClick={() => handleDeleteUser(user.id)}>
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                </div>
+                <Accordion type="single" collapsible defaultValue="orphans" className="border rounded-xl bg-slate-50/50 border-slate-200">
+                    <AccordionItem value="orphans" className="border-none">
+                        <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                            <div className="flex items-center gap-2 text-slate-700">
+                                <AlertCircle className="w-4 h-4 text-slate-500" />
+                                <span className="font-semibold text-sm">En attente d'affectation ({orphanedUsers.length})</span>
                             </div>
-                        ))}
-                    </div>
-                </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="px-3 pb-3 pt-0">
+                            <div className="space-y-2">
+                                {orphanedUsers.map(user => (
+                                    <div key={user.id} className="flex justify-between items-center p-2 rounded-lg bg-white border border-slate-100 shadow-sm">
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs">{user.avatar}</div>
+                                            <div className="min-w-0">
+                                                <p className="font-medium text-sm text-slate-700 truncate">{user.name}</p>
+                                                <p className="text-[10px] text-slate-400 truncate">{user.email}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            {/* BOUTON POUBELLE AMÉLIORÉ (Gris -> Rouge survol) */}
+                                            <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors" onClick={() => handleDeleteUser(user.id)}>
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                            <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-400" onClick={() => setSelectedUser(user)}>
+                                                <Settings className="w-4 h-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
             )}
 
-            {/* LISTE PAR ENTREPRISE (Accordéons) */}
+            {/* LISTE PAR ENTREPRISE (ACCORDÉON) */}
             <div className="space-y-4">
-               <h3 className="text-sm font-semibold text-foreground">Équipes par entreprise</h3>
+               <h3 className="text-sm font-semibold text-foreground px-1">Équipes par entreprise</h3>
                <Accordion type="multiple" className="space-y-3">
                 {filteredCompanies.map(company => {
                     const companyUsers = filteredUsers.filter(u => u.companyId === company.id);
@@ -683,35 +702,43 @@ export default function CentreControlePage() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="font-semibold text-sm truncate">{company.name}</p>
-                                        <p className="text-xs text-muted-foreground">{companyUsers.length} collaborateurs</p>
+                                        <p className="text-[10px] text-muted-foreground">{companyUsers.length} users</p>
                                     </div>
                                 </div>
                             </AccordionTrigger>
-                            <AccordionContent className="px-0 pb-0">
+                            <AccordionContent className="px-0 pb-0 bg-muted/5">
                                 <div className="divide-y divide-border/40 border-t border-border/40">
-                                    {companyUsers.length === 0 ? (
-                                        <div className="p-4 text-center text-xs text-muted-foreground">Aucun utilisateur assigné.</div>
-                                    ) : (
-                                        companyUsers.map(user => (
-                                            <div key={user.id} className="p-3 flex items-center gap-3 hover:bg-muted/20 cursor-pointer" onClick={() => setSelectedUser(user)}>
-                                                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground">
+                                    {companyUsers.map(user => (
+                                        <div key={user.id} className="p-3 flex items-center justify-between hover:bg-muted/20">
+                                            <div className="flex items-center gap-3" onClick={() => setSelectedUser(user)}>
+                                                <div className="w-7 h-7 rounded-full bg-white border flex items-center justify-center text-[10px] font-bold text-muted-foreground">
                                                     {user.avatar}
                                                 </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-sm font-medium truncate">{user.name}</span>
-                                                        {getStatusBadge(user.status)}
-                                                    </div>
-                                                    <div className="flex items-center gap-2 mt-0.5">
-                                                        <span className="text-[10px] text-muted-foreground truncate">{user.email}</span>
-                                                        <span className="text-[10px] text-muted-foreground">•</span>
-                                                        {getRoleBadge(user.role)}
-                                                    </div>
+                                                <div>
+                                                    <p className="text-sm font-medium">{user.name}</p>
+                                                    <p className="text-[10px] text-muted-foreground">{user.role}</p>
                                                 </div>
-                                                <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
                                             </div>
-                                        ))
-                                    )}
+                                            
+                                            {/* MENU ACTIONS UTILISATEUR */}
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="w-4 h-4 text-muted-foreground" /></Button></DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuLabel>Actions Super Admin</DropdownMenuLabel>
+                                                    <DropdownMenuItem onClick={() => handleImpersonate(user.id)}>
+                                                        <LogIn className="w-4 h-4 mr-2" /> Se connecter en tant que
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleSendResetEmail(user.email, user.name)}>
+                                                        <KeyRound className="w-4 h-4 mr-2" /> Reset MDP (Brevo)
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onClick={() => setSelectedUser(user)}>
+                                                        <Settings className="w-4 h-4 mr-2" /> Gérer profil
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
+                                    ))}
                                 </div>
                             </AccordionContent>
                         </AccordionItem>
