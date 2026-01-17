@@ -40,12 +40,13 @@ import {
   limit, 
   addDoc,
   serverTimestamp,
-  deleteDoc // Ajout pour la suppression
+  deleteDoc 
 } from "firebase/firestore"
 import { useAuth } from "@/components/auth/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 
-// IMPORTS SYSTEME DE PERMISSIONS & EXPORT
+// IMPORTS NOUS FONCTIONNALITÉS (Permissions & Export)
+// Assurez-vous que ces fichiers existent !
 import { usePermissions } from "@/hooks/use-permissions"
 import { PermissionGate } from "@/components/auth/permission-gate"
 import { exportToPulseCSV } from "@/lib/csv-export"
@@ -72,6 +73,7 @@ interface LogEntry {
 export default function UtilisateursPage() {
   const { profile, user: currentUser } = useAuth()
   const { toast } = useToast()
+  
   const [users, setUsers] = useState<UserData[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -81,8 +83,8 @@ export default function UtilisateursPage() {
   const [historyUserId, setHistoryUserId] = useState<string | null>(null)
 
   // 1. DROITS D'ACCÈS
-  // On utilise le hook de permissions pour affiner l'accès
   const { canAccess } = usePermissions()
+  // L'édition est réservée à ceux qui ont le droit 'parametres' ou les rôles admin/manager
   const canEdit = canAccess("parametres") || ["manager", "directeur", "gerant", "admin"].includes(profile?.role || "")
 
   // 2. RÉCUPÉRATION DES UTILISATEURS
@@ -112,11 +114,11 @@ export default function UtilisateursPage() {
   // 3. FONCTION DE MISE À JOUR + LOG
   const handleUpdateUser = async (targetUserId: string, newData: Partial<UserData>, oldData: UserData) => {
     try {
-      // 1. Mise à jour de l'utilisateur
+      // Mise à jour de l'utilisateur
       const userRef = doc(db, "users", targetUserId)
       await updateDoc(userRef, newData)
 
-      // 2. Création du log de modification
+      // Création du log
       let actionDetails = ""
       if (newData.role && newData.role !== oldData.role) {
         actionDetails += `Rôle changé de ${oldData.role} à ${newData.role}. `
@@ -132,22 +134,22 @@ export default function UtilisateursPage() {
           details: actionDetails,
           performedBy: profile?.displayName || currentUser?.email || "Admin",
           timestamp: serverTimestamp(),
-          company: profile?.company || "Système"
+          companyName: profile?.company || "Système"
         })
       }
 
       toast({
-        title: "Modifications enregistrées",
-        description: `Le profil de ${oldData.displayName} a été mis à jour avec succès.`,
+        title: "Profil mis à jour",
+        description: `Les modifications pour ${oldData.displayName} ont été enregistrées.`,
         variant: "success",
       })
 
       setEditingId(null)
     } catch (error) {
-      console.error("Erreur lors de la mise à jour :", error)
+      console.error("Erreur maj user:", error)
       toast({
         title: "Erreur",
-        description: "Impossible de modifier l'utilisateur. Veuillez réessayer.",
+        description: "Impossible de modifier l'utilisateur.",
         variant: "destructive",
       })
     }
@@ -184,7 +186,7 @@ export default function UtilisateursPage() {
     }).format(date)
   }
 
-  // Gestion Export CSV
+  // --- NOUVEAU : GESTION EXPORT CSV ---
   const handleExportCSV = () => {
     const headers = ["ID", "Nom", "Email", "Rôle", "Heures Contrat", "Statut", "Dernière Connexion"]
     const data = filteredUsers.map(u => ({
@@ -197,11 +199,11 @@ export default function UtilisateursPage() {
         lastLogin: formatDate(u.lastLogin)
     }))
     exportToPulseCSV("utilisateurs", data, headers)
-    toast({ title: "Export réussi", description: "Le fichier CSV a été généré.", variant: "success" })
+    toast({ title: "Export réussi", description: "Le fichier CSV a été téléchargé.", variant: "success" })
   }
 
   return (
-    // Protection globale de la page via le module "parametres"
+    // Protection de la page via PermissionGate
     <PermissionGate moduleId="parametres" redirect>
       <div className="min-h-screen bg-background pb-24">
         <Header />
@@ -232,14 +234,14 @@ export default function UtilisateursPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher..."
+                placeholder="Rechercher un utilisateur..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 rounded-xl"
               />
             </div>
             {/* BOUTON EXPORT CSV */}
-            <Button variant="outline" size="icon" onClick={handleExportCSV} className="rounded-xl" title="Exporter en CSV">
+            <Button variant="outline" size="icon" onClick={handleExportCSV} className="rounded-xl shrink-0" title="Exporter en CSV">
                 <Download className="w-4 h-4" />
             </Button>
           </div>
@@ -420,11 +422,11 @@ function UserEditPanel({
 // --- COMPOSANT LISTE HISTORIQUE AVEC SUPPRESSION ---
 function UserHistoryList({ userId }: { userId: string }) {
   const { toast } = useToast()
-  const { canAccess } = usePermissions() // Hook de permissions
+  const { canAccess } = usePermissions()
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Vérifie si l'utilisateur a le droit de modifier l'historique
+  // Permission pour supprimer l'historique
   const canDeleteHistory = canAccess("history_edit") 
 
   useEffect(() => {
@@ -432,7 +434,7 @@ function UserHistoryList({ userId }: { userId: string }) {
       collection(db, "logs"),
       where("userId", "==", userId),
       orderBy("timestamp", "desc"),
-      limit(20)
+      limit(50)
     )
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -448,12 +450,12 @@ function UserHistoryList({ userId }: { userId: string }) {
   }, [userId])
 
   const handleDeleteLog = async (logId: string) => {
-      if(!confirm("Êtes-vous sûr de vouloir supprimer définitivement cette entrée ?")) return
+      if(!confirm("Supprimer cette entrée définitivement ?")) return
       try {
           await deleteDoc(doc(db, "logs", logId))
-          toast({ title: "Entrée supprimée", description: "Le log a été effacé de l'historique.", variant: "success" })
+          toast({ title: "Entrée supprimée", variant: "success" })
       } catch(e) {
-          toast({ title: "Erreur", description: "Suppression impossible.", variant: "destructive" })
+          toast({ title: "Erreur", description: "Impossible de supprimer.", variant: "destructive" })
       }
   }
 
@@ -506,7 +508,7 @@ function UserHistoryList({ userId }: { userId: string }) {
             )}
           </div>
 
-          {/* BOUTON SUPPRESSION (Conditionnel selon permission) */}
+          {/* BOUTON SUPPRESSION (Visible uniquement si permission OK) */}
           {canDeleteHistory && (
              <button 
                onClick={() => handleDeleteLog(log.id)}
