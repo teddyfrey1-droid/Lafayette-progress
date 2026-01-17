@@ -33,14 +33,15 @@ import {
   Plus,
   Trash2,
   Briefcase,
-  AlertCircle, // Plus professionnel que AlertTriangle
+  AlertCircle,
   PieChart,
   UserX,
   MoreHorizontal,
   ChevronDown,
   KeyRound,
   Send,
-  Loader2
+  Loader2,
+  User
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -53,7 +54,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-// IMPORTANT : On utilise le hook de toast
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { useToast } from "@/hooks/use-toast"
 
 // Imports Firebase
@@ -140,7 +141,6 @@ export default function CentreControlePage() {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [isCompanySelectorOpen, setIsCompanySelectorOpen] = useState(false)
   const [companySearchQuery, setCompanySearchQuery] = useState("")
-  const [isOrphansOpen, setIsOrphansOpen] = useState(true)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
 
   // Données Firebase
@@ -186,7 +186,7 @@ export default function CentreControlePage() {
     }
   }
 
-  // --- ACTIONS FIREBASE AVEC TOASTS ---
+  // --- ACTIONS FIREBASE ---
 
   const handleCreateCompany = async () => {
     try {
@@ -207,11 +207,7 @@ export default function CentreControlePage() {
       })
     } catch (e) {
       console.error(e)
-      toast({
-        title: "Erreur",
-        description: "Impossible de créer l'entreprise.",
-        variant: "destructive"
-      })
+      toast({ title: "Erreur", description: "Impossible de créer l'entreprise.", variant: "destructive" })
     }
   }
 
@@ -221,9 +217,8 @@ export default function CentreControlePage() {
       if (selectedCompany && selectedCompany.id === companyId) {
         setSelectedCompany({ ...selectedCompany, ...data })
       }
-      toast({ title: "Mise à jour réussie", description: "Les informations de l'entreprise ont été modifiées." })
+      toast({ title: "Mise à jour réussie" })
     } catch (e) {
-      console.error(e)
       toast({ title: "Erreur", description: "La mise à jour a échoué.", variant: "destructive" })
     }
   }
@@ -234,16 +229,15 @@ export default function CentreControlePage() {
       await deleteDoc(doc(db, "companies", selectedCompany.id))
       setSelectedCompany(null)
       setIsDeleteConfirmOpen(false)
-      toast({ title: "Entreprise supprimée", description: "L'entreprise a été retirée définitivement." })
+      toast({ title: "Entreprise supprimée" })
     } catch (e) {
-      console.error(e)
       toast({ title: "Erreur", description: "Impossible de supprimer l'entreprise.", variant: "destructive" })
     }
   }
 
   const handleUpdateUser = async (userId: string, data: any) => {
     try {
-      // Gestion intelligente du changement d'entreprise
+      // Gestion changement d'entreprise
       if (data.companyId) {
         const targetCompany = companiesState.find(c => c.id === data.companyId)
         if (targetCompany) {
@@ -262,64 +256,43 @@ export default function CentreControlePage() {
         setSelectedUser({ ...selectedUser, ...data })
       }
       
-      toast({ title: "Utilisateur mis à jour", description: "Les modifications ont été enregistrées." })
+      toast({ title: "Utilisateur mis à jour" })
     } catch (e) {
-      console.error(e)
       toast({ title: "Erreur", description: "Impossible de modifier l'utilisateur.", variant: "destructive" })
     }
   }
 
-  // Envoi d'email (Reset MDP / Activation)
-  const handleSendResetEmail = async (email: string) => {
-    if (!email) {
-        toast({ title: "Erreur", description: "Aucun email associé à ce compte.", variant: "destructive" })
-        return
+  // Suppression d'un utilisateur (API)
+  const handleDeleteUser = async (uid: string) => {
+    if (!confirm("Voulez-vous vraiment supprimer cet utilisateur définitivement ?")) return;
+    try {
+        await fetch(`/api/admin/invite-user?uid=${uid}`, { method: "DELETE" });
+        toast({ title: "Utilisateur supprimé" });
+        // L'écouteur temps réel mettra à jour la liste
+    } catch (e) {
+        toast({ title: "Erreur", description: "Impossible de supprimer le compte.", variant: "destructive" });
     }
-    
+  }
+
+  const handleSendResetEmail = async (email: string) => {
+    if (!email) return;
     try {
       await sendPasswordResetEmail(auth, email)
-      toast({ 
-        title: "Email envoyé !", 
-        description: `Un lien de réinitialisation/activation a été envoyé à ${email}.`,
-        className: "bg-blue-50 border-blue-200"
-      })
+      toast({ title: "Email envoyé !", description: `Lien envoyé à ${email}.` })
     } catch (error: any) {
-      console.error(error)
-      // Gestion des erreurs courantes Firebase
-      if (error.code === 'auth/user-not-found') {
-        toast({ 
-            title: "Utilisateur introuvable", 
-            description: "Cet email n'existe pas dans la base d'authentification. L'utilisateur doit d'abord s'inscrire.", 
-            variant: "destructive" 
-        })
-      } else {
-        toast({ 
-            title: "Erreur d'envoi", 
-            description: "Impossible d'envoyer l'email. Vérifiez la configuration.", 
-            variant: "destructive" 
-        })
-      }
+      toast({ title: "Erreur d'envoi", variant: "destructive" })
     }
   }
 
   const toggleFeature = async (companyId: string, featureId: string) => {
     const company = companiesState.find(c => c.id === companyId)
     if (!company) return
-
-    const updatedFeatures = company.features.map(f => 
-        f.id === featureId ? { ...f, enabled: !f.enabled } : f
-    )
-
+    const updatedFeatures = company.features.map(f => f.id === featureId ? { ...f, enabled: !f.enabled } : f)
     try {
         await updateDoc(doc(db, "companies", companyId), { features: updatedFeatures })
-        if (selectedCompany?.id === companyId) {
-            setSelectedCompany({ ...company, features: updatedFeatures })
-        }
+        if (selectedCompany?.id === companyId) setSelectedCompany({ ...company, features: updatedFeatures })
         toast({ title: "Module mis à jour" })
-    } catch (error) {
-        console.error(error)
-        toast({ title: "Erreur", variant: "destructive" })
-    }
+    } catch (error) { toast({ title: "Erreur", variant: "destructive" }) }
   }
 
   // --- CHARGEMENT DES DONNÉES ---
@@ -351,7 +324,6 @@ export default function CentreControlePage() {
             const stored = storedFeatures.find((f: any) => f.id === def.id)
             return { ...def, enabled: stored ? stored.enabled : def.isDefault }
         })
-
         return {
           id: doc.id,
           name: d.name || "Sans nom",
@@ -376,26 +348,15 @@ export default function CentreControlePage() {
     return () => { unsubUsers(); unsubCompanies(); unsubLogs() }
   }, [])
 
-  // Stats calculées
+  // Stats & Filtres
   const activeCompanies = companiesState.filter(c => c.status === "active").length
   const activeUsers = usersState.filter(u => u.status === "active").length
-  const orphanedUsers = usersState.filter(u => !u.companyId || u.companyId === "")
-  const planDistribution = {
-    starter: companiesState.filter(c => c.plan === "starter").length,
-    pro: companiesState.filter(c => c.plan === "pro").length,
-    enterprise: companiesState.filter(c => c.plan === "enterprise").length,
-  }
+  // On considère "orphelin" si pas de companyId ou si companyName est vide/non assigné
+  const orphanedUsers = usersState.filter(u => !u.companyId || u.companyId === "" || u.companyName === "Non assigné" || !u.companyName)
 
-  // Filtres
   const filteredCompanies = companiesState.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
-  const filteredUsers = usersState.filter(u => 
-    u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    u.email.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  const filteredCompaniesForSelect = companiesState.filter(c => 
-    c.name.toLowerCase().includes(companySearchQuery.toLowerCase())
-  )
+  const filteredUsers = usersState.filter(u => u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filteredCompaniesForSelect = companiesState.filter(c => c.name.toLowerCase().includes(companySearchQuery.toLowerCase()))
 
   // --- VUE DÉTAIL ENTREPRISE ---
   if (selectedCompany) {
@@ -419,19 +380,11 @@ export default function CentreControlePage() {
                 <div className="flex gap-2 mt-2">
                     <Select value={selectedCompany.status} onValueChange={(v) => handleUpdateCompany(selectedCompany.id, { status: v as any })}>
                         <SelectTrigger className="h-7 text-xs w-auto border-none bg-muted/50"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="active">Actif</SelectItem>
-                            <SelectItem value="trial">Essai</SelectItem>
-                            <SelectItem value="suspended">Suspendu</SelectItem>
-                        </SelectContent>
+                        <SelectContent><SelectItem value="active">Actif</SelectItem><SelectItem value="trial">Essai</SelectItem><SelectItem value="suspended">Suspendu</SelectItem></SelectContent>
                     </Select>
                     <Select value={selectedCompany.plan} onValueChange={(v) => handleUpdateCompany(selectedCompany.id, { plan: v as any })}>
                         <SelectTrigger className="h-7 text-xs w-auto border-none bg-muted/50"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="starter">Starter</SelectItem>
-                            <SelectItem value="pro">Pro</SelectItem>
-                            <SelectItem value="enterprise">Enterprise</SelectItem>
-                        </SelectContent>
+                        <SelectContent><SelectItem value="starter">Starter</SelectItem><SelectItem value="pro">Pro</SelectItem><SelectItem value="enterprise">Enterprise</SelectItem></SelectContent>
                     </Select>
                 </div>
               </div>
@@ -477,10 +430,6 @@ export default function CentreControlePage() {
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                 <DropdownMenuItem onClick={() => { setSelectedCompany(null); setSelectedUser(u); }}><Edit3 className="w-4 h-4 mr-2" /> Détails</DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleSendResetEmail(u.email)}><KeyRound className="w-4 h-4 mr-2" /> Reset MDP</DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => handleUpdateUser(u.id, { disabled: !u.status.includes("active") })}>
-                                    {u.status === "active" ? <><XCircle className="w-4 h-4 mr-2 text-red-500" /> Suspendre</> : <><CheckCircle2 className="w-4 h-4 mr-2 text-emerald-500" /> Activer</>}
-                                </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
@@ -530,8 +479,8 @@ export default function CentreControlePage() {
                             <DropdownMenuItem onClick={() => handleSendResetEmail(selectedUser.email)}>
                                 <KeyRound className="w-4 h-4 mr-2" /> Envoyer reset MDP
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleSendResetEmail(selectedUser.email)}>
-                                <Send className="w-4 h-4 mr-2" /> Envoyer mail activation
+                            <DropdownMenuItem onClick={() => handleDeleteUser(selectedUser.id)} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+                                <Trash2 className="w-4 h-4 mr-2" /> Supprimer compte
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -653,7 +602,7 @@ export default function CentreControlePage() {
               <div className="pulse-card p-4"><div className="flex items-center gap-2 mb-2"><Users className="w-4 h-4 text-accent" /><span className="text-xs text-muted-foreground">Utilisateurs</span></div><p className="text-2xl font-bold">{usersState.length}</p><p className="text-xs text-emerald-500">{activeUsers} actifs</p></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-                <div className="pulse-card p-4 border-l-4 border-orange-500"><div className="flex items-center gap-2 mb-2"><UserX className="w-4 h-4 text-orange-500" /><span className="text-xs text-muted-foreground">Orphelins</span></div><p className="text-2xl font-bold text-orange-500">{orphanedUsers.length}</p><p className="text-[10px] text-muted-foreground">Sans entreprise</p></div>
+                <div className="pulse-card p-4 border-l-4 border-slate-300"><div className="flex items-center gap-2 mb-2"><UserX className="w-4 h-4 text-slate-500" /><span className="text-xs text-muted-foreground">Orphelins</span></div><p className="text-2xl font-bold text-slate-600">{orphanedUsers.length}</p><p className="text-[10px] text-muted-foreground">Sans entreprise</p></div>
                 <div className="pulse-card p-4"><div className="flex items-center gap-2 mb-2"><TrendingUp className="w-4 h-4 text-blue-500" /><span className="text-xs text-muted-foreground">Remplissage</span></div><p className="text-2xl font-bold">{companiesState.length > 0 ? Math.round(usersState.length / companiesState.length) : 0}</p><p className="text-[10px] text-muted-foreground">Moy. users / société</p></div>
             </div>
           </div>
@@ -684,59 +633,91 @@ export default function CentreControlePage() {
           </div>
         )}
 
+        {/* ONGLETS UTILISATEURS (Refondu avec Accordéons et couleurs douces) */}
         {activeTab === "users" && (
           <div className="space-y-6">
+            
+            {/* SECTION ORPHELINS (Design "Soft") */}
             {orphanedUsers.length > 0 && (
-                <Collapsible open={isOrphansOpen} onOpenChange={setIsOrphansOpen} className="border rounded-xl bg-orange-50/50 border-orange-100">
-                    <div className="flex items-center justify-between p-3 cursor-pointer" onClick={() => setIsOrphansOpen(!isOrphansOpen)}>
-                        <div className="flex items-center gap-2"><AlertCircle className="w-4 h-4 text-orange-600" /><h3 className="text-sm font-semibold text-orange-700">Non assignés ({orphanedUsers.length})</h3></div>
-                        <CollapsibleTrigger asChild><Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-orange-100"><ChevronDown className={cn("w-4 h-4 text-orange-700 transition-transform", isOrphansOpen && "rotate-180")} /></Button></CollapsibleTrigger>
-                    </div>
-                    <CollapsibleContent>
-                        <div className="p-3 pt-0 grid gap-2">
-                            {orphanedUsers.map(user => (
-                                <div key={user.id} className="bg-white p-3 rounded-lg flex items-center gap-3 border border-orange-100 shadow-sm">
-                                    <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-700 font-bold text-xs">{user.avatar}</div>
-                                    <div className="flex-1 min-w-0"><p className="font-medium text-sm truncate">{user.name}</p><p className="text-xs text-muted-foreground truncate">{user.email}</p></div>
-                                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSelectedUser(user)}>Assigner</Button>
+                <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-slate-500 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4" /> En attente d'affectation ({orphanedUsers.length})
+                    </h3>
+                    <div className="grid gap-2">
+                        {orphanedUsers.map(user => (
+                            <div key={user.id} className="bg-slate-50 p-3 rounded-xl flex items-center justify-between border border-slate-100">
+                                <div className="flex items-center gap-3 overflow-hidden">
+                                    <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-xs">{user.avatar}</div>
+                                    <div className="min-w-0">
+                                        <p className="font-medium text-sm text-slate-700 truncate">{user.name}</p>
+                                        <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                                    </div>
                                 </div>
-                            ))}
-                        </div>
-                    </CollapsibleContent>
-                </Collapsible>
+                                <div className="flex gap-2">
+                                    <Button size="sm" variant="outline" className="h-7 text-xs bg-white" onClick={() => setSelectedUser(user)}>Assigner</Button>
+                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full" onClick={() => handleDeleteUser(user.id)}>
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             )}
 
+            {/* LISTE PAR ENTREPRISE (Accordéons) */}
             <div className="space-y-4">
+               <h3 className="text-sm font-semibold text-foreground">Équipes par entreprise</h3>
+               <Accordion type="multiple" className="space-y-3">
                 {filteredCompanies.map(company => {
                     const companyUsers = filteredUsers.filter(u => u.companyId === company.id);
-                    if (companyUsers.length === 0) return null;
+                    // On n'affiche pas les entreprises vides si on cherche un user spécifique
+                    if (companyUsers.length === 0 && searchQuery) return null;
+                    
                     return (
-                        <div key={company.id} className="pulse-card overflow-hidden">
-                            <div className="bg-muted/30 p-3 border-b border-border/50 flex items-center justify-between">
-                                <div className="flex items-center gap-2"><div className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center text-[10px] font-bold">{company.logo}</div><span className="font-medium text-sm">{company.name}</span></div>
-                                <Badge variant="secondary" className="text-[10px] h-5">{companyUsers.length}</Badge>
-                            </div>
-                            <div className="divide-y divide-border/50">
-                                {companyUsers.map(user => (
-                                    <div key={user.id} className="p-3 flex items-center gap-3 hover:bg-muted/20">
-                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary cursor-pointer" onClick={() => setSelectedUser(user)}>{user.avatar}</div>
-                                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedUser(user)}>
-                                            <div className="flex items-center gap-2"><span className="text-sm font-medium truncate">{user.name}</span>{getStatusBadge(user.status)}</div>
-                                            <div className="flex items-center gap-2 mt-0.5"><span className="text-[10px] text-muted-foreground">{user.email}</span><span className="text-[10px] text-muted-foreground">•</span>{getRoleBadge(user.role)}</div>
-                                        </div>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="w-4 h-4 text-muted-foreground" /></Button></DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => setSelectedUser(user)}><Edit3 className="w-4 h-4 mr-2" /> Détails</DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleSendResetEmail(user.email)}><KeyRound className="w-4 h-4 mr-2" /> Reset MDP</DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                        <AccordionItem key={company.id} value={company.id} className="border-none rounded-xl bg-card shadow-sm border overflow-hidden">
+                            <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/30 transition-colors">
+                                <div className="flex items-center gap-3 text-left w-full">
+                                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
+                                        {company.logo}
                                     </div>
-                                ))}
-                            </div>
-                        </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-semibold text-sm truncate">{company.name}</p>
+                                        <p className="text-xs text-muted-foreground">{companyUsers.length} collaborateurs</p>
+                                    </div>
+                                </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="px-0 pb-0">
+                                <div className="divide-y divide-border/40 border-t border-border/40">
+                                    {companyUsers.length === 0 ? (
+                                        <div className="p-4 text-center text-xs text-muted-foreground">Aucun utilisateur assigné.</div>
+                                    ) : (
+                                        companyUsers.map(user => (
+                                            <div key={user.id} className="p-3 flex items-center gap-3 hover:bg-muted/20 cursor-pointer" onClick={() => setSelectedUser(user)}>
+                                                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground">
+                                                    {user.avatar}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-sm font-medium truncate">{user.name}</span>
+                                                        {getStatusBadge(user.status)}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        <span className="text-[10px] text-muted-foreground truncate">{user.email}</span>
+                                                        <span className="text-[10px] text-muted-foreground">•</span>
+                                                        {getRoleBadge(user.role)}
+                                                    </div>
+                                                </div>
+                                                <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
                     )
                 })}
+               </Accordion>
             </div>
           </div>
         )}
@@ -746,7 +727,7 @@ export default function CentreControlePage() {
           <div className="space-y-3">
             {logsState.length === 0 && <p className="text-center text-sm text-muted-foreground py-4">Aucun log récent.</p>}
             {logsState.map((log) => (
-                <div key={log.id} className="pulse-card p-3 flex items-center gap-3"><div className={cn("w-2 h-2 rounded-full", log.success ? "bg-emerald-500" : "bg-red-500")} /><div className="flex-1"><p className="text-sm font-medium">{log.userName}</p><p className="text-xs text-muted-foreground">{log.action}</p></div><span className="text-xs text-muted-foreground">{log.timestamp?.split(" ")[1]}</span></div>
+              <div key={log.id} className="pulse-card p-3 flex items-center gap-3"><div className={cn("w-2 h-2 rounded-full", log.success ? "bg-emerald-500" : "bg-red-500")} /><div className="flex-1"><p className="text-sm font-medium">{log.userName}</p><p className="text-xs text-muted-foreground">{log.action}</p></div><span className="text-xs text-muted-foreground">{log.timestamp?.split(" ")[1]}</span></div>
             ))}
           </div>
         )}
