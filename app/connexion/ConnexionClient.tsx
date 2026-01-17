@@ -1,7 +1,3 @@
-{
-type: uploaded file
-fileName: Lafayette-progress-main 44/app/connexion/ConnexionClient.tsx
-fullContent:
 "use client"
 
 import type React from "react"
@@ -250,5 +246,4 @@ export default function ConnexionClient() {
       </main>
     </div>
   )
-}
 }
