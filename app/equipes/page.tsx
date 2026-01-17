@@ -53,7 +53,6 @@ interface TeamMember {
   excludeFromPrimes: boolean
   disabled: boolean
   company: string
-  // Nouveaux champs pour le statut
   lastLogin?: any 
   pushEnabled?: boolean
 }
@@ -326,6 +325,7 @@ function MemberDrawer({
   const [editedRole, setEditedRole] = useState(member.role)
   const [editedHours, setEditedHours] = useState(member.contractHours.toString())
   const [editedCompany, setEditedCompany] = useState(member.company)
+  const [editedEmail, setEditedEmail] = useState(member.email) // AJOUT: State Email
   const [excludeFromPrimes, setExcludeFromPrimes] = useState(member.excludeFromPrimes)
   const [linkSent, setLinkSent] = useState(false)
 
@@ -345,16 +345,31 @@ function MemberDrawer({
   const handleSaveChanges = async () => {
     setIsSaving(true)
     try {
-      const userRef = doc(db, "users", member.id)
-      await updateDoc(userRef, {
-        role: editedRole,
-        contractHours: parseInt(editedHours) || 35,
-        company: editedCompany,
-        excludeFromPrimes: excludeFromPrimes
-      })
+      // UTILISATION DE L'API POUR METTRE À JOUR (Inclus changement Email)
+      const res = await fetch("/api/admin/invite-user", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            uid: member.id,
+            email: editedEmail,
+            role: editedRole,
+            contractHours: parseInt(editedHours) || 35,
+            company: editedCompany,
+            // excludeFromPrimes non géré par l'API PATCH actuelle, on le met à jour directement en local si besoin 
+            // ou on ajoute le support dans l'API. Pour l'instant l'API gère email, role, hours, company.
+        })
+      });
+
+      if(!res.ok) throw new Error("Erreur API");
+
+      // Mise à jour Firestore pour le champ local (excludeFromPrimes)
+      if (excludeFromPrimes !== member.excludeFromPrimes) {
+         await updateDoc(doc(db, "users", member.id), { excludeFromPrimes });
+      }
 
       onUpdate({
         ...member,
+        email: editedEmail,
         role: editedRole,
         contractHours: parseInt(editedHours) || 35,
         company: editedCompany,
@@ -455,6 +470,12 @@ function MemberDrawer({
                   <h4 className="text-sm font-semibold text-primary mb-2">Modification</h4>
                   
                   <div className="space-y-3">
+                    {/* AJOUT: Champ Email Modifiable */}
+                    <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-1 block">Email (Modifiable)</label>
+                        <Input value={editedEmail} onChange={(e) => setEditedEmail(e.target.value)} className="bg-background" />
+                    </div>
+
                     <div>
                         <label className="text-xs font-medium text-muted-foreground mb-1 block">Société</label>
                         <Input value={editedCompany} onChange={(e) => setEditedCompany(e.target.value)} className="bg-background" />
