@@ -12,6 +12,7 @@ export function usePermissions() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Écoute en temps réel du document 'permissions' dans la collection 'settings'
     const unsub = onSnapshot(doc(db, "settings", "permissions"), (docSnap) => {
       if (docSnap.exists()) {
         setPermissions(docSnap.data() as Record<string, string[]>)
@@ -21,10 +22,12 @@ export function usePermissions() {
     return () => unsub()
   }, [])
 
-  // Fonction pour vérifier l'accès
+  // Fonction principale pour vérifier un accès
   const canAccess = (moduleId: string): boolean => {
+    // Si pas de profil chargé, pas d'accès
     if (!profile || !profile.role) return false
-    // Sécurité : le super_admin a toujours tout les droits (optionnel)
+    
+    // Le super_admin a toujours tous les droits (sécurité ultime)
     if (profile.role === "super_admin") return true
     
     const allowedRoles = permissions[moduleId] || []
