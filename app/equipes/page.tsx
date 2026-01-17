@@ -37,7 +37,7 @@ import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { toast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/use-toast" // Changement ici : import du hook
 import { Badge } from "@/components/ui/badge"
 
 interface TeamMember {
@@ -59,6 +59,7 @@ interface TeamMember {
 
 export default function TeamsPage() {
   const { profile } = useAuth()
+  const { toast } = useToast() // Utilisation du hook
   
   const [members, setMembers] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
@@ -131,7 +132,11 @@ export default function TeamsPage() {
       
       if (!response.ok) throw new Error("Erreur serveur lors de la suppression");
 
-      toast({ title: "Utilisateur supprimé", description: "Le compte a été supprimé définitivement." });
+      toast({ 
+        title: "Utilisateur supprimé", 
+        description: "Le compte a été supprimé définitivement.",
+        variant: "success" // Notification verte
+      });
       setSelectedMember(null); // Fermer le drawer
     } catch (error) {
       toast({ title: "Erreur", description: "Impossible de supprimer l'utilisateur.", variant: "destructive" });
@@ -319,6 +324,7 @@ function MemberDrawer({
   onUpdate: (m: TeamMember) => void
   onDelete: (id: string) => void
 }) {
+  const { toast } = useToast() // Utilisation du hook
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   
@@ -335,7 +341,11 @@ function MemberDrawer({
     try {
       await sendPasswordResetEmail(auth, member.email)
       setLinkSent(true)
-      toast({ title: "Email envoyé", description: `Lien de rappel envoyé à ${member.email}` })
+      toast({ 
+        title: "Email envoyé", 
+        description: `Lien de rappel envoyé à ${member.email}`,
+        variant: "success" // Notification verte
+      })
       setTimeout(() => setLinkSent(false), 5000)
     } catch (error) {
       toast({ title: "Erreur", description: "Impossible d'envoyer l'email.", variant: "destructive" })
@@ -376,7 +386,11 @@ function MemberDrawer({
         excludeFromPrimes: excludeFromPrimes
       })
 
-      toast({ title: "Succès", description: "Profil mis à jour." })
+      toast({ 
+        title: "Profil mis à jour", 
+        description: "Les modifications ont été enregistrées avec succès.", 
+        variant: "success" // Notification verte
+      })
       setIsEditing(false)
     } catch (error) {
       toast({ title: "Erreur", description: "Échec de la sauvegarde.", variant: "destructive" })
@@ -391,7 +405,11 @@ function MemberDrawer({
       const newStatus = !member.disabled
       await updateDoc(doc(db, "users", member.id), { disabled: newStatus })
       onUpdate({ ...member, disabled: newStatus })
-      toast({ title: "Statut mis à jour" })
+      toast({ 
+        title: "Statut mis à jour", 
+        description: member.disabled ? "L'accès utilisateur a été rétabli." : "L'utilisateur a été bloqué.",
+        variant: "success" // Notification verte
+      })
     } catch (e) {
       toast({ title: "Erreur", description: "Action impossible.", variant: "destructive" })
     }
@@ -526,6 +544,7 @@ function MemberDrawer({
 }
 
 function InviteDrawer({ onClose, onSuccess }: { onClose: () => void, onSuccess: () => void }) {
+  const { toast } = useToast() // Utilisation du hook
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
@@ -562,7 +581,8 @@ function InviteDrawer({ onClose, onSuccess }: { onClose: () => void, onSuccess: 
 
       toast({
         title: "Invitation envoyée",
-        description: `Email envoyé à ${firstName} ${lastName}.`,
+        description: `Un email d'activation a été envoyé à ${firstName} ${lastName}.`,
+        variant: "success" // Notification verte
       });
       onSuccess();
     } catch (error: any) {
