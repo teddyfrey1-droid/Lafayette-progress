@@ -27,14 +27,12 @@ export default function ConnexionClient() {
   const { user, loading } = useAuth()
   const { toast } = useToast()
 
-  // États Connexion
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // États Mot de passe oublié
   const [isResetOpen, setIsResetOpen] = useState(false)
   const [resetEmail, setResetEmail] = useState("")
   const [isResetting, setIsResetting] = useState(false)
@@ -47,7 +45,6 @@ export default function ConnexionClient() {
     }
   }, [loading, user, router, nextUrl])
 
-  // Gestion Connexion
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -63,14 +60,13 @@ export default function ConnexionClient() {
     }
   }
 
-  // Gestion Mot de passe oublié (VIA API BREVO MAINTENANT)
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!resetEmail) return
 
     setIsResetting(true)
     try {
-      // APPEL API AU LIEU DE FIREBASE DIRECTEMENT
+      // Appel API vers Brevo
       const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -84,8 +80,8 @@ export default function ConnexionClient() {
         description: "Si ce compte existe, vous recevrez un email de réinitialisation via Pulse App.",
         variant: "success",
       })
-      setIsResetOpen(false) // Fermer la modale
-      setResetEmail("") // Reset champ
+      setIsResetOpen(false)
+      setResetEmail("")
     } catch (error: any) {
       console.error(error)
       toast({
@@ -146,8 +142,6 @@ export default function ConnexionClient() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Mot de passe</Label>
-                
-                {/* MODALE MOT DE PASSE OUBLIÉ */}
                 <Dialog open={isResetOpen} onOpenChange={setIsResetOpen}>
                   <DialogTrigger asChild>
                     <button type="button" className="text-xs text-primary hover:underline font-medium">
@@ -188,7 +182,6 @@ export default function ConnexionClient() {
                     </form>
                   </DialogContent>
                 </Dialog>
-
               </div>
               <div className="relative">
                 <Input
