@@ -9,6 +9,8 @@ import { primes, getCurrentPrime, calculateTotalPotentialPrime } from "@/lib/dem
 import { Coins, TrendingUp, Calendar, Check, Clock, CreditCard, Sparkles, Trophy, Download } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+// AJOUT : Import de la fonction d'export centralisée
+import { exportToPulseCSV } from "@/lib/csv-export"
 
 export default function PrimesPage() {
   const [showCelebration, setShowCelebration] = useState(false)
@@ -19,28 +21,25 @@ export default function PrimesPage() {
 
   const progressPercent = ((currentPrime?.amount ?? 0) / totalPotential) * 100
 
-  const downloadCSV = () => {
+  // FONCTION CORRIGÉE : Utilise maintenant le système centralisé
+  const handleExportCSV = () => {
     const headers = ["Mois", "Montant", "Statut", "Détails"]
-    const rows = primes.map((prime) => {
+    
+    const dataToExport = primes.map((prime) => {
       const details = prime.breakdown.map((b) => `${b.objectiveTitle}: ${b.amount}€`).join(" | ")
-      return [
-        prime.month,
-        `${prime.amount}€`,
-        prime.status === "paid" ? "Versée" : prime.status === "validated" ? "Validée" : "En cours",
-        details || "N/A",
-      ]
+      return {
+        mois: prime.month,
+        montant: `${prime.amount}€`,
+        statut: prime.status === "paid" ? "Versée" : prime.status === "validated" ? "Validée" : "En cours",
+        details: details || "N/A",
+      }
     })
 
-    const csvContent = [headers, ...rows].map((row) => row.join(";")).join("\n")
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-    const link = document.createElement("a")
-    link.href = URL.createObjectURL(blob)
-    link.download = `historique-primes-${new Date().toISOString().split("T")[0]}.csv`
-    link.click()
+    // Appel à la fonction qui gère le branding et le format Excel (;)
+    exportToPulseCSV("historique-primes", dataToExport, headers)
   }
 
   return (
-    
     <div className="min-h-screen bg-background pb-32">
       <Header />
 
@@ -51,7 +50,7 @@ export default function PrimesPage() {
             <h1 className="text-2xl font-bold">Primes & Historique</h1>
             <p className="text-sm text-muted-foreground mt-1">Suivez vos primes mensuelles</p>
           </div>
-          <Button variant="outline" size="sm" className="rounded-xl gap-2 bg-transparent" onClick={downloadCSV}>
+          <Button variant="outline" size="sm" className="rounded-xl gap-2 bg-transparent" onClick={handleExportCSV}>
             <Download className="w-4 h-4" />
             CSV
           </Button>
@@ -105,7 +104,7 @@ export default function PrimesPage() {
         {/* Stats */}
         <div className="grid grid-cols-2 gap-3">
           <StatCard
-            title="Total verse"
+            title="Total versé"
             value={`${totalPaid}€`}
             subtitle="3 derniers mois"
             icon={CreditCard}
@@ -160,8 +159,8 @@ export default function PrimesPage() {
                           prime.status === "pending" && "text-yellow-500",
                         )}
                       >
-                        {prime.status === "paid" && "Versee"}
-                        {prime.status === "validated" && "Validee"}
+                        {prime.status === "paid" && "Versée"}
+                        {prime.status === "validated" && "Validée"}
                         {prime.status === "pending" && "En cours"}
                       </p>
                     </div>
@@ -184,7 +183,7 @@ export default function PrimesPage() {
                 {prime.status === "pending" && prime.breakdown.length === 0 && (
                   <div className="pt-3 border-t border-border/50">
                     <p className="text-xs text-muted-foreground text-center">
-                      Les primes seront calculees a la fin du mois
+                      Les primes seront calculées à la fin du mois
                     </p>
                   </div>
                 )}
@@ -200,7 +199,7 @@ export default function PrimesPage() {
             <div>
               <p className="text-sm font-medium">Calendrier des versements</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Les primes sont validees le 5 du mois suivant et versees le 15.
+                Les primes sont validées le 5 du mois suivant et versées le 15.
               </p>
             </div>
           </div>
@@ -212,13 +211,11 @@ export default function PrimesPage() {
       <CelebrationModal
         open={showCelebration}
         onClose={() => setShowCelebration(false)}
-        title="Continue comme ca!"
+        title="Continue comme ça!"
         subtitle="Tu es sur la bonne voie pour maximiser tes primes ce mois-ci"
         reward={totalPotential - (currentPrime?.amount ?? 0)}
         type="palier"
       />
     </div>
-      
-
   )
 }
