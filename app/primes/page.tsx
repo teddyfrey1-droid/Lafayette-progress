@@ -1,221 +1,245 @@
 "use client"
 
-import { useState } from "react"
-import { Header } from "@/components/pulse/header"
-import { BottomNav } from "@/components/pulse/bottom-nav"
-import { StatCard } from "@/components/pulse/stat-card"
-import { CelebrationModal } from "@/components/pulse/celebration-modal"
-import { primes, getCurrentPrime, calculateTotalPotentialPrime } from "@/lib/demo-data"
-import { Coins, TrendingUp, Calendar, Check, Clock, CreditCard, Sparkles, Trophy, Download } from "lucide-react"
-import { cn } from "@/lib/utils"
+import type React from "react"
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
+import { ArrowLeft, Eye, EyeOff, Mail, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-// AJOUT : Import de la fonction d'export centralisée
-import { exportToPulseCSV } from "@/lib/csv-export"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { PulseLogo } from "@/components/pulse/pulse-logo"
+import { useAuth } from "@/components/auth/auth-provider"
+import { friendlyAuthError, signInWithEmail } from "@/lib/firebase/auth"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { useToast } from "@/hooks/use-toast"
 
-export default function PrimesPage() {
-  const [showCelebration, setShowCelebration] = useState(false)
-  const currentPrime = getCurrentPrime()
-  const totalPotential = calculateTotalPotentialPrime()
-  const paidPrimes = primes.filter((p) => p.status === "paid")
-  const totalPaid = paidPrimes.reduce((sum, p) => sum + p.amount, 0)
+export default function ConnexionClient() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { user, loading } = useAuth()
+  const { toast } = useToast()
 
-  const progressPercent = ((currentPrime?.amount ?? 0) / totalPotential) * 100
+  const [showPassword, setShowPassword] = useState(false)
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // FONCTION CORRIGÉE : Utilise maintenant le système centralisé
-  const handleExportCSV = () => {
-    const headers = ["Mois", "Montant", "Statut", "Détails"]
-    
-    const dataToExport = primes.map((prime) => {
-      const details = prime.breakdown.map((b) => `${b.objectiveTitle}: ${b.amount}€`).join(" | ")
-      return {
-        mois: prime.month,
-        montant: `${prime.amount}€`,
-        statut: prime.status === "paid" ? "Versée" : prime.status === "validated" ? "Validée" : "En cours",
-        details: details || "N/A",
-      }
-    })
+  const [isResetOpen, setIsResetOpen] = useState(false)
+  const [resetEmail, setResetEmail] = useState("")
+  const [isResetting, setIsResetting] = useState(false)
 
-    // Appel à la fonction qui gère le branding et le format Excel (;)
-    exportToPulseCSV("historique-primes", dataToExport, headers)
+  const nextUrl = searchParams.get("next") || "/dashboard"
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace(nextUrl)
+    }
+  }, [loading, user, router, nextUrl])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setIsLoading(true)
+
+    try {
+      await signInWithEmail(email.trim(), password)
+      router.replace(nextUrl)
+    } catch (err: unknown) {
+      const code = typeof (err as any)?.code === "string" ? (err as any).code : ""
+      setError(friendlyAuthError(code))
+      setIsLoading(false)
+    }
+  }
+
+  // --- CORRECTION MAJEURE ICI ---
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!resetEmail) return
+
+    setIsResetting(true)
+    try {
+      // On appelle NOTRE API, pas Firebase direct
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resetEmail }),
+      })
+
+      if (!res.ok) throw new Error("Erreur serveur")
+
+      toast({
+        title: "Email envoyé",
+        description: "Vérifiez vos emails (et spams). L'envoi via Pulse est confirmé.",
+        variant: "success", // Utilise le style vert ajouté
+      })
+      setIsResetOpen(false)
+      setResetEmail("")
+    } catch (error: any) {
+      console.error(error)
+      toast({
+        title: "Erreur",
+        description: "Impossible d'envoyer l'email.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsResetting(false)
+    }
   }
 
   return (
-    <div className="min-h-screen bg-background pb-32">
-      <Header />
-
-      <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
-        {/* Page Title */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Primes & Historique</h1>
-            <p className="text-sm text-muted-foreground mt-1">Suivez vos primes mensuelles</p>
-          </div>
-          <Button variant="outline" size="sm" className="rounded-xl gap-2 bg-transparent" onClick={handleExportCSV}>
-            <Download className="w-4 h-4" />
-            CSV
-          </Button>
-        </div>
-
-        {/* Current Month Prime - Hero Card */}
-        <div
-          className="pulse-card p-5 bg-gradient-to-br from-primary/10 via-card to-accent/10 border-primary/20 cursor-pointer animate-rainbow-border"
-          onClick={() => setShowCelebration(true)}
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="px-4 py-4">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Sparkles className="w-4 h-4 text-primary" />
-                <p className="text-xs font-medium text-primary uppercase tracking-wider">Prime du mois</p>
-              </div>
-              <p className="text-4xl font-bold">{currentPrime?.amount.toLocaleString() ?? 0}€</p>
-            </div>
-            <div className="p-3 rounded-2xl bg-primary/20 animate-float">
-              <Coins className="w-8 h-8 text-primary" />
+          <ArrowLeft className="w-4 h-4" />
+          Retour
+        </Link>
+      </header>
+
+      <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
+        <div className="w-full max-w-sm">
+          <div className="flex justify-center mb-8">
+            <div className="w-16 h-16 rounded-2xl pulse-gradient flex items-center justify-center">
+              <span className="text-2xl font-bold text-white">P</span>
             </div>
           </div>
 
-          {/* Progress Ring Visual */}
-          <div className="relative h-4 bg-muted rounded-full overflow-hidden mb-2">
-            <div
-              className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary via-accent to-primary bg-[length:200%_100%] animate-shimmer rounded-full transition-all duration-700"
-              style={{ width: `${progressPercent}%` }}
-            />
-            {/* Milestones */}
-            {[25, 50, 75].map((milestone) => (
-              <div
-                key={milestone}
-                className="absolute top-0 bottom-0 w-0.5 bg-background/50"
-                style={{ left: `${milestone}%` }}
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <PulseLogo size="md" showText={true} />
+            </div>
+            <h1 className="text-2xl font-bold mb-2">Bon retour !</h1>
+            <p className="text-muted-foreground text-sm">
+              Connectez-vous pour accéder à votre tableau de bord.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Adresse email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="vous@exemple.fr"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="h-12 rounded-xl"
+                autoComplete="email"
               />
-            ))}
-          </div>
+            </div>
 
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Potentiel total</span>
-            <span className="font-semibold">{totalPotential}€</span>
-          </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Mot de passe</Label>
+                
+                <Dialog open={isResetOpen} onOpenChange={setIsResetOpen}>
+                  <DialogTrigger asChild>
+                    <button type="button" className="text-xs text-primary hover:underline font-medium">
+                      Mot de passe oublié ?
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md rounded-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Mot de passe oublié</DialogTitle>
+                      <DialogDescription>
+                        Entrez votre adresse email. Nous vous enverrons un lien pour réinitialiser votre mot de passe.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleForgotPassword} className="space-y-4 mt-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="reset-email">Email</Label>
+                        <Input
+                          id="reset-email"
+                          type="email"
+                          placeholder="nom@entreprise.com"
+                          value={resetEmail}
+                          onChange={(e) => setResetEmail(e.target.value)}
+                          required
+                          className="rounded-xl"
+                        />
+                      </div>
+                      <Button type="submit" className="w-full rounded-xl" disabled={isResetting}>
+                        {isResetting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Envoi...
+                          </>
+                        ) : (
+                          <>
+                            <Mail className="w-4 h-4 mr-2" /> Envoyer le lien
+                          </>
+                        )}
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
 
-          <p className="text-xs text-center mt-2 text-muted-foreground">
-            <Trophy className="w-3 h-3 inline mr-1" />
-            {Math.round(progressPercent)}% du potentiel atteint
+              </div>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="h-12 rounded-xl pr-10"
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            {error && <p className="text-sm text-destructive font-medium text-center bg-destructive/10 p-2 rounded-lg">{error}</p>}
+
+            <Button
+              type="submit"
+              className="w-full h-12 rounded-xl pulse-gradient text-white font-semibold"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Connexion...
+                </>
+              ) : (
+                "Se connecter"
+              )}
+            </Button>
+          </form>
+
+          <p className="text-center text-sm text-muted-foreground mt-6">
+            Pas encore de compte ?{" "}
+            <Link href="/inscription" className="text-primary hover:underline font-medium">
+              Créer un compte
+            </Link>
+          </p>
+
+          <p className="text-center text-xs text-muted-foreground mt-8 opacity-70">
+            En vous connectant, vous acceptez nos{" "}
+            <Link href="#" className="underline">
+              conditions d'utilisation
+            </Link>
+            .
           </p>
         </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-3">
-          <StatCard
-            title="Total versé"
-            value={`${totalPaid}€`}
-            subtitle="3 derniers mois"
-            icon={CreditCard}
-            trend="up"
-            trendValue="+12%"
-          />
-          <StatCard
-            title="Moyenne"
-            value={`${Math.round(totalPaid / Math.max(paidPrimes.length, 1))}€`}
-            subtitle="Par mois"
-            icon={TrendingUp}
-          />
-        </div>
-
-        {/* Prime History */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold">Historique</h2>
-            <span className="text-xs text-muted-foreground">{primes.length} mois</span>
-          </div>
-
-          <div className="space-y-3">
-            {primes.map((prime, index) => (
-              <div
-                key={prime.id}
-                className={cn(
-                  "pulse-card p-4 transition-all",
-                  index === 0 && prime.status === "pending" && "border-primary/30 animate-glow-pulse",
-                )}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={cn(
-                        "w-10 h-10 rounded-xl flex items-center justify-center",
-                        prime.status === "paid" && "bg-green-500/15 text-green-500",
-                        prime.status === "validated" && "bg-blue-500/15 text-blue-500",
-                        prime.status === "pending" && "bg-yellow-500/15 text-yellow-500",
-                      )}
-                    >
-                      {prime.status === "paid" && <Check className="w-5 h-5" />}
-                      {prime.status === "validated" && <CreditCard className="w-5 h-5" />}
-                      {prime.status === "pending" && <Clock className="w-5 h-5" />}
-                    </div>
-                    <div>
-                      <p className="font-semibold">{prime.month}</p>
-                      <p
-                        className={cn(
-                          "text-xs font-medium",
-                          prime.status === "paid" && "text-green-500",
-                          prime.status === "validated" && "text-blue-500",
-                          prime.status === "pending" && "text-yellow-500",
-                        )}
-                      >
-                        {prime.status === "paid" && "Versée"}
-                        {prime.status === "validated" && "Validée"}
-                        {prime.status === "pending" && "En cours"}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-xl font-bold">{prime.amount}€</p>
-                </div>
-
-                {/* Breakdown */}
-                {prime.breakdown.length > 0 && (
-                  <div className="pt-3 border-t border-border/50 space-y-2">
-                    {prime.breakdown.map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">{item.objectiveTitle}</span>
-                        <span className="font-medium text-green-500">+{item.amount}€</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {prime.status === "pending" && prime.breakdown.length === 0 && (
-                  <div className="pt-3 border-t border-border/50">
-                    <p className="text-xs text-muted-foreground text-center">
-                      Les primes seront calculées à la fin du mois
-                    </p>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Info */}
-        <div className="pulse-card p-4 bg-muted/30">
-          <div className="flex items-start gap-3">
-            <Calendar className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-medium">Calendrier des versements</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Les primes sont validées le 5 du mois suivant et versées le 15.
-              </p>
-            </div>
-          </div>
-        </div>
       </main>
-
-      <BottomNav />
-
-      <CelebrationModal
-        open={showCelebration}
-        onClose={() => setShowCelebration(false)}
-        title="Continue comme ça!"
-        subtitle="Tu es sur la bonne voie pour maximiser tes primes ce mois-ci"
-        reward={totalPotential - (currentPrime?.amount ?? 0)}
-        type="palier"
-      />
     </div>
   )
 }
