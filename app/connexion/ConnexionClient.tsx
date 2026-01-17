@@ -1,3 +1,7 @@
+{
+type: uploaded file
+fileName: Lafayette-progress-main 44/app/connexion/ConnexionClient.tsx
+fullContent:
 "use client"
 
 import type React from "react"
@@ -11,8 +15,6 @@ import { Label } from "@/components/ui/label"
 import { PulseLogo } from "@/components/pulse/pulse-logo"
 import { useAuth } from "@/components/auth/auth-provider"
 import { friendlyAuthError, signInWithEmail } from "@/lib/firebase/auth"
-import { sendPasswordResetEmail } from "firebase/auth"
-import { auth } from "@/lib/firebase/client"
 import {
   Dialog,
   DialogContent,
@@ -65,18 +67,26 @@ export default function ConnexionClient() {
     }
   }
 
-  // Gestion Mot de passe oublié
+  // Gestion Mot de passe oublié (VIA API BREVO MAINTENANT)
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!resetEmail) return
 
     setIsResetting(true)
     try {
-      await sendPasswordResetEmail(auth, resetEmail)
+      // APPEL API AU LIEU DE FIREBASE DIRECTEMENT
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resetEmail }),
+      })
+
+      if (!res.ok) throw new Error("Erreur serveur")
+
       toast({
         title: "Email envoyé",
-        description: "Vérifiez votre boîte mail (et vos spams) pour réinitialiser votre mot de passe.",
-        className: "bg-emerald-50 border-emerald-200",
+        description: "Si ce compte existe, vous recevrez un email de réinitialisation via Pulse App.",
+        variant: "success",
       })
       setIsResetOpen(false) // Fermer la modale
       setResetEmail("") // Reset champ
@@ -84,7 +94,7 @@ export default function ConnexionClient() {
       console.error(error)
       toast({
         title: "Erreur",
-        description: friendlyAuthError(error.code) || "Impossible d'envoyer l'email.",
+        description: "Impossible d'envoyer l'email. Veuillez réessayer.",
         variant: "destructive",
       })
     } finally {
@@ -240,4 +250,5 @@ export default function ConnexionClient() {
       </main>
     </div>
   )
+}
 }
