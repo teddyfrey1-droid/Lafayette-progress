@@ -41,6 +41,7 @@ import {
   serverTimestamp 
 } from "firebase/firestore"
 import { useAuth } from "@/components/auth/auth-provider"
+import { useToast } from "@/hooks/use-toast"
 
 // TYPES
 interface UserData {
@@ -63,6 +64,7 @@ interface LogEntry {
 
 export default function UtilisateursPage() {
   const { profile, user: currentUser } = useAuth()
+  const { toast } = useToast()
   const [users, setUsers] = useState<UserData[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -126,10 +128,20 @@ export default function UtilisateursPage() {
         })
       }
 
+      toast({
+        title: "Modifications enregistrées",
+        description: `Le profil de ${oldData.displayName} a été mis à jour avec succès.`,
+        variant: "success",
+      })
+
       setEditingId(null)
     } catch (error) {
       console.error("Erreur lors de la mise à jour :", error)
-      alert("Erreur lors de la modification.")
+      toast({
+        title: "Erreur",
+        description: "Impossible de modifier l'utilisateur. Veuillez réessayer.",
+        variant: "destructive",
+      })
     }
   }
 
