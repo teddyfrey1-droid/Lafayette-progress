@@ -10,21 +10,37 @@ export async function POST(req: Request) {
   console.log("🚀 [API] Demande de réinitialisation mot de passe");
   
   try {
-    const { email } = await req.json();
+    const body = await req.json().catch(() => ({} as any));
+    const email = typeof (body as any)?.email === "string" ? (body as any).email.trim() : "";
     if (!email) return NextResponse.json({ error: "Email requis" }, { status: 400 });
 
+    const brevoUser = process.env.BREVO_USER;
+    const brevoPass = process.env.BREVO_PASS;
+    if (!brevoUser || !brevoPass) {
+      console.error('[API] SMTP not configured: missing BREVO_USER/BREVO_PASS');
+      return NextResponse.json({ error: 'SMTP non configuré.' }, { status: 500 });
+    }
+
     // 1. Générer le lien via Admin SDK (Côté serveur)
-    const link = await adminAuth.generatePasswordResetLink(email);
+    let link: string;
+    try {
+      link = await adminAuth.generatePasswordResetLink(email);
+    } catch (err: any) {
+      const code = err?.code || err?.errorInfo?.code;
+      // Ne pas révéler si l'email existe ou non (anti-enumeration)
+      if (code === 'auth/user-not-found') {
+        console.log(`[API] reset-password: user not found for ${email} (success returned)`);
+        return NextResponse.json({ success: true });
+      }
+      throw err;
+    }
 
     // 2. Configurer Nodemailer (Brevo)
     const transporter = nodemailer.createTransport({
       host: "smtp-relay.brevo.com", 
       port: 2525, 
       secure: false,
-      auth: { 
-        user: process.env.BREVO_USER || "9f9c88001@smtp-brevo.com", 
-        pass: process.env.BREVO_PASS || "bskRITXqoGxtW0X" 
-      },
+      auth: { user: brevoUser, pass: brevoPass },
     });
 
     // 3. Template Email

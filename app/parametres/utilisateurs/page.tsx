@@ -25,6 +25,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
 import Link from "next/link"
 
 // IMPORTS FIREBASE
@@ -82,10 +84,10 @@ export default function UtilisateursPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [historyUserId, setHistoryUserId] = useState<string | null>(null)
 
-  // 1. DROITS D'ACCÈS
-  const { canAccess } = usePermissions()
-  // L'édition est réservée à ceux qui ont le droit 'parametres' ou les rôles admin/manager
-  const canEdit = canAccess("parametres") || ["manager", "directeur", "gerant", "admin"].includes(profile?.role || "")
+  // 1. DROITS D'ACCÈS (100% pilotés par la page "Activation des services")
+  const { canEdit: canEditPermission } = usePermissions()
+  const canEditUsers = canEditPermission("parametres") || canEditPermission("centre_controle")
+  const canManageHistory = canEditPermission("history_edit")
 
   // 2. RÉCUPÉRATION DES UTILISATEURS
   useEffect(() => {
@@ -294,7 +296,7 @@ export default function UtilisateursPage() {
 
                       {/* Actions */}
                       <div className="flex flex-col gap-1">
-                        {canEdit && (
+                        {canEditUsers && (
                           <Button
                             size="icon"
                             variant="ghost"
@@ -419,28 +421,36 @@ function UserEditPanel({
   )
 }
 
-// --- COMPOSANT LISTE HISTORIQUE AVEC SUPPRESSION ---
+// --- COMPOSANT LISTE HISTORIQUE (EDIT + SUPPRESSION) ---
 function UserHistoryList({ userId }: { userId: string }) {
   const { toast } = useToast()
-  const { canAccess } = usePermissions()
+  const { canEdit } = usePermissions()
+  const { profile, user: currentUser } = useAuth()
+
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Permission pour supprimer l'historique
-  const canDeleteHistory = canAccess("history_edit") 
+  // Permission: modifier / supprimer l'historique
+  const canManageHistory = canEdit("history_edit")
+
+  // Edition
+  const [editingLog, setEditingLog] = useState<LogEntry | null>(null)
+  const [editingAction, setEditingAction] = useState("")
+  const [editingDetails, setEditingDetails] = useState("")
+  const [savingEdit, setSavingEdit] = useState(false)
 
   useEffect(() => {
     const q = query(
       collection(db, "logs"),
       where("userId", "==", userId),
       orderBy("timestamp", "desc"),
-      limit(50)
+      limit(50),
     )
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedLogs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
+      const fetchedLogs = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as any),
       })) as LogEntry[]
       setLogs(fetchedLogs)
       setLoading(false)
@@ -450,13 +460,54 @@ function UserHistoryList({ userId }: { userId: string }) {
   }, [userId])
 
   const handleDeleteLog = async (logId: string) => {
-      if(!confirm("Supprimer cette entrée définitivement ?")) return
-      try {
-          await deleteDoc(doc(db, "logs", logId))
-          toast({ title: "Entrée supprimée", variant: "success" })
-      } catch(e) {
-          toast({ title: "Erreur", description: "Impossible de supprimer.", variant: "destructive" })
-      }
+    if (!canManageHistory) {
+      toast({ title: "Accès refusé", description: "Vous n'avez pas la permission.", variant: "destructive" })
+      return
+    }
+    if (!confirm("Supprimer cette entrée définitivement ?")) return
+
+    try {
+      await deleteDoc(doc(db, "logs", logId))
+      toast({ title: "Entrée supprimée", variant: "success" })
+    } catch (e) {
+      console.error(e)
+      toast({ title: "Erreur", description: "Impossible de supprimer.", variant: "destructive" })
+    }
+  }
+
+  const openEdit = (log: LogEntry) => {
+    if (!canManageHistory) return
+    setEditingLog(log)
+    setEditingAction(log.action || "")
+    setEditingDetails(log.details || "")
+  }
+
+  const saveEdit = async () => {
+    if (!editingLog) return
+    if (!canManageHistory) {
+      toast({ title: "Accès refusé", description: "Vous n'avez pas la permission.", variant: "destructive" })
+      return
+    }
+
+    setSavingEdit(true)
+    try {
+      const editedBy = profile?.displayName || profile?.email || currentUser?.email || "Admin"
+
+      await updateDoc(doc(db, "logs", editingLog.id), {
+        action: editingAction.trim() || "unknown",
+        details: editingDetails.trim(),
+        editedAt: serverTimestamp(),
+        editedBy,
+      } as any)
+
+      toast({ title: "Historique modifié", variant: "success" })
+      setEditingLog(null)
+    } catch (e) {
+      console.error(e)
+      toast({ title: "Erreur", description: "Impossible d'enregistrer.", variant: "destructive" })
+    } finally {
+      setSavingEdit(false)
+    }
   }
 
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>
@@ -471,55 +522,119 @@ function UserHistoryList({ userId }: { userId: string }) {
   }
 
   return (
-    <div className="space-y-4 overflow-y-auto h-full pb-10 pr-2">
-      {logs.map((log) => (
-        <div key={log.id} className="group flex gap-3 text-sm relative p-2 rounded-lg hover:bg-muted/50 transition-colors">
-          <div className="flex flex-col items-center">
-            <div className={cn(
-              "w-2 h-2 rounded-full mt-1.5",
-              log.action === "login" ? "bg-emerald-500" : 
-              log.action === "modification_compte" ? "bg-amber-500" : "bg-blue-500"
-            )} />
-            <div className="w-px h-full bg-border mt-1" />
-          </div>
-          <div className="pb-2 flex-1 pr-6">
-            <div className="flex justify-between items-start">
-              <p className="font-medium">
-                {log.action === "login" ? "Connexion" : 
-                 log.action === "modification_compte" ? "Modification du compte" : log.action}
-              </p>
-              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                {log.timestamp?.toDate ? log.timestamp.toDate().toLocaleDateString("fr-FR", {
-                  day: "numeric", month: "short", hour:"2-digit", minute:"2-digit"
-                }) : "Date inconnue"}
-              </span>
+    <>
+      <div className="space-y-4 overflow-y-auto h-full pb-10 pr-2">
+        {logs.map((log) => (
+          <div
+            key={log.id}
+            className="group flex gap-3 text-sm relative p-2 rounded-lg hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex flex-col items-center">
+              <div
+                className={cn(
+                  "w-2 h-2 rounded-full mt-1.5",
+                  log.action === "login"
+                    ? "bg-emerald-500"
+                    : log.action === "modification_compte"
+                      ? "bg-amber-500"
+                      : "bg-blue-500",
+                )}
+              />
+              <div className="w-px h-full bg-border mt-1" />
             </div>
-            
-            {log.details && (
-              <p className="text-xs text-muted-foreground mt-1 bg-background border border-border/50 p-2 rounded-lg">
-                {log.details}
-              </p>
+
+            <div className="pb-2 flex-1 pr-16">
+              <div className="flex justify-between items-start">
+                <p className="font-medium">
+                  {log.action === "login"
+                    ? "Connexion"
+                    : log.action === "modification_compte"
+                      ? "Modification du compte"
+                      : log.action}
+                </p>
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {log.timestamp?.toDate
+                    ? log.timestamp.toDate().toLocaleDateString("fr-FR", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "Date inconnue"}
+                </span>
+              </div>
+
+              {log.details && (
+                <p className="text-xs text-muted-foreground mt-1 bg-background border border-border/50 p-2 rounded-lg">
+                  {log.details}
+                </p>
+              )}
+
+              {log.performedBy && log.action === "modification_compte" && (
+                <p className="text-[10px] text-muted-foreground mt-1 italic">Modifié par : {log.performedBy}</p>
+              )}
+            </div>
+
+            {canManageHistory && (
+              <div className="absolute right-2 top-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                <button
+                  onClick={() => openEdit(log)}
+                  className="p-1.5 text-muted-foreground/50 hover:text-foreground hover:bg-muted rounded-md"
+                  title="Modifier cette entrée"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleDeleteLog(log.id)}
+                  className="p-1.5 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 rounded-md"
+                  title="Supprimer cette entrée"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             )}
-            
-            {log.performedBy && log.action === "modification_compte" && (
-              <p className="text-[10px] text-muted-foreground mt-1 italic">
-                Modifié par : {log.performedBy}
-              </p>
-            )}
+          </div>
+        ))}
+      </div>
+
+      <Dialog open={!!editingLog} onOpenChange={(open) => !open && setEditingLog(null)}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Modifier l'entrée</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-medium mb-1 block text-muted-foreground">Action</label>
+              <Input
+                value={editingAction}
+                onChange={(e) => setEditingAction(e.target.value)}
+                className="rounded-xl"
+                placeholder="ex: modification_compte"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block text-muted-foreground">Détails</label>
+              <Textarea
+                value={editingDetails}
+                onChange={(e) => setEditingDetails(e.target.value)}
+                className="rounded-xl min-h-[120px]"
+                placeholder="Décrire l'action..."
+              />
+            </div>
           </div>
 
-          {/* BOUTON SUPPRESSION (Visible uniquement si permission OK) */}
-          {canDeleteHistory && (
-             <button 
-               onClick={() => handleDeleteLog(log.id)}
-               className="absolute right-2 top-2 p-1.5 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 rounded-md opacity-0 group-hover:opacity-100 transition-all"
-               title="Supprimer cette entrée"
-             >
-                 <Trash2 className="w-4 h-4" />
-             </button>
-          )}
-        </div>
-      ))}
-    </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setEditingLog(null)} disabled={savingEdit}>
+              Annuler
+            </Button>
+            <Button onClick={saveEdit} disabled={savingEdit}>
+              {savingEdit ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

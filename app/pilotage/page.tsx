@@ -3,6 +3,8 @@
 import { useState, useMemo } from "react"
 import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
+import { PermissionGate } from "@/components/auth/permission-gate"
+import { usePermissions } from "@/hooks/use-permissions"
 import { objectives as initialObjectives, teamMembers, pilotageSettings, calculateProRataPrime } from "@/lib/demo-data"
 import {
 
@@ -46,6 +48,9 @@ interface EditingPalier {
 }
 
 export default function PilotagePage() {
+  const { canEdit } = usePermissions()
+  const canManage = canEdit("pilotage")
+
   const [activeTab, setActiveTab] = useState<TabValue>("pilotage")
   const [baseHours, setBaseHours] = useState(pilotageSettings.baseHours)
   const [showEditHours, setShowEditHours] = useState(false)
@@ -125,8 +130,8 @@ export default function PilotagePage() {
   const activeObjectives = initialObjectives.filter((obj) => obj.isActive).length
 
   return (
-    
-    <div className="min-h-screen bg-background pb-32">
+    <PermissionGate moduleId="pilotage" redirect>
+      <div className="min-h-screen bg-background pb-32">
       <Header />
 
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
@@ -779,7 +784,8 @@ export default function PilotagePage() {
       {showScheduleModal && <ScheduleObjectivesModal onClose={() => setShowScheduleModal(false)} />}
 
       <BottomNav />
-    </div>
+      </div>
+    </PermissionGate>
   )
 }
 

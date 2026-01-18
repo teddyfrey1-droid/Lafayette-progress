@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation" // Ajout pour la redirection
 import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
+import { PermissionGate } from "@/components/auth/permission-gate"
 import {
   Shield, Users, Search, Building2, ChevronRight, Edit3, CheckCircle2,
   XCircle, Activity, TrendingUp, LogIn, Monitor, Smartphone, MapPin,
@@ -40,6 +41,14 @@ interface CompanyFeature {
   icon: any
   enabled: boolean
   isDefault: boolean
+}
+
+export default function CentreControlePage() {
+  return (
+    <PermissionGate moduleId="centre_controle" redirect>
+      <CentreControlePageContent />
+    </PermissionGate>
+  )
 }
 
 interface Company {
@@ -96,7 +105,7 @@ const defaultFeatures: Omit<CompanyFeature, "enabled">[] = [
 
 type TabType = "overview" | "companies" | "users" | "logs"
 
-export default function CentreControlePage() {
+function CentreControlePageContent() {
   const { toast } = useToast()
   const router = useRouter() // Pour redirection après connexion
   const [activeTab, setActiveTab] = useState<TabType>("overview")

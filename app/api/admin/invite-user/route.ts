@@ -29,9 +29,16 @@ export async function POST(req: Request) {
     const actionLink = await adminAuth.generatePasswordResetLink(email);
     
     // Config SMTP (Port 2525 pour éviter les blocages Render)
+    const brevoUser = process.env.BREVO_USER;
+    const brevoPass = process.env.BREVO_PASS;
+    if (!brevoUser || !brevoPass) {
+      console.error('[API] SMTP not configured: missing BREVO_USER/BREVO_PASS');
+      return NextResponse.json({ error: 'SMTP non configuré.' }, { status: 500 });
+    }
+
     const transporter = nodemailer.createTransport({
       host: "smtp-relay.brevo.com", port: 2525, secure: false,
-      auth: { user: process.env.BREVO_USER || "9f9c88001@smtp-brevo.com", pass: process.env.BREVO_PASS || "bskRITXqoGxtW0X" },
+      auth: { user: brevoUser, pass: brevoPass },
     });
 
     // TEMPLATE EMAIL "PRO" (Logo centré et design épuré)

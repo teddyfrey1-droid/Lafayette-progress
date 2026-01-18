@@ -5,8 +5,9 @@ import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
 import { calculateProRataPrime, calculateTotalPotentialPrime } from "@/lib/demo-data"
 import { useAuth } from "@/components/auth/auth-provider"
+import { usePermissions } from "@/hooks/use-permissions"
+import { PermissionGate } from "@/components/auth/permission-gate"
 import { db, auth } from "@/lib/firebase/client"
-import { sendPasswordResetEmail } from "firebase/auth"
 import { collection, doc, updateDoc, onSnapshot, query, orderBy, deleteDoc } from "firebase/firestore"
 import {
   Users,
@@ -59,6 +60,7 @@ interface TeamMember {
 
 export default function TeamsPage() {
   const { profile } = useAuth()
+  const { canEdit } = usePermissions()
   const { toast } = useToast() // Utilisation du hook
   
   const [members, setMembers] = useState<TeamMember[]>([])
@@ -114,7 +116,7 @@ export default function TeamsPage() {
       member.company.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const isAdmin = profile?.role === "admin" || profile?.role === "manager" || profile?.role === "super_admin"
+  const canManage = canEdit("equipes")
   const totalPotential = calculateTotalPotentialPrime()
 
   const handleMemberUpdated = (updatedMember: TeamMember) => {
@@ -144,7 +146,8 @@ export default function TeamsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <PermissionGate moduleId="equipes" redirect>
+      <div className="min-h-screen bg-background pb-32">
       <Header />
 
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
@@ -155,7 +158,7 @@ export default function TeamsPage() {
               {loading ? "Chargement..." : `${members.length} collaborateurs`}
             </p>
           </div>
-          {isAdmin && (
+          {canManage && (
             <Button size="sm" className="rounded-xl gap-2" onClick={() => setShowInvite(true)}>
               <UserPlus className="w-4 h-4" />
               Inviter
@@ -292,14 +295,14 @@ export default function TeamsPage() {
         <MemberDrawer 
           member={selectedMember} 
           onClose={() => setSelectedMember(null)} 
-          isAdmin={isAdmin}
+          isAdmin={canManage}
           onUpdate={handleMemberUpdated}
           onDelete={handleMemberDeleted}
         />
       )}
 
       {/* DRAWER INVITATION */}
-      {showInvite && (
+      {showInvite && canManage && (
         <InviteDrawer 
           onClose={() => setShowInvite(false)} 
           onSuccess={() => setShowInvite(false)} 
@@ -307,7 +310,8 @@ export default function TeamsPage() {
       )}
 
       <BottomNav />
-    </div>
+      </div>
+    </PermissionGate>
   )
 }
 
@@ -339,12 +343,22 @@ function MemberDrawer({
 
   const handleSendActivationLink = async () => {
     try {
-      await sendPasswordResetEmail(auth, member.email)
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: member.email }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({} as any))
+        throw new Error((data as any)?.error || "Erreur API")
+      }
+
       setLinkSent(true)
-      toast({ 
-        title: "Email envoyé", 
+      toast({
+        title: "Email envoyé",
         description: `Lien de rappel envoyé à ${member.email}`,
-        variant: "success" // Notification verte
+        variant: "success",
       })
       setTimeout(() => setLinkSent(false), 5000)
     } catch (error) {

@@ -1,245 +1,186 @@
 "use client"
 
-import type React from "react"
-import { useEffect, useState } from "react"
-import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowLeft, Eye, EyeOff, Mail, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { PulseLogo } from "@/components/pulse/pulse-logo"
+import { useMemo, useState } from "react"
+import { Header } from "@/components/pulse/header"
+import { BottomNav } from "@/components/pulse/bottom-nav"
+import { PermissionGate } from "@/components/auth/permission-gate"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { BadgeCheck, CheckCircle2, ChevronRight, Clock, Coins } from "lucide-react"
+import { calculateProRataPrime, calculateTotalPotentialPrime, getCurrentPrime, primes as demoPrimes, type Prime } from "@/lib/demo-data"
 import { useAuth } from "@/components/auth/auth-provider"
-import { friendlyAuthError, signInWithEmail } from "@/lib/firebase/auth"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { useToast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
 
-export default function ConnexionClient() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { user, loading } = useAuth()
-  const { toast } = useToast()
-
-  const [showPassword, setShowPassword] = useState(false)
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const [isResetOpen, setIsResetOpen] = useState(false)
-  const [resetEmail, setResetEmail] = useState("")
-  const [isResetting, setIsResetting] = useState(false)
-
-  const nextUrl = searchParams.get("next") || "/dashboard"
-
-  useEffect(() => {
-    if (!loading && user) {
-      router.replace(nextUrl)
-    }
-  }, [loading, user, router, nextUrl])
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setIsLoading(true)
-
-    try {
-      await signInWithEmail(email.trim(), password)
-      router.replace(nextUrl)
-    } catch (err: unknown) {
-      const code = typeof (err as any)?.code === "string" ? (err as any).code : ""
-      setError(friendlyAuthError(code))
-      setIsLoading(false)
-    }
+function statusMeta(status: Prime["status"]) {
+  switch (status) {
+    case "paid":
+      return { label: "Payée", icon: CheckCircle2, className: "bg-emerald-500/15 text-emerald-700 border-emerald-500/20" }
+    case "validated":
+      return { label: "Validée", icon: BadgeCheck, className: "bg-blue-500/15 text-blue-700 border-blue-500/20" }
+    default:
+      return { label: "En cours", icon: Clock, className: "bg-amber-500/15 text-amber-700 border-amber-500/20" }
   }
+}
 
-  // --- CORRECTION MAJEURE ICI ---
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!resetEmail) return
+export default function PrimesPage() {
+  const { profile } = useAuth()
+  const [selectedPrime, setSelectedPrime] = useState<Prime | null>(null)
 
-    setIsResetting(true)
+  const currentPrime = useMemo(() => getCurrentPrime(), [])
+  const totalPotential = useMemo(() => calculateTotalPotentialPrime(), [])
+
+  const contractHours = profile?.contractHours ?? 35
+  const baseHours = 35
+
+  const currentAmount = currentPrime?.amount ?? 0
+  const currentAmountProRata = useMemo(() => {
     try {
-      // On appelle NOTRE API, pas Firebase direct
-      const res = await fetch("/api/auth/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: resetEmail }),
-      })
-
-      if (!res.ok) throw new Error("Erreur serveur")
-
-      toast({
-        title: "Email envoyé",
-        description: "Vérifiez vos emails (et spams). L'envoi via Pulse est confirmé.",
-        variant: "success", // Utilise le style vert ajouté
-      })
-      setIsResetOpen(false)
-      setResetEmail("")
-    } catch (error: any) {
-      console.error(error)
-      toast({
-        title: "Erreur",
-        description: "Impossible d'envoyer l'email.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsResetting(false)
+      return calculateProRataPrime(currentAmount, contractHours, baseHours)
+    } catch {
+      return currentAmount
     }
-  }
+  }, [currentAmount, contractHours])
+
+  const progress = totalPotential > 0 ? Math.min(100, Math.round((currentAmount / totalPotential) * 100)) : 0
+
+  const ordered = useMemo(() => {
+    // On affiche d'abord la prime en cours, puis le reste par ordre inverse (simple)
+    const list = [...demoPrimes]
+    return list
+  }, [])
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="px-4 py-4">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Retour
-        </Link>
-      </header>
+    <PermissionGate moduleId="primes" redirect>
+      <div className="min-h-screen bg-background pb-32">
+        <Header />
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
-        <div className="w-full max-w-sm">
-          <div className="flex justify-center mb-8">
-            <div className="w-16 h-16 rounded-2xl pulse-gradient flex items-center justify-center">
-              <span className="text-2xl font-bold text-white">P</span>
-            </div>
+        <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+              <Coins className="w-6 h-6 text-primary" />
+              Primes & Historique
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Suivi des primes, validation et historique.</p>
           </div>
 
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <PulseLogo size="md" showText={true} />
-            </div>
-            <h1 className="text-2xl font-bold mb-2">Bon retour !</h1>
-            <p className="text-muted-foreground text-sm">
-              Connectez-vous pour accéder à votre tableau de bord.
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Adresse email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="vous@exemple.fr"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="h-12 rounded-xl"
-                autoComplete="email"
-              />
+          <section className="pulse-card p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Prime en cours</p>
+                <p className="text-2xl font-bold mt-1">{currentAmount.toLocaleString("fr-FR")} €</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Pro-rata ({contractHours}h) : <span className="font-medium">{currentAmountProRata.toLocaleString("fr-FR")} €</span>
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Potentiel max</p>
+                <p className="text-lg font-semibold mt-1">{totalPotential.toLocaleString("fr-FR")} €</p>
+                <Badge className={cn("mt-2", "bg-muted text-foreground border-border")}>{progress}%</Badge>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Mot de passe</Label>
-                
-                <Dialog open={isResetOpen} onOpenChange={setIsResetOpen}>
-                  <DialogTrigger asChild>
-                    <button type="button" className="text-xs text-primary hover:underline font-medium">
-                      Mot de passe oublié ?
-                    </button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md rounded-2xl">
-                    <DialogHeader>
-                      <DialogTitle>Mot de passe oublié</DialogTitle>
-                      <DialogDescription>
-                        Entrez votre adresse email. Nous vous enverrons un lien pour réinitialiser votre mot de passe.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleForgotPassword} className="space-y-4 mt-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="reset-email">Email</Label>
-                        <Input
-                          id="reset-email"
-                          type="email"
-                          placeholder="nom@entreprise.com"
-                          value={resetEmail}
-                          onChange={(e) => setResetEmail(e.target.value)}
-                          required
-                          className="rounded-xl"
-                        />
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Progression</span>
+                <span>
+                  {currentAmount.toLocaleString("fr-FR")} € / {totalPotential.toLocaleString("fr-FR")} €
+                </span>
+              </div>
+              <Progress value={progress} className="h-2" />
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-foreground">Historique</h2>
+              <p className="text-xs text-muted-foreground">{ordered.length} entrées</p>
+            </div>
+
+            <div className="space-y-3">
+              {ordered.map((p) => {
+                const meta = statusMeta(p.status)
+                const Icon = meta.icon
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => setSelectedPrime(p)}
+                    className="w-full text-left pulse-card p-4 hover:shadow-lg transition-shadow"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+                        <Coins className="w-5 h-5 text-primary" />
                       </div>
-                      <Button type="submit" className="w-full rounded-xl" disabled={isResetting}>
-                        {isResetting ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Envoi...
-                          </>
-                        ) : (
-                          <>
-                            <Mail className="w-4 h-4 mr-2" /> Envoyer le lien
-                          </>
-                        )}
-                      </Button>
-                    </form>
-                  </DialogContent>
-                </Dialog>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-semibold leading-tight">{p.month}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Montant : <span className="font-medium text-foreground">{p.amount.toLocaleString("fr-FR")} €</span>
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge className={cn("border", meta.className)}>
+                              <Icon className="w-3.5 h-3.5 mr-1" />
+                              {meta.label}
+                            </Badge>
+                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                        </div>
 
-              </div>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="h-12 rounded-xl pr-10"
-                  autoComplete="current-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
+                        <p className="text-xs text-muted-foreground mt-2 line-clamp-1">
+                          {p.breakdown?.length ? `${p.breakdown.length} ligne(s) de détail` : "Aucun détail"}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
+          </section>
+        </main>
 
-            {error && <p className="text-sm text-destructive font-medium text-center bg-destructive/10 p-2 rounded-lg">{error}</p>}
+        <BottomNav />
 
-            <Button
-              type="submit"
-              className="w-full h-12 rounded-xl pulse-gradient text-white font-semibold"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Connexion...
-                </>
-              ) : (
-                "Se connecter"
-              )}
-            </Button>
-          </form>
+        <Sheet open={!!selectedPrime} onOpenChange={(open) => !open && setSelectedPrime(null)}>
+          <SheetContent side="bottom" className="rounded-t-3xl max-h-[85vh] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>{selectedPrime?.month || "Détail"}</SheetTitle>
+              <SheetDescription>
+                Montant : {selectedPrime?.amount?.toLocaleString("fr-FR") || 0} €
+              </SheetDescription>
+            </SheetHeader>
 
-          <p className="text-center text-sm text-muted-foreground mt-6">
-            Pas encore de compte ?{" "}
-            <Link href="/inscription" className="text-primary hover:underline font-medium">
-              Créer un compte
-            </Link>
-          </p>
+            {selectedPrime && (
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Statut</span>
+                  <span className="text-xs font-medium">{statusMeta(selectedPrime.status).label}</span>
+                </div>
 
-          <p className="text-center text-xs text-muted-foreground mt-8 opacity-70">
-            En vous connectant, vous acceptez nos{" "}
-            <Link href="#" className="underline">
-              conditions d'utilisation
-            </Link>
-            .
-          </p>
-        </div>
-      </main>
-    </div>
+                <div className="pulse-card p-4 space-y-2">
+                  <p className="text-sm font-semibold">Répartition</p>
+                  {selectedPrime.breakdown?.length ? (
+                    <div className="space-y-2">
+                      {selectedPrime.breakdown.map((b) => (
+                        <div key={b.objectiveId} className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{b.objectiveTitle}</p>
+                            <p className="text-xs text-muted-foreground">ID: {b.objectiveId}</p>
+                          </div>
+                          <p className="text-sm font-semibold">{b.amount.toLocaleString("fr-FR")} €</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Aucun détail disponible pour cette prime.</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </SheetContent>
+        </Sheet>
+      </div>
+    </PermissionGate>
   )
 }

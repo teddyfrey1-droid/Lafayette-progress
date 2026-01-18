@@ -4,6 +4,7 @@ import type React from "react"
 import { Suspense, useState, useRef } from "react"
 import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
+import { PermissionGate } from "@/components/auth/permission-gate"
 import { usefulSites, siteCategories, usefulContacts, currentUser } from "@/lib/demo-data"
 import type { UsefulSite, SiteCategory } from "@/lib/demo-data"
 import { Button } from "@/components/ui/button"
@@ -764,14 +765,14 @@ function SiteCard({
 
 export default function SitesContactsUtilesPage() {
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <PermissionGate moduleId="sites" redirect>
+      <div className="min-h-screen bg-background pb-32">
       <Header />
       <Suspense fallback={null}>
         <SitesContactsContent />
       </Suspense>
       <BottomNav />
     </div>
-      
-
+    </PermissionGate>
   )
 }

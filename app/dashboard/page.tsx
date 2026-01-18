@@ -10,6 +10,7 @@ import { objectives, calculateTotalPotentialPrime, getCriticalAlerts } from "@/l
 import { useCurrentUser } from "@/lib/use-current-user" 
 import { Coins, Target, Thermometer, ChevronRight, TrendingUp, Clock } from "lucide-react"
 import Link from "next/link"
+import { PermissionGate } from "@/components/auth/permission-gate"
 
 export default function DashboardPage() {
   // Récupération de l'utilisateur via le hook personnalisé
@@ -40,7 +41,8 @@ export default function DashboardPage() {
   const firstName = user?.displayName ? user.displayName.split(" ")[0] : "Invité"
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <PermissionGate moduleId="dashboard" redirect>
+      <div className="min-h-screen bg-background pb-32">
       <Header />
 
       <main className="px-4 py-6 max-w-lg mx-auto">
@@ -169,5 +171,6 @@ export default function DashboardPage() {
       </main>
       <BottomNav />
     </div>
+    </PermissionGate>
   )
 }

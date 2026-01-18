@@ -3,17 +3,21 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   updateProfile,
-  sendPasswordResetEmail,
-  getAuth,
   type User,
 } from "firebase/auth"
 import { doc, serverTimestamp, setDoc } from "firebase/firestore"
-import { initializeApp, getApps, getApp, deleteApp, type FirebaseApp } from "firebase/app"
 
 import { auth, db } from "./client"
-import { FIREBASE_CONFIG } from "./config"
 
-export type UserRole = "admin" | "manager" | "employee"
+export type UserRole =
+  | "super_admin"
+  | "admin"
+  | "manager"
+  | "assistant_manager"
+  | "employee"
+  | "employe"
+  | "directeur"
+  | "gerant"
 
 export interface UserProfile {
   uid: string
@@ -21,6 +25,7 @@ export interface UserProfile {
   displayName: string
   role: UserRole
   contractHours?: number
+  company?: string
   disabled?: boolean
   createdAt?: unknown
   updatedAt?: unknown
@@ -31,7 +36,6 @@ export async function signInWithEmail(email: string, password: string): Promise<
   return res.user
 }
 
-// Inscription publique (via la page /inscription)
 export async function signUpWithEmail(params: {
   email: string
   password: string
@@ -40,87 +44,54 @@ export async function signUpWithEmail(params: {
 }): Promise<User> {
   const { email, password, displayName } = params
 
-  // CORRECTION ICI : C'est teddy.frey1@gmail.com qui devient Admin auto
   const role: UserRole = email?.toLowerCase() === "teddy.frey1@gmail.com" ? "admin" : "employee"
 
   const res = await createUserWithEmailAndPassword(auth, email, password)
-
-  // Mise à jour du profil Auth
   await updateProfile(res.user, { displayName })
 
-  // Création du profil Firestore
   const ref = doc(db, "users", res.user.uid)
-  try {
-    await setDoc(
-      ref,
-      {
-        uid: res.user.uid,
-        email,
-        displayName,
-        role,
-        contractHours: 35, // Valeur par défaut
-        disabled: false,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true },
-    )
-  } catch {
-    // Si les règles Firestore bloquent, on continue (le compte Auth est créé)
-  }
+  await setDoc(
+    ref,
+    {
+      uid: res.user.uid,
+      email,
+      displayName,
+      role,
+      contractHours: 35,
+      company: "Heiko",
+      disabled: false,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  )
 
   return res.user
 }
 
-// --- FONCTION MANQUANTE QUI PROVOQUAIT L'ERREUR ---
-// Permet d'inviter un utilisateur sans déconnecter l'admin actuel
-export const inviteUser = async (email: string, role: string, hours: number) => {
-  const SECONDARY_APP_NAME = "SecondaryApp"
-  let secondaryApp: FirebaseApp
+export const inviteUser = async (email: string, role: string, hours: number, company: string) => {
+  const [firstNameRaw] = (email || "").split("@")
+  const firstName = firstNameRaw || "Utilisateur"
 
-  // 1. Initialiser une instance secondaire de l'app Firebase
-  if (getApps().some((app) => app.name === SECONDARY_APP_NAME)) {
-    secondaryApp = getApp(SECONDARY_APP_NAME)
-  } else {
-    secondaryApp = initializeApp(FIREBASE_CONFIG, SECONDARY_APP_NAME)
-  }
-
-  try {
-    const secondaryAuth = getAuth(secondaryApp)
-
-    // 2. Créer l'utilisateur avec un mot de passe temporaire complexe
-    const tempPassword = Math.random().toString(36).slice(-8) + "Aa1!" + Date.now()
-    const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, tempPassword)
-    const uid = userCredential.user.uid
-
-    // 3. Envoyer l'email de "mot de passe oublié" pour qu'il définisse le sien
-    await sendPasswordResetEmail(secondaryAuth, email)
-
-    // 4. Créer sa fiche dans Firestore (avec l'instance principale 'db')
-    await setDoc(doc(db, "users", uid), {
-      uid,
+  const res = await fetch("/api/admin/invite-user", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
       email,
-      displayName: email.split("@")[0],
-      role, 
+      firstName,
+      lastName: "",
+      role,
       contractHours: hours,
-      disabled: false,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    })
+      company: company || "Heiko",
+    }),
+  })
 
-    // 5. Déconnecter l'instance secondaire pour ne pas interférer
-    await firebaseSignOut(secondaryAuth)
-
-    return uid
-  } catch (error) {
-    console.error("Erreur invitation:", error)
-    throw error
-  } finally {
-    // Nettoyage de la mémoire
-    if (secondaryApp!) {
-      await deleteApp(secondaryApp)
-    }
+  const data = await res.json().catch(() => ({} as any))
+  if (!res.ok) {
+    throw new Error((data as any)?.error || "Erreur API")
   }
+
+  return (data as any)?.uid as string
 }
 
 export async function signOut(): Promise<void> {
@@ -133,16 +104,18 @@ export function friendlyAuthError(code: string): string {
     case "auth/wrong-password":
       return "Email ou mot de passe incorrect."
     case "auth/user-not-found":
-      return "Aucun compte ne correspond à cet email."
+      return "Aucun compte ne correspond a cet email."
     case "auth/email-already-in-use":
-      return "Cet email est déjà utilisé."
+      return "Cet email est deja utilise par un autre compte."
     case "auth/weak-password":
-      return "Mot de passe trop faible."
+      return "Le mot de passe doit contenir au moins 6 caracteres."
+    case "auth/invalid-email":
+      return "L'adresse email n'est pas valide."
     case "auth/too-many-requests":
-      return "Trop de tentatives. Réessayez plus tard."
+      return "Trop de tentatives. Veuillez reessayer plus tard."
     case "auth/network-request-failed":
-      return "Problème réseau. Vérifiez votre connexion."
+      return "Probleme de connexion internet."
     default:
-      return "Une erreur est survenue."
+      return "Une erreur est survenue lors de l'authentification."
   }
 }

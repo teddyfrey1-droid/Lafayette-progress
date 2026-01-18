@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
+import { PermissionGate } from "@/components/auth/permission-gate"
 import {
 
   Truck,
@@ -150,8 +151,8 @@ export default function FournisseursPage() {
   }
 
   return (
-    
-    <div className="min-h-screen bg-background pb-24">
+    <PermissionGate moduleId="fournisseurs" redirect>
+      <div className="min-h-screen bg-background pb-24">
       <Header />
 
       <main className="px-4 py-6 max-w-4xl mx-auto space-y-6">
@@ -407,7 +408,8 @@ export default function FournisseursPage() {
       )}
 
       <BottomNav />
-    </div>
+      </div>
+    </PermissionGate>
   )
 }
 

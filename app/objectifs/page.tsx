@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
+import { PermissionGate } from "@/components/auth/permission-gate"
 import { ProgressRing } from "@/components/pulse/progress-ring"
 import { PalierTimeline } from "@/components/pulse/palier-timeline"
 import { CelebrationModal } from "@/components/pulse/celebration-modal"
@@ -72,7 +73,8 @@ export default function ObjectivesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <PermissionGate moduleId="objectifs" redirect>
+      <div className="min-h-screen bg-background pb-32">
       <Header />
 
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
@@ -234,7 +236,8 @@ export default function ObjectivesPage() {
         subtitle="Vous avez debloque un nouveau succes"
         type="achievement"
       />
-    </div>
+      </div>
+    </PermissionGate>
   )
 }
 

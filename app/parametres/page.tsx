@@ -3,6 +3,8 @@
 import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
 import { useAuth } from "@/components/auth/auth-provider"
+import { PermissionGate } from "@/components/auth/permission-gate"
+import { usePermissions } from "@/hooks/use-permissions"
 import { signOut } from "@/lib/firebase/auth"
 import { useRouter } from "next/navigation"
 import {
@@ -23,6 +25,7 @@ import { useState } from "react"
 
 export default function SettingsPage() {
   const { profile, user, loading } = useAuth()
+  const { canEdit, loading: permissionsLoading } = usePermissions()
   // Note: useRouter n'est plus nécessaire pour la déconnexion, mais peut servir ailleurs
   const router = useRouter()
   const [notifications, setNotifications] = useState(true)
@@ -34,9 +37,9 @@ export default function SettingsPage() {
   // Récupération du rôle (avec fallback sur 'employe')
   const role = profile?.role || "employe"
 
-  // DÉFINITION DE LA HIÉRARCHIE
-  // Sont considérés comme Admin (accès aux paramètres avancés) : Manager, Directeur, Gérant
-  const isAdmin = ["manager", "directeur", "gerant"].includes(role)
+  const canAdminister = permissionsLoading ? false : canEdit("parametres")
+  const canOpenCentreControle = permissionsLoading ? false : canEdit("centre_controle")
+  const isAdmin = canAdminister || canOpenCentreControle
 
   // Fonction pour afficher le nom du rôle proprement
   const formatRole = (r: string) => {
@@ -71,7 +74,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <PermissionGate moduleId="parametres" redirect>
+      <div className="min-h-screen bg-background pb-32">
       <Header />
 
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
@@ -159,6 +163,17 @@ export default function SettingsPage() {
                 <ChevronRight className="w-5 h-5 text-muted-foreground" />
               </Link>
 
+              <Link href="/pilotage/activation-services" className="flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0">
+                <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-500">
+                  <Shield className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-sm">Activation des services</p>
+                  <p className="text-xs text-muted-foreground">Contrôler l'accès par rôle</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+              </Link>
+
               <Link href="/parametres/objectifs" className="flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0">
                 <div className="p-2 rounded-lg bg-red-500/10 text-red-500">
                   <Settings className="w-5 h-5" />
@@ -216,6 +231,7 @@ export default function SettingsPage() {
       </main>
 
       <BottomNav />
-    </div>
+      </div>
+    </PermissionGate>
   )
 }

@@ -4,21 +4,19 @@ import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
 import { Truck, ChevronRight, Globe, Settings, Lock } from "lucide-react"
 import Link from "next/link"
-import { useAuth } from "@/components/auth/auth-provider"
+import { PermissionGate } from "@/components/auth/permission-gate"
+import { usePermissions } from "@/hooks/use-permissions"
 
 export default function GestionFournisseursPage() {
-  // On récupère le vrai profil utilisateur connecté
-  const { profile } = useAuth()
-  
-  // On vérifie les droits réels avec la nouvelle hiérarchie
-  // Valeur par défaut : "employe"
-  const role = profile?.role || "employe"
-  
-  // Sont considérés comme Admin pour cette section : Manager, Directeur, Gérant
-  const isAdmin = ["manager", "directeur", "gerant"].includes(role)
+  const { canView, canEdit, loading } = usePermissions()
+
+  const canSeeFournisseurs = loading ? true : canView("fournisseurs")
+  const canSeeSites = loading ? true : canView("sites")
+  const canSeeAdminSites = loading ? false : canEdit("gestion")
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <PermissionGate moduleId={["gestion", "fournisseurs", "sites"]} match="any" redirect>
+      <div className="min-h-screen bg-background pb-32">
       <Header />
 
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
@@ -30,6 +28,7 @@ export default function GestionFournisseursPage() {
 
         {/* Main Links */}
         <section className="space-y-3">
+          {canSeeFournisseurs && (
           <Link href="/fournisseurs" className="block">
             <div className="pulse-card p-5 hover:shadow-lg transition-shadow">
               <div className="flex items-center gap-4">
@@ -46,7 +45,9 @@ export default function GestionFournisseursPage() {
               </div>
             </div>
           </Link>
+          )}
 
+          {canSeeSites && (
           <Link href="/sites-contacts-utiles" className="block">
             <div className="pulse-card p-5 hover:shadow-lg transition-shadow">
               <div className="flex items-center gap-4">
@@ -61,9 +62,10 @@ export default function GestionFournisseursPage() {
               </div>
             </div>
           </Link>
+          )}
 
           {/* Section visible uniquement pour Manager, Directeur et Gérant */}
-          {isAdmin && (
+          {canSeeAdminSites && (
             <Link href="/gestion-fournisseurs/admin-sites" className="block">
               <div className="pulse-card p-5 hover:shadow-lg transition-shadow border-primary/20">
                 <div className="flex items-center gap-4">
@@ -99,6 +101,7 @@ export default function GestionFournisseursPage() {
       </main>
 
       <BottomNav />
-    </div>
+      </div>
+    </PermissionGate>
   )
 }

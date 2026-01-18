@@ -4,8 +4,9 @@ import type React from "react"
 import { Suspense, useState, useRef } from "react"
 import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
-import { adminSites, adminSiteCategories, currentUser } from "@/lib/demo-data"
+import { adminSites, adminSiteCategories } from "@/lib/demo-data"
 import type { AdminSite, AdminSiteCategory } from "@/lib/demo-data"
+import { PermissionGate } from "@/components/auth/permission-gate"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -45,8 +46,6 @@ const iconMap: Record<string, React.ElementType> = {
 }
 
 function AdminSitesContent() {
-  const isAdmin = currentUser.role === "admin" || currentUser.role === "manager"
-
   const [sites, setSites] = useState<AdminSite[]>(adminSites)
   const [categories, setCategories] = useState<AdminSiteCategory[]>(adminSiteCategories)
   const [activeCategory, setActiveCategory] = useState<string>("all")
@@ -156,32 +155,6 @@ function AdminSitesContent() {
     setCategories(categories.filter((c) => c.id !== id))
     setSites(sites.filter((s) => s.category !== id))
     if (activeCategory === id) setActiveCategory("all")
-  }
-
-  // Show access denied for non-admins
-  if (!isAdmin) {
-    return (
-    
-      <main className="px-4 py-6 max-w-2xl mx-auto">
-        <Link
-          href="/gestion-fournisseurs"
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span className="text-sm">Gestion & Fournisseurs</span>
-        </Link>
-
-        <div className="pulse-card p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-            <Lock className="w-8 h-8 text-destructive" />
-          </div>
-          <h2 className="text-xl font-bold mb-2">Accès restreint</h2>
-          <p className="text-muted-foreground">
-            Cette page est réservée aux administrateurs. Veuillez contacter votre responsable pour plus d'informations.
-          </p>
-        </div>
-      </main>
-    )
   }
 
   return (
@@ -546,14 +519,14 @@ function AdminSitesContent() {
 
 export default function AdminSitesPage() {
   return (
-    <div className="min-h-screen bg-background pb-24">
-      <Header />
-      <Suspense fallback={null}>
-        <AdminSitesContent />
-      </Suspense>
-      <BottomNav />
-    </div>
-      
-
+    <PermissionGate moduleId="gestion" requireEdit redirect>
+      <div className="min-h-screen bg-background pb-24">
+        <Header />
+        <Suspense fallback={null}>
+          <AdminSitesContent />
+        </Suspense>
+        <BottomNav />
+      </div>
+    </PermissionGate>
   )
 }
