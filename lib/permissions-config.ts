@@ -1,27 +1,100 @@
-export const MODULES = [
-  { id: "pilotage", label: "Pilotage (Vue globale)" },
-  { id: "fournisseurs", label: "Gestion Fournisseurs" },
-  { id: "equipes", label: "Gestion Équipes" },
-  { id: "parametres", label: "Paramètres & Config" },
-  { id: "diffusion", label: "Diffusion / Campagnes" },
-  { id: "history_edit", label: "Modifier/Supprimer Historique" }, // Droit spécifique pour les logs
-] as const;
+// Configuration des modules et des roles pour le systeme de permissions
 
+export interface ModuleDefinition {
+  id: string
+  name: string
+  description: string
+  icon: string
+}
+
+// Roles affiches dans l'UI d'activation (les alias sont gerees dans use-permissions)
 export const ROLES = [
-  { id: "gerant", label: "Gérant" },
-  { id: "directeur", label: "Directeur" },
-  { id: "admin", label: "Admin" },
-  { id: "manager", label: "Manager" },
-  { id: "assistant_manager", label: "Assistant Manager" },
-  { id: "employe", label: "Employé" },
-  { id: "employee", label: "Employee (Legacy)" },
-] as const;
+  { id: "employe", name: "Employe", description: "Acces de base" },
+  { id: "assistant_manager", name: "Assistant Manager", description: "Supervision" },
+  { id: "manager", name: "Manager", description: "Gestion d'equipe" },
+  { id: "directeur", name: "Directeur", description: "Direction site" },
+  { id: "gerant", name: "Gerant", description: "Gestion complete" },
+  { id: "admin", name: "Admin", description: "Administration" },
+  { id: "super_admin", name: "Super Admin", description: "Acces total" },
+] as const
 
-// Droits par défaut (si rien n'est configuré en base)
-export const DEFAULT_PERMISSIONS = {
-  pilotage: ["gerant", "directeur", "admin"],
-  fournisseurs: ["gerant", "directeur", "admin", "manager"],
-  equipes: ["gerant", "directeur", "admin", "manager"],
-  parametres: ["gerant", "directeur", "admin"],
-  history_edit: ["gerant", "admin"],
-};
+export const MODULES: ModuleDefinition[] = [
+  { id: "dashboard", name: "Dashboard", description: "Vue d'ensemble", icon: "LayoutDashboard" },
+  { id: "objectifs", name: "Objectifs", description: "Objectifs et suivi", icon: "Target" },
+  { id: "primes", name: "Primes", description: "Primes & historique", icon: "Trophy" },
+  { id: "equipes", name: "Equipes", description: "Gestion des membres", icon: "Users" },
+  { id: "gestion", name: "Gestion", description: "Gestion & operations", icon: "ClipboardList" },
+  { id: "fournisseurs", name: "Fournisseurs", description: "Fournisseurs et commandes", icon: "Truck" },
+  { id: "sites", name: "Sites / Contacts", description: "Sites & contacts utiles", icon: "MapPin" },
+  { id: "diffusion", name: "Diffusion", description: "Emails / notifications", icon: "Mail" },
+  { id: "notifications", name: "Notifications", description: "Centre de notifications", icon: "Bell" },
+  { id: "pilotage", name: "Pilotage", description: "Pilotage & simulateur", icon: "Gauge" },
+  { id: "centre_controle", name: "Centre de controle", description: "Console admin", icon: "Shield" },
+  { id: "parametres", name: "Parametres", description: "Parametres et utilisateurs", icon: "Settings" },
+  { id: "history_edit", name: "Historique", description: "Modifier/supprimer l'historique", icon: "History" },
+]
+
+export type PermissionMode = "view" | "edit"
+
+export type ModulePermission = {
+  view: string[]
+  edit: string[]
+}
+
+// Permissions par defaut (VIEW et EDIT)
+// - view: qui peut voir le module
+// - edit: qui peut modifier / executer des actions sensibles
+export const DEFAULT_PERMISSIONS: Record<string, ModulePermission> = {
+  dashboard: {
+    view: ["employe", "assistant_manager", "manager", "directeur", "gerant", "admin", "super_admin"],
+    edit: ["assistant_manager", "manager", "directeur", "gerant", "admin", "super_admin"],
+  },
+  objectifs: {
+    view: ["employe", "assistant_manager", "manager", "directeur", "gerant", "admin", "super_admin"],
+    edit: ["manager", "directeur", "gerant", "admin", "super_admin"],
+  },
+  primes: {
+    view: ["employe", "assistant_manager", "manager", "directeur", "gerant", "admin", "super_admin"],
+    edit: ["manager", "directeur", "gerant", "admin", "super_admin"],
+  },
+  equipes: {
+    view: ["assistant_manager", "manager", "directeur", "gerant", "admin", "super_admin"],
+    edit: ["directeur", "gerant", "admin", "super_admin"],
+  },
+  gestion: {
+    view: ["assistant_manager", "manager", "directeur", "gerant", "admin", "super_admin"],
+    edit: ["manager", "directeur", "gerant", "admin", "super_admin"],
+  },
+  fournisseurs: {
+    view: ["assistant_manager", "manager", "directeur", "gerant", "admin", "super_admin"],
+    edit: ["manager", "directeur", "gerant", "admin", "super_admin"],
+  },
+  sites: {
+    view: ["employe", "assistant_manager", "manager", "directeur", "gerant", "admin", "super_admin"],
+    edit: ["manager", "directeur", "gerant", "admin", "super_admin"],
+  },
+  diffusion: {
+    view: ["directeur", "gerant", "admin", "super_admin"],
+    edit: ["directeur", "gerant", "admin", "super_admin"],
+  },
+  notifications: {
+    view: ["employe", "assistant_manager", "manager", "directeur", "gerant", "admin", "super_admin"],
+    edit: ["assistant_manager", "manager", "directeur", "gerant", "admin", "super_admin"],
+  },
+  pilotage: {
+    view: ["manager", "directeur", "gerant", "admin", "super_admin"],
+    edit: ["directeur", "gerant", "admin", "super_admin"],
+  },
+  centre_controle: {
+    view: ["admin", "super_admin"],
+    edit: ["admin", "super_admin"],
+  },
+  parametres: {
+    view: ["directeur", "gerant", "admin", "super_admin"],
+    edit: ["directeur", "gerant", "admin", "super_admin"],
+  },
+  history_edit: {
+    view: ["directeur", "gerant", "admin", "super_admin"],
+    edit: ["directeur", "gerant", "admin", "super_admin"],
+  },
+}
