@@ -4,22 +4,30 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { LayoutDashboard, Target, Coins, Globe } from "lucide-react"
+import { usePermissions } from "@/hooks/use-permissions"
 
-const navItems = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Accueil" },
-  { href: "/objectifs", icon: Target, label: "Objectifs" },
-  { href: "/primes", icon: Coins, label: "Primes" },
-  { href: "/sites-contacts-utiles", icon: Globe, label: "Sites" },
+const navItems: Array<{ href: string; icon: any; label: string; moduleId?: string }> = [
+  { href: "/dashboard", icon: LayoutDashboard, label: "Accueil", moduleId: "dashboard" },
+  { href: "/objectifs", icon: Target, label: "Objectifs", moduleId: "objectifs" },
+  { href: "/primes", icon: Coins, label: "Primes", moduleId: "primes" },
+  { href: "/sites-contacts-utiles", icon: Globe, label: "Sites", moduleId: "sites" },
 ]
 
 export function BottomNav() {
   const pathname = usePathname()
+  const { canView, loading } = usePermissions()
+
+  const visible = navItems.filter((item) => {
+    if (!item.moduleId) return true
+    if (loading) return true
+    return canView(item.moduleId)
+  })
 
   return (
     // Keep the bottom nav below drawers/modals (many overlays use z-50).
     <nav className="fixed bottom-0 left-0 right-0 z-30 bg-card/80 backdrop-blur-xl border-t border-border safe-bottom">
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
-        {navItems.map((item) => {
+        {visible.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))
 
           return (

@@ -26,24 +26,31 @@ import { PulseLogo } from "./pulse-logo"
 import { useState } from "react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { signOut } from "@/lib/firebase/auth"
+import { usePermissions } from "@/hooks/use-permissions"
 
 interface SideDrawerProps {
   open: boolean
   onClose: () => void
 }
 
-const menuItems = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord", adminOnly: false },
-  { href: "/objectifs", icon: Target, label: "Objectifs", adminOnly: false },
-  { href: "/primes", icon: Coins, label: "Primes & Historique", adminOnly: false },
-  { href: "/equipes", icon: Users, label: "Equipes", adminOnly: false },
-  { href: "/sites-contacts-utiles", icon: Globe, label: "Sites & Contacts utiles", adminOnly: false },
-  { href: "/gestion-fournisseurs", icon: Truck, label: "Gestion & Fournisseurs", adminOnly: false },
-  { href: "/pilotage", icon: BarChart3, label: "Pilotage", adminOnly: false },
-  { href: "/diffusion", icon: Send, label: "Diffusion", adminOnly: false },
-  { href: "/centre-controle", icon: Shield, label: "Centre de contrôle", adminOnly: true },
-  { href: "/parametres", icon: Settings, label: "Parametres", adminOnly: false },
-  { href: "/aide", icon: HelpCircle, label: "Aide", adminOnly: false },
+const menuItems: Array<{
+  href: string
+  icon: any
+  label: string
+  moduleId?: string | string[]
+  match?: "all" | "any"
+}> = [
+  { href: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord", moduleId: "dashboard" },
+  { href: "/objectifs", icon: Target, label: "Objectifs", moduleId: "objectifs" },
+  { href: "/primes", icon: Coins, label: "Primes & Historique", moduleId: "primes" },
+  { href: "/equipes", icon: Users, label: "Equipes", moduleId: "equipes" },
+  { href: "/sites-contacts-utiles", icon: Globe, label: "Sites & Contacts utiles", moduleId: "sites" },
+  { href: "/gestion-fournisseurs", icon: Truck, label: "Gestion & Fournisseurs", moduleId: ["gestion", "fournisseurs", "sites"], match: "any" },
+  { href: "/pilotage", icon: BarChart3, label: "Pilotage", moduleId: "pilotage" },
+  { href: "/diffusion", icon: Send, label: "Diffusion", moduleId: "diffusion" },
+  { href: "/centre-controle", icon: Shield, label: "Centre de contrôle", moduleId: "centre_controle" },
+  { href: "/parametres", icon: Settings, label: "Parametres", moduleId: "parametres" },
+  { href: "/aide", icon: HelpCircle, label: "Aide" },
 ]
 
 function initials(name: string | null | undefined) {
@@ -66,6 +73,7 @@ export function SideDrawer({ open, onClose }: SideDrawerProps) {
   
   // Récupération des données utilisateur réelles via le contexte Auth
   const { user, profile } = useAuth()
+  const { canView, loading: permissionsLoading } = usePermissions()
 
   // Détermination des valeurs d'affichage avec fallback
   const displayName = profile?.displayName || user?.displayName || "Utilisateur"
@@ -135,7 +143,13 @@ export function SideDrawer({ open, onClose }: SideDrawerProps) {
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
             {menuItems
-              .filter((item) => !item.adminOnly || isAdmin)
+              .filter((item) => {
+                if (!item.moduleId) return true
+                if (permissionsLoading) return true
+                const ids = Array.isArray(item.moduleId) ? item.moduleId : [item.moduleId]
+                const check = (id: string) => canView(id)
+                return item.match === "any" ? ids.some(check) : ids.every(check)
+              })
               .map((item) => {
                 const isActive = pathname === item.href
 
