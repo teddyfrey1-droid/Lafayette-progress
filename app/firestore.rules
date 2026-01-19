@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Minimal "admin" check for now.
+    // For stronger RBAC, use custom claims managed server-side.
+    function isOwnerAdmin() {
+      return signedIn() && request.auth.token.email == 'teddy.frey1@gmail.com';
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if signedIn() && (userId == request.auth.uid || isOwnerAdmin());
+
+      allow create: if signedIn()
+        && userId == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.displayName is string
+        && request.resource.data.role in ['admin', 'manager', 'employee']
+        && ((request.resource.data.role == 'admin' && isOwnerAdmin()) || request.resource.data.role != 'admin')
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+
+      allow update: if signedIn() && (
+        // Self-update: cannot change uid/email/role
+        (userId == request.auth.uid
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.displayName is string
+          && request.resource.data.updatedAt is timestamp
+        )
+        || isOwnerAdmin()
+      );
+
+      allow delete: if isOwnerAdmin();
+    }
+  }
+}
