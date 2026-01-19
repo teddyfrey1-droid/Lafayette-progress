@@ -5,6 +5,7 @@ import { BottomNav } from "@/components/pulse/bottom-nav"
 import { MainGauge } from "@/components/pulse/main-gauge"
 import { CountdownTimer } from "@/components/pulse/countdown-timer"
 import { useCurrentUser } from "@/lib/use-current-user" 
+// 👇 Import du hook connecté à Firebase
 import { useObjectives } from "@/hooks/use-objectives" 
 import { Coins, Target, TrendingUp, Clock, Loader2, AlertCircle } from "lucide-react"
 import Link from "next/link"
@@ -13,33 +14,36 @@ import { useAuth } from "@/components/auth/auth-provider"
 
 export default function DashboardPage() {
   const { loading: authLoading } = useAuth()
-  const user = useCurrentUser() // Utilise le nouveau hook corrigé
+  const user = useCurrentUser()
+  // 👇 Récupération des données réelles depuis la base de données
   const { objectives, loading: objLoading } = useObjectives()
   
-  // 1. Récupération du prénom (Plus de "L'équipe")
+  // 1. Récupération du prénom
   const firstName = user.firstName || "Collaborateur";
 
-  // 2. Calcul du Pro-Rata (Temps Réel)
-  const userHours = user.contractHours || 35; // Vient du hook corrigé
+  // 2. Calcul du Pro-Rata (Heures contrat vs 35h)
+  const userHours = user.contractHours || 35;
   const baseHours = 35;
   const ratio = userHours / baseHours;
 
-  // 3. Calculs des Objectifs Firebase
+  // 3. Calculs dynamiques basés sur les objectifs actifs
   const stats = objectives.reduce((acc: any, obj: any) => {
     if (obj.isActive) {
        acc.totalObjectives++;
-       acc.totalPotential += obj.reward; // Récompense totale (Base 35h)
+       acc.totalPotential += obj.reward || 0; // Montant total possible pour cet objectif
        
-       // Calcul progression
-       const progressPercent = Math.min(100, Math.max(0, (obj.progress / obj.target) * 100));
+       // Calcul progression (0 à 100%)
+       const safeTarget = obj.target > 0 ? obj.target : 1;
+       const progressPercent = Math.min(100, Math.max(0, (obj.progress / safeTarget) * 100));
        acc.globalProgress += progressPercent;
 
-       // Si débloqué (ici on considère débloqué si on a atteint la cible)
-       // Vous pourrez affiner si c'est par paliers
+       // Calcul du montant DÉBLOQUÉ (Acquis)
+       // Cas 1 : Objectif terminé (100% atteint)
        if (obj.progress >= obj.target) {
          acc.unlockedAmount += obj.reward;
-       } else if (obj.paliers) {
-         // Si système de paliers, on additionne les récompenses des paliers atteints
+       } 
+       // Cas 2 : Système de paliers (On additionne chaque palier franchi)
+       else if (obj.paliers && obj.paliers.length > 0) {
          obj.paliers.forEach((p: any) => {
              if (obj.progress >= p.threshold) {
                  acc.unlockedAmount += p.reward;
@@ -50,23 +54,28 @@ export default function DashboardPage() {
     return acc;
   }, { totalPotential: 0, unlockedAmount: 0, globalProgress: 0, totalObjectives: 0 });
 
-  // Moyenne de progression pour la jauge
+  // Moyenne de progression globale pour la jauge centrale
   const mainProgress = stats.totalObjectives > 0 ? stats.globalProgress / stats.totalObjectives : 0;
-
-  // 4. Application du Ratio sur les montants
+  
+  // 4. Application du Ratio heures sur les montants finaux
   const potentialProRata = stats.totalPotential * ratio;
   const unlockedProRata = stats.unlockedAmount * ratio;
   const pendingProRata = potentialProRata - unlockedProRata;
 
-  // Configuration date fin du mois
+  // Configuration dates
   const endOfMonth = new Date();
   endOfMonth.setMonth(endOfMonth.getMonth() + 1);
   endOfMonth.setDate(0);
   endOfMonth.setHours(23, 59, 59, 999);
   const currentMonth = new Date().toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
 
+  // Écran de chargement
   if (authLoading || objLoading) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary w-8 h-8" /></div>
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="animate-spin text-primary w-8 h-8" />
+      </div>
+    )
   }
 
   return (
@@ -86,12 +95,12 @@ export default function DashboardPage() {
           {userHours !== 35 && (
             <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-xs text-accent font-medium">
                 <AlertCircle className="w-3 h-3" />
-                Base contrat : {userHours}h (Ajusté)
+                Base contrat : {userHours}h (Calcul ajusté)
             </div>
           )}
         </div>
 
-        {/* Jauge Principale (Montants Pro-ratés) */}
+        {/* Jauge Principale */}
         <div className="flex justify-center mb-6">
           <MainGauge
             progress={mainProgress}
@@ -109,6 +118,7 @@ export default function DashboardPage() {
 
         {/* Grille de Statistiques */}
         <div className="grid grid-cols-2 gap-3 mb-6">
+          {/* Carte 1 : Acquis */}
           <div className="p-4 rounded-2xl bg-card border border-border">
             <div className="flex items-center gap-2 mb-2">
               <Coins className="w-4 h-4 text-primary" />
@@ -118,6 +128,7 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground">Net estimé</p>
           </div>
 
+          {/* Carte 2 : Objectifs Actifs */}
           <div className="p-4 rounded-2xl bg-card border border-border">
             <div className="flex items-center gap-2 mb-2">
               <Target className="w-4 h-4 text-primary" />
@@ -127,16 +138,18 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground">Actifs</p>
           </div>
 
+          {/* Carte 3 : Potentiel Max */}
           <div className="p-4 rounded-2xl bg-card border border-border">
-            <div className="flex items-center gap-2 mb-2">
+             <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="w-4 h-4 text-primary" />
               <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Potentiel</p>
             </div>
             <p className="text-xl font-bold text-foreground">{potentialProRata.toFixed(0)}€</p>
             <p className="text-xs text-muted-foreground">Max ({userHours}h)</p>
           </div>
-
-          <div className="p-4 rounded-2xl bg-card border border-border">
+          
+          {/* Carte 4 : Status Live */}
+           <div className="p-4 rounded-2xl bg-card border border-border">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="w-4 h-4 text-primary" />
               <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Mise à jour</p>
@@ -147,18 +160,15 @@ export default function DashboardPage() {
         </div>
 
         {/* Liens de Navigation */}
-         <div className="space-y-2">
-          <Link
-            href="/objectifs"
-            className="flex items-center justify-between p-4 rounded-2xl bg-card border border-border hover:border-primary/50 transition-colors"
-          >
+        <div className="space-y-2">
+          <Link href="/objectifs" className="flex items-center justify-between p-4 rounded-2xl bg-card border border-border hover:border-primary/50 transition-colors">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                 <Target className="w-5 h-5 text-primary" />
               </div>
               <div>
                 <p className="text-sm font-medium text-foreground">Voir les objectifs</p>
-                <p className="text-xs text-muted-foreground">{stats.totalObjectives} actifs ce mois</p>
+                <p className="text-xs text-muted-foreground">{stats.totalObjectives} actifs</p>
               </div>
             </div>
              <div className="flex items-center gap-3">
@@ -169,10 +179,7 @@ export default function DashboardPage() {
             </div>
           </Link>
 
-          <Link
-            href="/primes"
-            className="flex items-center justify-between p-4 rounded-2xl bg-card border border-border hover:border-primary/50 transition-colors"
-          >
+          <Link href="/primes" className="flex items-center justify-between p-4 rounded-2xl bg-card border border-border hover:border-primary/50 transition-colors">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                 <Coins className="w-5 h-5 text-primary" />
@@ -182,7 +189,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-muted-foreground">Consultez vos primes passées</p>
               </div>
             </div>
-             <Coins className="w-5 h-5 text-muted-foreground" />
+            <Coins className="w-5 h-5 text-muted-foreground" />
           </Link>
         </div>
       </main>
