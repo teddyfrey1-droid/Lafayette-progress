@@ -1,61 +1,44 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState } from "react"
-import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore"
+import { doc, onSnapshot, setDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase/client"
 import { useAuth } from "./auth-provider"
-
-// 1. Définition de toutes les actions possibles dans l'app
-// C'est ici que vous rajouterez des lignes quand l'app grandira
-export const PERMISSIONS_SCHEMA = {
-  dashboard: { label: "Tableau de bord", actions: { view: "Voir", stats: "Voir stats financières" } },
-  objectives: { label: "Objectifs", actions: { view: "Voir", edit: "Modifier", create: "Créer", delete: "Supprimer" } },
-  primes: { label: "Primes", actions: { view: "Voir historique", validate: "Valider", pay: "Marquer payé", delete: "Supprimer historique" } },
-  suppliers: { label: "Fournisseurs", actions: { view: "Voir liste", create: "Ajouter", edit: "Modifier", delete: "Supprimer" } },
-  users: { label: "Utilisateurs", actions: { view: "Voir liste", invite: "Inviter", edit: "Modifier rôles", delete: "Bannir" } },
-  settings: { label: "Paramètres", actions: { view: "Accéder", manage_roles: "Gérer les droits (DANGER)" } }
-}
-
-type PermissionsMap = Record<string, Record<string, boolean>>;
+// On importe le schéma qu'on vient de créer pour ne pas surcharger ce fichier
+import { DEFAULT_ROLES, RBAC_SCHEMA } from "@/lib/rbac-schema"
 
 interface RBACContextType {
-  can: (resource: keyof typeof PERMISSIONS_SCHEMA, action: string) => boolean;
-  rolePermissions: Record<string, PermissionsMap>; // { manager: { suppliers: { delete: true } } }
-  updatePermission: (role: string, resource: string, action: string, value: boolean) => Promise<void>;
+  // Vérifie si l'utilisateur a le droit (ex: "objectifs", "edit")
+  can: (module: keyof typeof RBAC_SCHEMA, action: string) => boolean;
+  
+  // Données pour l'admin (liste des rôles et leurs droits)
+  roleDefinitions: any; 
+  userRole: string;
   loading: boolean;
+  
+  // Actions d'administration (Pour la future page "Gestion des accès")
+  updateRolePermissions: (roleKey: string, permissions: any) => Promise<void>;
+  createRole: (roleKey: string, label: string, baseRole?: string) => Promise<void>;
+  deleteRole: (roleKey: string) => Promise<void>;
 }
 
 const RBACContext = createContext<RBACContextType | null>(null);
 
 export function RBACProvider({ children }: { children: React.ReactNode }) {
   const { profile } = useAuth();
-  const [rolePermissions, setRolePermissions] = useState<Record<string, PermissionsMap>>({});
+  const [roleDefinitions, setRoleDefinitions] = useState<any>({});
   const [loading, setLoading] = useState(true);
 
-  // Initialisation par défaut si la base est vide
-  const defaultPermissions = {
-    admin: { "*": { "*": true } }, // Admin a tout
-    manager: { 
-      dashboard: { view: true, stats: true },
-      suppliers: { view: true, create: true, edit: true, delete: false }, // Manager ne peut pas supprimer par défaut
-      objectives: { view: true, edit: true },
-    },
-    employee: {
-      dashboard: { view: true },
-      objectives: { view: true },
-      primes: { view: true } // Employé ne voit que SES primes
-    }
-  };
-
+  // 1. Charger la configuration des rôles depuis Firestore (Collection: config / Doc: roles)
   useEffect(() => {
-    // Écoute en temps réel la configuration des rôles
-    const unsub = onSnapshot(doc(db, "config", "roles_permissions"), async (snapshot) => {
+    const unsub = onSnapshot(doc(db, "config", "roles"), async (snapshot) => {
       if (snapshot.exists()) {
-        setRolePermissions(snapshot.data() as any);
+        setRoleDefinitions(snapshot.data());
       } else {
-        // Si première installation, on écrit les défauts
-        await setDoc(doc(db, "config", "roles_permissions"), defaultPermissions);
-        setRolePermissions(defaultPermissions as any);
+        // Initialisation automatique si la config n'existe pas encore
+        console.log("⚠️ Initialisation RBAC : Création des rôles par défaut...");
+        await setDoc(doc(db, "config", "roles"), DEFAULT_ROLES);
+        setRoleDefinitions(DEFAULT_ROLES);
       }
       setLoading(false);
     });
@@ -63,36 +46,68 @@ export function RBACProvider({ children }: { children: React.ReactNode }) {
     return () => unsub();
   }, []);
 
-  // Fonction principale de vérification
-  const can = (resource: keyof typeof PERMISSIONS_SCHEMA, action: string) => {
+  // 2. Fonction de vérification universelle (Le cœur de la sécurité)
+  const can = (module: keyof typeof RBAC_SCHEMA, action: string) => {
+    // Si pas de rôle (pas connecté ou bug), on refuse tout
     if (!profile?.role) return false;
-    
-    const roleConfig = rolePermissions[profile.role];
-    if (!roleConfig) return false;
 
-    // 1. Super Admin Check
-    if (rolePermissions[profile.role]?.["*"]?.["*"]) return true;
+    // Le Super Admin (ou vous) a toujours tous les droits (God Mode)
+    if (profile.role === "super_admin" || profile.email === "teddy.frey1@gmail.com") return true;
 
-    // 2. Resource Check
-    const resConfig = roleConfig[resource];
-    if (!resConfig) return false;
+    // On récupère la config du rôle de l'utilisateur actuel
+    const userRoleConfig = roleDefinitions[profile.role];
+    if (!userRoleConfig) return false; // Rôle inconnu ou supprimé
 
-    // 3. Action Check
-    return resConfig[action] === true;
+    // Vérifier si le rôle a un accès total "*" (Admin simple)
+    if (userRoleConfig.permissions?.["*"]) return true;
+
+    // Vérifier le module spécifique (ex: "objectifs")
+    const moduleConfig = userRoleConfig.permissions?.[module];
+    if (!moduleConfig) return false;
+
+    // Vérifier l'action spécifique (ex: "edit") ou accès total au module ("*")
+    if (moduleConfig["*"] === true) return true;
+    return moduleConfig[action] === true;
   };
 
-  const updatePermission = async (role: string, resource: string, action: string, value: boolean) => {
-    const newPermissions = { ...rolePermissions };
-    if (!newPermissions[role]) newPermissions[role] = {};
-    if (!newPermissions[role][resource]) newPermissions[role][resource] = {};
+  // 3. Actions d'administration (Sera utilisé par la page "Gestion des accès")
+  
+  // Modifier les cases à cocher d'un rôle
+  const updateRolePermissions = async (roleKey: string, permissions: any) => {
+    const newRoles = { ...roleDefinitions };
+    if (!newRoles[roleKey]) return;
     
-    newPermissions[role][resource][action] = value;
+    newRoles[roleKey].permissions = permissions;
+    await setDoc(doc(db, "config", "roles"), newRoles);
+  };
+
+  // Créer un nouveau rôle (ex: "Stagiaire")
+  const createRole = async (roleKey: string, label: string, baseRole = "employe") => {
+    const newRoles = { ...roleDefinitions };
+    // On copie les permissions d'un rôle existant pour ne pas partir de zéro
+    const basePerms = roleDefinitions[baseRole]?.permissions || DEFAULT_ROLES.employe.permissions;
     
-    await setDoc(doc(db, "config", "roles_permissions"), newPermissions);
+    newRoles[roleKey] = { label, permissions: basePerms };
+    await setDoc(doc(db, "config", "roles"), newRoles);
+  };
+
+  // Supprimer un rôle
+  const deleteRole = async (roleKey: string) => {
+    const newRoles = { ...roleDefinitions };
+    delete newRoles[roleKey];
+    await setDoc(doc(db, "config", "roles"), newRoles);
   };
 
   return (
-    <RBACContext.Provider value={{ can, rolePermissions, updatePermission, loading }}>
+    <RBACContext.Provider value={{ 
+      can, 
+      roleDefinitions, 
+      userRole: profile?.role || "guest", 
+      loading,
+      updateRolePermissions,
+      createRole,
+      deleteRole
+    }}>
       {children}
     </RBACContext.Provider>
   );
