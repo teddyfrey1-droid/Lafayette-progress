@@ -88,24 +88,40 @@ export async function POST(req: Request) {
   }
 }
 
-// --- PATCH: MODIFIER UTILISATEUR (EMAIL INCLUS) ---
+// --- PATCH: MODIFIER UTILISATEUR (EMAIL, NOM, PRÉNOM INCLUS) ---
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { uid, email, role, contractHours, company } = body;
+    const { uid, email, firstName, lastName, role, contractHours, company } = body;
 
     console.log(`📝 [API] Mise à jour pour ${uid}`);
 
-    // 1. Mise à jour Auth (Email)
-    if (email) {
-      await adminAuth.updateUser(uid, { email });
+    // 1. Préparation des données Auth (Email & DisplayName)
+    const authUpdates: any = {};
+    if (email) authUpdates.email = email;
+    
+    // Recalcul du displayName si le nom ou prénom change
+    if (firstName || lastName) {
+        const newDisplayName = `${firstName || ""} ${lastName || ""}`.trim();
+        if (newDisplayName) authUpdates.displayName = newDisplayName;
+    }
+
+    // Mise à jour Auth seulement si nécessaire
+    if (Object.keys(authUpdates).length > 0) {
+      await adminAuth.updateUser(uid, authUpdates);
     }
 
     // 2. Mise à jour Firestore
     const updateData: any = { updatedAt: new Date() };
     if (email) updateData.email = email;
+    if (firstName) updateData.firstName = firstName;
+    if (lastName) updateData.lastName = lastName;
+    // On met aussi à jour le displayName dans Firestore pour qu'il soit synchro
+    if (firstName || lastName) {
+        updateData.displayName = `${firstName || ""} ${lastName || ""}`.trim();
+    }
     if (role) updateData.role = role;
-    if (contractHours) updateData.contractHours = Number(contractHours);
+    if (contractHours !== undefined) updateData.contractHours = Number(contractHours);
     if (company) updateData.company = company;
 
     await adminDb.collection("users").doc(uid).update(updateData);
