@@ -2,105 +2,148 @@
 
 import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
-import { Truck, ChevronRight, Globe, Settings, Lock } from "lucide-react"
-import Link from "next/link"
 import { PermissionGate } from "@/components/auth/permission-gate"
-import { usePermissions } from "@/hooks/use-permissions"
+import { useRBAC } from "@/components/auth/rbac-provider" // ✅ Nouveau système
+import { 
+  Truck, Globe, Laptop2, Shield, ChevronRight, Lock, Users, KeyRound 
+} from "lucide-react"
+import Link from "next/link"
+import { cn } from "@/lib/utils"
 
-export default function GestionFournisseursPage() {
-  const { canView, canEdit, loading } = usePermissions()
+export default function GestionHubPage() {
+  const { can, userRole, loading } = useRBAC()
 
-  const canSeeFournisseurs = loading ? true : canView("fournisseurs")
-  const canSeeSites = loading ? true : canView("sites")
-  const canSeeAdminSites = loading ? false : canEdit("gestion")
+  // Détermination du lien de gestion des droits selon le rôle
+  // Super Admin -> Centre de Contrôle (Tout)
+  // Gérant -> Gestion (Ses équipes)
+  const accessManagementLink = userRole === 'super_admin' ? '/centre-controle/acces' : '/gestion/acces';
+
+  if (loading) return <div className="min-h-screen bg-background" />
 
   return (
-    <PermissionGate moduleId={["gestion", "fournisseurs", "sites"]} match="any" redirect>
+    // On laisse l'accès large (dashboard) car le filtrage se fait à l'intérieur
+    <PermissionGate moduleId="dashboard" redirect>
       <div className="min-h-screen bg-background pb-32">
-      <Header />
+        <Header />
 
-      <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
-        {/* Page Header */}
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Gestion & Fournisseurs</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Gérez vos fournisseurs et outils internes</p>
-        </div>
+        <main className="px-4 py-6 max-w-lg mx-auto space-y-8">
+          
+          {/* Header de la page */}
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Gestion & Ressources</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Plateforme centrale des outils et de l'administration.
+            </p>
+          </div>
 
-        {/* Main Links */}
-        <section className="space-y-3">
-          {canSeeFournisseurs && (
-          <Link href="/fournisseurs" className="block">
-            <div className="pulse-card p-5 hover:shadow-lg transition-shadow">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/15 to-emerald-600/10 flex items-center justify-center">
-                  <Truck className="w-7 h-7 text-emerald-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-base mb-1">Fournisseurs</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Livraisons, délais, commerciaux et conditions de commande
-                  </p>
-                </div>
-                <ChevronRight className="w-5 h-5 text-muted-foreground" />
-              </div>
-            </div>
-          </Link>
-          )}
+          {/* --- SECTION 1 : OPÉRATIONNEL (Tout le monde selon droits) --- */}
+          <section className="space-y-3">
+            <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1 mb-2">
+                Outils du quotidien
+            </h2>
 
-          {canSeeSites && (
-          <Link href="/sites-contacts-utiles" className="block">
-            <div className="pulse-card p-5 hover:shadow-lg transition-shadow">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/15 to-blue-600/10 flex items-center justify-center">
-                  <Globe className="w-7 h-7 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-base mb-1">Sites & Contacts utiles</h3>
-                  <p className="text-xs text-muted-foreground">CAF, impôts, santé et autres ressources utiles</p>
-                </div>
-                <ChevronRight className="w-5 h-5 text-muted-foreground" />
-              </div>
-            </div>
-          </Link>
-          )}
-
-          {/* Section visible uniquement pour Manager, Directeur et Gérant */}
-          {canSeeAdminSites && (
-            <Link href="/gestion-fournisseurs/admin-sites" className="block">
-              <div className="pulse-card p-5 hover:shadow-lg transition-shadow border-primary/20">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/15 to-accent/10 flex items-center justify-center">
-                    <Settings className="w-7 h-7 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-base">Sites Admin</h3>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/15 text-primary font-semibold flex items-center gap-1">
-                        <Lock className="w-3 h-3" />
-                        ADMIN
-                      </span>
+            {/* 1. Fournisseurs */}
+            {can("fournisseurs", "view") && (
+                <Link href="/fournisseurs" className="block">
+                    <div className="pulse-card p-4 flex items-center gap-4 hover:bg-muted/40 transition-all active:scale-[0.98]">
+                        <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0 text-blue-600">
+                            <Truck className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h3 className="font-bold text-base text-foreground">Fournisseurs</h3>
+                            <p className="text-xs text-muted-foreground mt-0.5">Commandes, livraisons et contacts</p>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-muted-foreground/50" />
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Dood, Mal, outils internes et plateformes de livraison
-                    </p>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                </Link>
+            )}
+
+            {/* 2. Sites Utiles */}
+            {can("sites_utiles", "view") && (
+                <Link href="/sites-contacts-utiles" className="block">
+                    <div className="pulse-card p-4 flex items-center gap-4 hover:bg-muted/40 transition-all active:scale-[0.98]">
+                        <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0 text-emerald-600">
+                            <Globe className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h3 className="font-bold text-base text-foreground">Sites & Contacts</h3>
+                            <p className="text-xs text-muted-foreground mt-0.5">Ressources externes, CAF, Santé...</p>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-muted-foreground/50" />
+                    </div>
+                </Link>
+            )}
+
+            {/* 3. Sites Admin (Réservé) */}
+            {/* On affiche si on a accès aux params OU si on est manager */}
+            {(can("parametres", "access") || userRole === 'manager' || userRole === 'gerant') && (
+                <Link href="/gestion-fournisseurs/admin-sites" className="block">
+                    <div className="pulse-card p-4 flex items-center gap-4 hover:bg-muted/40 transition-all active:scale-[0.98]">
+                        <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0 text-amber-600">
+                            <Laptop2 className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                                <h3 className="font-bold text-base text-foreground">Sites Admin</h3>
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-bold border border-amber-200">RESTREINT</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">Plateformes de livraison & Outils internes</p>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-muted-foreground/50" />
+                    </div>
+                </Link>
+            )}
+          </section>
+
+          {/* --- SECTION 2 : ADMINISTRATION RH (Gérant / Super Admin) --- */}
+          {/* C'est ici que se trouve le bouton "Puissant" que vous vouliez */}
+          {can("equipes", "manage_permissions") && (
+            <section className="space-y-3 pt-2">
+                <div className="flex items-center gap-2 mb-2 ml-1">
+                    <Shield className="w-4 h-4 text-primary" />
+                    <h2 className="text-xs font-bold text-primary uppercase tracking-wider">
+                        Administration RH
+                    </h2>
                 </div>
-              </div>
-            </Link>
+
+                <Link 
+                    href={accessManagementLink}
+                    className="pulse-card p-5 flex items-center gap-4 hover:bg-muted/40 transition-all active:scale-[0.98] border-primary/30 bg-primary/5 shadow-sm"
+                >
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-primary text-white shadow-md shadow-primary/20">
+                        <KeyRound className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
+                            Gestion des Droits
+                        </h3>
+                        <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+                            Contrôle total des permissions par rôle.<br/>
+                            <span className="opacity-80">Définissez qui peut voir, modifier ou supprimer.</span>
+                        </p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-primary" />
+                </Link>
+
+                {/* Optionnel : Raccourci vers l'équipe si pas déjà dans la nav */}
+                <Link 
+                    href="/equipe"
+                    className="pulse-card p-4 flex items-center gap-4 hover:bg-muted/40 transition-all active:scale-[0.98]"
+                >
+                    <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0 text-purple-600">
+                        <Users className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-sm text-foreground">Annuaire de l'équipe</h3>
+                        <p className="text-xs text-muted-foreground">Liste des membres et contrats</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground/50" />
+                </Link>
+            </section>
           )}
-        </section>
 
-        {/* Info */}
-        <div className="pulse-card p-4 bg-muted/30">
-          <p className="text-xs text-muted-foreground">
-            Cette section regroupe tous les outils de gestion et les contacts de vos fournisseurs pour faciliter vos
-            commandes et suivis de livraisons.
-          </p>
-        </div>
-      </main>
-
-      <BottomNav />
+        </main>
+        <BottomNav />
       </div>
     </PermissionGate>
   )
