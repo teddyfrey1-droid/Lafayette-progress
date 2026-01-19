@@ -4,24 +4,31 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { LayoutDashboard, Target, Coins, Globe } from "lucide-react"
-import { usePermissions } from "@/hooks/use-permissions"
+// 👇 On remplace l'ancien hook par le nouveau
+import { useRBAC } from "@/components/auth/rbac-provider"
 
-const navItems: Array<{ href: string; icon: any; label: string; moduleId?: string }> = [
+// On met à jour les moduleId pour qu'ils matchent RBAC_SCHEMA
+const navItems: Array<{ href: string; icon: any; label: string; moduleId: string }> = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Accueil", moduleId: "dashboard" },
   { href: "/objectifs", icon: Target, label: "Objectifs", moduleId: "objectifs" },
   { href: "/primes", icon: Coins, label: "Primes", moduleId: "primes" },
-  { href: "/sites-contacts-utiles", icon: Globe, label: "Sites", moduleId: "sites" },
+  { href: "/sites-contacts-utiles", icon: Globe, label: "Sites", moduleId: "sites_utiles" }, // Attention: c'est "sites_utiles" dans le schéma
 ]
 
 export function BottomNav() {
   const pathname = usePathname()
-  const { canView, loading } = usePermissions()
+  const { can, loading } = useRBAC() // 👈 Nouveau système
 
   const visible = navItems.filter((item) => {
-    if (!item.moduleId) return true
+    // Pendant le chargement, on affiche tout pour éviter que le menu saute
     if (loading) return true
-    return canView(item.moduleId)
+    
+    // On vérifie si l'utilisateur a le droit de "view" (voir) ce module
+    return can(item.moduleId, "view")
   })
+
+  // Si l'utilisateur n'a accès à rien (bizarre mais possible), on cache la barre
+  if (!loading && visible.length === 0) return null;
 
   return (
     // Keep the bottom nav below drawers/modals (many overlays use z-50).
