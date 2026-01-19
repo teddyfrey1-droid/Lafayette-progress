@@ -7,8 +7,9 @@ import { PermissionGate } from "@/components/auth/permission-gate"
 import { usePermissions } from "@/hooks/use-permissions"
 import { useObjectives } from "@/hooks/use-objectives"
 import {
-  Target, TrendingUp, Clock, Plus, Edit3, Trash2, X, Check, Euro, Users,
-  Layers, AlertCircle, Save, Calculator, Wallet, ChevronDown, ChevronUp, Calendar, Loader2
+  Target, TrendingUp, TrendingDown, Clock, Plus, Edit3, Trash2, X, Check, Euro, Users,
+  Layers, AlertCircle, Save, Wallet, ChevronDown, ChevronUp, Calendar, Loader2,
+  Percent, Hash, AlertTriangle, ThumbsUp
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -20,11 +21,15 @@ import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { Badge } from "@/components/ui/badge"
 
 // Imports Firebase
-import { doc, updateDoc, addDoc, collection, onSnapshot, query, getDoc, setDoc } from "firebase/firestore"
+import { doc, updateDoc, addDoc, collection, onSnapshot, query, getDoc, setDoc, deleteDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase/client"
 
+// --- TYPES ---
+
+type ObjectiveDirection = "ascending" | "descending" // Monter (CA) ou Descendre (Erreurs)
 type TabValue = "objectifs" | "paliers" | "pilotage" | "equipe"
 
 interface EditingPalier {
@@ -42,6 +47,15 @@ interface TeamMember {
   contractHours: number
 }
 
+// Liste des modèles d'objectifs pour faciliter la création
+const OBJECTIVE_PRESETS = [
+  { id: "ca", label: "Chiffre d'Affaires", icon: Euro, unit: "€", direction: "ascending", desc: "Augmenter le revenu" },
+  { id: "error", label: "Taux d'erreur", icon: AlertTriangle, unit: "%", direction: "descending", desc: "Réduire les erreurs (qualité)" },
+  { id: "volume", label: "Volume Commandes", icon: Hash, unit: "cmd", direction: "ascending", desc: "Augmenter la production" },
+  { id: "satisfaction", label: "Satisfaction Client", icon: ThumbsUp, unit: "/5", direction: "ascending", desc: "Améliorer la notation" },
+  { id: "margin", label: "Marge Brute", icon: Percent, unit: "%", direction: "ascending", desc: "Optimiser la rentabilité" },
+]
+
 export default function PilotagePage() {
   const { canEdit } = usePermissions()
   const { objectives, loading: loadingObj } = useObjectives()
@@ -51,13 +65,12 @@ export default function PilotagePage() {
   const [baseHours, setBaseHours] = useState(35)
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   
-  // États d'édition & Modales
+  // États d'édition
   const [showEditHours, setShowEditHours] = useState(false)
   const [editingPalier, setEditingPalier] = useState<EditingPalier | null>(null)
   const [showAddPalier, setShowAddPalier] = useState<string | null>(null)
-  const [showObjectiveDetail, setShowObjectiveDetail] = useState<string | null>(null) // ID de l'objectif à afficher
+  const [showObjectiveDetail, setShowObjectiveDetail] = useState<string | null>(null)
   const [showAddObjective, setShowAddObjective] = useState(false)
-  const [showScheduleModal, setShowScheduleModal] = useState(false) // <--- PLANIFICATION
   
   const [budgetMax, setBudgetMax] = useState(2000)
   const [simulatedPaliers, setSimulatedPaliers] = useState<Record<string, Record<string, number>>>({})
@@ -65,18 +78,16 @@ export default function PilotagePage() {
 
   // 1. CHARGEMENT DES DONNÉES
   useEffect(() => {
-    // Équipe
     const unsubUsers = onSnapshot(query(collection(db, "users")), (snapshot) => {
       const members = snapshot.docs.map(doc => ({
         id: doc.id,
         name: doc.data().displayName || doc.data().email || "Inconnu",
         role: doc.data().role || "Employé",
-        contractHours: doc.data().contractHours || 35
+        contractHours: Number(doc.data().contractHours) || 35
       }))
       setTeamMembers(members)
     })
 
-    // Config (Base horaires)
     const loadConfig = async () => {
         const docSnap = await getDoc(doc(db, "config", "pilotage"));
         if (docSnap.exists()) {
@@ -103,7 +114,7 @@ export default function PilotagePage() {
     }
   }, [objectives])
 
-  // 3. CALCULS EN TEMPS RÉEL (Simulation)
+  // 3. CALCULS SIMULATION
   const simulationData = useMemo(() => {
     const objectiveCosts: any[] = []
     let totalCost = 0
@@ -114,15 +125,17 @@ export default function PilotagePage() {
       let objCost = 0
       const paliersList: any[] = []
 
-      if (obj.rewardType === 'fixed') {
-          objCost = obj.fixedReward || 0;
-      } 
-      else if (obj.paliers) {
+      // Logique Paliers
+      if (obj.paliers) {
           obj.paliers.forEach((p: any) => {
             const reward = simulatedPaliers[obj.id]?.[p.id] ?? p.reward
             objCost += reward
             paliersList.push({ id: p.id, name: p.name, reward })
           })
+      } 
+      // Logique Prime Fixe (Legacy fallback)
+      else {
+          objCost = obj.fixedReward || 0;
       }
 
       objectiveCosts.push({ id: obj.id, title: obj.title, cost: objCost, paliers: paliersList })
@@ -134,17 +147,27 @@ export default function PilotagePage() {
       return sum + (totalCost * ratio);
     }, 0)
 
-    const prime35h = totalCost;
-
     return {
       objectiveCosts,
-      totalCost,
       teamTotalCost: Math.round(teamTotalCost),
-      prime35h,
       budgetDiff: budgetMax - Math.round(teamTotalCost),
       isOverBudget: teamTotalCost > budgetMax,
     }
   }, [objectives, simulatedPaliers, baseHours, budgetMax, teamMembers, activeTab])
+
+  // --- HELPER PROGRESSION ---
+  const calculateProgress = (current: number, target: number, direction: ObjectiveDirection) => {
+      if (direction === 'descending') {
+          // Pour "Moins de 1%", si on est à 5%, c'est 0% de réussite. Si on est à 0.5%, c'est 100%.
+          // On assume une base de départ (ex: 10% d'erreur) pour l'affichage, ou on simplifie.
+          // Simplification : Si current <= target, c'est gagné.
+          if (current <= target) return 100;
+          // Sinon on affiche une jauge inverse simple : Target / Current (plus current est grand, plus ratio est petit)
+          return Math.max(0, Math.min(100, (target / (current || 1)) * 100));
+      }
+      // Standard Ascending
+      return Math.min(100, Math.max(0, (current / (target || 1)) * 100));
+  }
 
   // --- ACTIONS FIREBASE ---
 
@@ -191,14 +214,14 @@ export default function PilotagePage() {
       }
   }
 
-  // Paliers CRUD
+  // GESTION PALIERS
   const handleAddPalierConfirm = async (objectiveId: string, name: string, threshold: number, reward: number) => {
       const obj = objectives.find((o: any) => o.id === objectiveId);
       if(!obj) return;
 
       const newPalier = { id: `p-${Date.now()}`, name, threshold, reward };
       const newPaliers = [...(obj.paliers || []), newPalier];
-      const newReward = newPaliers.reduce((acc, p) => acc + p.reward, 0);
+      const newReward = newPaliers.reduce((acc:any, p:any) => acc + p.reward, 0);
 
       await updateDoc(doc(db, "objectives", objectiveId), { paliers: newPaliers, reward: newReward });
       setShowAddPalier(null);
@@ -233,15 +256,30 @@ export default function PilotagePage() {
       toast({ title: "Palier supprimé" });
   }
 
-  const handleCreateObjective = async (title: string) => {
-      await addDoc(collection(db, "objectives"), {
-          title, description: "Nouvel objectif", isActive: true, type: "secondary", target: 100, unit: "pts", reward: 0, progress: 0, paliers: [], createdAt: new Date()
-      });
-      setShowAddObjective(false);
-      toast({ title: "Objectif créé" });
+  // CRÉATION OBJECTIF AVANCÉE
+  const handleCreateObjective = async (data: any) => {
+      try {
+        await addDoc(collection(db, "objectives"), {
+            title: data.title,
+            description: data.description || "",
+            isActive: true,
+            type: "secondary", // Défaut, modifiable après
+            target: Number(data.target),
+            unit: data.unit,
+            direction: data.direction, // "ascending" | "descending"
+            reward: 0,
+            progress: data.direction === "descending" ? Number(data.target) * 2 : 0, // Si descendant, on commence "haut" pour simuler
+            paliers: [],
+            createdAt: new Date()
+        });
+        setShowAddObjective(false);
+        toast({ title: "Objectif créé avec succès" });
+      } catch(e) {
+        toast({ title: "Erreur création", variant: "destructive" });
+      }
   }
 
-  if (loadingObj) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin"/></div>;
+  if (loadingObj) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary w-8 h-8"/></div>;
 
   return (
     <PermissionGate moduleId="pilotage" redirect>
@@ -249,23 +287,20 @@ export default function PilotagePage() {
       <Header />
 
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
-        {/* Page Header */}
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Pilotage</h1>
             <p className="text-sm text-muted-foreground mt-0.5">Gérez les objectifs et les primes</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="rounded-xl gap-2 bg-transparent" onClick={() => setShowScheduleModal(true)}>
-              <Calendar className="w-4 h-4" /> Planifier
-            </Button>
             <Button variant="outline" size="sm" className="rounded-xl gap-2 bg-transparent" onClick={() => setShowEditHours(true)}>
               <Clock className="w-4 h-4" /> {baseHours}h
             </Button>
           </div>
         </div>
 
-        {/* KPI Summary */}
+        {/* KPIs */}
         <div className="grid grid-cols-3 gap-3">
           <div className="pulse-card p-4 text-center">
             <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -298,87 +333,104 @@ export default function PilotagePage() {
             <TabsTrigger value="equipe" className="rounded-lg text-xs font-medium">Équipe</TabsTrigger>
           </TabsList>
 
-          {/* OBJECTIFS */}
+          {/* --- ONGLET 1 : OBJECTIFS --- */}
           <TabsContent value="objectifs" className="space-y-4 mt-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-sm">Liste des objectifs</h2>
+              <h2 className="font-semibold text-sm">Définition des objectifs</h2>
               <Button size="sm" variant="outline" className="rounded-xl gap-1 bg-transparent" onClick={() => setShowAddObjective(true)}>
                 <Plus className="w-4 h-4" /> Ajouter
               </Button>
             </div>
+
             <div className="space-y-3">
-              {objectives.map((obj: any) => (
-                <div key={obj.id} className="pulse-card p-4 cursor-pointer" onClick={() => setShowObjectiveDetail(obj.id)}>
-                  <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-3">
-                        <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", obj.type === "principal" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground")}>
-                            {obj.type === "principal" ? <Target className="w-5 h-5"/> : <TrendingUp className="w-5 h-5"/>}
+              {objectives.map((obj: any) => {
+                const isDescending = obj.direction === 'descending';
+                const progressPercent = calculateProgress(obj.progress, obj.target, obj.direction);
+
+                return (
+                  <div key={obj.id} className="pulse-card p-4 cursor-pointer" onClick={() => setShowObjectiveDetail(obj.id)}>
+                    <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", obj.type === "principal" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground")}>
+                              {isDescending ? <TrendingDown className="w-5 h-5"/> : <TrendingUp className="w-5 h-5"/>}
+                          </div>
+                          <div>
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-medium text-sm">{obj.title}</h3>
+                                {isDescending && <Badge variant="destructive" className="text-[9px] px-1 h-4">Réduire</Badge>}
+                              </div>
+                              <p className="text-xs text-muted-foreground">{obj.paliers?.length || 0} paliers • {obj.reward}€ max</p>
+                          </div>
                         </div>
-                        <div>
-                            <h3 className="font-medium text-sm">{obj.title}</h3>
-                            <p className="text-xs text-muted-foreground">{obj.paliers?.length || 0} paliers • {obj.reward}€ max</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">{obj.isActive ? "Actif" : "Inactif"}</span>
-                          <Switch checked={obj.isActive} onCheckedChange={() => handleToggleActive(obj)} onClick={(e) => e.stopPropagation()} />
-                      </div>
-                  </div>
-                  <div className="flex items-center gap-2 mt-3">
-                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${Math.min(100, (obj.progress / obj.target) * 100)}%` }} />
+                        <Switch checked={obj.isActive} onCheckedChange={() => handleToggleActive(obj)} onClick={(e) => e.stopPropagation()} />
                     </div>
-                    <span className="text-xs font-medium text-muted-foreground">
-                        {Math.round(Math.min(100, (obj.progress / obj.target) * 100))}%
-                    </span>
+                    
+                    <div className="flex items-center gap-2 mt-3">
+                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div className={cn("h-full rounded-full transition-all", isDescending ? "bg-red-500" : "bg-primary")} style={{ width: `${progressPercent}%` }} />
+                      </div>
+                      <span className="text-xs font-medium text-muted-foreground">
+                          {obj.progress?.toLocaleString()} / {obj.target?.toLocaleString()} {obj.unit}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </TabsContent>
 
-          {/* PALIERS */}
+          {/* --- ONGLET 2 : PALIERS --- */}
           <TabsContent value="paliers" className="space-y-4 mt-4">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-sm">Gestion des paliers</h2>
             </div>
-            {objectives.filter((o:any) => o.isActive).map((obj: any) => (
-              <div key={obj.id} className="space-y-3">
-                <div className="flex items-center justify-between bg-muted/30 p-2 rounded-lg">
-                  <div className="flex items-center gap-2"><Layers className="w-4 h-4 text-muted-foreground" /><span className="text-sm font-medium">{obj.title}</span></div>
-                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowAddPalier(obj.id)}><Plus className="w-3 h-3 mr-1" /> Palier</Button>
-                </div>
-                <div className="space-y-2 pl-2 border-l-2 border-muted">
-                  {obj.paliers?.map((palier: any, index: number) => (
-                    <div key={palier.id} className="pulse-card p-3 flex items-center gap-3">
-                      <div className="w-6 h-6 rounded-md bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">{index + 1}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2"><span className="text-sm font-medium">{palier.name}</span></div>
-                        <p className="text-xs text-muted-foreground">Seuil : {palier.threshold.toLocaleString()}</p>
+            {objectives.filter((o:any) => o.isActive).map((obj: any) => {
+               const isDescending = obj.direction === 'descending';
+               return (
+                <div key={obj.id} className="space-y-3">
+                  <div className="flex items-center justify-between bg-muted/30 p-2 rounded-lg">
+                    <div className="flex items-center gap-2"><Layers className="w-4 h-4 text-muted-foreground" /><span className="text-sm font-medium">{obj.title}</span></div>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowAddPalier(obj.id)}><Plus className="w-3 h-3 mr-1" /> Palier</Button>
+                  </div>
+                  <div className="space-y-2 pl-2 border-l-2 border-muted">
+                    {obj.paliers?.sort((a:any, b:any) => isDescending ? b.threshold - a.threshold : a.threshold - b.threshold).map((palier: any, index: number) => (
+                      <div key={palier.id} className="pulse-card p-3 flex items-center gap-3">
+                        <div className="w-6 h-6 rounded-md bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">{index + 1}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2"><span className="text-sm font-medium">{palier.name}</span></div>
+                          <p className="text-xs text-muted-foreground">
+                             {isDescending ? "Si inférieur à" : "Si supérieur à"} : <strong>{palier.threshold} {obj.unit}</strong>
+                          </p>
+                        </div>
+                        <div className="text-right"><p className="text-sm font-bold text-primary">+{palier.reward}€</p></div>
+                        <Button size="icon" variant="ghost" className="w-8 h-8" onClick={() => setEditingPalier({ objectiveId: obj.id, palierId: palier.id, name: palier.name, threshold: palier.threshold, reward: palier.reward })}><Edit3 className="w-4 h-4 text-muted-foreground" /></Button>
                       </div>
-                      <div className="text-right"><p className="text-sm font-bold text-primary">+{palier.reward}€</p></div>
-                      <Button size="icon" variant="ghost" className="w-8 h-8" onClick={() => setEditingPalier({ objectiveId: obj.id, palierId: palier.id, name: palier.name, threshold: palier.threshold, reward: palier.reward })}><Edit3 className="w-4 h-4 text-muted-foreground" /></Button>
-                    </div>
-                  ))}
+                    ))}
+                    {(!obj.paliers || obj.paliers.length === 0) && <p className="text-xs text-muted-foreground italic pl-2">Aucun palier défini.</p>}
+                  </div>
                 </div>
-              </div>
-            ))}
+               )
+            })}
           </TabsContent>
 
-          {/* PILOTAGE */}
+          {/* --- ONGLET 3 : PILOTAGE --- */}
           <TabsContent value="pilotage" className="space-y-4 mt-4">
             <div className="pulse-card p-4">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"><Wallet className="w-5 h-5 text-primary" /></div>
-                <div className="flex-1"><h3 className="font-semibold text-sm">Budget & Simulation</h3><p className="text-xs text-muted-foreground">Les modifications ici impactent les primes réelles</p></div>
+                <div className="flex-1"><h3 className="font-semibold text-sm">Simulation Budgétaire</h3><p className="text-xs text-muted-foreground">Ajustez pour voir l'impact global</p></div>
               </div>
               <div className="mb-4">
-                <Label className="text-xs text-muted-foreground mb-2 block">Budget maximum alloué</Label>
-                <div className="flex items-center gap-2"><Input type="number" value={budgetMax} onChange={(e) => setBudgetMax(Number(e.target.value))} className="rounded-xl text-lg font-bold" /><span className="text-lg font-bold text-muted-foreground">€</span></div>
+                <Label className="text-xs text-muted-foreground mb-2 block">Budget Max (€)</Label>
+                <Input type="number" value={budgetMax} onChange={(e) => setBudgetMax(Number(e.target.value))} className="rounded-xl text-lg font-bold" />
               </div>
               <div className={cn("p-4 rounded-xl mb-4", simulationData.isOverBudget ? "bg-red-500/10 border border-red-500/30" : "bg-green-500/10 border border-green-500/30")}>
-                <div className="flex items-center justify-between mb-2"><span className="text-xs font-medium">Coût total équipe</span><span className={cn("text-lg font-bold", simulationData.isOverBudget ? "text-red-400" : "text-green-400")}>{simulationData.teamTotalCost}€</span></div>
+                <div className="flex items-center justify-between mb-2"><span className="text-xs font-medium">Coût projeté</span><span className={cn("text-lg font-bold", simulationData.isOverBudget ? "text-red-400" : "text-green-400")}>{simulationData.teamTotalCost}€</span></div>
                 <div className="h-3 bg-muted rounded-full overflow-hidden mb-2"><div className={cn("h-full rounded-full transition-all", simulationData.isOverBudget ? "bg-red-500" : "bg-green-500")} style={{ width: `${Math.min((simulationData.teamTotalCost / budgetMax) * 100, 100)}%` }} /></div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Budget: {budgetMax}€</span>
+                  <span className={cn("font-semibold", simulationData.isOverBudget ? "text-red-400" : "text-green-400")}>{simulationData.isOverBudget ? "Dépassement: " : "Reste: "}{Math.abs(simulationData.budgetDiff)}€</span>
+                </div>
               </div>
             </div>
 
@@ -407,29 +459,26 @@ export default function PilotagePage() {
                 ))}
               </div>
               <div className="mt-4 pt-4 border-t border-border">
-                <Button className="w-full rounded-xl" onClick={handleSaveSimulation}><Save className="w-4 h-4 mr-2" /> Appliquer la simulation (Enregistrer)</Button>
+                <Button className="w-full rounded-xl" onClick={handleSaveSimulation}><Save className="w-4 h-4 mr-2" /> Appliquer la simulation</Button>
               </div>
             </div>
           </TabsContent>
 
-          {/* EQUIPE */}
+          {/* --- ONGLET 4 : EQUIPE --- */}
           <TabsContent value="equipe" className="space-y-4 mt-4">
             <div className="flex items-center justify-between"><h2 className="font-semibold text-sm">Primes au prorata</h2><span className="text-xs text-muted-foreground">Base {baseHours}h</span></div>
             <div className="space-y-3">
               {teamMembers.map((member) => {
                 const ratio = member.contractHours / baseHours;
-                const potentialPrime = Math.round(simulationData.totalCost * ratio);
+                const potentialPrime = Math.round(simulationData.teamTotalCost * (ratio / teamMembers.length)); // Approximatif pour visuel
                 return (
                   <div key={member.id} className="pulse-card p-4">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/80 to-accent/80 flex items-center justify-center"><span className="text-xs font-bold text-white">{member.name.substring(0,2).toUpperCase()}</span></div>
                       <div className="flex-1 min-w-0"><p className="font-medium text-sm truncate">{member.name}</p><p className="text-xs text-muted-foreground">{member.role}</p></div>
-                      <div className="text-right"><p className="text-lg font-bold">{potentialPrime}€</p><p className="text-[10px] text-muted-foreground">potentiel</p></div>
+                      <div className="text-right"><p className="text-lg font-bold">{member.contractHours}h</p><p className="text-[10px] text-muted-foreground">contrat</p></div>
                     </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-4"><div><span className="text-muted-foreground">Contrat:</span> <span className="font-medium">{member.contractHours}h</span></div><div><span className="text-muted-foreground">Ratio:</span> <span className="font-medium">{Math.round(ratio * 100)}%</span></div></div>
-                      <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(100, ratio * 100)}%` }} /></div>
-                    </div>
+                    <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(100, ratio * 100)}%` }} /></div>
                   </div>
                 )
               })}
@@ -442,16 +491,12 @@ export default function PilotagePage() {
 
       {/* 1. EDIT HEURES */}
       {showEditHours && (
-        <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm">
-          <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-4 pb-8">
-            <div className="w-12 h-1 bg-muted rounded-full mx-auto mb-4" />
-            <h2 className="font-semibold mb-4">Base horaire de référence</h2>
+        <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={() => setShowEditHours(false)}>
+          <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
+            <h2 className="font-semibold mb-4 text-lg">Configuration Horaire</h2>
             <div className="space-y-4">
-              <div><Label className="text-sm">Heures temps plein</Label><Input type="number" value={baseHours} onChange={(e) => setBaseHours(Number(e.target.value))} className="rounded-xl mt-2" /></div>
-              <div className="flex gap-2">
-                  <Button variant="outline" className="flex-1" onClick={() => setShowEditHours(false)}>Annuler</Button>
-                  <Button className="flex-1" onClick={handleUpdateBaseHours}><Save className="w-4 h-4 mr-2" /> Enregistrer</Button>
-              </div>
+              <div><Label className="text-sm">Heures temps plein (référence)</Label><Input type="number" value={baseHours} onChange={(e) => setBaseHours(Number(e.target.value))} className="rounded-xl mt-2" /></div>
+              <Button className="w-full rounded-xl" onClick={handleUpdateBaseHours}><Save className="w-4 h-4 mr-2" /> Enregistrer</Button>
             </div>
           </div>
         </div>
@@ -459,15 +504,14 @@ export default function PilotagePage() {
 
       {/* 2. EDIT PALIER */}
       {editingPalier && (
-        <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm">
-          <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-4 pb-8">
-            <div className="w-12 h-1 bg-muted rounded-full mx-auto mb-4" />
-            <h2 className="font-semibold mb-6">Modifier le palier</h2>
+        <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={() => setEditingPalier(null)}>
+          <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
+            <h2 className="font-semibold mb-6 text-lg">Modifier le palier</h2>
             <div className="space-y-4">
-              <div><Label className="text-sm">Nom</Label><Input value={editingPalier.name} onChange={(e) => setEditingPalier({ ...editingPalier, name: e.target.value })} className="rounded-xl mt-1" /></div>
-              <div><Label className="text-sm">Seuil</Label><Input type="number" value={editingPalier.threshold} onChange={(e) => setEditingPalier({ ...editingPalier, threshold: Number(e.target.value) })} className="rounded-xl mt-1" /></div>
-              <div><Label className="text-sm">Récompense (€)</Label><Input type="number" value={editingPalier.reward} onChange={(e) => setEditingPalier({ ...editingPalier, reward: Number(e.target.value) })} className="rounded-xl mt-1" /></div>
-              <div className="flex gap-3">
+              <div><Label>Nom</Label><Input value={editingPalier.name} onChange={(e) => setEditingPalier({ ...editingPalier, name: e.target.value })} className="rounded-xl mt-1" /></div>
+              <div><Label>Seuil Cible</Label><Input type="number" value={editingPalier.threshold} onChange={(e) => setEditingPalier({ ...editingPalier, threshold: Number(e.target.value) })} className="rounded-xl mt-1" /></div>
+              <div><Label>Prime (€)</Label><Input type="number" value={editingPalier.reward} onChange={(e) => setEditingPalier({ ...editingPalier, reward: Number(e.target.value) })} className="rounded-xl mt-1" /></div>
+              <div className="flex gap-3 pt-2">
                 <Button variant="destructive" className="flex-1 rounded-xl" onClick={handleDeletePalier}><Trash2 className="w-4 h-4 mr-2" /> Supprimer</Button>
                 <Button className="flex-1 rounded-xl" onClick={handleUpdatePalierConfirm}><Save className="w-4 h-4 mr-2" /> Enregistrer</Button>
               </div>
@@ -478,34 +522,22 @@ export default function PilotagePage() {
 
       {/* 3. ADD PALIER */}
       {showAddPalier && (
-        <AddPalierModal onClose={() => setShowAddPalier(null)} onConfirm={(name, threshold, reward) => handleAddPalierConfirm(showAddPalier, name, threshold, reward)} />
+        <AddPalierModal 
+            onClose={() => setShowAddPalier(null)} 
+            onConfirm={(n, t, r) => handleAddPalierConfirm(showAddPalier, n, t, r)}
+            objective={objectives.find((o:any) => o.id === showAddPalier)} 
+        />
       )}
 
-      {/* 4. ADD OBJECTIF (SIMPLE) */}
+      {/* 4. ADD OBJECTIVE (AVANCÉ) */}
       {showAddObjective && (
-          <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm flex items-end justify-center sm:items-center">
-              <div className="bg-card w-full max-w-sm rounded-t-3xl sm:rounded-2xl p-6 space-y-4">
-                  <h3 className="font-bold text-lg">Nouvel Objectif</h3>
-                  <form onSubmit={(e: any) => { e.preventDefault(); handleCreateObjective(e.target.title.value) }}>
-                      <div className="space-y-2">
-                          <Label>Titre de l'objectif</Label>
-                          <Input name="title" placeholder="Ex: Vente Produits Frais" required />
-                      </div>
-                      <div className="pt-2 flex gap-3">
-                          <Button type="button" variant="outline" className="flex-1" onClick={() => setShowAddObjective(false)}>Annuler</Button>
-                          <Button type="submit" className="flex-1">Créer</Button>
-                      </div>
-                  </form>
-              </div>
-          </div>
+          <AddObjectiveAdvancedModal 
+            onClose={() => setShowAddObjective(false)} 
+            onConfirm={handleCreateObjective} 
+          />
       )}
 
-      {/* 5. PLANIFICATION / CALENDRIER */}
-      {showScheduleModal && (
-        <ScheduleObjectivesModal onClose={() => setShowScheduleModal(false)} />
-      )}
-
-      {/* 6. DETAIL OBJECTIF */}
+      {/* 5. DETAIL OBJECTIF */}
       {showObjectiveDetail && (
         <ObjectiveDetailModal 
             objectiveId={showObjectiveDetail} 
@@ -520,26 +552,121 @@ export default function PilotagePage() {
   )
 }
 
-// --- SOUS-COMPOSANTS MODALES ---
+// --- SOUS-COMPOSANTS ---
 
-function AddPalierModal({ onClose, onConfirm }: { onClose: () => void, onConfirm: (n: string, t: number, r: number) => void }) {
+function AddObjectiveAdvancedModal({ onClose, onConfirm }: { onClose: () => void, onConfirm: (data: any) => void }) {
+    const [selectedPreset, setSelectedPreset] = useState<string>("ca")
+    const [title, setTitle] = useState("Chiffre d'Affaires")
+    const [target, setTarget] = useState("")
+    const [description, setDescription] = useState("")
+
+    // Met à jour les champs quand on change de preset
+    useEffect(() => {
+        const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)
+        if(p) {
+            setTitle(p.label)
+            setDescription(p.desc)
+        }
+    }, [selectedPreset])
+
+    const handleSubmit = () => {
+        const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)!
+        onConfirm({
+            title, description, target,
+            unit: p.unit,
+            direction: p.direction
+        })
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm flex items-end sm:items-center justify-center" onClick={onClose}>
+            <div className="bg-card w-full max-w-md rounded-t-3xl sm:rounded-2xl p-6 space-y-6 pb-10" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center">
+                    <h2 className="text-lg font-bold">Nouvel Objectif</h2>
+                    <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5"/></Button>
+                </div>
+
+                <div className="space-y-4">
+                    {/* Selecteur de Type */}
+                    <div>
+                        <Label className="mb-2 block">Type d'objectif</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {OBJECTIVE_PRESETS.map(preset => (
+                                <button 
+                                    key={preset.id}
+                                    onClick={() => setSelectedPreset(preset.id)}
+                                    className={cn(
+                                        "flex flex-col items-center justify-center gap-1 p-3 rounded-xl border transition-all text-xs text-center h-20",
+                                        selectedPreset === preset.id 
+                                            ? "border-primary bg-primary/10 text-primary font-semibold ring-2 ring-primary/20" 
+                                            : "border-border bg-muted/20 text-muted-foreground hover:bg-muted"
+                                    )}
+                                >
+                                    <preset.icon className="w-5 h-5" />
+                                    <span>{preset.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div><Label>Titre personnalisé</Label><Input value={title} onChange={e => setTitle(e.target.value)} className="mt-1.5"/></div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label>Cible à atteindre</Label>
+                            <Input type="number" value={target} onChange={e => setTarget(e.target.value)} placeholder="0" className="mt-1.5 font-bold" />
+                        </div>
+                        <div>
+                            <Label>Unité</Label>
+                            <div className="flex h-10 items-center justify-center rounded-md border bg-muted font-bold text-muted-foreground mt-1.5">
+                                {OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)?.unit}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-blue-50 p-3 rounded-lg text-xs text-blue-700 flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                        {OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)?.direction === 'descending' 
+                            ? "Info : Pour cet objectif, la progression augmentera quand la valeur diminuera (ex: moins d'erreurs)." 
+                            : "Info : La progression augmentera quand la valeur augmentera (ex: plus de CA)."}
+                    </div>
+
+                    <Button className="w-full py-6 text-base" onClick={handleSubmit} disabled={!target}>Créer l'objectif</Button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function AddPalierModal({ onClose, onConfirm, objective }: { onClose: () => void, onConfirm: (n: string, t: number, r: number) => void, objective: any }) {
     const [name, setName] = useState("")
     const [threshold, setThreshold] = useState("")
     const [reward, setReward] = useState("")
+    
+    const isDescending = objective?.direction === 'descending'
 
     return (
-        <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm">
-          <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-4 pb-8">
-            <div className="w-12 h-1 bg-muted rounded-full mx-auto mb-4" />
-            <h2 className="font-semibold mb-6">Ajouter un palier</h2>
+        <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={onClose}>
+          <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
+            <h2 className="font-semibold mb-6 text-lg">Ajouter un palier</h2>
             <div className="space-y-4">
-              <div><Label className="text-sm">Nom</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Niveau 1" className="rounded-xl mt-1" /></div>
-              <div><Label className="text-sm">Seuil</Label><Input type="number" value={threshold} onChange={e => setThreshold(e.target.value)} placeholder="1000" className="rounded-xl mt-1" /></div>
-              <div><Label className="text-sm">Récompense (€)</Label><Input type="number" value={reward} onChange={e => setReward(e.target.value)} placeholder="50" className="rounded-xl mt-1" /></div>
+              <div><Label>Nom</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Niveau 1" className="rounded-xl mt-1" /></div>
+              
+              <div>
+                  <Label>
+                      {isDescending ? `Seuil max autorisé (${objective.unit})` : `Seuil à atteindre (${objective.unit})`}
+                  </Label>
+                  <Input type="number" value={threshold} onChange={e => setThreshold(e.target.value)} placeholder="1000" className="rounded-xl mt-1" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                      {isDescending ? "La prime sera débloquée si la valeur est EN-DESSOUS de ce chiffre." : "La prime sera débloquée si la valeur est AU-DESSUS de ce chiffre."}
+                  </p>
+              </div>
+
+              <div><Label>Récompense (€)</Label><Input type="number" value={reward} onChange={e => setReward(e.target.value)} placeholder="50" className="rounded-xl mt-1" /></div>
+              
               <Button className="w-full rounded-xl" onClick={() => onConfirm(name, Number(threshold), Number(reward))} disabled={!name || !threshold}>
                 <Plus className="w-4 h-4 mr-2" /> Ajouter
               </Button>
-              <Button variant="ghost" className="w-full" onClick={onClose}>Annuler</Button>
             </div>
           </div>
         </div>
@@ -548,114 +675,40 @@ function AddPalierModal({ onClose, onConfirm }: { onClose: () => void, onConfirm
 
 function ObjectiveDetailModal({ objectiveId, onClose, objectivesList }: { objectiveId: string, onClose: () => void, objectivesList: any[] }) {
   const objective = objectivesList.find((o) => o.id === objectiveId)
+  const handleDelete = async () => {
+      if(confirm("Supprimer cet objectif ?")) {
+          await deleteDoc(doc(db, "objectives", objectiveId))
+          onClose()
+      }
+  }
+  
   if (!objective) return null
 
-  // Fonction pour mettre à jour directement depuis le détail
-  const updateField = async (field: string, value: any) => {
-      await updateDoc(doc(db, "objectives", objectiveId), { [field]: value });
-  }
-
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={onClose}>
-      <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 bg-card rounded-t-3xl p-4 border-b border-border">
-          <div className="w-12 h-1 bg-muted rounded-full mx-auto mb-4" />
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold">Détails de l'objectif</h2>
+    <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-card w-full max-w-sm rounded-2xl p-6 space-y-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-between items-start">
+            <div>
+                <h2 className="font-bold text-lg">{objective.title}</h2>
+                <Badge variant="outline" className="mt-1">{objective.direction === 'descending' ? 'Objectif de réduction' : 'Objectif de croissance'}</Badge>
+            </div>
             <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5" /></Button>
-          </div>
         </div>
 
-        <div className="p-4 space-y-6">
-          <div className="text-center">
-            <div className={cn("w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3", objective.type === "principal" ? "bg-primary/15" : "bg-muted")}>
-              <Target className={cn("w-7 h-7", objective.type === "principal" ? "text-primary" : "text-muted-foreground")} />
+        <div className="space-y-4">
+            <div className="flex justify-between p-3 bg-muted/50 rounded-lg">
+                <span className="text-sm">Cible actuelle</span>
+                <span className="font-bold">{objective.target} {objective.unit}</span>
             </div>
-            <h3 className="font-bold text-lg">{objective.title}</h3>
-            <p className="text-sm text-muted-foreground">{objective.description}</p>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 rounded-xl bg-muted/50">
-              <div><p className="text-sm font-medium">Objectif actif</p><p className="text-xs text-muted-foreground">Visible par l'équipe</p></div>
-              <Switch checked={objective.isActive} onCheckedChange={(v) => updateField('isActive', v)} />
+            <div className="flex justify-between p-3 bg-muted/50 rounded-lg">
+                <span className="text-sm">Progression</span>
+                <span className="font-bold">{objective.progress} {objective.unit}</span>
             </div>
-            <div>
-              <Label className="text-sm">Objectif cible</Label>
-              <div className="flex items-center gap-2 mt-1">
-                <Input type="number" defaultValue={objective.target} onBlur={(e) => updateField('target', Number(e.target.value))} className="rounded-xl" />
-                <span className="text-sm text-muted-foreground w-12">{objective.unit}</span>
-              </div>
-            </div>
-          </div>
-          <Button className="w-full rounded-xl" onClick={onClose}>Fermer</Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function ScheduleObjectivesModal({ onClose }: { onClose: () => void }) {
-  const [selectedMonth, setSelectedMonth] = useState("02")
-  const [selectedYear, setSelectedYear] = useState("2026")
-  const [duration, setDuration] = useState("1")
-  const { toast } = useToast()
-
-  const months = [{ value: "01", label: "Janvier" }, { value: "02", label: "Février" }, { value: "03", label: "Mars" }, { value: "04", label: "Avril" }, { value: "05", label: "Mai" }, { value: "06", label: "Juin" }, { value: "07", label: "Juillet" }, { value: "08", label: "Août" }, { value: "09", label: "Septembre" }, { value: "10", label: "Octobre" }, { value: "11", label: "Novembre" }, { value: "12", label: "Décembre" }]
-
-  const handleSaveSchedule = () => {
-      // Pour l'instant, on simule la sauvegarde car la logique "future" demande un backend plus complexe
-      // Mais on peut stocker ça dans une collection "planning" si besoin plus tard
-      toast({ title: "Planification enregistrée", description: `Objectifs appliqués pour ${duration} mois.` });
-      onClose();
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={onClose}>
-      <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 bg-card rounded-t-3xl p-4 border-b border-border">
-          <div className="w-12 h-1 bg-muted rounded-full mx-auto mb-4" />
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold">Programmer les objectifs</h2>
-            <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5" /></Button>
-          </div>
         </div>
 
-        <div className="p-4 space-y-6 pb-8">
-          <div className="pulse-card p-4 bg-primary/5 border-primary/20">
-            <div className="flex gap-3">
-              <Calendar className="w-5 h-5 text-primary shrink-0" />
-              <div><p className="text-sm font-medium">Anticipez vos objectifs</p><p className="text-xs text-muted-foreground mt-1">Programmez les objectifs pour les mois à venir.</p></div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-sm">Mois de début</Label>
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className="rounded-xl mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>{months.map((month) => (<SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>))}</SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-sm">Année</Label>
-              <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger className="rounded-xl mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="2026">2026</SelectItem><SelectItem value="2027">2027</SelectItem></SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div>
-            <Label className="text-sm">Durée (mois)</Label>
-            <div className="flex gap-2 mt-2">
-              {["1", "3", "6", "12"].map((d) => (
-                <button key={d} onClick={() => setDuration(d)} className={cn("flex-1 py-3 rounded-xl text-sm font-medium transition-all", duration === d ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80")}>{d} mois</button>
-              ))}
-            </div>
-          </div>
-
-          <Button className="w-full rounded-xl" onClick={handleSaveSchedule}><Save className="w-4 h-4 mr-2" /> Enregistrer la programmation</Button>
+        <div className="pt-4 flex gap-3">
+            <Button variant="destructive" className="flex-1" onClick={handleDelete}><Trash2 className="w-4 h-4 mr-2"/> Supprimer</Button>
+            <Button variant="outline" className="flex-1" onClick={onClose}>Fermer</Button>
         </div>
       </div>
     </div>
