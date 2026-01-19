@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation" // Ajout pour la redirection
+import { useRouter } from "next/navigation"
 import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
 import { PermissionGate } from "@/components/auth/permission-gate"
@@ -11,7 +11,7 @@ import {
   Calendar, Mail, Phone, ArrowLeft, Settings, History, BarChart3, Globe,
   Truck, Target, Coins, FileText, Plus, Trash2, Briefcase, AlertCircle,
   PieChart, UserX, MoreHorizontal, ChevronDown, KeyRound, Send, Loader2,
-  User, Lock
+  User, Lock, Save, X, Clock
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -29,7 +29,7 @@ import { useToast } from "@/hooks/use-toast"
 
 // Imports Firebase
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, deleteDoc, serverTimestamp } from "firebase/firestore"
-import { signInWithCustomToken, signOut } from "firebase/auth" // Ajout pour impersonate
+import { signInWithCustomToken, signOut } from "firebase/auth"
 import { db, auth } from "@/lib/firebase/client"
 
 // --- TYPES ---
@@ -41,14 +41,6 @@ interface CompanyFeature {
   icon: any
   enabled: boolean
   isDefault: boolean
-}
-
-export default function CentreControlePage() {
-  return (
-    <PermissionGate moduleId="centre_controle" redirect>
-      <CentreControlePageContent />
-    </PermissionGate>
-  )
 }
 
 interface Company {
@@ -69,11 +61,14 @@ interface Company {
 interface User {
   id: string
   name: string
+  firstName?: string
+  lastName?: string
   email: string
   avatar: string
   role: "employe" | "assistant_manager" | "manager" | "directeur" | "gerant"
   companyId: string
   companyName: string
+  contractHours?: number
   status: "active" | "inactive" | "suspended"
   lastLogin: any
   createdAt: string
@@ -105,15 +100,24 @@ const defaultFeatures: Omit<CompanyFeature, "enabled">[] = [
 
 type TabType = "overview" | "companies" | "users" | "logs"
 
+export default function CentreControlePage() {
+  return (
+    <PermissionGate moduleId="centre_controle" redirect>
+      <CentreControlePageContent />
+    </PermissionGate>
+  )
+}
+
 function CentreControlePageContent() {
   const { toast } = useToast()
-  const router = useRouter() // Pour redirection après connexion
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>("overview")
   const [searchQuery, setSearchQuery] = useState("")
   
-  // Sélections
+  // Sélections & Édition
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [editingUser, setEditingUser] = useState<User | null>(null) // Pour le drawer d'édition
   
   // Modales & Collapsibles
   const [isAddCompanyOpen, setIsAddCompanyOpen] = useState(false)
@@ -148,14 +152,6 @@ function CentreControlePageContent() {
     }
   }
 
-  const getPlanBadge = (plan: string) => {
-    switch (plan) {
-      case "enterprise": return <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0">Enterprise</Badge>
-      case "pro": return <Badge className="bg-gradient-to-r from-primary to-accent text-white border-0">Pro</Badge>
-      default: return <Badge variant="secondary">Starter</Badge>
-    }
-  }
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active": return <Badge className="bg-emerald-500/20 text-emerald-600 border-emerald-200">Actif</Badge>
@@ -165,12 +161,33 @@ function CentreControlePageContent() {
     }
   }
 
-  // --- ACTIONS SUPER ADMIN (NOUVEAU) ---
+  // --- ACTIONS SUPER ADMIN ---
 
-  // 1. Se connecter en tant que (Impersonate)
+  // 1. Mise à jour complète utilisateur via API
+  const handleFullUpdateUser = async (formData: any) => {
+    try {
+        const res = await fetch("/api/admin/invite-user", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+               uid: editingUser?.id,
+               ...formData
+            }),
+        });
+        
+        if (!res.ok) throw new Error("Erreur API");
+        
+        setEditingUser(null);
+        toast({ title: "Utilisateur mis à jour", description: "Les informations ont été synchronisées." });
+    } catch (error) {
+        console.error(error);
+        toast({ title: "Erreur", description: "Échec de la mise à jour.", variant: "destructive" });
+    }
+  };
+
+  // 2. Se connecter en tant que (Impersonate)
   const handleImpersonate = async (uid: string) => {
     if (!confirm("⚠️ ATTENTION : Vous allez être déconnecté de votre compte Admin et connecté en tant que cet utilisateur.")) return;
-    
     try {
         const res = await fetch("/api/admin/user-actions", {
             method: "POST",
@@ -178,10 +195,9 @@ function CentreControlePageContent() {
             body: JSON.stringify({ action: "impersonate", uid })
         });
         const data = await res.json();
-        
         if (data.success && data.token) {
-            await signOut(auth); // Déconnexion Admin
-            await signInWithCustomToken(auth, data.token); // Connexion User
+            await signOut(auth);
+            await signInWithCustomToken(auth, data.token);
             router.push("/dashboard"); 
             toast({ title: "Mode Incarnation", description: "Vous êtes connecté sur le compte utilisateur." });
         } else {
@@ -192,7 +208,7 @@ function CentreControlePageContent() {
     }
   }
 
-  // 2. Reset Mot de Passe (Via API Brevo)
+  // 3. Reset Mot de Passe (API)
   const handleSendResetEmail = async (email: string, name: string) => {
     if (!email) return;
     try {
@@ -220,14 +236,8 @@ function CentreControlePageContent() {
       })
       setIsAddCompanyOpen(false)
       setNewCompany({ name: "", industry: "", plan: "starter", status: "active", contactEmail: "" })
-      
-      toast({
-        title: "Entreprise créée",
-        description: `La société ${newCompany.name} a été ajoutée avec succès.`,
-        className: "bg-emerald-50 border-emerald-200"
-      })
+      toast({ title: "Entreprise créée" })
     } catch (e) {
-      console.error(e)
       toast({ title: "Erreur", description: "Impossible de créer l'entreprise.", variant: "destructive" })
     }
   }
@@ -252,11 +262,11 @@ function CentreControlePageContent() {
       setIsDeleteConfirmOpen(false)
       toast({ title: "Entreprise supprimée" })
     } catch (e) {
-      toast({ title: "Erreur", description: "Impossible de supprimer l'entreprise.", variant: "destructive" })
+      toast({ title: "Erreur", variant: "destructive" })
     }
   }
 
-  const handleUpdateUser = async (userId: string, data: any) => {
+  const handleUpdateUserSimple = async (userId: string, data: any) => {
     try {
       if (data.companyId) {
         const targetCompany = companiesState.find(c => c.id === data.companyId)
@@ -269,20 +279,16 @@ function CentreControlePageContent() {
             data.company = ""
         }
       }
-
       await updateDoc(doc(db, "users", userId), data)
-      
       if (selectedUser && selectedUser.id === userId) {
         setSelectedUser({ ...selectedUser, ...data })
       }
-      
       toast({ title: "Utilisateur mis à jour" })
     } catch (e) {
-      toast({ title: "Erreur", description: "Impossible de modifier l'utilisateur.", variant: "destructive" })
+      toast({ title: "Erreur", variant: "destructive" })
     }
   }
 
-  // Suppression d'un utilisateur (API)
   const handleDeleteUser = async (uid: string) => {
     if (!confirm("Voulez-vous vraiment supprimer cet utilisateur définitivement ?")) return;
     try {
@@ -314,11 +320,14 @@ function CentreControlePageContent() {
         return {
           id: doc.id,
           name: d.displayName || d.email || "Utilisateur",
+          firstName: d.firstName,
+          lastName: d.lastName,
           email: d.email || "",
           avatar: (d.displayName || d.email || "U").substring(0, 2).toUpperCase(),
           role: d.role || "employe",
           companyId: d.companyId || "",
           companyName: d.company || d.companyName || "Non assigné",
+          contractHours: d.contractHours || 35,
           status: d.disabled ? "suspended" : "active",
           lastLogin: "N/A",
           createdAt: d.createdAt?.toDate ? d.createdAt.toDate().toLocaleDateString() : "Récemment"
@@ -361,8 +370,6 @@ function CentreControlePageContent() {
   // Stats & Filtres
   const activeCompanies = companiesState.filter(c => c.status === "active").length
   const activeUsers = usersState.filter(u => u.status === "active").length
-  
-  // Orphelins (exclure le super admin s'il n'a pas de boite)
   const orphanedUsers = usersState.filter(u => (!u.companyId || u.companyId === "" || u.companyName === "Non assigné") && u.role !== 'super_admin')
 
   const filteredCompanies = companiesState.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -435,7 +442,6 @@ function CentreControlePageContent() {
                             <div className="flex items-center gap-2"><p className="text-sm font-medium">{u.name}</p>{getStatusBadge(u.status)}</div>
                             <p className="text-xs text-muted-foreground">{u.email}</p>
                         </div>
-                        {/* MENU ACTION UTILISATEUR (Dans liste entreprise) */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="w-4 h-4 text-muted-foreground" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
@@ -478,18 +484,27 @@ function CentreControlePageContent() {
                     <div className="flex items-center gap-4">
                         <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-2xl font-bold text-white">{selectedUser.avatar}</div>
                         <div>
-                            <h1 className="text-xl font-bold">{selectedUser.name}</h1>
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-xl font-bold">{selectedUser.name}</h1>
+                                {/* BOUTON MODIFIER */}
+                                <Button size="sm" variant="outline" className="h-7 w-7 p-0 rounded-full" onClick={() => setEditingUser(selectedUser)}>
+                                    <Edit3 className="w-3 h-3 text-muted-foreground" />
+                                </Button>
+                            </div>
                             <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
                             <div className="mt-1">{getStatusBadge(selectedUser.status)}</div>
                         </div>
                     </div>
-                    {/* Bouton Action Rapide (Email) */}
+                    {/* Bouton Action Rapide */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="icon" className="rounded-xl"><MoreHorizontal className="w-5 h-5 text-muted-foreground" /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Administration</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => setEditingUser(selectedUser)}>
+                                <Edit3 className="w-4 h-4 mr-2" /> Modifier informations
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleImpersonate(selectedUser.id)}>
                                 <LogIn className="w-4 h-4 mr-2" /> Se connecter en tant que
                             </DropdownMenuItem>
@@ -520,12 +535,12 @@ function CentreControlePageContent() {
                                     <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input placeholder="Rechercher..." value={companySearchQuery} onChange={(e) => setCompanySearchQuery(e.target.value)} className="pl-9 rounded-xl bg-muted/50"/></div>
                                 </div>
                                 <div className="flex-1 overflow-y-auto p-2">
-                                    <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted cursor-pointer mb-1" onClick={() => { handleUpdateUser(selectedUser.id, { companyId: "none" }); setIsCompanySelectorOpen(false); }}>
+                                    <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted cursor-pointer mb-1" onClick={() => { handleUpdateUserSimple(selectedUser.id, { companyId: "none" }); setIsCompanySelectorOpen(false); }}>
                                         <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center border border-dashed"><XCircle className="w-5 h-5 text-muted-foreground" /></div>
                                         <div><p className="font-medium text-sm">Non assigné</p><p className="text-xs text-muted-foreground">Retirer de l'entreprise</p></div>
                                     </div>
                                     {filteredCompaniesForSelect.map(c => (
-                                        <div key={c.id} className={cn("flex items-center gap-3 p-3 rounded-xl hover:bg-muted cursor-pointer mb-1", selectedUser.companyId === c.id && "bg-primary/5 border border-primary/20")} onClick={() => { handleUpdateUser(selectedUser.id, { companyId: c.id }); setIsCompanySelectorOpen(false); }}>
+                                        <div key={c.id} className={cn("flex items-center gap-3 p-3 rounded-xl hover:bg-muted cursor-pointer mb-1", selectedUser.companyId === c.id && "bg-primary/5 border border-primary/20")} onClick={() => { handleUpdateUserSimple(selectedUser.id, { companyId: c.id }); setIsCompanySelectorOpen(false); }}>
                                             <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center text-xs font-bold shadow-sm">{c.logo}</div>
                                             <div><p className="font-medium text-sm">{c.name}</p><p className="text-xs text-muted-foreground">{c.industry}</p></div>
                                             {selectedUser.companyId === c.id && <CheckCircle2 className="w-4 h-4 text-primary ml-auto" />}
@@ -539,7 +554,7 @@ function CentreControlePageContent() {
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                             <Label className="text-xs text-muted-foreground uppercase font-bold">Rôle</Label>
-                            <Select value={selectedUser.role} onValueChange={(val) => handleUpdateUser(selectedUser.id, { role: val })}>
+                            <Select value={selectedUser.role} onValueChange={(val) => handleUpdateUserSimple(selectedUser.id, { role: val })}>
                                 <SelectTrigger className="w-full h-10 rounded-xl bg-muted/30"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="employe">Employé</SelectItem>
@@ -552,7 +567,7 @@ function CentreControlePageContent() {
                         </div>
                         <div className="space-y-1">
                             <Label className="text-xs text-muted-foreground uppercase font-bold">Statut</Label>
-                            <Select value={selectedUser.status === "suspended" ? "suspended" : "active"} onValueChange={(val) => handleUpdateUser(selectedUser.id, { disabled: val === "suspended" })}>
+                            <Select value={selectedUser.status === "suspended" ? "suspended" : "active"} onValueChange={(val) => handleUpdateUserSimple(selectedUser.id, { disabled: val === "suspended" })}>
                                 <SelectTrigger className="w-full h-10 rounded-xl bg-muted/30"><SelectValue /></SelectTrigger>
                                 <SelectContent><SelectItem value="active">Actif</SelectItem><SelectItem value="suspended">Suspendu</SelectItem></SelectContent>
                             </Select>
@@ -588,6 +603,16 @@ function CentreControlePageContent() {
                 </Collapsible>
             </div>
         </main>
+        
+        {/* DRAWER D'ÉDITION UTILISATEUR */}
+        {editingUser && (
+            <UserEditDrawer 
+                user={editingUser} 
+                onClose={() => setEditingUser(null)} 
+                onSave={handleFullUpdateUser} 
+            />
+        )}
+
         <BottomNav />
       </div>
     )
@@ -654,8 +679,6 @@ function CentreControlePageContent() {
         {/* ONGLETS UTILISATEURS */}
         {activeTab === "users" && (
           <div className="space-y-6">
-            
-            {/* SECTION ORPHELINS (ACCORDÉON COMPACT) */}
             {orphanedUsers.length > 0 && (
                 <Accordion type="single" collapsible defaultValue="orphans" className="border rounded-xl bg-slate-50/50 border-slate-200">
                     <AccordionItem value="orphans" className="border-none">
@@ -677,7 +700,6 @@ function CentreControlePageContent() {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-1">
-                                            {/* BOUTON POUBELLE AMÉLIORÉ (Gris -> Rouge survol) */}
                                             <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors" onClick={() => handleDeleteUser(user.id)}>
                                                 <Trash2 className="w-4 h-4" />
                                             </Button>
@@ -693,13 +715,11 @@ function CentreControlePageContent() {
                 </Accordion>
             )}
 
-            {/* LISTE PAR ENTREPRISE (ACCORDÉON) */}
             <div className="space-y-4">
                <h3 className="text-sm font-semibold text-foreground px-1">Équipes par entreprise</h3>
                <Accordion type="multiple" className="space-y-3">
                 {filteredCompanies.map(company => {
                     const companyUsers = filteredUsers.filter(u => u.companyId === company.id);
-                    // On n'affiche pas les entreprises vides si on cherche un user spécifique
                     if (companyUsers.length === 0 && searchQuery) return null;
                     
                     return (
@@ -728,8 +748,6 @@ function CentreControlePageContent() {
                                                     <p className="text-[10px] text-muted-foreground">{user.role}</p>
                                                 </div>
                                             </div>
-                                            
-                                            {/* MENU ACTIONS UTILISATEUR */}
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="w-4 h-4 text-muted-foreground" /></Button></DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
@@ -768,7 +786,90 @@ function CentreControlePageContent() {
           </div>
         )}
       </main>
+      
+      {/* DRAWER D'ÉDITION GLOBAL */}
+      {editingUser && (
+        <UserEditDrawer 
+            user={editingUser} 
+            onClose={() => setEditingUser(null)} 
+            onSave={handleFullUpdateUser} 
+        />
+      )}
+
       <BottomNav />
     </div>
   )
+}
+
+// --- COMPOSANT FORMULAIRE D'ÉDITION (Drawer) ---
+function UserEditDrawer({ user, onClose, onSave }: { user: any, onClose: () => void, onSave: (data: any) => void }) {
+    // Parsing intelligent du nom
+    const initialFirst = user.firstName || user.name?.split(' ')[0] || "";
+    const initialLast = user.lastName || user.name?.split(' ').slice(1).join(' ') || "";
+
+    const [firstName, setFirstName] = useState(initialFirst);
+    const [lastName, setLastName] = useState(initialLast);
+    const [email, setEmail] = useState(user.email || "");
+    const [role, setRole] = useState(user.role || "employee");
+    const [contractHours, setContractHours] = useState(user.contractHours || 35);
+
+    const handleSave = () => {
+        onSave({ firstName, lastName, email, role, contractHours });
+    }
+
+    return (
+        <>
+            <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={onClose} />
+            <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl z-50 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom">
+                <div className="sticky top-0 bg-card rounded-t-3xl p-4 border-b border-border z-10 flex justify-between items-center">
+                    <h2 className="font-semibold text-lg">Modifier l'utilisateur</h2>
+                    <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5" /></Button>
+                </div>
+
+                <div className="p-5 space-y-5 pb-10">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium flex items-center gap-2"><User className="w-4 h-4"/> Prénom</label>
+                            <Input value={firstName} onChange={e => setFirstName(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Nom</label>
+                            <Input value={lastName} onChange={e => setLastName(e.target.value)} />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2"><Mail className="w-4 h-4"/> Email (Connexion)</label>
+                        <Input value={email} onChange={e => setEmail(e.target.value)} />
+                        <p className="text-xs text-muted-foreground">Attention: modifier l'email changera ses identifiants de connexion.</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium flex items-center gap-2"><Shield className="w-4 h-4"/> Rôle</label>
+                            <Select value={role} onValueChange={setRole}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="employe">Employé</SelectItem>
+                                    <SelectItem value="assistant_manager">Assistant Manager</SelectItem>
+                                    <SelectItem value="manager">Manager</SelectItem>
+                                    <SelectItem value="directeur">Directeur</SelectItem>
+                                    <SelectItem value="gerant">Gérant</SelectItem>
+                                    <SelectItem value="admin">Admin</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium flex items-center gap-2"><Clock className="w-4 h-4"/> Heures Contrat</label>
+                            <Input type="number" value={contractHours} onChange={e => setContractHours(Number(e.target.value))} />
+                        </div>
+                    </div>
+
+                    <Button className="w-full py-6 text-lg rounded-xl mt-4" onClick={handleSave}>
+                        <Save className="w-5 h-5 mr-2" /> Enregistrer les modifications
+                    </Button>
+                </div>
+            </div>
+        </>
+    )
 }
