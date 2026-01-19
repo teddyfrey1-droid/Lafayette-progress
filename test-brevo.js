@@ -5,7 +5,7 @@ async function main() {
 
   const transport = nodemailer.createTransport({
     host: "smtp-relay.brevo.com",
-    port: 587,
+    port: 2525,
     secure: false,
     auth: {
       user: "9f9c88001@smtp-brevo.com", 
