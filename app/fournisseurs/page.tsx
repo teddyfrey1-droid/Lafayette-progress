@@ -148,7 +148,9 @@ export default function FournisseursPage() {
   )
 
   const handleDelete = (id: string) => {
-    setFournisseurs(fournisseurs.filter((f) => f.id !== id))
+    if (confirm("Voulez-vous vraiment supprimer ce fournisseur ?")) {
+      setFournisseurs(fournisseurs.filter((f) => f.id !== id))
+    }
   }
 
   return (
@@ -176,7 +178,7 @@ export default function FournisseursPage() {
             </div>
             
             {/* 🔒 PROTECTION DU BOUTON AJOUTER */}
-            {can("suppliers", "create") && (
+            {can("fournisseurs", "create") && (
               <Button size="sm" className="rounded-xl gap-2" onClick={() => setShowAdd(true)}>
                 <Plus className="w-4 h-4" />
                 Ajouter
@@ -278,7 +280,7 @@ export default function FournisseursPage() {
                         {/* Actions protégées */}
                         <div className="flex gap-1">
                           {/* 🔒 BOUTON MODIFIER */}
-                          {can("suppliers", "edit") && (
+                          {can("fournisseurs", "edit") && (
                             <Button
                               size="icon"
                               variant="ghost"
@@ -290,7 +292,7 @@ export default function FournisseursPage() {
                           )}
                           
                           {/* 🔒 BOUTON SUPPRIMER */}
-                          {can("suppliers", "delete") && (
+                          {can("fournisseurs", "delete") && (
                             <Button
                               size="icon"
                               variant="ghost"
