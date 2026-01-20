@@ -7,13 +7,14 @@ import { PermissionGate } from "@/components/auth/permission-gate"
 import { ProgressRing } from "@/components/pulse/progress-ring"
 import { PalierTimeline } from "@/components/pulse/palier-timeline"
 import { CelebrationModal } from "@/components/pulse/celebration-modal"
-import { Target, ChevronRight, Sparkles, Info, TrendingUp, Loader2 } from "lucide-react"
+import { Target, ChevronRight, Sparkles, Info, TrendingUp, Loader2, Lock, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { Progress } from "@/components/ui/progress"
 import { useObjectives } from "@/hooks/use-objectives"
+import { Badge } from "@/components/ui/badge"
 
-// Historique visuel (Mock pour l'instant car l'historique n'est pas encore stocké en base)
+// Historique visuel (Mock pour l'instant pour le design)
 const MockHistory = ({ target }: { target: number }) => (
   <div className="flex items-end gap-1 h-12 mt-4 opacity-70">
      {[40, 50, 65, 70, 55, 80, 75].map((h, i) => (
@@ -29,7 +30,14 @@ export default function ObjectivesPage() {
 
   // Filtrage des objectifs depuis la base de données
   const principalObjective = objectives.find((o: any) => o.type === "principal" && o.isActive)
-  const secondaryObjectives = objectives.filter((o: any) => o.type === "secondary" && o.isActive)
+  const secondaryObjectives = objectives.filter((o: any) => (o.type === "secondaire" || !o.type) && o.isActive)
+
+  // Vérification si le principal est atteint (Gatekeeper)
+  const isPrincipalMet = !principalObjective || (
+      principalObjective.direction === 'descending' 
+      ? (principalObjective.current || 0) <= (principalObjective.target || 1) 
+      : (principalObjective.current || 0) >= (principalObjective.target || 1)
+  );
 
   if (loading) {
     return (
@@ -49,10 +57,19 @@ export default function ObjectivesPage() {
     )
   }
 
-  // Calcul de la progression principale
-  const principalProgress = principalObjective 
-    ? Math.min(100, (principalObjective.progress / principalObjective.target) * 100) 
-    : 0
+  // Calcul de la progression principale sécurisée
+  // Note: Dans Firebase, le champ est 'current', pas 'progress'
+  const currentP = principalObjective?.current || 0;
+  const targetP = principalObjective?.target || 1;
+  
+  let principalProgress = 0;
+  if (principalObjective) {
+      if (principalObjective.direction === 'descending') {
+          principalProgress = currentP <= targetP ? 100 : Math.max(0, (targetP / (currentP || 1)) * 100);
+      } else {
+          principalProgress = Math.min(100, (currentP / targetP) * 100);
+      }
+  }
 
   return (
     <PermissionGate moduleId="objectifs" redirect>
@@ -83,7 +100,7 @@ export default function ObjectivesPage() {
                     progress={principalProgress} 
                     size={100} 
                     strokeWidth={8} 
-                    showPercentage={!principalObjective.hideRevenue} 
+                    showPercentage={!principalObjective.isConfidential} 
                   />
                   <h3 className="font-semibold mt-3">{principalObjective.title}</h3>
                   <p className="text-sm text-muted-foreground mt-1">{principalObjective.description}</p>
@@ -91,8 +108,11 @@ export default function ObjectivesPage() {
                     <span className="text-xs px-2 py-1 rounded-full bg-primary/15 text-primary font-medium">
                       Principal
                     </span>
-                    {principalObjective.reward > 0 && (
-                        <span className="text-xs text-muted-foreground">Prime max: {principalObjective.reward}€</span>
+                    {/* On cache le montant si confidentiel */}
+                    {!principalObjective.isConfidential && principalObjective.paliers && (
+                        <span className="text-xs text-muted-foreground">
+                            Max: {principalObjective.paliers.reduce((acc:number, p:any) => acc + p.reward, 0)}€
+                        </span>
                     )}
                   </div>
                 </div>
@@ -102,9 +122,9 @@ export default function ObjectivesPage() {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Progression</span>
                     <span className="font-semibold">
-                      {principalObjective.hideRevenue 
-                        ? `${Math.round(principalProgress)}%` 
-                        : `${principalObjective.progress.toLocaleString()} / ${principalObjective.target.toLocaleString()} ${principalObjective.unit}`}
+                      {principalObjective.isConfidential 
+                        ? <span className="flex items-center gap-1 italic opacity-70"><EyeOff className="w-3 h-3"/> Masqué</span> 
+                        : `${(currentP).toLocaleString()} / ${(targetP).toLocaleString()} ${principalObjective.unit}`}
                     </span>
                   </div>
                   <Progress
@@ -116,22 +136,22 @@ export default function ObjectivesPage() {
                 {/* Mock History */}
                 <div className="mt-4 pt-4 border-t border-border/50">
                   <p className="text-xs text-muted-foreground mb-1">Tendance</p>
-                  <MockHistory target={principalObjective.target} />
+                  <MockHistory target={targetP} />
                 </div>
 
                 {/* Next Palier */}
-                {principalObjective.paliers?.find((p: any) => p.threshold > principalObjective.progress) && (
+                {principalObjective.paliers?.find((p: any) => p.threshold > currentP) && (
                   <div className="mt-4 p-3 rounded-xl bg-muted/50 flex items-center justify-between">
                     <div>
                       <p className="text-xs text-muted-foreground">Prochain palier</p>
                       <p className="font-medium text-sm">
-                        {principalObjective.paliers.find((p: any) => p.threshold > principalObjective.progress)?.name}
+                        {principalObjective.paliers.find((p: any) => p.threshold > currentP)?.name}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">Cible</p>
                       <p className="font-semibold text-primary">
-                        {principalObjective.paliers.find((p: any) => p.threshold > principalObjective.progress)?.threshold.toLocaleString()} {principalObjective.unit}
+                        {principalObjective.paliers.find((p: any) => p.threshold > currentP)?.threshold.toLocaleString()} {principalObjective.unit}
                       </p>
                     </div>
                     <ChevronRight className="w-5 h-5 text-muted-foreground" />
@@ -158,15 +178,30 @@ export default function ObjectivesPage() {
 
             <div className="grid gap-3">
               {secondaryObjectives.map((obj: any) => {
-                const progress = Math.min(100, (obj.progress / obj.target) * 100)
-                const nextPalier = obj.paliers?.find((p: any) => p.threshold > obj.progress)
+                const current = obj.current || 0;
+                const target = obj.target || 1;
+                
+                let progress = 0;
+                if (obj.direction === 'descending') {
+                    progress = current <= target ? 100 : Math.max(0, (target / (current || 1)) * 100);
+                } else {
+                    progress = Math.min(100, (current / target) * 100);
+                }
+
+                const nextPalier = obj.paliers?.find((p: any) => p.threshold > current)
+                const isLocked = !isPrincipalMet; // Verrouillé si principal non atteint
 
                 return (
-                  <div key={obj.id} className="pulse-card p-4 cursor-pointer hover:shadow-md transition-all" onClick={() => setSelectedObjective(obj)}>
+                  <div 
+                    key={obj.id} 
+                    className={cn("pulse-card p-4 cursor-pointer transition-all", isLocked ? "opacity-60 grayscale-[0.5]" : "hover:shadow-md")}
+                    onClick={() => !isLocked && setSelectedObjective(obj)}
+                  >
                     <div className="text-center mb-3">
                       <div className="flex justify-center mb-2">
-                        <div className="p-2 rounded-xl bg-accent/15">
+                        <div className="p-2 rounded-xl bg-accent/15 relative">
                           <TrendingUp className="w-4 h-4 text-accent" />
+                          {isLocked && <div className="absolute -top-1 -right-1 bg-amber-500 rounded-full p-0.5"><Lock className="w-2.5 h-2.5 text-white"/></div>}
                         </div>
                       </div>
                       <h3 className="font-semibold text-sm">{obj.title}</h3>
@@ -177,9 +212,9 @@ export default function ObjectivesPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-center gap-2">
                         <span className="text-lg font-bold">
-                          {obj.hideRevenue ? `${Math.round(progress)}%` : obj.progress.toLocaleString()}
+                          {obj.isConfidential ? `${Math.round(progress)}%` : current.toLocaleString()}
                           <span className="text-sm font-normal text-muted-foreground ml-1">
-                            {obj.hideRevenue ? "" : `/ ${obj.target.toLocaleString()} ${obj.unit}`}
+                            {obj.isConfidential ? "" : `/ ${target.toLocaleString()} ${obj.unit}`}
                           </span>
                         </span>
                       </div>
@@ -190,13 +225,20 @@ export default function ObjectivesPage() {
                     </div>
 
                     {/* Next Palier */}
-                    {nextPalier && (
+                    {nextPalier && !isLocked && (
                       <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
                           Prochain: <span className="font-medium text-foreground">{nextPalier.name}</span>
                         </span>
                         <span className="text-xs font-semibold text-accent">+{nextPalier.reward}€</span>
                       </div>
+                    )}
+                    {isLocked && (
+                        <div className="mt-3 pt-3 border-t border-border/50 text-center">
+                            <span className="text-xs font-bold text-amber-600 flex items-center justify-center gap-1">
+                                <Lock className="w-3 h-3"/> En attente du principal
+                            </span>
+                        </div>
                     )}
                   </div>
                 )
@@ -213,8 +255,7 @@ export default function ObjectivesPage() {
             <div className="flex items-start gap-3">
               <Info className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
               <p className="text-xs text-muted-foreground">
-                Les paliers se débloquent automatiquement lorsque vous atteignez les objectifs. Les primes sont calculées
-                à la fin du mois.
+                Les paliers se débloquent automatiquement. Les primes secondaires ne sont validées que si l'objectif principal est atteint.
               </p>
             </div>
           </div>
@@ -243,7 +284,21 @@ function ObjectiveDetail({
   onBack: () => void
 }) {
   const isPrimary = objective.type === "principal"
-  const progress = Math.min(100, (objective.progress / objective.target) * 100)
+  // Sécurisation des valeurs pour éviter le crash .toLocaleString
+  const current = objective.current || 0;
+  const target = objective.target || 1;
+  
+  let progress = 0;
+  if (objective.direction === 'descending') {
+      progress = current <= target ? 100 : Math.max(0, (target / (current || 1)) * 100);
+  } else {
+      progress = Math.min(100, (current / target) * 100);
+  }
+
+  const maxReward = objective.paliers?.reduce((acc:number, p:any) => acc + p.reward, 0) || 0;
+  const unlockedPaliers = objective.paliers?.filter((p: any) => 
+      objective.direction === 'descending' ? current <= p.threshold : current >= p.threshold
+  ).length || 0;
 
   return (
     <div className="min-h-screen bg-background pb-32">
@@ -285,14 +340,18 @@ function ObjectiveDetail({
             size={130}
             strokeWidth={10}
             showPercentage={true}
-            sublabel={objective.hideRevenue ? "Complété" : `${objective.progress.toLocaleString()} / ${objective.target.toLocaleString()} ${objective.unit}`}
+            // Affiche "Masqué" ou les valeurs
+            sublabel={objective.isConfidential 
+                ? "Données masquées" 
+                : `${current.toLocaleString()} / ${target.toLocaleString()} ${objective.unit}`}
           />
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           <div className="pulse-card p-3 text-center">
-            <p className="text-lg font-bold">{objective.reward}€</p>
+            {/* Si confidentiel, on ne montre pas l'argent */}
+            <p className="text-lg font-bold">{objective.isConfidential ? "?" : maxReward}€</p>
             <p className="text-xs text-muted-foreground">Prime max</p>
           </div>
           <div className="pulse-card p-3 text-center">
@@ -300,8 +359,7 @@ function ObjectiveDetail({
             <p className="text-xs text-muted-foreground">Paliers</p>
           </div>
           <div className="pulse-card p-3 text-center">
-            {/* Calcul dynamique des paliers débloqués */}
-            <p className="text-lg font-bold">{objective.paliers?.filter((p: any) => p.threshold <= objective.progress).length || 0}</p>
+            <p className="text-lg font-bold">{unlockedPaliers}</p>
             <p className="text-xs text-muted-foreground">Débloqués</p>
           </div>
         </div>
@@ -312,7 +370,8 @@ function ObjectiveDetail({
             <Target className="w-5 h-5 text-primary" />
             Paliers de récompense
           </h2>
-          <PalierTimeline objective={objective} />
+          {/* On passe l'objectif sécurisé au composant */}
+          <PalierTimeline objective={{...objective, current}} />
         </section>
 
         {/* Info */}
@@ -320,7 +379,7 @@ function ObjectiveDetail({
           <div className="flex items-start gap-3">
             <Info className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
             <p className="text-xs text-muted-foreground">
-              Les paliers se débloquent automatiquement. Continuez vos efforts pour atteindre le prochain niveau !
+              Continuez vos efforts ! Les mises à jour sont effectuées quotidiennement par votre manager.
             </p>
           </div>
         </div>
