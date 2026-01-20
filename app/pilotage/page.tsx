@@ -10,7 +10,7 @@ import { useAuth } from "@/components/auth/auth-provider"
 import {
   Target, TrendingUp, TrendingDown, Clock, Plus, Edit3, Trash2, X, Check, Euro, Users,
   Layers, AlertCircle, Save, Wallet, ChevronDown, ChevronUp, Calendar, Loader2,
-  Percent, Hash, AlertTriangle, ThumbsUp, CalendarDays, Crown, Lock, EyeOff
+  Percent, Hash, AlertTriangle, ThumbsUp, CalendarDays, Crown, Lock, EyeOff, Trash
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -82,30 +82,16 @@ export default function PilotagePage() {
   const [budgetMax, setBudgetMax] = useState(2000)
   const [simulatedPaliers, setSimulatedPaliers] = useState<Record<string, Record<string, number>>>({})
 
-  // 1. CHARGEMENT DES DONNÉES (SÉCURISÉ PAR ENTREPRISE)
+  // 1. CHARGEMENT
   useEffect(() => {
     if (!profile?.companyId) return;
-
-    // Filtre Firebase strict sur companyId
-    const q = query(
-        collection(db, "users"), 
-        where("companyId", "==", profile.companyId)
-    );
-
+    const q = query(collection(db, "users"), where("companyId", "==", profile.companyId));
     const unsubUsers = onSnapshot(q, (snapshot) => {
-      const members = snapshot.docs
-        .map(doc => {
+      const members = snapshot.docs.map(doc => {
             const data = doc.data();
-            
-            // 🛑 FILTRE JS STRICT
-            // On exclut explicitement les "Non assigné" et "Super Admin"
-            // On garde ceux qui sont "En attente" (pending) s'ils ont le bon companyId
-            if (data.role === 'super_admin') return null;
-            if (data.companyName === 'Non assigné') return null;
-
+            if (data.role === 'super_admin' || data.companyName === 'Non assigné') return null;
             const initials = (data.displayName || data.email || "??").substring(0, 2).toUpperCase();
             const colors = ["bg-purple-500", "bg-blue-500", "bg-pink-500", "bg-indigo-500", "bg-emerald-500"];
-            
             return {
                 id: doc.id,
                 name: data.displayName || data.email || "Inconnu",
@@ -115,19 +101,13 @@ export default function PilotagePage() {
                 color: colors[initials.charCodeAt(0) % colors.length]
             }
       })
-      // Nettoyage des null
       setTeamMembers(members.filter(Boolean) as TeamMember[])
     })
-
     const loadConfig = async () => {
         const docSnap = await getDoc(doc(db, "config", "pilotage"));
-        if (docSnap.exists()) {
-            setBaseHours(docSnap.data().baseHours || 35);
-            setBudgetMax(docSnap.data().budgetMax || 2000);
-        }
+        if (docSnap.exists()) { setBaseHours(docSnap.data().baseHours || 35); setBudgetMax(docSnap.data().budgetMax || 2000); }
     }
     loadConfig();
-
     return () => unsubUsers();
   }, [profile?.companyId])
 
@@ -137,9 +117,7 @@ export default function PilotagePage() {
         const initial: Record<string, Record<string, number>> = {}
         objectives.forEach((obj: any) => {
           initial[obj.id] = {}
-          obj.paliers?.forEach((p: any) => {
-            initial[obj.id][p.id] = p.reward
-          })
+          obj.paliers?.forEach((p: any) => { initial[obj.id][p.id] = p.reward })
         })
         setSimulatedPaliers(initial)
     }
@@ -150,7 +128,6 @@ export default function PilotagePage() {
     const objectiveCosts: any[] = []
     let totalCost = 0
 
-    // Vérifier si le principal est atteint (Gatekeeper)
     const principalObj = objectives.find((o: any) => o.type === 'principal');
     const isPrincipalMet = !principalObj || (principalObj.direction === 'descending' 
         ? ((principalObj.current || 0) <= (principalObj.target || 1)) 
@@ -159,23 +136,19 @@ export default function PilotagePage() {
 
     objectives.forEach((obj: any) => {
       if (!obj.isActive && activeTab !== 'pilotage') return;
-
-      // Si secondaire et principal non atteint -> Potentiel 0 dans le calcul courant (mais on garde le potentiel max pour le budget)
-      // Pour le budget GLOBAL PREVISIONNEL, on compte tout comme si c'était atteint.
-      
+      if (obj.type === 'secondaire' && !isPrincipalMet) {
+          objectiveCosts.push({ id: obj.id, title: obj.title, cost: 0, paliers: [] });
+          return;
+      }
       let objCost = 0
       const paliersList: any[] = []
-
       if (obj.paliers && obj.paliers.length > 0) {
           const maxReward = obj.paliers.reduce((acc:number, p:any) => acc + (simulatedPaliers[obj.id]?.[p.id] ?? p.reward), 0);
           objCost = maxReward;
-          obj.paliers.forEach((p: any) => {
-            paliersList.push({ id: p.id, name: p.name, reward: simulatedPaliers[obj.id]?.[p.id] ?? p.reward })
-          })
+          obj.paliers.forEach((p: any) => { paliersList.push({ id: p.id, name: p.name, reward: simulatedPaliers[obj.id]?.[p.id] ?? p.reward }) })
       } else {
           objCost = obj.fixedReward || 0;
       }
-
       objectiveCosts.push({ id: obj.id, title: obj.title, cost: objCost, paliers: paliersList })
       totalCost += objCost
     })
@@ -184,49 +157,21 @@ export default function PilotagePage() {
     const teamTotalCost = Math.round(totalCost * totalTeamRatio);
 
     return {
-      objectiveCosts,
-      teamTotalCost,
-      budgetDiff: budgetMax - teamTotalCost,
-      isOverBudget: teamTotalCost > budgetMax,
-      totalCostPerPerson: totalCost, // C'est le MAX possible par personne à 35h
-      activeObjectivesCount: objectives.filter(o => o.isActive).length,
-      isPrincipalMet
+      objectiveCosts, teamTotalCost, budgetDiff: budgetMax - teamTotalCost, isOverBudget: teamTotalCost > budgetMax,
+      totalCostPerPerson: totalCost, 
+      activeObjectivesCount: objectives.filter(o => o.isActive).length, isPrincipalMet
     }
   }, [objectives, simulatedPaliers, baseHours, budgetMax, teamMembers, activeTab])
 
-  // --- ACTIONS ---
-
+  // ACTIONS
   const handleUpdateBaseHours = async () => {
       try {
           await setDoc(doc(db, "config", "pilotage"), { baseHours, budgetMax }, { merge: true });
           setShowEditHours(false);
           toast({ title: "Configuration sauvegardée" });
-      } catch (e) {
-          toast({ title: "Erreur sauvegarde", variant: "destructive" });
-      }
+      } catch (e) { toast({ title: "Erreur", variant: "destructive" }); }
   }
 
-  const handleSaveSimulation = async () => {
-      try {
-          const promises = objectives.map(async (obj: any) => {
-              if (!obj.paliers) return;
-              const changes = simulatedPaliers[obj.id];
-              if (!changes) return;
-              const newPaliers = obj.paliers.map((p: any) => ({
-                  ...p,
-                  reward: changes[p.id] !== undefined ? changes[p.id] : p.reward
-              }));
-              await updateDoc(doc(db, "objectives", obj.id), { paliers: newPaliers });
-          });
-          await Promise.all(promises);
-          await setDoc(doc(db, "config", "pilotage"), { budgetMax }, { merge: true });
-          toast({ title: "Simulation appliquée !" });
-      } catch (e) {
-          toast({ title: "Erreur", variant: "destructive" });
-      }
-  }
-
-  // CRÉATION OBJECTIF
   const handleCreateObjective = async (data: any) => {
       if (!profile?.companyId) return;
       try {
@@ -252,7 +197,6 @@ export default function PilotagePage() {
       }
   }
 
-  // PLANIFICATION (Sauvegarde)
   const handleCreatePlanning = async (data: any) => {
       if (!profile?.companyId) return;
       try {
@@ -269,7 +213,6 @@ export default function PilotagePage() {
       }
   }
 
-  // MISE À JOUR PROGRESSION (Avec Date)
   const updateProgress = async (amount: number, dateStr?: string) => {
       if (!selectedObj) return;
       const targetDate = dateStr ? new Date(dateStr) : new Date();
@@ -286,9 +229,7 @@ export default function PilotagePage() {
             })
         });
         toast({ title: "Mise à jour réussie" });
-      } catch (e) {
-        toast({ title: "Erreur mise à jour", variant: "destructive" });
-      }
+      } catch (e) { toast({ title: "Erreur", variant: "destructive" }); }
   }
 
   // PALIERS
@@ -315,17 +256,10 @@ export default function PilotagePage() {
         
         {/* Header */}
         <div className="flex items-center justify-between">
-            <div>
-                <h1 className="text-2xl font-bold tracking-tight">Pilotage</h1>
-                <p className="text-sm text-muted-foreground mt-0.5">Gérez les objectifs et les primes</p>
-            </div>
+            <div><h1 className="text-2xl font-bold tracking-tight">Pilotage</h1><p className="text-sm text-muted-foreground mt-0.5">Gérez les objectifs et les primes</p></div>
             <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="rounded-xl gap-2 bg-transparent border-muted-foreground/20" onClick={() => setShowPlanning(true)}>
-                    <Calendar className="w-4 h-4" /> Planifier
-                </Button>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted/50 border border-border text-xs font-medium">
-                    <Clock className="w-3.5 h-3.5" /> 35h
-                </div>
+                <Button variant="outline" size="sm" className="rounded-xl gap-2 bg-transparent border-muted-foreground/20" onClick={() => setShowPlanning(true)}><Calendar className="w-4 h-4" /> Planifier</Button>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted/50 border border-border text-xs font-medium"><Clock className="w-3.5 h-3.5" /> 35h</div>
             </div>
         </div>
 
@@ -342,33 +276,19 @@ export default function PilotagePage() {
 
         {/* Navigation Onglets */}
         <div className="bg-muted/50 p-1 rounded-2xl flex mb-6">
-            <button onClick={() => setActiveTab("objectifs")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "objectifs" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}>
-                <Target className="w-4 h-4" /> Objectifs
-            </button>
-            <button onClick={() => setActiveTab("paliers")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "paliers" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}>
-                <Layers className="w-4 h-4" /> Paliers
-            </button>
-            <button onClick={() => setActiveTab("pilotage")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "pilotage" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}>
-                <Wallet className="w-4 h-4" /> Budget
-            </button>
-            <button onClick={() => setActiveTab("equipe")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "equipe" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}>
-                <Users className="w-4 h-4" /> Équipe
-            </button>
+            <button onClick={() => setActiveTab("objectifs")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "objectifs" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}><Target className="w-4 h-4" /> Objectifs</button>
+            <button onClick={() => setActiveTab("paliers")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "paliers" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}><Layers className="w-4 h-4" /> Paliers</button>
+            <button onClick={() => setActiveTab("pilotage")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "pilotage" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}><Wallet className="w-4 h-4" /> Budget</button>
+            <button onClick={() => setActiveTab("equipe")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "equipe" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}><Users className="w-4 h-4" /> Équipe</button>
         </div>
 
         {/* --- ONGLET 1 : OBJECTIFS --- */}
         {activeTab === "objectifs" && (
             <div className="space-y-6 animate-in fade-in">
                 <div className="flex justify-between items-center">
-                    <div>
-                        <h2 className="font-semibold text-sm">Vos objectifs en cours</h2>
-                        <p className="text-xs text-muted-foreground">Progression en temps réel</p>
-                    </div>
-                    <Button size="sm" className="rounded-full bg-purple-500 hover:bg-purple-600 text-white px-4" onClick={() => setShowAddObjective(true)}>
-                        <Plus className="w-4 h-4 mr-2" /> Créer
-                    </Button>
+                    <div><h2 className="font-semibold text-sm">Vos objectifs en cours</h2><p className="text-xs text-muted-foreground">Progression en temps réel</p></div>
+                    <Button size="sm" className="rounded-full bg-purple-500 hover:bg-purple-600 text-white px-4" onClick={() => setShowAddObjective(true)}><Plus className="w-4 h-4 mr-2" /> Créer</Button>
                 </div>
-
                 {objectives.map((obj: any) => {
                     const isLocked = obj.type === 'secondaire' && !simulationData.isPrincipalMet;
                     return (
@@ -404,10 +324,9 @@ export default function PilotagePage() {
             </div>
         )}
 
-        {/* --- ONGLET 4 : EQUIPE (Design KPI + Footer) --- */}
+        {/* --- ONGLET 4 : EQUIPE --- */}
         {activeTab === "equipe" && (
             <div className="space-y-6 animate-in fade-in">
-                {/* 3 CARTES DU HAUT (Design Screen 1) */}
                 <div className="grid grid-cols-3 gap-3">
                     <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none">
                         <div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center mb-2"><Target className="w-4 h-4 text-purple-500" /></div>
@@ -445,7 +364,6 @@ export default function PilotagePage() {
                     })}
                 </div>
 
-                {/* FOOTER BUDGET (Design Screen 2) */}
                 <div className="mt-4 p-5 rounded-2xl bg-[#0f0f11] border border-white/5 text-white">
                     <div className="flex justify-between items-end mb-1">
                         <div><p className="text-xs text-white/60 mb-1">Budget total primes</p><p className="text-3xl font-bold">{simulationData.teamTotalCost}€</p></div>
@@ -455,7 +373,6 @@ export default function PilotagePage() {
             </div>
         )}
 
-        {/* ... (ONGLETS PALIERS/BUDGET conservés) ... */}
         {activeTab === "paliers" && (
             <div className="space-y-4 animate-in fade-in">
                 {objectives.filter((o:any) => o.isActive).map((obj: any) => (
@@ -488,7 +405,7 @@ export default function PilotagePage() {
                 <div className="pulse-card p-4">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"><Wallet className="w-5 h-5 text-primary" /></div>
-                        <div className="flex-1"><h3 className="font-semibold text-sm">Simulation Budgétaire</h3><p className="text-xs text-muted-foreground">Coût total si 100% atteint</p></div>
+                        <div className="flex-1"><h3 className="font-semibold text-sm">Simulation Budgétaire</h3><p className="text-xs text-muted-foreground">Potentiel Maximum (Cumulé)</p></div>
                     </div>
                     <div className="mb-4 space-y-4">
                         <div><Label className="text-xs text-muted-foreground mb-1 block">Budget Max (€)</Label><Input type="number" value={budgetMax} onChange={(e) => setBudgetMax(Number(e.target.value))} className="rounded-xl text-lg font-bold" /></div>
@@ -507,8 +424,16 @@ export default function PilotagePage() {
 
       {/* --- MODALES --- */}
       {showAddObjective && <AddObjectiveAdvancedModal onClose={() => setShowAddObjective(false)} onConfirm={handleCreateObjective} />}
+      
       {showPlanning && <AddPlanningAdvancedModal onClose={() => setShowPlanning(false)} onConfirm={handleCreatePlanning} />}
-      {showAddPalier && <AddPalierModal onClose={() => setShowAddPalier(null)} onConfirm={(n, t, r) => handleAddPalierConfirm(showAddPalier, n, t, r)} objective={objectives.find((o:any) => o.id === showAddPalier)} />}
+      
+      {showAddPalier && (
+        <AddPalierModal 
+            onClose={() => setShowAddPalier(null)} 
+            onConfirm={(n, t, r) => handleAddPalierConfirm(showAddPalier, n, t, r)} 
+            objective={objectives.find((o:any) => o.id === showAddPalier)} 
+        />
+      )}
       
       {editingPalier && (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={() => setEditingPalier(null)}>
@@ -549,7 +474,6 @@ export default function PilotagePage() {
 
 // --- SOUS-COMPOSANTS ---
 
-// 1. MODAL CRÉATION (AVEC SWITCH PRINCIPAL + CONFIDENTIEL)
 function AddObjectiveAdvancedModal({ onClose, onConfirm }: { onClose: () => void, onConfirm: (data: any) => void }) {
     const [selectedPreset, setSelectedPreset] = useState<string>("ca")
     const [title, setTitle] = useState("Chiffre d'Affaires")
@@ -590,7 +514,6 @@ function AddObjectiveAdvancedModal({ onClose, onConfirm }: { onClose: () => void
     )
 }
 
-// 2. MODAL PLANIFICATION (TUILES + SWITCH, SANS TYPE CALCUL)
 function AddPlanningAdvancedModal({ onClose, onConfirm }: { onClose: () => void, onConfirm: (data: any) => void }) {
     const [selectedPreset, setSelectedPreset] = useState<string>("ca")
     const [startMonth, setStartMonth] = useState("Février")
@@ -599,27 +522,78 @@ function AddPlanningAdvancedModal({ onClose, onConfirm }: { onClose: () => void,
     const [title, setTitle] = useState("Chiffre d'Affaires")
     const [target, setTarget] = useState("")
     const [isPrincipal, setIsPrincipal] = useState(false)
+    const [isConfidential, setIsConfidential] = useState(false)
+    const [paliers, setPaliers] = useState<any[]>([]) // Liste locale des paliers
+    
+    // Etats pour l'ajout d'un palier
+    const [palierName, setPalierName] = useState("")
+    const [palierThreshold, setPalierThreshold] = useState("")
+    const [palierReward, setPalierReward] = useState("")
 
     useEffect(() => { const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset); if(p) setTitle(p.label); }, [selectedPreset])
 
+    const handleAddPalier = () => {
+        if (!palierName || !palierThreshold || !palierReward) return;
+        setPaliers([...paliers, { id: Date.now().toString(), name: palierName, threshold: Number(palierThreshold), reward: Number(palierReward) }]);
+        setPalierName(""); setPalierThreshold(""); setPalierReward("");
+    }
+
+    const handleRemovePalier = (id: string) => {
+        setPaliers(paliers.filter(p => p.id !== id));
+    }
+
     const handleSubmit = () => {
         const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)!
-        onConfirm({ title, target, unit: p.unit, direction: p.direction, startMonth, startYear, duration, type: isPrincipal ? 'principal' : 'secondaire' })
+        onConfirm({ 
+            title, target, unit: p.unit, direction: p.direction, 
+            startMonth, startYear, duration, 
+            type: isPrincipal ? 'principal' : 'secondaire', 
+            isConfidential,
+            paliers // On envoie les paliers configurés
+        })
     }
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm flex items-end sm:items-center justify-center" onClick={onClose}>
-            <div className="bg-card w-full max-w-md rounded-t-3xl sm:rounded-2xl p-6 space-y-6 pb-10" onClick={e => e.stopPropagation()}>
+            <div className="bg-card w-full max-w-md rounded-t-3xl sm:rounded-2xl p-6 space-y-6 pb-10 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center"><h2 className="text-lg font-bold">Programmer un objectif</h2><Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5"/></Button></div>
+                
                 <div className="space-y-5">
+                    {/* ... (Date, Durée, Switches - IDENTIQUES) ... */}
                     <div className="grid grid-cols-2 gap-4"><div><Label className="mb-2 block">Mois de début</Label><Select value={startMonth} onValueChange={setStartMonth}><SelectTrigger className="h-10 bg-muted/30"><SelectValue /></SelectTrigger><SelectContent>{["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"].map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select></div><div><Label className="mb-2 block">Année</Label><Select value={startYear} onValueChange={setStartYear}><SelectTrigger className="h-10 bg-muted/30"><SelectValue /></SelectTrigger><SelectContent>{["2025", "2026", "2027"].map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent></Select></div></div>
                     <div><Label className="mb-2 block">Durée</Label><div className="flex gap-2">{[1, 3, 6, 12].map(d => (<button key={d} onClick={() => setDuration(d)} className={cn("flex-1 py-2 rounded-lg text-sm border transition-all", duration === d ? "bg-purple-600 text-white border-purple-600" : "bg-muted/20 border-border text-muted-foreground")}>{d} mois</button>))}</div></div>
-                    <div className="bg-muted/30 p-3 rounded-xl flex items-center justify-between border border-border">
-                        <Label className="text-sm font-bold flex items-center gap-2"><Crown className={cn("w-4 h-4", isPrincipal ? "text-amber-500" : "text-muted-foreground")} /> Objectif Principal ?</Label>
-                        <Switch checked={isPrincipal} onCheckedChange={setIsPrincipal} />
+                    <div className="flex gap-2">
+                        <div className="bg-muted/30 p-3 rounded-xl flex-1 flex items-center justify-between border border-border"><Label className="text-xs font-bold flex items-center gap-1"><Crown className="w-3 h-3 text-amber-500" /> Principal</Label><Switch checked={isPrincipal} onCheckedChange={setIsPrincipal} /></div>
+                        <div className="bg-muted/30 p-3 rounded-xl flex-1 flex items-center justify-between border border-border"><Label className="text-xs font-bold flex items-center gap-1"><EyeOff className="w-3 h-3 text-muted-foreground" /> Masquer</Label><Switch checked={isConfidential} onCheckedChange={setIsConfidential} /></div>
                     </div>
-                    <div><Label className="mb-2 block">Type d'objectif à planifier</Label><div className="grid grid-cols-3 gap-2">{OBJECTIVE_PRESETS.map(preset => (<button key={preset.id} onClick={() => setSelectedPreset(preset.id)} className={cn("flex flex-col items-center justify-center gap-1 p-3 rounded-xl border transition-all text-xs text-center h-20", selectedPreset === preset.id ? "border-purple-500 bg-purple-500/10 text-purple-500 font-semibold ring-1 ring-purple-500/20" : "border-border bg-muted/20 text-muted-foreground hover:bg-muted")}><preset.icon className="w-5 h-5" /><span>{preset.label}</span></button>))}</div></div>
+
+                    <div><Label className="mb-2 block">Type d'objectif</Label><div className="grid grid-cols-3 gap-2">{OBJECTIVE_PRESETS.map(preset => (<button key={preset.id} onClick={() => setSelectedPreset(preset.id)} className={cn("flex flex-col items-center justify-center gap-1 p-3 rounded-xl border transition-all text-xs text-center h-20", selectedPreset === preset.id ? "border-purple-500 bg-purple-500/10 text-purple-500 font-semibold ring-1 ring-purple-500/20" : "border-border bg-muted/20 text-muted-foreground hover:bg-muted")}><preset.icon className="w-5 h-5" /><span>{preset.label}</span></button>))}</div></div>
                     <div><Label>Cible prévue</Label><Input type="number" value={target} onChange={e => setTarget(e.target.value)} className="mt-1.5 font-bold" placeholder="0" /></div>
+
+                    {/* CONFIGURATION DES PALIERS (NOUVEAU) */}
+                    <div className="border-t border-border pt-4">
+                        <Label className="mb-3 block text-sm font-semibold">Configuration des paliers</Label>
+                        <div className="space-y-3 mb-4">
+                            {paliers.map((p, idx) => (
+                                <div key={p.id} className="flex items-center justify-between bg-muted/20 p-2 rounded-lg text-sm">
+                                    <span className="font-medium text-xs">{idx + 1}. {p.name} (Seuil: {p.threshold})</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-green-600">+{p.reward}€</span>
+                                        <button onClick={() => handleRemovePalier(p.id)}><Trash2 className="w-4 h-4 text-muted-foreground hover:text-red-500" /></button>
+                                    </div>
+                                </div>
+                            ))}
+                            {paliers.length === 0 && <p className="text-xs text-muted-foreground italic text-center py-2">Aucun palier configuré</p>}
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-2 items-end">
+                            <div><Label className="text-[10px] mb-1">Nom</Label><Input value={palierName} onChange={e => setPalierName(e.target.value)} placeholder="Niveau 1" className="h-8 text-xs" /></div>
+                            <div><Label className="text-[10px] mb-1">Seuil</Label><Input type="number" value={palierThreshold} onChange={e => setPalierThreshold(e.target.value)} placeholder="1000" className="h-8 text-xs" /></div>
+                            <div><Label className="text-[10px] mb-1">Prime</Label><Input type="number" value={palierReward} onChange={e => setPalierReward(e.target.value)} placeholder="50" className="h-8 text-xs" /></div>
+                        </div>
+                        <Button variant="outline" size="sm" className="w-full mt-2 h-8 text-xs" onClick={handleAddPalier} disabled={!palierName || !palierThreshold || !palierReward}><Plus className="w-3 h-3 mr-1" /> Ajouter ce palier</Button>
+                    </div>
+
                     <Button className="w-full py-6 text-base bg-purple-600 hover:bg-purple-700" onClick={handleSubmit} disabled={!target}>Valider la planification</Button>
                 </div>
             </div>
@@ -627,50 +601,54 @@ function AddPlanningAdvancedModal({ onClose, onConfirm }: { onClose: () => void,
     )
 }
 
-// 3. DETAIL DRAWER (AVEC DATE ET HISTORIQUE FULL)
+function AddPalierModal({ onClose, onConfirm, objective }: { onClose: () => void, onConfirm: (n: string, t: number, r: number) => void, objective: any }) {
+    const [name, setName] = useState("")
+    const [threshold, setThreshold] = useState("")
+    const [reward, setReward] = useState("")
+    const isDescending = objective?.direction === 'descending'
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={onClose}>
+          <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
+            <h2 className="font-semibold mb-6 text-lg">Ajouter un palier</h2>
+            <div className="space-y-4">
+              <div><Label>Nom</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Niveau 1" className="rounded-xl mt-1" /></div>
+              <div><Label>{isDescending ? `Seuil max autorisé (${objective.unit})` : `Seuil à atteindre (${objective.unit})`}</Label><Input type="number" value={threshold} onChange={e => setThreshold(e.target.value)} placeholder="1000" className="rounded-xl mt-1" /></div>
+              <div><Label>Récompense (€)</Label><Input type="number" value={reward} onChange={e => setReward(e.target.value)} placeholder="50" className="rounded-xl mt-1" /></div>
+              <Button className="w-full rounded-xl" onClick={() => onConfirm(name, Number(threshold), Number(reward))} disabled={!name || !threshold}><Plus className="w-4 h-4 mr-2" /> Ajouter</Button>
+            </div>
+          </div>
+        </div>
+    )
+}
+
 function ObjectiveDetailDrawer({ objective, onClose, onUpdateProgress }: { objective: any, onClose: () => void, onUpdateProgress: (amount: number, date?: string) => void }) {
     const [updateVal, setUpdateVal] = useState("")
-    const [updateDate, setUpdateDate] = useState("") 
+    const [updateDate, setUpdateDate] = useState("")
 
     if (!objective) return null
 
     return (
         <Drawer open={!!objective} onOpenChange={(open) => !open && onClose()}>
-            <DrawerContent className="max-h-[95vh] outline-none">
-                <div className="w-full max-w-lg mx-auto">
-                    <DrawerHeader className="text-left border-b border-border/50 pb-4">
+            <DrawerContent className="fixed bottom-0 left-0 right-0 max-h-[96vh] flex flex-col outline-none">
+                <div className="w-full max-w-lg mx-auto flex flex-col h-full max-h-[96vh]">
+                    <DrawerHeader className="text-left border-b border-border/50 pb-4 shrink-0">
                         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-purple-500/10 mx-auto mb-3"><Target className="w-6 h-6 text-purple-500" /></div>
                         <div className="text-center space-y-1"><Badge variant="outline" className="mb-2 border-purple-500/30 text-purple-400 bg-purple-500/10">{objective.type === "principal" ? "Principal" : "Secondaire"}</Badge><DrawerTitle className="text-2xl font-bold">{objective.title}</DrawerTitle><p className="text-sm text-muted-foreground px-4">{objective.description}</p></div>
                     </DrawerHeader>
-                    <div className="p-4 space-y-6 overflow-y-auto max-h-[60vh]">
+                    
+                    <div className="flex-1 overflow-y-auto p-4 space-y-6">
                         <div className="flex flex-col items-center"><CircularProgress value={objective.current} max={objective.target} direction={objective.direction} size={160} strokeWidth={12} /></div>
-                        
-                        {/* Mise à jour avec DATE */}
-                        <div className="bg-purple-500/5 border border-purple-500/20 p-4 rounded-2xl space-y-3">
-                            <h3 className="font-bold text-sm flex items-center gap-2"><Wallet className="w-4 h-4 text-purple-500" /> Mettre à jour la progression</h3>
-                            <div className="flex gap-2">
-                                <Input type="number" placeholder="Montant..." value={updateVal} onChange={(e) => setUpdateVal(e.target.value)} className="bg-background flex-1" />
-                                <Input type="date" value={updateDate} onChange={(e) => setUpdateDate(e.target.value)} className="bg-background w-32" />
-                                <Button onClick={() => { onUpdateProgress(Number(updateVal), updateDate); setUpdateVal(""); setUpdateDate(""); }} className="bg-purple-600 hover:bg-purple-700"><Plus className="w-4 h-4" /></Button>
-                            </div>
-                        </div>
-
-                        {/* Historique ILLIMITÉ */}
-                        <div>
-                            <h3 className="font-bold text-base mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-purple-500" /> Historique complet</h3>
-                            <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
-                                {objective.history && objective.history.length > 0 ? ([...objective.history].reverse().map((h: any, i: number) => (<div key={i} className="flex justify-between items-center p-3 rounded-xl hover:bg-muted/30 transition-colors border-b border-border/40 last:border-0"><div className="flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-purple-500" /><span className="text-sm font-medium">{h.date}</span></div><div className="flex items-center gap-4"><span className="font-bold text-sm">{(h.value||0).toLocaleString()} {objective.unit}</span><span className="text-xs font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded">+{h.change}</span></div></div>))) : (<p className="text-sm text-muted-foreground italic">Aucun historique.</p>)}
-                            </div>
-                        </div>
+                        <div className="bg-purple-500/5 border border-purple-500/20 p-4 rounded-2xl space-y-3"><h3 className="font-bold text-sm flex items-center gap-2"><Wallet className="w-4 h-4 text-purple-500" /> Mettre à jour la progression</h3><div className="flex gap-2"><Input type="number" placeholder="Montant..." value={updateVal} onChange={(e) => setUpdateVal(e.target.value)} className="bg-background flex-1" /><Input type="date" value={updateDate} onChange={(e) => setUpdateDate(e.target.value)} className="bg-background w-32" /><Button onClick={() => { onUpdateProgress(Number(updateVal), updateDate); setUpdateVal(""); setUpdateDate(""); }} className="bg-purple-600 hover:bg-purple-700"><Plus className="w-4 h-4" /></Button></div></div>
+                        <div><h3 className="font-bold text-base mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-purple-500" /> Historique complet</h3><div className="space-y-1">{objective.history && objective.history.length > 0 ? ([...objective.history].reverse().map((h: any, i: number) => (<div key={i} className="flex justify-between items-center p-3 rounded-xl hover:bg-muted/30 transition-colors border-b border-border/40 last:border-0"><div className="flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-purple-500" /><span className="text-sm font-medium">{h.date}</span></div><div className="flex items-center gap-4"><span className="font-bold text-sm">{(h.value||0).toLocaleString()} {objective.unit}</span><span className="text-xs font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded">+{h.change}</span></div></div>))) : (<p className="text-sm text-muted-foreground italic">Aucun historique.</p>)}</div></div>
                     </div>
-                    <DrawerFooter className="pt-2"><DrawerClose asChild><Button variant="outline" className="w-full rounded-xl">Fermer</Button></DrawerClose></DrawerFooter>
+                    
+                    <DrawerFooter className="pt-2 shrink-0"><DrawerClose asChild><Button variant="outline" className="w-full rounded-xl">Fermer</Button></DrawerClose></DrawerFooter>
                 </div>
             </DrawerContent>
         </Drawer>
     )
 }
 
-// 4. JAUGE SÉCURISÉE
 function CircularProgress({ value, max, size = 180, strokeWidth = 12, direction = "ascending" }: { value: number, max: number, size?: number, strokeWidth?: number, direction?: string }) {
     const safeValue = value || 0; const safeMax = max || 1;
     const radius = (size - strokeWidth) / 2; const circumference = radius * 2 * Math.PI;
