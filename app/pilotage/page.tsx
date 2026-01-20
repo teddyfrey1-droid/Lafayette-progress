@@ -67,7 +67,7 @@ export default function PilotagePage() {
   const { objectives, loading: loadingObj } = useObjectives()
   const { toast } = useToast()
 
-  const [activeTab, setActiveTab] = useState<TabValue>("objectifs") 
+  const [activeTab, setActiveTab] = useState<TabValue>("objectifs")
   const [baseHours, setBaseHours] = useState(35)
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   
@@ -75,7 +75,7 @@ export default function PilotagePage() {
   const [showEditHours, setShowEditHours] = useState(false)
   const [editingPalier, setEditingPalier] = useState<EditingPalier | null>(null)
   const [showAddPalier, setShowAddPalier] = useState<string | null>(null)
-  const [selectedObj, setSelectedObj] = useState<any | null>(null) 
+  const [selectedObj, setSelectedObj] = useState<any | null>(null)
   const [showAddObjective, setShowAddObjective] = useState(false)
   const [showPlanning, setShowPlanning] = useState(false)
   
@@ -629,20 +629,70 @@ function ObjectiveDetailDrawer({ objective, onClose, onUpdateProgress }: { objec
 
     return (
         <Drawer open={!!objective} onOpenChange={(open) => !open && onClose()}>
-            <DrawerContent className="fixed bottom-0 left-0 right-0 max-h-[96vh] flex flex-col outline-none">
-                <div className="w-full max-w-lg mx-auto flex flex-col h-full max-h-[96vh]">
+            {/* AJOUT : bg-card et rounded-t-3xl pour le style, et h-[96vh] pour forcer la hauteur max */}
+            <DrawerContent className="fixed bottom-0 left-0 right-0 h-[96vh] flex flex-col outline-none bg-card rounded-t-3xl">
+                
+                {/* AJOUT : overflow-hidden ici est CRUCIAL pour que le scroll interne fonctionne */}
+                <div className="w-full max-w-lg mx-auto flex flex-col h-full overflow-hidden">
+                    
                     <DrawerHeader className="text-left border-b border-border/50 pb-4 shrink-0">
-                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-purple-500/10 mx-auto mb-3"><Target className="w-6 h-6 text-purple-500" /></div>
-                        <div className="text-center space-y-1"><Badge variant="outline" className="mb-2 border-purple-500/30 text-purple-400 bg-purple-500/10">{objective.type === "principal" ? "Principal" : "Secondaire"}</Badge><DrawerTitle className="text-2xl font-bold">{objective.title}</DrawerTitle><p className="text-sm text-muted-foreground px-4">{objective.description}</p></div>
+                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-purple-500/10 mx-auto mb-3">
+                            <Target className="w-6 h-6 text-purple-500" />
+                        </div>
+                        <div className="text-center space-y-1">
+                            <Badge variant="outline" className="mb-2 border-purple-500/30 text-purple-400 bg-purple-500/10">
+                                {objective.type === "principal" ? "Principal" : "Secondaire"}
+                            </Badge>
+                            <DrawerTitle className="text-2xl font-bold">{objective.title}</DrawerTitle>
+                            <p className="text-sm text-muted-foreground px-4">{objective.description}</p>
+                        </div>
                     </DrawerHeader>
                     
+                    {/* Le flex-1 overflow-y-auto fonctionne maintenant car le parent a overflow-hidden */}
                     <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                        <div className="flex flex-col items-center"><CircularProgress value={objective.current} max={objective.target} direction={objective.direction} size={160} strokeWidth={12} /></div>
-                        <div className="bg-purple-500/5 border border-purple-500/20 p-4 rounded-2xl space-y-3"><h3 className="font-bold text-sm flex items-center gap-2"><Wallet className="w-4 h-4 text-purple-500" /> Mettre à jour la progression</h3><div className="flex gap-2"><Input type="number" placeholder="Montant..." value={updateVal} onChange={(e) => setUpdateVal(e.target.value)} className="bg-background flex-1" /><Input type="date" value={updateDate} onChange={(e) => setUpdateDate(e.target.value)} className="bg-background w-32" /><Button onClick={() => { onUpdateProgress(Number(updateVal), updateDate); setUpdateVal(""); setUpdateDate(""); }} className="bg-purple-600 hover:bg-purple-700"><Plus className="w-4 h-4" /></Button></div></div>
-                        <div><h3 className="font-bold text-base mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-purple-500" /> Historique complet</h3><div className="space-y-1">{objective.history && objective.history.length > 0 ? ([...objective.history].reverse().map((h: any, i: number) => (<div key={i} className="flex justify-between items-center p-3 rounded-xl hover:bg-muted/30 transition-colors border-b border-border/40 last:border-0"><div className="flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-purple-500" /><span className="text-sm font-medium">{h.date}</span></div><div className="flex items-center gap-4"><span className="font-bold text-sm">{(h.value||0).toLocaleString()} {objective.unit}</span><span className="text-xs font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded">+{h.change}</span></div></div>))) : (<p className="text-sm text-muted-foreground italic">Aucun historique.</p>)}</div></div>
+                        <div className="flex flex-col items-center">
+                            <CircularProgress value={objective.current} max={objective.target} direction={objective.direction} size={160} strokeWidth={12} />
+                        </div>
+                        
+                        <div className="bg-purple-500/5 border border-purple-500/20 p-4 rounded-2xl space-y-3">
+                            <h3 className="font-bold text-sm flex items-center gap-2">
+                                <Wallet className="w-4 h-4 text-purple-500" /> Mettre à jour la progression
+                            </h3>
+                            <div className="flex gap-2">
+                                <Input type="number" placeholder="Montant..." value={updateVal} onChange={(e) => setUpdateVal(e.target.value)} className="bg-background flex-1" />
+                                <Input type="date" value={updateDate} onChange={(e) => setUpdateDate(e.target.value)} className="bg-background w-32" />
+                                <Button onClick={() => { onUpdateProgress(Number(updateVal), updateDate); setUpdateVal(""); setUpdateDate(""); }} className="bg-purple-600 hover:bg-purple-700">
+                                    <Plus className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 className="font-bold text-base mb-3 flex items-center gap-2">
+                                <TrendingUp className="w-4 h-4 text-purple-500" /> Historique complet
+                            </h3>
+                            <div className="space-y-1 pb-4"> {/* Petit padding bottom pour ne pas coller au bouton fermer */}
+                                {objective.history && objective.history.length > 0 ? ([...objective.history].reverse().map((h: any, i: number) => (
+                                    <div key={i} className="flex justify-between items-center p-3 rounded-xl hover:bg-muted/30 transition-colors border-b border-border/40 last:border-0">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-2 h-2 rounded-full bg-purple-500" />
+                                            <span className="text-sm font-medium">{h.date}</span>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <span className="font-bold text-sm">{(h.value||0).toLocaleString()} {objective.unit}</span>
+                                            <span className="text-xs font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded">+{h.change}</span>
+                                        </div>
+                                    </div>
+                                ))) : (<p className="text-sm text-muted-foreground italic">Aucun historique.</p>)}
+                            </div>
+                        </div>
                     </div>
                     
-                    <DrawerFooter className="pt-2 shrink-0"><DrawerClose asChild><Button variant="outline" className="w-full rounded-xl">Fermer</Button></DrawerClose></DrawerFooter>
+                    <DrawerFooter className="pt-2 pb-6 px-4 shrink-0 bg-card border-t border-border/50">
+                        <DrawerClose asChild>
+                            <Button variant="outline" className="w-full rounded-xl">Fermer</Button>
+                        </DrawerClose>
+                    </DrawerFooter>
                 </div>
             </DrawerContent>
         </Drawer>
