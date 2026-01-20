@@ -32,7 +32,6 @@ import { fr } from "date-fns/locale"
 
 // --- TYPES ---
 
-type ObjectiveDirection = "ascending" | "descending" // Monter (CA) ou Descendre (Erreurs)
 type TabValue = "objectifs" | "paliers" | "pilotage" | "equipe"
 
 interface EditingPalier {
@@ -76,7 +75,7 @@ export default function PilotagePage() {
   const [showAddPalier, setShowAddPalier] = useState<string | null>(null)
   const [selectedObj, setSelectedObj] = useState<any | null>(null) 
   const [showAddObjective, setShowAddObjective] = useState(false)
-  const [showPlanning, setShowPlanning] = useState(false) // Nouvel état pour le drawer planification
+  const [showPlanning, setShowPlanning] = useState(false) // Pour le drawer planification
   
   const [budgetMax, setBudgetMax] = useState(2000)
   const [simulatedPaliers, setSimulatedPaliers] = useState<Record<string, Record<string, number>>>({})
@@ -366,10 +365,11 @@ export default function PilotagePage() {
                         <div className="space-y-2 mb-6">
                             <div className="flex justify-between text-sm font-medium">
                                 <span className="text-muted-foreground">Progression</span>
-                                <span>{obj.current.toLocaleString()} / {obj.target.toLocaleString()} {obj.unit}</span>
+                                {/* SÉCURITÉ : .toLocaleString() sur valeurs potentiellement undefined */}
+                                <span>{(obj.current || 0).toLocaleString()} / {(obj.target || 0).toLocaleString()} {obj.unit}</span>
                             </div>
                             <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                                <div className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min((obj.current / obj.target) * 100, 100)}%` }} />
+                                <div className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(((obj.current || 0) / (obj.target || 1)) * 100, 100)}%` }} />
                             </div>
                         </div>
                     </div>
@@ -410,7 +410,7 @@ export default function PilotagePage() {
             </div>
         )}
 
-        {/* --- ONGLET 3 : PILOTAGE --- */}
+        {/* --- ONGLET 3 : PILOTAGE (Budget) --- */}
         {activeTab === "pilotage" && (
             <div className="space-y-4 animate-in fade-in">
                 <div className="pulse-card p-4">
@@ -641,6 +641,7 @@ function AddPlanningAdvancedModal({ onClose, onConfirm }: { onClose: () => void,
     const [duration, setDuration] = useState(1)
     const [title, setTitle] = useState("Chiffre d'Affaires")
     const [target, setTarget] = useState("")
+    const [calcType, setCalcType] = useState("moyenne") // Nouveau
 
     // MAJ du titre quand on change de tuile
     useEffect(() => {
@@ -654,7 +655,8 @@ function AddPlanningAdvancedModal({ onClose, onConfirm }: { onClose: () => void,
             title, target,
             unit: p.unit,
             direction: p.direction,
-            startMonth, startYear, duration
+            startMonth, startYear, duration,
+            calculationType: calcType
         })
     }
 
@@ -681,17 +683,28 @@ function AddPlanningAdvancedModal({ onClose, onConfirm }: { onClose: () => void,
                             </Select>
                         </div>
                         <div>
-                            <Label className="mb-2 block">Durée</Label>
-                            <Select value={duration.toString()} onValueChange={v => setDuration(Number(v))}>
+                            <Label className="mb-2 block">Année</Label>
+                            <Select value={startYear} onValueChange={setStartYear}>
                                 <SelectTrigger className="h-10 bg-muted/30"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                    {[1, 3, 6, 12].map(d => <SelectItem key={d} value={d.toString()}>{d} mois</SelectItem>)}
+                                    {["2025", "2026", "2027"].map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                         </div>
                     </div>
 
-                    {/* Grille de Tuiles (REPRISE À L'IDENTIQUE) */}
+                    <div>
+                        <Label className="mb-2 block">Durée</Label>
+                        <div className="flex gap-2">
+                            {[1, 3, 6, 12].map(d => (
+                                <button key={d} onClick={() => setDuration(d)} className={cn("flex-1 py-2 rounded-lg text-sm border transition-all", duration === d ? "bg-purple-600 text-white border-purple-600" : "bg-muted/20 border-border text-muted-foreground")}>
+                                    {d} mois
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Grille de Tuiles (OBJECTIVE TYPES) */}
                     <div>
                         <Label className="mb-2 block">Type d'objectif à planifier</Label>
                         <div className="grid grid-cols-3 gap-2">
@@ -715,46 +728,25 @@ function AddPlanningAdvancedModal({ onClose, onConfirm }: { onClose: () => void,
 
                     <div><Label>Cible prévue</Label><Input type="number" value={target} onChange={e => setTarget(e.target.value)} className="mt-1.5 font-bold" placeholder="0" /></div>
 
-                    <div className="bg-purple-500/10 p-3 rounded-lg text-xs text-purple-600 flex items-start gap-2 border border-purple-500/20">
-                        <CalendarDays className="w-4 h-4 shrink-0 mt-0.5" />
-                        Info : Cet objectif s'activera automatiquement en {startMonth} {startYear} pour {duration} mois.
+                    {/* Boutons Type de calcul (Demandés) */}
+                    <div>
+                        <Label className="mb-2 block">Type de calcul</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {[
+                                { id: 'moyenne', label: 'Moyenne' },
+                                { id: 'cumul', label: 'Cumul' },
+                                { id: 'pourcentage', label: '%' }
+                            ].map(t => (
+                                <button key={t.id} onClick={() => setCalcType(t.id)} className={cn("py-2 rounded-lg text-xs border transition-all", calcType === t.id ? "bg-blue-600 text-white border-blue-600" : "bg-muted/20 border-border")}>
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
                     <Button className="w-full py-6 text-base bg-purple-600 hover:bg-purple-700" onClick={handleSubmit} disabled={!target}>Valider la planification</Button>
                 </div>
             </div>
-        </div>
-    )
-}
-
-function AddPalierModal({ onClose, onConfirm, objective }: { onClose: () => void, onConfirm: (n: string, t: number, r: number) => void, objective: any }) {
-    const [name, setName] = useState("")
-    const [threshold, setThreshold] = useState("")
-    const [reward, setReward] = useState("")
-    
-    const isDescending = objective?.direction === 'descending'
-
-    return (
-        <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={onClose}>
-          <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
-            <h2 className="font-semibold mb-6 text-lg">Ajouter un palier</h2>
-            <div className="space-y-4">
-              <div><Label>Nom</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Niveau 1" className="rounded-xl mt-1" /></div>
-              
-              <div>
-                  <Label>
-                      {isDescending ? `Seuil max autorisé (${objective.unit})` : `Seuil à atteindre (${objective.unit})`}
-                  </Label>
-                  <Input type="number" value={threshold} onChange={e => setThreshold(e.target.value)} placeholder="1000" className="rounded-xl mt-1" />
-              </div>
-
-              <div><Label>Récompense (€)</Label><Input type="number" value={reward} onChange={e => setReward(e.target.value)} placeholder="50" className="rounded-xl mt-1" /></div>
-              
-              <Button className="w-full rounded-xl" onClick={() => onConfirm(name, Number(threshold), Number(reward))} disabled={!name || !threshold}>
-                <Plus className="w-4 h-4 mr-2" /> Ajouter
-              </Button>
-            </div>
-          </div>
         </div>
     )
 }
@@ -783,9 +775,9 @@ function ObjectiveDetailDrawer({ objective, onClose, onUpdateProgress }: { objec
                     </DrawerHeader>
 
                     <div className="p-4 space-y-6 overflow-y-auto max-h-[60vh]">
-                        {/* Jauge */}
+                        {/* Jauge SÉCURISÉE */}
                         <div className="flex flex-col items-center">
-                            <CircularProgress value={objective.current} max={objective.target} direction={objective.direction} size={160} strokeWidth={12} />
+                            <CircularProgress value={objective.current || 0} max={objective.target || 1} direction={objective.direction} size={160} strokeWidth={12} />
                         </div>
 
                         {/* Mise à jour */}
@@ -808,7 +800,7 @@ function ObjectiveDetailDrawer({ objective, onClose, onUpdateProgress }: { objec
                             </div>
                         </div>
 
-                        {/* Historique */}
+                        {/* Historique SÉCURISÉ */}
                         <div>
                             <h3 className="font-bold text-base mb-3 flex items-center gap-2">
                                 <TrendingUp className="w-4 h-4 text-purple-500" />
@@ -823,7 +815,7 @@ function ObjectiveDetailDrawer({ objective, onClose, onUpdateProgress }: { objec
                                                 <span className="text-sm font-medium">{h.date}</span>
                                             </div>
                                             <div className="flex items-center gap-4">
-                                                <span className="font-bold text-sm">{h.value.toLocaleString()} {objective.unit}</span>
+                                                <span className="font-bold text-sm">{(h.value || 0).toLocaleString()} {objective.unit}</span>
                                                 <span className="text-xs font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded">+{h.change}</span>
                                             </div>
                                         </div>
@@ -842,16 +834,20 @@ function ObjectiveDetailDrawer({ objective, onClose, onUpdateProgress }: { objec
     )
 }
 
-// 4. JAUGE CIRCULAIRE
+// 4. JAUGE CIRCULAIRE SÉCURISÉE
 function CircularProgress({ value, max, size = 180, strokeWidth = 12, direction = "ascending" }: { value: number, max: number, size?: number, strokeWidth?: number, direction?: string }) {
+    // Protection contre les valeurs undefined ou null
+    const safeValue = value || 0;
+    const safeMax = max || 1; // Evite division par zéro
+
     const radius = (size - strokeWidth) / 2
     const circumference = radius * 2 * Math.PI
     
     let percentage = 0;
     if (direction === 'descending') {
-        percentage = value <= max ? 100 : Math.max(0, (max / (value || 1)) * 100);
+        percentage = safeValue <= safeMax ? 100 : Math.max(0, (safeMax / (safeValue || 1)) * 100);
     } else {
-        percentage = Math.min(100, Math.max(0, (value / max) * 100));
+        percentage = Math.min(100, Math.max(0, (safeValue / safeMax) * 100));
     }
 
     const offset = circumference - (percentage / 100) * circumference
@@ -871,7 +867,7 @@ function CircularProgress({ value, max, size = 180, strokeWidth = 12, direction 
             <div className="absolute flex flex-col items-center">
                 <span className="text-4xl font-bold tracking-tighter">{Math.round(percentage)}%</span>
                 <span className="text-[10px] text-muted-foreground mt-1 font-medium">
-                    {value.toLocaleString()} / {max.toLocaleString()}
+                    {safeValue.toLocaleString()} / {safeMax.toLocaleString()}
                 </span>
             </div>
         </div>
