@@ -33,6 +33,7 @@ export default function ObjectivesPage() {
   const secondaryObjectives = objectives.filter((o: any) => (o.type === "secondaire" || !o.type) && o.isActive)
 
   // Vérification si le principal est atteint (Gatekeeper)
+  // Utilisation sécurisée de .current
   const isPrincipalMet = !principalObjective || (
       principalObjective.direction === 'descending' 
       ? (principalObjective.current || 0) <= (principalObjective.target || 1) 
@@ -58,9 +59,10 @@ export default function ObjectivesPage() {
   }
 
   // Calcul de la progression principale sécurisée
-  // Note: Dans Firebase, le champ est 'current', pas 'progress'
+  // CORRECTION : On utilise 'current' au lieu de 'progress'
   const currentP = principalObjective?.current || 0;
   const targetP = principalObjective?.target || 1;
+  const isConfidentialP = principalObjective?.isConfidential || principalObjective?.hideRevenue;
   
   let principalProgress = 0;
   if (principalObjective) {
@@ -100,7 +102,7 @@ export default function ObjectivesPage() {
                     progress={principalProgress} 
                     size={100} 
                     strokeWidth={8} 
-                    showPercentage={!principalObjective.isConfidential} 
+                    showPercentage={!isConfidentialP} 
                   />
                   <h3 className="font-semibold mt-3">{principalObjective.title}</h3>
                   <p className="text-sm text-muted-foreground mt-1">{principalObjective.description}</p>
@@ -108,10 +110,9 @@ export default function ObjectivesPage() {
                     <span className="text-xs px-2 py-1 rounded-full bg-primary/15 text-primary font-medium">
                       Principal
                     </span>
-                    {/* On cache le montant si confidentiel */}
-                    {!principalObjective.isConfidential && principalObjective.paliers && (
+                    {!isConfidentialP && principalObjective.paliers && (
                         <span className="text-xs text-muted-foreground">
-                            Max: {principalObjective.paliers.reduce((acc:number, p:any) => acc + p.reward, 0)}€
+                            Prime max: {principalObjective.paliers.reduce((acc:number, p:any) => acc + p.reward, 0)}€
                         </span>
                     )}
                   </div>
@@ -122,9 +123,9 @@ export default function ObjectivesPage() {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Progression</span>
                     <span className="font-semibold">
-                      {principalObjective.isConfidential 
+                      {isConfidentialP 
                         ? <span className="flex items-center gap-1 italic opacity-70"><EyeOff className="w-3 h-3"/> Masqué</span> 
-                        : `${(currentP).toLocaleString()} / ${(targetP).toLocaleString()} ${principalObjective.unit}`}
+                        : `${currentP.toLocaleString()} / ${targetP.toLocaleString()} ${principalObjective.unit}`}
                     </span>
                   </div>
                   <Progress
@@ -178,8 +179,10 @@ export default function ObjectivesPage() {
 
             <div className="grid gap-3">
               {secondaryObjectives.map((obj: any) => {
+                // CORRECTION : Utilisation de .current + Sécurité || 0
                 const current = obj.current || 0;
                 const target = obj.target || 1;
+                const isConfidential = obj.isConfidential || obj.hideRevenue;
                 
                 let progress = 0;
                 if (obj.direction === 'descending') {
@@ -212,9 +215,9 @@ export default function ObjectivesPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-center gap-2">
                         <span className="text-lg font-bold">
-                          {obj.isConfidential ? `${Math.round(progress)}%` : current.toLocaleString()}
+                          {isConfidential ? `${Math.round(progress)}%` : current.toLocaleString()}
                           <span className="text-sm font-normal text-muted-foreground ml-1">
-                            {obj.isConfidential ? "" : `/ ${target.toLocaleString()} ${obj.unit}`}
+                            {isConfidential ? "" : `/ ${target.toLocaleString()} ${obj.unit}`}
                           </span>
                         </span>
                       </div>
@@ -284,9 +287,10 @@ function ObjectiveDetail({
   onBack: () => void
 }) {
   const isPrimary = objective.type === "principal"
-  // Sécurisation des valeurs pour éviter le crash .toLocaleString
+  // CORRECTION : Utilisation de .current + Sécurité || 0
   const current = objective.current || 0;
   const target = objective.target || 1;
+  const isConfidential = objective.isConfidential || objective.hideRevenue;
   
   let progress = 0;
   if (objective.direction === 'descending') {
@@ -340,8 +344,7 @@ function ObjectiveDetail({
             size={130}
             strokeWidth={10}
             showPercentage={true}
-            // Affiche "Masqué" ou les valeurs
-            sublabel={objective.isConfidential 
+            sublabel={isConfidential 
                 ? "Données masquées" 
                 : `${current.toLocaleString()} / ${target.toLocaleString()} ${objective.unit}`}
           />
@@ -351,7 +354,7 @@ function ObjectiveDetail({
         <div className="grid grid-cols-3 gap-3">
           <div className="pulse-card p-3 text-center">
             {/* Si confidentiel, on ne montre pas l'argent */}
-            <p className="text-lg font-bold">{objective.isConfidential ? "?" : maxReward}€</p>
+            <p className="text-lg font-bold">{isConfidential ? "?" : maxReward}€</p>
             <p className="text-xs text-muted-foreground">Prime max</p>
           </div>
           <div className="pulse-card p-3 text-center">
