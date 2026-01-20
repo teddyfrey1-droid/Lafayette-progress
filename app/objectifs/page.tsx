@@ -30,10 +30,15 @@ export default function ObjectivesPage() {
   const principalObjective = objectives.find((o: any) => o.type === "principal" && o.isActive)
   const secondaryObjectives = objectives.filter((o: any) => (o.type === "secondaire" || !o.type) && o.isActive)
 
+  // SÉCURITÉ : Conversion en nombres pour éviter les crashs
+  const pCurrent = Number(principalObjective?.current || 0)
+  const pTarget = Number(principalObjective?.target || 1)
+
+  // Vérification Gatekeeper
   const isPrincipalMet = !principalObjective || (
       principalObjective.direction === 'descending' 
-      ? (principalObjective.current || 0) <= (principalObjective.target || 1) 
-      : (principalObjective.current || 0) >= (principalObjective.target || 1)
+      ? pCurrent <= pTarget 
+      : pCurrent >= pTarget
   );
 
   if (loading) {
@@ -44,6 +49,7 @@ export default function ObjectivesPage() {
     )
   }
 
+  // VUE DÉTAIL (CLIC)
   if (selectedObjective) {
     return (
       <ObjectiveDetail
@@ -53,21 +59,20 @@ export default function ObjectivesPage() {
     )
   }
 
-  // SÉCURITÉ : On utilise des valeurs par défaut pour éviter le crash
-  const currentP = principalObjective?.current || 0;
-  const targetP = principalObjective?.target || 1;
-  const nextPalier = principalObjective?.paliers?.find((p: any) => 
-     principalObjective.direction === 'descending' ? p.threshold < currentP : p.threshold > currentP
-  );
-  
+  // VUE LISTE (DASHBOARD)
   let principalProgress = 0;
   if (principalObjective) {
       if (principalObjective.direction === 'descending') {
-          principalProgress = currentP <= targetP ? 100 : Math.max(0, (targetP / (currentP || 1)) * 100);
+          principalProgress = pCurrent <= pTarget ? 100 : Math.max(0, (pTarget / (pCurrent || 1)) * 100);
       } else {
-          principalProgress = Math.min(100, (currentP / targetP) * 100);
+          principalProgress = Math.min(100, (pCurrent / pTarget) * 100);
       }
   }
+
+  // Recherche du prochain palier pour l'objectif principal
+  const nextPalier = principalObjective?.paliers?.find((p: any) => 
+     principalObjective.direction === 'descending' ? Number(p.threshold) < pCurrent : Number(p.threshold) > pCurrent
+  );
 
   return (
     <PermissionGate moduleId="objectifs" redirect>
@@ -80,6 +85,7 @@ export default function ObjectivesPage() {
             <p className="text-sm text-muted-foreground mt-1">Suivez votre progression et débloquez vos primes</p>
           </div>
 
+          {/* OBJECTIF PRINCIPAL */}
           <section className="space-y-4">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" />
@@ -104,7 +110,7 @@ export default function ObjectivesPage() {
                     <span className="text-xs px-2 py-1 rounded-full bg-primary/15 text-primary font-medium">Principal</span>
                     {!principalObjective.isConfidential && principalObjective.paliers && (
                         <span className="text-xs text-muted-foreground">
-                            Max: {(principalObjective.paliers.reduce((acc:number, p:any) => acc + (p.reward || 0), 0) || 0)}€
+                            Max: {(principalObjective.paliers.reduce((acc:number, p:any) => acc + Number(p.reward || 0), 0)).toLocaleString()}€
                         </span>
                     )}
                   </div>
@@ -116,7 +122,7 @@ export default function ObjectivesPage() {
                     <span className="font-semibold">
                       {principalObjective.isConfidential 
                         ? <span className="flex items-center gap-1 italic opacity-70"><EyeOff className="w-3 h-3"/> Masqué</span> 
-                        : `${(currentP || 0).toLocaleString()} / ${(targetP || 0).toLocaleString()} ${principalObjective.unit}`}
+                        : `${pCurrent.toLocaleString()} / ${pTarget.toLocaleString()} ${principalObjective.unit}`}
                     </span>
                   </div>
                   <Progress value={principalProgress} className="h-2 [&>div]:bg-gradient-to-r [&>div]:from-primary [&>div]:to-accent" />
@@ -124,10 +130,9 @@ export default function ObjectivesPage() {
 
                 <div className="mt-4 pt-4 border-t border-border/50">
                   <p className="text-xs text-muted-foreground mb-1">Tendance</p>
-                  <MockHistory target={targetP} />
+                  <MockHistory target={pTarget} />
                 </div>
 
-                {/* SÉCURITÉ : Protection de l'affichage du palier */}
                 {nextPalier && (
                   <div className="mt-4 p-3 rounded-xl bg-muted/50 flex items-center justify-between">
                     <div>
@@ -137,8 +142,7 @@ export default function ObjectivesPage() {
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">Cible</p>
                       <p className="font-semibold text-primary">
-                        {/* 🛑 C'est ici que ça plantait : on sécurise avec ( || 0) */}
-                        {(nextPalier.threshold || 0).toLocaleString()} {principalObjective.unit}
+                        {Number(nextPalier.threshold || 0).toLocaleString()} {principalObjective.unit}
                       </p>
                     </div>
                     <ChevronRight className="w-5 h-5 text-muted-foreground" />
@@ -153,6 +157,7 @@ export default function ObjectivesPage() {
             )}
           </section>
 
+          {/* OBJECTIFS SECONDAIRES */}
           <section className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -164,9 +169,10 @@ export default function ObjectivesPage() {
 
             <div className="grid gap-3">
               {secondaryObjectives.map((obj: any) => {
-                // SÉCURITÉ
-                const current = obj.current || 0;
-                const target = obj.target || 1;
+                // SÉCURISATION DES DONNÉES SECONDAIRES
+                const current = Number(obj.current || 0);
+                const target = Number(obj.target || 1);
+                const isConfidential = obj.isConfidential || obj.hideRevenue;
                 
                 let progress = 0;
                 if (obj.direction === 'descending') {
@@ -175,7 +181,10 @@ export default function ObjectivesPage() {
                     progress = Math.min(100, (current / target) * 100);
                 }
 
-                const nextPalier = obj.paliers?.find((p: any) => p.threshold > current)
+                const nextPalierS = obj.paliers?.find((p: any) => 
+                    obj.direction === 'descending' ? Number(p.threshold) < current : Number(p.threshold) > current
+                );
+                
                 const isLocked = !isPrincipalMet; 
 
                 return (
@@ -198,9 +207,9 @@ export default function ObjectivesPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-center gap-2">
                         <span className="text-lg font-bold">
-                          {obj.isConfidential ? `${Math.round(progress)}%` : (current || 0).toLocaleString()}
+                          {isConfidential ? `${Math.round(progress)}%` : current.toLocaleString()}
                           <span className="text-sm font-normal text-muted-foreground ml-1">
-                            {obj.isConfidential ? "" : `/ ${(target || 0).toLocaleString()} ${obj.unit}`}
+                            {isConfidential ? "" : `/ ${target.toLocaleString()} ${obj.unit}`}
                           </span>
                         </span>
                       </div>
@@ -210,12 +219,12 @@ export default function ObjectivesPage() {
                       </div>
                     </div>
 
-                    {nextPalier && !isLocked && (
+                    {nextPalierS && !isLocked && (
                       <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
-                          Prochain: <span className="font-medium text-foreground">{nextPalier.name}</span>
+                          Prochain: <span className="font-medium text-foreground">{nextPalierS.name}</span>
                         </span>
-                        <span className="text-xs font-semibold text-accent">+{nextPalier.reward}€</span>
+                        <span className="text-xs font-semibold text-accent">+{nextPalierS.reward}€</span>
                       </div>
                     )}
                     {isLocked && (
@@ -251,24 +260,36 @@ export default function ObjectivesPage() {
   )
 }
 
+// --- VUE DÉTAIL ---
 function ObjectiveDetail({ objective, onBack }: { objective: any, onBack: () => void }) {
-  const isPrimary = objective.type === "principal"
-  // SÉCURITÉ : Valeurs par défaut
-  const current = objective.current || 0;
-  const target = objective.target || 1;
-  const isConfidential = objective.isConfidential || objective.hideRevenue;
+  // CRÉATION D'UN OBJET SÉCURISÉ ("SAFE OBJECT")
+  // On s'assure ici que TOUTES les valeurs numériques sont bien des nombres et existent.
+  // C'est cet objet "safeObj" qu'on utilisera et qu'on passera aux enfants.
+  const safeObj = {
+      ...objective,
+      current: Number(objective.current || 0),
+      target: Number(objective.target || 1),
+      paliers: (objective.paliers || []).map((p:any) => ({
+          ...p,
+          threshold: Number(p.threshold || 0),
+          reward: Number(p.reward || 0)
+      }))
+  };
+
+  const isPrimary = safeObj.type === "principal"
+  const isConfidential = safeObj.isConfidential || safeObj.hideRevenue;
   
   let progress = 0;
-  if (objective.direction === 'descending') {
-      progress = current <= target ? 100 : Math.max(0, (target / (current || 1)) * 100);
+  if (safeObj.direction === 'descending') {
+      progress = safeObj.current <= safeObj.target ? 100 : Math.max(0, (safeObj.target / (safeObj.current || 1)) * 100);
   } else {
-      progress = Math.min(100, (current / target) * 100);
+      progress = Math.min(100, (safeObj.current / safeObj.target) * 100);
   }
 
-  const maxReward = objective.paliers?.reduce((acc:number, p:any) => acc + (p.reward || 0), 0) || 0;
-  const unlockedPaliers = objective.paliers?.filter((p: any) => 
-      objective.direction === 'descending' ? current <= p.threshold : current >= p.threshold
-  ).length || 0;
+  const maxReward = safeObj.paliers.reduce((acc:number, p:any) => acc + p.reward, 0);
+  const unlockedPaliers = safeObj.paliers.filter((p: any) => 
+      safeObj.direction === 'descending' ? safeObj.current <= p.threshold : safeObj.current >= p.threshold
+  ).length;
 
   return (
     <div className="min-h-screen bg-background pb-32">
@@ -286,8 +307,8 @@ function ObjectiveDetail({ objective, onBack }: { objective: any, onBack: () => 
             <span className={cn("text-xs font-medium px-3 py-1 rounded-full", isPrimary ? "bg-primary/15 text-primary" : "bg-accent/15 text-accent")}>
               {isPrimary ? "Objectif Principal" : "Objectif Secondaire"}
             </span>
-            <h1 className="text-xl font-bold mt-3">{objective.title}</h1>
-            <p className="text-sm text-muted-foreground mt-1">{objective.description}</p>
+            <h1 className="text-xl font-bold mt-3">{safeObj.title}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{safeObj.description}</p>
           </div>
         </div>
 
@@ -297,10 +318,10 @@ function ObjectiveDetail({ objective, onBack }: { objective: any, onBack: () => 
             size={130}
             strokeWidth={10}
             showPercentage={true}
-            // SÉCURITÉ : .toLocaleString() protégé
+            // ICI ON EST SÛR QUE safeObj.current EST UN NOMBRE
             sublabel={isConfidential 
                 ? "Données masquées" 
-                : `${(current || 0).toLocaleString()} / ${(target || 0).toLocaleString()} ${objective.unit}`}
+                : `${safeObj.current.toLocaleString()} / ${safeObj.target.toLocaleString()} ${safeObj.unit}`}
           />
         </div>
 
@@ -310,7 +331,7 @@ function ObjectiveDetail({ objective, onBack }: { objective: any, onBack: () => 
             <p className="text-xs text-muted-foreground">Prime max</p>
           </div>
           <div className="pulse-card p-3 text-center">
-            <p className="text-lg font-bold">{objective.paliers?.length || 0}</p>
+            <p className="text-lg font-bold">{safeObj.paliers.length}</p>
             <p className="text-xs text-muted-foreground">Paliers</p>
           </div>
           <div className="pulse-card p-3 text-center">
@@ -324,8 +345,8 @@ function ObjectiveDetail({ objective, onBack }: { objective: any, onBack: () => 
             <Target className="w-5 h-5 text-primary" />
             Paliers de récompense
           </h2>
-          {/* On passe l'objectif sécurisé */}
-          <PalierTimeline objective={{...objective, current}} />
+          {/* On passe l'objet SÉCURISÉ au composant timeline */}
+          <PalierTimeline objective={safeObj} />
         </section>
 
         <div className="pulse-card p-4 bg-muted/30">
