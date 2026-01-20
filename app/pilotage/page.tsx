@@ -6,10 +6,11 @@ import { BottomNav } from "@/components/pulse/bottom-nav"
 import { PermissionGate } from "@/components/auth/permission-gate"
 import { usePermissions } from "@/hooks/use-permissions"
 import { useObjectives } from "@/hooks/use-objectives"
+import { useAuth } from "@/components/auth/auth-provider" // 👈 Ajouté pour sécuriser par entreprise
 import {
   Target, TrendingUp, TrendingDown, Clock, Plus, Edit3, Trash2, X, Check, Euro, Users,
   Layers, AlertCircle, Save, Wallet, ChevronDown, ChevronUp, Calendar, Loader2,
-  Percent, Hash, AlertTriangle, ThumbsUp, CalendarDays
+  Percent, Hash, AlertTriangle, ThumbsUp, CalendarDays, Crown, Lock
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -25,7 +26,7 @@ import { Badge } from "@/components/ui/badge"
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger, DrawerFooter, DrawerClose } from "@/components/ui/drawer"
 
 // Imports Firebase
-import { doc, updateDoc, addDoc, collection, onSnapshot, query, getDoc, setDoc, deleteDoc, arrayUnion, increment } from "firebase/firestore"
+import { doc, updateDoc, addDoc, collection, onSnapshot, query, getDoc, setDoc, deleteDoc, arrayUnion, increment, where } from "firebase/firestore"
 import { db } from "@/lib/firebase/client"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
@@ -51,16 +52,17 @@ interface TeamMember {
   color: string
 }
 
-// Liste des modèles d'objectifs (Pour création immédiate ET planification)
+// Liste des modèles d'objectifs
 const OBJECTIVE_PRESETS = [
   { id: "ca", label: "Chiffre d'Affaires", icon: Euro, unit: "€", direction: "ascending", desc: "Augmenter le revenu" },
-  { id: "error", label: "Taux d'erreur", icon: AlertTriangle, unit: "%", direction: "descending", desc: "Réduire les erreurs (qualité)" },
+  { id: "error", label: "Taux d'erreur", icon: AlertTriangle, unit: "%", direction: "descending", desc: "Réduire les erreurs" },
   { id: "volume", label: "Volume Commandes", icon: Hash, unit: "cmd", direction: "ascending", desc: "Augmenter la production" },
   { id: "satisfaction", label: "Satisfaction Client", icon: ThumbsUp, unit: "/5", direction: "ascending", desc: "Améliorer la notation" },
   { id: "margin", label: "Marge Brute", icon: Percent, unit: "%", direction: "ascending", desc: "Optimiser la rentabilité" },
 ]
 
 export default function PilotagePage() {
+  const { profile } = useAuth() // 👈 Récupère l'utilisateur connecté
   const { canEdit } = usePermissions()
   const { objectives, loading: loadingObj } = useObjectives()
   const { toast } = useToast()
@@ -75,19 +77,30 @@ export default function PilotagePage() {
   const [showAddPalier, setShowAddPalier] = useState<string | null>(null)
   const [selectedObj, setSelectedObj] = useState<any | null>(null) 
   const [showAddObjective, setShowAddObjective] = useState(false)
-  const [showPlanning, setShowPlanning] = useState(false) // Pour le drawer planification
+  const [showPlanning, setShowPlanning] = useState(false)
   
   const [budgetMax, setBudgetMax] = useState(2000)
   const [simulatedPaliers, setSimulatedPaliers] = useState<Record<string, Record<string, number>>>({})
-  const [expandedObjective, setExpandedObjective] = useState<string | null>(null)
 
-  // 1. CHARGEMENT DES DONNÉES
+  // 1. CHARGEMENT DES DONNÉES (SÉCURISÉ)
   useEffect(() => {
-    const unsubUsers = onSnapshot(query(collection(db, "users")), (snapshot) => {
+    if (!profile?.companyId) return;
+
+    // On charge UNIQUEMENT les utilisateurs de l'entreprise connectée
+    const q = query(
+        collection(db, "users"), 
+        where("companyId", "==", profile.companyId)
+    );
+
+    const unsubUsers = onSnapshot(q, (snapshot) => {
       const members = snapshot.docs
-        .filter(d => d.data().role !== 'super_admin') 
         .map(doc => {
             const data = doc.data();
+            
+            // 🛑 FILTRE STRICT : On vire les Super Admin et les "Non assigné"
+            if (data.role === 'super_admin') return null;
+            if (data.companyName === 'Non assigné') return null;
+
             const initials = (data.displayName || data.email || "??").substring(0, 2).toUpperCase();
             const colors = ["bg-purple-500", "bg-blue-500", "bg-pink-500", "bg-indigo-500", "bg-emerald-500"];
             
@@ -100,7 +113,8 @@ export default function PilotagePage() {
                 color: colors[initials.charCodeAt(0) % colors.length]
             }
       })
-      setTeamMembers(members)
+      // On garde uniquement les utilisateurs valides (non null)
+      setTeamMembers(members.filter(Boolean) as TeamMember[])
     })
 
     const loadConfig = async () => {
@@ -113,7 +127,7 @@ export default function PilotagePage() {
     loadConfig();
 
     return () => unsubUsers();
-  }, [])
+  }, [profile?.companyId])
 
   // 2. SYNCHRONISATION SIMULATION
   useEffect(() => {
@@ -134,16 +148,29 @@ export default function PilotagePage() {
     const objectiveCosts: any[] = []
     let totalCost = 0
 
+    // Vérifier si le principal est atteint
+    const principalObj = objectives.find((o: any) => o.type === 'principal');
+    const isPrincipalMet = !principalObj || (principalObj.direction === 'descending' 
+        ? ((principalObj.current || 0) <= (principalObj.target || 1)) 
+        : ((principalObj.current || 0) >= (principalObj.target || 1))
+    );
+
     objectives.forEach((obj: any) => {
       if (!obj.isActive && activeTab !== 'pilotage') return;
+
+      // Si c'est un secondaire et que le principal bloque -> coût 0
+      if (obj.type === 'secondaire' && !isPrincipalMet) {
+          objectiveCosts.push({ id: obj.id, title: obj.title, cost: 0, paliers: [] });
+          return;
+      }
 
       let objCost = 0
       const paliersList: any[] = []
 
       if (obj.paliers && obj.paliers.length > 0) {
+          // On prend le cumul des paliers pour le budget max
           const maxReward = obj.paliers.reduce((acc:number, p:any) => acc + (simulatedPaliers[obj.id]?.[p.id] ?? p.reward), 0);
           objCost = maxReward;
-          
           obj.paliers.forEach((p: any) => {
             paliersList.push({ id: p.id, name: p.name, reward: simulatedPaliers[obj.id]?.[p.id] ?? p.reward })
           })
@@ -163,7 +190,9 @@ export default function PilotagePage() {
       teamTotalCost,
       budgetDiff: budgetMax - teamTotalCost,
       isOverBudget: teamTotalCost > budgetMax,
-      totalCostPerPerson: totalCost 
+      totalCostPerPerson: totalCost, 
+      activeObjectivesCount: objectives.filter(o => o.isActive).length,
+      isPrincipalMet
     }
   }, [objectives, simulatedPaliers, baseHours, budgetMax, teamMembers, activeTab])
 
@@ -189,63 +218,30 @@ export default function PilotagePage() {
               if (!obj.paliers) return;
               const changes = simulatedPaliers[obj.id];
               if (!changes) return;
-
               const newPaliers = obj.paliers.map((p: any) => ({
                   ...p,
                   reward: changes[p.id] !== undefined ? changes[p.id] : p.reward
               }));
-
               await updateDoc(doc(db, "objectives", obj.id), { paliers: newPaliers });
           });
-
           await Promise.all(promises);
           await setDoc(doc(db, "config", "pilotage"), { budgetMax }, { merge: true });
-          toast({ title: "Simulation appliquée !", description: "Les montants des primes ont été mis à jour." });
+          toast({ title: "Simulation appliquée !" });
       } catch (e) {
           toast({ title: "Erreur", variant: "destructive" });
       }
   }
 
-  // PALIERS
-  const handleAddPalierConfirm = async (objectiveId: string, name: string, threshold: number, reward: number) => {
-      const obj = objectives.find((o: any) => o.id === objectiveId);
-      if(!obj) return;
-      const newPalier = { id: `p-${Date.now()}`, name, threshold, reward };
-      const newPaliers = [...(obj.paliers || []), newPalier];
-      await updateDoc(doc(db, "objectives", objectiveId), { paliers: newPaliers });
-      setShowAddPalier(null);
-      toast({ title: "Palier ajouté" });
-  }
-
-  const handleUpdatePalierConfirm = async () => {
-      if(!editingPalier) return;
-      const obj = objectives.find((o: any) => o.id === editingPalier.objectiveId);
-      if(!obj) return;
-      const newPaliers = obj.paliers.map((p: any) => p.id === editingPalier.palierId ? { ...p, name: editingPalier.name, threshold: editingPalier.threshold, reward: editingPalier.reward } : p);
-      await updateDoc(doc(db, "objectives", editingPalier.objectiveId), { paliers: newPaliers });
-      setEditingPalier(null);
-      toast({ title: "Palier modifié" });
-  }
-
-  const handleDeletePalier = async () => {
-      if(!editingPalier) return;
-      if(!confirm("Supprimer ce palier ?")) return;
-      const obj = objectives.find((o: any) => o.id === editingPalier.objectiveId);
-      if(!obj) return;
-      const newPaliers = obj.paliers.filter((p: any) => p.id !== editingPalier.palierId);
-      await updateDoc(doc(db, "objectives", editingPalier.objectiveId), { paliers: newPaliers });
-      setEditingPalier(null);
-      toast({ title: "Palier supprimé" });
-  }
-
   // CRÉATION OBJECTIF
   const handleCreateObjective = async (data: any) => {
+      if (!profile?.companyId) return;
       try {
         await addDoc(collection(db, "objectives"), {
+            companyId: profile.companyId,
             title: data.title,
             description: data.description || "",
             isActive: true,
-            type: "principal",
+            type: data.type || "secondaire",
             target: Number(data.target),
             unit: data.unit,
             direction: data.direction,
@@ -263,8 +259,10 @@ export default function PilotagePage() {
 
   // PLANIFICATION (Sauvegarde)
   const handleCreatePlanning = async (data: any) => {
+      if (!profile?.companyId) return;
       try {
           await addDoc(collection(db, "plannings"), {
+              companyId: profile.companyId,
               ...data,
               createdAt: new Date().toISOString(),
               status: "scheduled"
@@ -280,7 +278,6 @@ export default function PilotagePage() {
   const updateProgress = async (amount: number) => {
       if (!selectedObj) return;
       const todayStr = format(new Date(), "d MMM", { locale: fr });
-      
       try {
         await updateDoc(doc(db, "objectives", selectedObj.id), {
             current: increment(amount),
@@ -297,6 +294,19 @@ export default function PilotagePage() {
       }
   }
 
+  // PALIERS
+  const handleAddPalierConfirm = async (objectiveId: string, name: string, threshold: number, reward: number) => {
+      const obj = objectives.find((o: any) => o.id === objectiveId);
+      if(!obj) return;
+      const newPalier = { id: `p-${Date.now()}`, name, threshold, reward };
+      const newPaliers = [...(obj.paliers || []), newPalier];
+      await updateDoc(doc(db, "objectives", objectiveId), { paliers: newPaliers });
+      setShowAddPalier(null);
+      toast({ title: "Palier ajouté" });
+  }
+  const handleUpdatePalierConfirm = async () => { if(!editingPalier) return; const obj = objectives.find((o: any) => o.id === editingPalier.objectiveId); if(!obj) return; const newPaliers = obj.paliers.map((p: any) => p.id === editingPalier.palierId ? { ...p, name: editingPalier.name, threshold: editingPalier.threshold, reward: editingPalier.reward } : p); await updateDoc(doc(db, "objectives", editingPalier.objectiveId), { paliers: newPaliers }); setEditingPalier(null); toast({ title: "Palier modifié" }); }
+  const handleDeletePalier = async () => { if(!editingPalier) return; if(!confirm("Supprimer ce palier ?")) return; const obj = objectives.find((o: any) => o.id === editingPalier.objectiveId); if(!obj) return; const newPaliers = obj.paliers.filter((p: any) => p.id !== editingPalier.palierId); await updateDoc(doc(db, "objectives", editingPalier.objectiveId), { paliers: newPaliers }); setEditingPalier(null); toast({ title: "Palier supprimé" }); }
+
   if (loadingObj) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary w-8 h-8"/></div>;
 
   return (
@@ -306,7 +316,7 @@ export default function PilotagePage() {
 
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
         
-        {/* Header avec bouton Planifier */}
+        {/* Header */}
         <div className="flex items-center justify-between">
             <div>
                 <h1 className="text-2xl font-bold tracking-tight">Pilotage</h1>
@@ -351,125 +361,148 @@ export default function PilotagePage() {
                     </Button>
                 </div>
 
-                {objectives.map((obj: any) => (
-                    <div key={obj.id} onClick={() => setSelectedObj(obj)} className="pulse-card p-6 bg-gradient-to-b from-card to-muted/20 cursor-pointer hover:border-primary/50 transition-all group">
-                        <div className="flex items-center gap-2 mb-4 text-purple-400">
-                            <Target className="w-4 h-4" />
-                            <span className="text-xs font-bold uppercase tracking-wider">{obj.type === 'principal' ? 'Principal' : 'Secondaire'}</span>
-                        </div>
-                        <div className="flex flex-col items-center justify-center mb-6">
-                            <CircularProgress value={obj.current} max={obj.target} direction={obj.direction} />
-                            <h2 className="text-xl font-bold mt-4">{obj.title}</h2>
-                            <p className="text-center text-xs text-muted-foreground mt-1 max-w-[280px] leading-relaxed">{obj.description}</p>
-                        </div>
-                        <div className="space-y-2 mb-6">
-                            <div className="flex justify-between text-sm font-medium">
-                                <span className="text-muted-foreground">Progression</span>
-                                {/* SÉCURITÉ : .toLocaleString() sur valeurs potentiellement undefined */}
-                                <span>{(obj.current || 0).toLocaleString()} / {(obj.target || 0).toLocaleString()} {obj.unit}</span>
-                            </div>
-                            <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                                <div className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(((obj.current || 0) / (obj.target || 1)) * 100, 100)}%` }} />
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        )}
-
-        {/* --- ONGLET 2 : PALIERS --- */}
-        {activeTab === "paliers" && (
-            <div className="space-y-4 animate-in fade-in">
-                {objectives.filter((o:any) => o.isActive).map((obj: any) => {
-                    const isDescending = obj.direction === 'descending';
+                {objectives.map((obj: any) => {
+                    const isLocked = obj.type === 'secondaire' && !simulationData.isPrincipalMet;
                     return (
-                    <div key={obj.id} className="space-y-3">
-                        <div className="flex items-center justify-between bg-muted/30 p-2 rounded-lg">
-                        <div className="flex items-center gap-2"><Layers className="w-4 h-4 text-muted-foreground" /><span className="text-sm font-medium">{obj.title}</span></div>
-                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowAddPalier(obj.id)}><Plus className="w-3 h-3 mr-1" /> Palier</Button>
-                        </div>
-                        <div className="space-y-2 pl-2 border-l-2 border-muted">
-                        {obj.paliers?.sort((a:any, b:any) => isDescending ? b.threshold - a.threshold : a.threshold - b.threshold).map((palier: any, index: number) => (
-                            <div key={palier.id} className="pulse-card p-3 flex items-center gap-3">
-                            <div className="w-6 h-6 rounded-md bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">{index + 1}</div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2"><span className="text-sm font-medium">{palier.name}</span></div>
-                                <p className="text-xs text-muted-foreground">
-                                    {isDescending ? "Si inférieur à" : "Si supérieur à"} : <strong>{palier.threshold} {obj.unit}</strong>
-                                </p>
+                        <div key={obj.id} onClick={() => setSelectedObj(obj)} className={cn("pulse-card p-6 bg-gradient-to-b from-card to-muted/20 cursor-pointer hover:border-primary/50 transition-all group", isLocked && "opacity-60 grayscale-[0.5]")}>
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2 text-purple-400">
+                                    {obj.type === 'principal' && <Crown className="w-4 h-4 text-amber-400" />}
+                                    <Target className="w-4 h-4" />
+                                    <span className={cn("text-xs font-bold uppercase tracking-wider", obj.type === 'principal' ? "text-amber-400" : "")}>{obj.type === 'principal' ? 'Principal' : 'Secondaire'}</span>
+                                </div>
+                                {isLocked && <Badge variant="secondary" className="bg-amber-100 text-amber-700 gap-1"><Lock className="w-3 h-3"/> En attente</Badge>}
                             </div>
-                            <div className="text-right"><p className="text-sm font-bold text-primary">+{palier.reward}€</p></div>
-                            <Button size="icon" variant="ghost" className="w-8 h-8" onClick={() => setEditingPalier({ objectiveId: obj.id, palierId: palier.id, name: palier.name, threshold: palier.threshold, reward: palier.reward })}><Edit3 className="w-4 h-4 text-muted-foreground" /></Button>
+                            <div className="flex flex-col items-center justify-center mb-6">
+                                <CircularProgress value={obj.current} max={obj.target} direction={obj.direction} />
+                                <h2 className="text-xl font-bold mt-4">{obj.title}</h2>
+                                <p className="text-center text-xs text-muted-foreground mt-1 max-w-[280px] leading-relaxed">{obj.description}</p>
                             </div>
-                        ))}
-                        {(!obj.paliers || obj.paliers.length === 0) && <p className="text-xs text-muted-foreground italic pl-2">Aucun palier défini.</p>}
+                            <div className="space-y-2 mb-6">
+                                <div className="flex justify-between text-sm font-medium">
+                                    <span className="text-muted-foreground">Progression</span>
+                                    <span>{(obj.current || 0).toLocaleString()} / {(obj.target || 0).toLocaleString()} {obj.unit}</span>
+                                </div>
+                                <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                                    <div className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(((obj.current || 0) / (obj.target || 1)) * 100, 100)}%` }} />
+                                </div>
+                            </div>
                         </div>
-                    </div>
                     )
                 })}
             </div>
         )}
 
-        {/* --- ONGLET 3 : PILOTAGE (Budget) --- */}
-        {activeTab === "pilotage" && (
-            <div className="space-y-4 animate-in fade-in">
-                <div className="pulse-card p-4">
-                    <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"><Wallet className="w-5 h-5 text-primary" /></div>
-                    <div className="flex-1"><h3 className="font-semibold text-sm">Simulation Budgétaire</h3><p className="text-xs text-muted-foreground">Coût total si 100% atteint</p></div>
+        {/* --- ONGLET 4 : EQUIPE (DESIGN RÉTABLI) --- */}
+        {activeTab === "equipe" && (
+            <div className="space-y-6 animate-in fade-in">
+                {/* 3 CARTES DU HAUT (Design Screen 1) */}
+                <div className="grid grid-cols-3 gap-3">
+                    <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none">
+                        <div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center mb-2"><Target className="w-4 h-4 text-purple-500" /></div>
+                        <span className="text-xl font-bold">{simulationData.activeObjectivesCount}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Objectifs actifs</span>
                     </div>
-                    
-                    <div className="mb-4 space-y-4">
-                        <div>
-                            <Label className="text-xs text-muted-foreground mb-1 block">Budget Max (€)</Label>
-                            <Input type="number" value={budgetMax} onChange={(e) => setBudgetMax(Number(e.target.value))} className="rounded-xl text-lg font-bold" />
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground">Pour un 35h (Max) :</span>
-                            <span className="font-bold text-primary">{simulationData.totalCostPerPerson}€</span>
-                        </div>
+                    <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none">
+                        <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center mb-2"><Euro className="w-4 h-4 text-blue-500" /></div>
+                        <span className="text-xl font-bold">{simulationData.totalCostPerPerson}€</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Prime potentielle</span>
                     </div>
+                    <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none">
+                        <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center mb-2"><Users className="w-4 h-4 text-emerald-500" /></div>
+                        <span className="text-xl font-bold">{teamMembers.length}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Collaborateurs</span>
+                    </div>
+                </div>
 
-                    <div className={cn("p-4 rounded-xl mb-4", simulationData.isOverBudget ? "bg-red-500/10 border border-red-500/30" : "bg-green-500/10 border border-green-500/30")}>
-                        <div className="flex items-center justify-between mb-2"><span className="text-xs font-medium">Coût total équipe</span><span className={cn("text-lg font-bold", simulationData.isOverBudget ? "text-red-400" : "text-green-400")}>{simulationData.teamTotalCost}€</span></div>
-                        <div className="h-3 bg-muted rounded-full overflow-hidden mb-2"><div className={cn("h-full rounded-full transition-all", simulationData.isOverBudget ? "bg-red-500" : "bg-green-500")} style={{ width: `${Math.min((simulationData.teamTotalCost / budgetMax) * 100, 100)}%` }} /></div>
-                        <div className="flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground">Budget: {budgetMax}€</span>
-                            <span className={cn("font-semibold", simulationData.isOverBudget ? "text-red-400" : "text-green-400")}>{simulationData.isOverBudget ? "Dépassement: " : "Reste: "}{Math.abs(simulationData.budgetDiff)}€</span>
+                <div className="flex items-center justify-between"><h2 className="font-semibold text-sm">Primes au prorata</h2><span className="text-xs text-muted-foreground">Base {baseHours}h</span></div>
+                
+                <div className="space-y-3">
+                    {teamMembers.map((member) => {
+                        const ratio = member.contractHours / baseHours;
+                        const potentialPrime = Math.round(simulationData.totalCostPerPerson * ratio);
+                        return (
+                            <div key={member.id} className="pulse-card p-4">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm", member.color)}>
+                                        {member.initials}
+                                    </div>
+                                    <div className="flex-1 min-w-0"><p className="font-medium text-sm truncate">{member.name}</p><p className="text-xs text-muted-foreground">{member.role}</p></div>
+                                    <div className="text-right">
+                                        <p className="text-lg font-bold text-purple-400">{potentialPrime}€</p>
+                                        <p className="text-[10px] text-muted-foreground">potentiel</p>
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center text-xs text-muted-foreground mt-2">
+                                    <span>Contrat: {member.contractHours}h</span>
+                                    <span>Ratio: {Math.round(ratio * 100)}%</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mt-2"><div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(100, ratio * 100)}%` }} /></div>
+                            </div>
+                        )
+                    })}
+                </div>
+
+                {/* FOOTER BUDGET (Design Screen 2) */}
+                <div className="mt-4 p-5 rounded-2xl bg-[#0f0f11] border border-white/5 text-white">
+                    <div className="flex justify-between items-end mb-1">
+                        <div>
+                            <p className="text-xs text-white/60 mb-1">Budget total primes</p>
+                            <p className="text-3xl font-bold">{simulationData.teamTotalCost}€</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[10px] text-white/40 mb-1">Si 100% atteint</p>
+                            <p className="text-sm font-medium text-purple-400">{simulationData.totalCostPerPerson}€ / personne <span className="text-white/40 font-normal">(base 35h)</span></p>
                         </div>
                     </div>
                 </div>
             </div>
         )}
 
-        {/* --- ONGLET 4 : EQUIPE --- */}
-        {activeTab === "equipe" && (
+        {/* ... (ONGLETS PALIERS et PILOTAGE conservés tels quels) ... */}
+        {activeTab === "paliers" && (
             <div className="space-y-4 animate-in fade-in">
-                <div className="flex items-center justify-between"><h2 className="font-semibold text-sm">Primes au prorata</h2><span className="text-xs text-muted-foreground">Base {baseHours}h</span></div>
-                <div className="space-y-3">
-                    {teamMembers.map((member) => {
-                    const ratio = member.contractHours / baseHours;
-                    const potentialPrime = Math.round(simulationData.totalCostPerPerson * ratio);
-                    return (
-                        <div key={member.id} className="pulse-card p-4">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm", member.color)}>
-                                {member.initials}
-                            </div>
-                            <div className="flex-1 min-w-0"><p className="font-medium text-sm truncate">{member.name}</p><p className="text-xs text-muted-foreground">{member.role}</p></div>
-                            <div className="text-right">
-                                <p className="text-lg font-bold text-purple-400">{potentialPrime}€</p>
-                                <p className="text-[10px] text-muted-foreground">potentiel</p>
-                            </div>
+                {objectives.filter((o:any) => o.isActive).map((obj: any) => (
+                    <div key={obj.id} className="space-y-3">
+                        <div className="flex items-center justify-between bg-muted/30 p-2 rounded-lg">
+                            <div className="flex items-center gap-2"><Layers className="w-4 h-4 text-muted-foreground" /><span className="text-sm font-medium">{obj.title}</span></div>
+                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowAddPalier(obj.id)}><Plus className="w-3 h-3 mr-1" /> Palier</Button>
                         </div>
-                        <div className="flex justify-between items-center text-xs text-muted-foreground mt-2">
-                            <span>Contrat: {member.contractHours}h</span>
-                            <span>Ratio: {Math.round(ratio * 100)}%</span>
+                        <div className="space-y-2 pl-2 border-l-2 border-muted">
+                            {obj.paliers?.sort((a:any, b:any) => (obj.direction === 'descending' ? b.threshold - a.threshold : a.threshold - b.threshold)).map((palier: any, index: number) => (
+                                <div key={palier.id} className="pulse-card p-3 flex items-center gap-3">
+                                    <div className="w-6 h-6 rounded-md bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">{index + 1}</div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2"><span className="text-sm font-medium">{palier.name}</span></div>
+                                        <p className="text-xs text-muted-foreground">{obj.direction === 'descending' ? "Si inférieur à" : "Si supérieur à"} : <strong>{palier.threshold} {obj.unit}</strong></p>
+                                    </div>
+                                    <div className="text-right"><p className="text-sm font-bold text-primary">+{palier.reward}€</p></div>
+                                    <Button size="icon" variant="ghost" className="w-8 h-8" onClick={() => setEditingPalier({ objectiveId: obj.id, palierId: palier.id, name: palier.name, threshold: palier.threshold, reward: palier.reward })}><Edit3 className="w-4 h-4 text-muted-foreground" /></Button>
+                                </div>
+                            ))}
+                            {(!obj.paliers || obj.paliers.length === 0) && <p className="text-xs text-muted-foreground italic pl-2">Aucun palier défini.</p>}
                         </div>
-                        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mt-2"><div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(100, ratio * 100)}%` }} /></div>
-                        </div>
-                    )
-                    })}
+                    </div>
+                ))}
+            </div>
+        )}
+
+        {activeTab === "pilotage" && (
+            <div className="space-y-4 animate-in fade-in">
+                <div className="pulse-card p-4">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"><Wallet className="w-5 h-5 text-primary" /></div>
+                        <div className="flex-1"><h3 className="font-semibold text-sm">Simulation Budgétaire</h3><p className="text-xs text-muted-foreground">Coût total si 100% atteint</p></div>
+                    </div>
+                    <div className="mb-4 space-y-4">
+                        <div><Label className="text-xs text-muted-foreground mb-1 block">Budget Max (€)</Label><Input type="number" value={budgetMax} onChange={(e) => setBudgetMax(Number(e.target.value))} className="rounded-xl text-lg font-bold" /></div>
+                        <div className="flex justify-between items-center text-sm"><span className="text-muted-foreground">Pour un 35h (Max) :</span><span className="font-bold text-primary">{simulationData.totalCostPerPerson}€</span></div>
+                    </div>
+                    <div className={cn("p-4 rounded-xl mb-4", simulationData.isOverBudget ? "bg-red-500/10 border border-red-500/30" : "bg-green-500/10 border border-green-500/30")}>
+                        <div className="flex items-center justify-between mb-2"><span className="text-xs font-medium">Coût total équipe</span><span className={cn("text-lg font-bold", simulationData.isOverBudget ? "text-red-400" : "text-green-400")}>{simulationData.teamTotalCost}€</span></div>
+                        <div className="h-3 bg-muted rounded-full overflow-hidden mb-2"><div className={cn("h-full rounded-full transition-all", simulationData.isOverBudget ? "bg-red-500" : "bg-green-500")} style={{ width: `${Math.min((simulationData.teamTotalCost / budgetMax) * 100, 100)}%` }} /></div>
+                        <div className="flex items-center justify-between text-xs"><span className="text-muted-foreground">Budget: {budgetMax}€</span><span className={cn("font-semibold", simulationData.isOverBudget ? "text-red-400" : "text-green-400")}>{simulationData.isOverBudget ? "Dépassement: " : "Reste: "}{Math.abs(simulationData.budgetDiff)}€</span></div>
+                    </div>
                 </div>
             </div>
         )}
@@ -478,20 +511,24 @@ export default function PilotagePage() {
 
       {/* --- MODALES --- */}
 
-      {/* 1. EDIT HEURES */}
-      {showEditHours && (
-        <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={() => setShowEditHours(false)}>
-          <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
-            <h2 className="font-semibold mb-4 text-lg">Configuration Horaire</h2>
-            <div className="space-y-4">
-              <div><Label className="text-sm">Heures temps plein (référence)</Label><Input type="number" value={baseHours} onChange={(e) => setBaseHours(Number(e.target.value))} className="rounded-xl mt-2" /></div>
-              <Button className="w-full rounded-xl" onClick={handleUpdateBaseHours}><Save className="w-4 h-4 mr-2" /> Enregistrer</Button>
-            </div>
-          </div>
-        </div>
+      {/* 4. ADD OBJECTIVE (AVEC SWITCH) */}
+      {showAddObjective && (
+          <AddObjectiveAdvancedModal 
+            onClose={() => setShowAddObjective(false)} 
+            onConfirm={handleCreateObjective} 
+          />
       )}
 
-      {/* 2. EDIT PALIER */}
+      {/* 5. PLANIFICATION (NOUVEAU - AVEC TUILES ET SWITCH) */}
+      {showPlanning && (
+          <AddPlanningAdvancedModal
+            onClose={() => setShowPlanning(false)}
+            onConfirm={handleCreatePlanning}
+          />
+      )}
+
+      {showAddPalier && <AddPalierModal onClose={() => setShowAddPalier(null)} onConfirm={(n, t, r) => handleAddPalierConfirm(showAddPalier, n, t, r)} objective={objectives.find((o:any) => o.id === showAddPalier)} />}
+      
       {editingPalier && (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={() => setEditingPalier(null)}>
           <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
@@ -509,37 +546,19 @@ export default function PilotagePage() {
         </div>
       )}
 
-      {/* 3. ADD PALIER */}
-      {showAddPalier && (
-        <AddPalierModal 
-            onClose={() => setShowAddPalier(null)} 
-            onConfirm={(n, t, r) => handleAddPalierConfirm(showAddPalier, n, t, r)}
-            objective={objectives.find((o:any) => o.id === showAddPalier)} 
-        />
+      {showEditHours && (
+        <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={() => setShowEditHours(false)}>
+          <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
+            <h2 className="font-semibold mb-4 text-lg">Configuration Horaire</h2>
+            <div className="space-y-4">
+              <div><Label className="text-sm">Heures temps plein (référence)</Label><Input type="number" value={baseHours} onChange={(e) => setBaseHours(Number(e.target.value))} className="rounded-xl mt-2" /></div>
+              <Button className="w-full rounded-xl" onClick={handleUpdateBaseHours}><Save className="w-4 h-4 mr-2" /> Enregistrer</Button>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* 4. ADD OBJECTIVE (AVANCÉ - SCREENSHOT 1) */}
-      {showAddObjective && (
-          <AddObjectiveAdvancedModal 
-            onClose={() => setShowAddObjective(false)} 
-            onConfirm={handleCreateObjective} 
-          />
-      )}
-
-      {/* 5. PLANIFICATION (NOUVEAU - AVEC TUILES) */}
-      {showPlanning && (
-          <AddPlanningAdvancedModal
-            onClose={() => setShowPlanning(false)}
-            onConfirm={handleCreatePlanning}
-          />
-      )}
-
-      {/* 6. DRAWER DÉTAIL & MISE À JOUR (SCREENSHOT 2 & 3) */}
-      <ObjectiveDetailDrawer 
-        objective={selectedObj} 
-        onClose={() => setSelectedObj(null)} 
-        onUpdateProgress={updateProgress}
-      />
+      <ObjectiveDetailDrawer objective={selectedObj} onClose={() => setSelectedObj(null)} onUpdateProgress={updateProgress} />
 
       <BottomNav />
       </div>
@@ -549,83 +568,33 @@ export default function PilotagePage() {
 
 // --- SOUS-COMPOSANTS ---
 
-// 1. LE MODAL DE CRÉATION AVEC LES TUILES (SCREENSHOT 1)
+// 1. MODAL CRÉATION (AVEC SWITCH PRINCIPAL)
 function AddObjectiveAdvancedModal({ onClose, onConfirm }: { onClose: () => void, onConfirm: (data: any) => void }) {
     const [selectedPreset, setSelectedPreset] = useState<string>("ca")
     const [title, setTitle] = useState("Chiffre d'Affaires")
     const [target, setTarget] = useState("")
     const [description, setDescription] = useState("")
+    const [isPrincipal, setIsPrincipal] = useState(false)
 
-    useEffect(() => {
-        const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)
-        if(p) {
-            setTitle(p.label)
-            setDescription(p.desc)
-        }
-    }, [selectedPreset])
+    useEffect(() => { const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset); if(p) { setTitle(p.label); setDescription(p.desc); } }, [selectedPreset])
 
     const handleSubmit = () => {
         const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)!
-        onConfirm({
-            title, description, target,
-            unit: p.unit,
-            direction: p.direction
-        })
+        onConfirm({ title, description, target, unit: p.unit, direction: p.direction, type: isPrincipal ? 'principal' : 'secondaire' })
     }
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm flex items-end sm:items-center justify-center" onClick={onClose}>
             <div className="bg-card w-full max-w-md rounded-t-3xl sm:rounded-2xl p-6 space-y-6 pb-10" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center">
-                    <h2 className="text-lg font-bold">Nouvel Objectif</h2>
-                    <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5"/></Button>
-                </div>
-
+                <div className="flex justify-between items-center"><h2 className="text-lg font-bold">Nouvel Objectif</h2><Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5"/></Button></div>
                 <div className="space-y-4">
-                    {/* Grille de Tuiles */}
-                    <div>
-                        <Label className="mb-2 block">Type d'objectif</Label>
-                        <div className="grid grid-cols-3 gap-2">
-                            {OBJECTIVE_PRESETS.map(preset => (
-                                <button 
-                                    key={preset.id}
-                                    onClick={() => setSelectedPreset(preset.id)}
-                                    className={cn(
-                                        "flex flex-col items-center justify-center gap-1 p-3 rounded-xl border transition-all text-xs text-center h-20",
-                                        selectedPreset === preset.id 
-                                            ? "border-purple-500 bg-purple-500/10 text-purple-500 font-semibold ring-1 ring-purple-500/20" 
-                                            : "border-border bg-muted/20 text-muted-foreground hover:bg-muted"
-                                    )}
-                                >
-                                    <preset.icon className="w-5 h-5" />
-                                    <span>{preset.label}</span>
-                                </button>
-                            ))}
-                        </div>
+                    <div className="bg-muted/30 p-3 rounded-xl flex items-center justify-between border border-border">
+                        <Label className="text-sm font-bold flex items-center gap-2"><Crown className={cn("w-4 h-4", isPrincipal ? "text-amber-500" : "text-muted-foreground")} /> Objectif Principal</Label>
+                        <Switch checked={isPrincipal} onCheckedChange={setIsPrincipal} />
                     </div>
-
-                    <div><Label>Titre personnalisé</Label><Input value={title} onChange={e => setTitle(e.target.value)} className="mt-1.5"/></div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <Label>Cible à atteindre</Label>
-                            <Input type="number" value={target} onChange={e => setTarget(e.target.value)} placeholder="0" className="mt-1.5 font-bold" />
-                        </div>
-                        <div>
-                            <Label>Unité</Label>
-                            <div className="flex h-10 items-center justify-center rounded-md border bg-muted font-bold text-muted-foreground mt-1.5">
-                                {OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)?.unit}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-blue-500/10 p-3 rounded-lg text-xs text-blue-500 flex items-start gap-2 border border-blue-500/20">
-                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                        {OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)?.direction === 'descending' 
-                            ? "Info : Progression inversée (ex: moins d'erreurs = mieux)." 
-                            : "Info : Progression normale (ex: plus de CA = mieux)."}
-                    </div>
-
+                    <div><Label className="mb-2 block">Type d'objectif</Label><div className="grid grid-cols-3 gap-2">{OBJECTIVE_PRESETS.map(preset => (<button key={preset.id} onClick={() => setSelectedPreset(preset.id)} className={cn("flex flex-col items-center justify-center gap-1 p-3 rounded-xl border transition-all text-xs text-center h-20", selectedPreset === preset.id ? "border-purple-500 bg-purple-500/10 text-purple-500 font-semibold ring-1 ring-purple-500/20" : "border-border bg-muted/20 text-muted-foreground hover:bg-muted")}><preset.icon className="w-5 h-5" /><span>{preset.label}</span></button>))}</div></div>
+                    <div><Label>Titre</Label><Input value={title} onChange={e => setTitle(e.target.value)} className="mt-1.5"/></div>
+                    <div className="grid grid-cols-2 gap-4"><div><Label>Cible</Label><Input type="number" value={target} onChange={e => setTarget(e.target.value)} placeholder="0" className="mt-1.5 font-bold" /></div><div><Label>Unité</Label><div className="flex h-10 items-center justify-center rounded-md border bg-muted font-bold text-muted-foreground mt-1.5">{OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)?.unit}</div></div></div>
                     <Button className="w-full py-6 text-base bg-purple-600 hover:bg-purple-700" onClick={handleSubmit} disabled={!target}>Créer l'objectif</Button>
                 </div>
             </div>
@@ -633,7 +602,7 @@ function AddObjectiveAdvancedModal({ onClose, onConfirm }: { onClose: () => void
     )
 }
 
-// 2. LE MODAL DE PLANIFICATION AVEC LES MÊMES TUILES
+// 2. MODAL PLANIFICATION (TUILES + SWITCH, SANS TYPE CALCUL)
 function AddPlanningAdvancedModal({ onClose, onConfirm }: { onClose: () => void, onConfirm: (data: any) => void }) {
     const [selectedPreset, setSelectedPreset] = useState<string>("ca")
     const [startMonth, setStartMonth] = useState("Février")
@@ -641,109 +610,28 @@ function AddPlanningAdvancedModal({ onClose, onConfirm }: { onClose: () => void,
     const [duration, setDuration] = useState(1)
     const [title, setTitle] = useState("Chiffre d'Affaires")
     const [target, setTarget] = useState("")
-    const [calcType, setCalcType] = useState("moyenne") // Nouveau
+    const [isPrincipal, setIsPrincipal] = useState(false)
 
-    // MAJ du titre quand on change de tuile
-    useEffect(() => {
-        const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)
-        if(p) setTitle(p.label)
-    }, [selectedPreset])
+    useEffect(() => { const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset); if(p) setTitle(p.label); }, [selectedPreset])
 
     const handleSubmit = () => {
         const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)!
-        onConfirm({
-            title, target,
-            unit: p.unit,
-            direction: p.direction,
-            startMonth, startYear, duration,
-            calculationType: calcType
-        })
+        onConfirm({ title, target, unit: p.unit, direction: p.direction, startMonth, startYear, duration, type: isPrincipal ? 'principal' : 'secondaire' })
     }
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm flex items-end sm:items-center justify-center" onClick={onClose}>
             <div className="bg-card w-full max-w-md rounded-t-3xl sm:rounded-2xl p-6 space-y-6 pb-10" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center">
-                    <h2 className="text-lg font-bold">Programmer un objectif</h2>
-                    <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5"/></Button>
-                </div>
-
+                <div className="flex justify-between items-center"><h2 className="text-lg font-bold">Programmer un objectif</h2><Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5"/></Button></div>
                 <div className="space-y-5">
-                    {/* Date et Durée */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <Label className="mb-2 block">Mois de début</Label>
-                            <Select value={startMonth} onValueChange={setStartMonth}>
-                                <SelectTrigger className="h-10 bg-muted/30"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    {["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"].map(m => (
-                                        <SelectItem key={m} value={m}>{m}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div>
-                            <Label className="mb-2 block">Année</Label>
-                            <Select value={startYear} onValueChange={setStartYear}>
-                                <SelectTrigger className="h-10 bg-muted/30"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    {["2025", "2026", "2027"].map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                    <div className="grid grid-cols-2 gap-4"><div><Label className="mb-2 block">Mois de début</Label><Select value={startMonth} onValueChange={setStartMonth}><SelectTrigger className="h-10 bg-muted/30"><SelectValue /></SelectTrigger><SelectContent>{["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"].map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select></div><div><Label className="mb-2 block">Année</Label><Select value={startYear} onValueChange={setStartYear}><SelectTrigger className="h-10 bg-muted/30"><SelectValue /></SelectTrigger><SelectContent>{["2025", "2026", "2027"].map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent></Select></div></div>
+                    <div><Label className="mb-2 block">Durée</Label><div className="flex gap-2">{[1, 3, 6, 12].map(d => (<button key={d} onClick={() => setDuration(d)} className={cn("flex-1 py-2 rounded-lg text-sm border transition-all", duration === d ? "bg-purple-600 text-white border-purple-600" : "bg-muted/20 border-border text-muted-foreground")}>{d} mois</button>))}</div></div>
+                    <div className="bg-muted/30 p-3 rounded-xl flex items-center justify-between border border-border">
+                        <Label className="text-sm font-bold flex items-center gap-2"><Crown className={cn("w-4 h-4", isPrincipal ? "text-amber-500" : "text-muted-foreground")} /> Objectif Principal ?</Label>
+                        <Switch checked={isPrincipal} onCheckedChange={setIsPrincipal} />
                     </div>
-
-                    <div>
-                        <Label className="mb-2 block">Durée</Label>
-                        <div className="flex gap-2">
-                            {[1, 3, 6, 12].map(d => (
-                                <button key={d} onClick={() => setDuration(d)} className={cn("flex-1 py-2 rounded-lg text-sm border transition-all", duration === d ? "bg-purple-600 text-white border-purple-600" : "bg-muted/20 border-border text-muted-foreground")}>
-                                    {d} mois
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Grille de Tuiles (OBJECTIVE TYPES) */}
-                    <div>
-                        <Label className="mb-2 block">Type d'objectif à planifier</Label>
-                        <div className="grid grid-cols-3 gap-2">
-                            {OBJECTIVE_PRESETS.map(preset => (
-                                <button 
-                                    key={preset.id}
-                                    onClick={() => setSelectedPreset(preset.id)}
-                                    className={cn(
-                                        "flex flex-col items-center justify-center gap-1 p-3 rounded-xl border transition-all text-xs text-center h-20",
-                                        selectedPreset === preset.id 
-                                            ? "border-purple-500 bg-purple-500/10 text-purple-500 font-semibold ring-1 ring-purple-500/20" 
-                                            : "border-border bg-muted/20 text-muted-foreground hover:bg-muted"
-                                    )}
-                                >
-                                    <preset.icon className="w-5 h-5" />
-                                    <span>{preset.label}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
+                    <div><Label className="mb-2 block">Type d'objectif à planifier</Label><div className="grid grid-cols-3 gap-2">{OBJECTIVE_PRESETS.map(preset => (<button key={preset.id} onClick={() => setSelectedPreset(preset.id)} className={cn("flex flex-col items-center justify-center gap-1 p-3 rounded-xl border transition-all text-xs text-center h-20", selectedPreset === preset.id ? "border-purple-500 bg-purple-500/10 text-purple-500 font-semibold ring-1 ring-purple-500/20" : "border-border bg-muted/20 text-muted-foreground hover:bg-muted")}><preset.icon className="w-5 h-5" /><span>{preset.label}</span></button>))}</div></div>
                     <div><Label>Cible prévue</Label><Input type="number" value={target} onChange={e => setTarget(e.target.value)} className="mt-1.5 font-bold" placeholder="0" /></div>
-
-                    {/* Boutons Type de calcul (Demandés) */}
-                    <div>
-                        <Label className="mb-2 block">Type de calcul</Label>
-                        <div className="grid grid-cols-3 gap-2">
-                            {[
-                                { id: 'moyenne', label: 'Moyenne' },
-                                { id: 'cumul', label: 'Cumul' },
-                                { id: 'pourcentage', label: '%' }
-                            ].map(t => (
-                                <button key={t.id} onClick={() => setCalcType(t.id)} className={cn("py-2 rounded-lg text-xs border transition-all", calcType === t.id ? "bg-blue-600 text-white border-blue-600" : "bg-muted/20 border-border")}>
-                                    {t.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
                     <Button className="w-full py-6 text-base bg-purple-600 hover:bg-purple-700" onClick={handleSubmit} disabled={!target}>Valider la planification</Button>
                 </div>
             </div>
@@ -751,125 +639,59 @@ function AddPlanningAdvancedModal({ onClose, onConfirm }: { onClose: () => void,
     )
 }
 
-// 3. LE DRAWER DE DÉTAIL (SCREENSHOT 2 & 3)
+function AddPalierModal({ onClose, onConfirm, objective }: { onClose: () => void, onConfirm: (n: string, t: number, r: number) => void, objective: any }) {
+    const [name, setName] = useState("")
+    const [threshold, setThreshold] = useState("")
+    const [reward, setReward] = useState("")
+    const isDescending = objective?.direction === 'descending'
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={onClose}>
+          <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
+            <h2 className="font-semibold mb-6 text-lg">Ajouter un palier</h2>
+            <div className="space-y-4">
+              <div><Label>Nom</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Niveau 1" className="rounded-xl mt-1" /></div>
+              <div><Label>{isDescending ? `Seuil max autorisé (${objective.unit})` : `Seuil à atteindre (${objective.unit})`}</Label><Input type="number" value={threshold} onChange={e => setThreshold(e.target.value)} placeholder="1000" className="rounded-xl mt-1" /></div>
+              <div><Label>Récompense (€)</Label><Input type="number" value={reward} onChange={e => setReward(e.target.value)} placeholder="50" className="rounded-xl mt-1" /></div>
+              <Button className="w-full rounded-xl" onClick={() => onConfirm(name, Number(threshold), Number(reward))} disabled={!name || !threshold}><Plus className="w-4 h-4 mr-2" /> Ajouter</Button>
+            </div>
+          </div>
+        </div>
+    )
+}
+
 function ObjectiveDetailDrawer({ objective, onClose, onUpdateProgress }: { objective: any, onClose: () => void, onUpdateProgress: (amount: number) => void }) {
     const [updateVal, setUpdateVal] = useState("")
-
     if (!objective) return null
-
     return (
         <Drawer open={!!objective} onOpenChange={(open) => !open && onClose()}>
             <DrawerContent className="max-h-[95vh] outline-none">
                 <div className="w-full max-w-lg mx-auto">
                     <DrawerHeader className="text-left border-b border-border/50 pb-4">
-                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-purple-500/10 mx-auto mb-3">
-                            <Target className="w-6 h-6 text-purple-500" />
-                        </div>
-                        <div className="text-center space-y-1">
-                            <Badge variant="outline" className="mb-2 border-purple-500/30 text-purple-400 bg-purple-500/10">
-                                {objective.type === "principal" ? "Principal" : "Secondaire"}
-                            </Badge>
-                            <DrawerTitle className="text-2xl font-bold">{objective.title}</DrawerTitle>
-                            <p className="text-sm text-muted-foreground px-4">{objective.description}</p>
-                        </div>
+                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-purple-500/10 mx-auto mb-3"><Target className="w-6 h-6 text-purple-500" /></div>
+                        <div className="text-center space-y-1"><Badge variant="outline" className="mb-2 border-purple-500/30 text-purple-400 bg-purple-500/10">{objective.type === "principal" ? "Principal" : "Secondaire"}</Badge><DrawerTitle className="text-2xl font-bold">{objective.title}</DrawerTitle><p className="text-sm text-muted-foreground px-4">{objective.description}</p></div>
                     </DrawerHeader>
-
                     <div className="p-4 space-y-6 overflow-y-auto max-h-[60vh]">
-                        {/* Jauge SÉCURISÉE */}
-                        <div className="flex flex-col items-center">
-                            <CircularProgress value={objective.current || 0} max={objective.target || 1} direction={objective.direction} size={160} strokeWidth={12} />
-                        </div>
-
-                        {/* Mise à jour */}
-                        <div className="bg-purple-500/5 border border-purple-500/20 p-4 rounded-2xl space-y-3">
-                            <h3 className="font-bold text-sm flex items-center gap-2">
-                                <Wallet className="w-4 h-4 text-purple-500" />
-                                Mettre à jour la progression
-                            </h3>
-                            <div className="flex gap-2">
-                                <Input 
-                                    type="number" 
-                                    placeholder="Montant à ajouter..." 
-                                    value={updateVal}
-                                    onChange={(e) => setUpdateVal(e.target.value)}
-                                    className="bg-background"
-                                />
-                                <Button onClick={() => { onUpdateProgress(Number(updateVal)); setUpdateVal(""); }} className="bg-purple-600 hover:bg-purple-700">
-                                    <Plus className="w-4 h-4" />
-                                </Button>
-                            </div>
-                        </div>
-
-                        {/* Historique SÉCURISÉ */}
-                        <div>
-                            <h3 className="font-bold text-base mb-3 flex items-center gap-2">
-                                <TrendingUp className="w-4 h-4 text-purple-500" />
-                                Historique récent
-                            </h3>
-                            <div className="space-y-1">
-                                {objective.history && objective.history.length > 0 ? (
-                                    [...objective.history].reverse().slice(0, 5).map((h: any, i: number) => (
-                                        <div key={i} className="flex justify-between items-center p-3 rounded-xl hover:bg-muted/30 transition-colors border-b border-border/40 last:border-0">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-2 h-2 rounded-full bg-purple-500" />
-                                                <span className="text-sm font-medium">{h.date}</span>
-                                            </div>
-                                            <div className="flex items-center gap-4">
-                                                <span className="font-bold text-sm">{(h.value || 0).toLocaleString()} {objective.unit}</span>
-                                                <span className="text-xs font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded">+{h.change}</span>
-                                            </div>
-                                        </div>
-                                    ))
-                                ) : ( <p className="text-sm text-muted-foreground italic">Aucun historique.</p> )}
-                            </div>
-                        </div>
+                        <div className="flex flex-col items-center"><CircularProgress value={objective.current || 0} max={objective.target || 1} direction={objective.direction} size={160} strokeWidth={12} /></div>
+                        <div className="bg-purple-500/5 border border-purple-500/20 p-4 rounded-2xl space-y-3"><h3 className="font-bold text-sm flex items-center gap-2"><Wallet className="w-4 h-4 text-purple-500" /> Mettre à jour la progression</h3><div className="flex gap-2"><Input type="number" placeholder="Montant..." value={updateVal} onChange={(e) => setUpdateVal(e.target.value)} className="bg-background" /><Button onClick={() => { onUpdateProgress(Number(updateVal)); setUpdateVal(""); }} className="bg-purple-600 hover:bg-purple-700"><Plus className="w-4 h-4" /></Button></div></div>
+                        <div><h3 className="font-bold text-base mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-purple-500" /> Historique récent</h3><div className="space-y-1">{objective.history && objective.history.length > 0 ? ([...objective.history].reverse().slice(0, 5).map((h: any, i: number) => (<div key={i} className="flex justify-between items-center p-3 rounded-xl hover:bg-muted/30 transition-colors border-b border-border/40 last:border-0"><div className="flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-purple-500" /><span className="text-sm font-medium">{h.date}</span></div><div className="flex items-center gap-4"><span className="font-bold text-sm">{(h.value||0).toLocaleString()} {objective.unit}</span><span className="text-xs font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded">+{h.change}</span></div></div>))) : (<p className="text-sm text-muted-foreground italic">Aucun historique.</p>)}</div></div>
                     </div>
-                    
-                    <DrawerFooter className="pt-2">
-                        <DrawerClose asChild><Button variant="outline" className="w-full rounded-xl">Fermer</Button></DrawerClose>
-                    </DrawerFooter>
+                    <DrawerFooter className="pt-2"><DrawerClose asChild><Button variant="outline" className="w-full rounded-xl">Fermer</Button></DrawerClose></DrawerFooter>
                 </div>
             </DrawerContent>
         </Drawer>
     )
 }
 
-// 4. JAUGE CIRCULAIRE SÉCURISÉE
 function CircularProgress({ value, max, size = 180, strokeWidth = 12, direction = "ascending" }: { value: number, max: number, size?: number, strokeWidth?: number, direction?: string }) {
-    // Protection contre les valeurs undefined ou null
-    const safeValue = value || 0;
-    const safeMax = max || 1; // Evite division par zéro
-
-    const radius = (size - strokeWidth) / 2
-    const circumference = radius * 2 * Math.PI
-    
+    const safeValue = value || 0; const safeMax = max || 1;
+    const radius = (size - strokeWidth) / 2; const circumference = radius * 2 * Math.PI;
     let percentage = 0;
-    if (direction === 'descending') {
-        percentage = safeValue <= safeMax ? 100 : Math.max(0, (safeMax / (safeValue || 1)) * 100);
-    } else {
-        percentage = Math.min(100, Math.max(0, (safeValue / safeMax) * 100));
-    }
-
-    const offset = circumference - (percentage / 100) * circumference
-
+    if (direction === 'descending') { percentage = safeValue <= safeMax ? 100 : Math.max(0, (safeMax / (safeValue || 1)) * 100); } else { percentage = Math.min(100, Math.max(0, (safeValue / safeMax) * 100)); }
+    const offset = circumference - (percentage / 100) * circumference;
     return (
         <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-            <svg width={size} height={size} className="transform -rotate-90">
-                <circle cx={size / 2} cy={size / 2} r={radius} stroke="currentColor" strokeWidth={strokeWidth} fill="transparent" className="text-muted/20" />
-                <circle cx={size / 2} cy={size / 2} r={radius} stroke="url(#gradient)" strokeWidth={strokeWidth} fill="transparent" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000 ease-out" />
-                <defs>
-                    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#3b82f6" /> 
-                        <stop offset="100%" stopColor="#a855f7" /> 
-                    </linearGradient>
-                </defs>
-            </svg>
-            <div className="absolute flex flex-col items-center">
-                <span className="text-4xl font-bold tracking-tighter">{Math.round(percentage)}%</span>
-                <span className="text-[10px] text-muted-foreground mt-1 font-medium">
-                    {safeValue.toLocaleString()} / {safeMax.toLocaleString()}
-                </span>
-            </div>
+            <svg width={size} height={size} className="transform -rotate-90"><circle cx={size / 2} cy={size / 2} r={radius} stroke="currentColor" strokeWidth={strokeWidth} fill="transparent" className="text-muted/20" /><circle cx={size / 2} cy={size / 2} r={radius} stroke="url(#gradient)" strokeWidth={strokeWidth} fill="transparent" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000 ease-out" /><defs><linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#3b82f6" /><stop offset="100%" stopColor="#a855f7" /></linearGradient></defs></svg>
+            <div className="absolute flex flex-col items-center"><span className="text-4xl font-bold tracking-tighter">{Math.round(percentage)}%</span><span className="text-[10px] text-muted-foreground mt-1 font-medium">{safeValue.toLocaleString()} / {safeMax.toLocaleString()}</span></div>
         </div>
     )
 }
