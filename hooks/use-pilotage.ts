@@ -5,47 +5,57 @@ import { collection, onSnapshot, query, doc, updateDoc, arrayUnion, increment, a
 import { db } from "@/lib/firebase/client"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
-import { useCurrentUser } from "@/lib/use-current-user" // 👈 INDISPENSABLE pour savoir qui est connecté
+import { useCurrentUser } from "@/lib/use-current-user"
 
 export type ObjectiveType = "ca" | "error" | "volume" | "satisfaction" | "margin"
 
 export function usePilotage() {
-  const currentUser = useCurrentUser() // 👈 On récupère l'utilisateur connecté
+  const currentUser = useCurrentUser()
   const [team, setTeam] = useState<any[]>([])
   const [objectives, setObjectives] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  // 1. Charger les données en temps réel (FILTRÉES PAR ENTREPRISE)
+  // 1. Charger les données en temps réel (CLOISONNÉ PAR ENTREPRISE)
   useEffect(() => {
-    // Si l'utilisateur n'est pas encore chargé ou n'a pas d'entreprise, on attend
+    // Tant qu'on ne sait pas qui est connecté et quelle est son entreprise, on ne charge rien
     if (!currentUser?.companyId) return;
 
     // --- A. CHARGEMENT DE L'ÉQUIPE ---
-    // On ne prend que les utilisateurs qui ont le MÊME companyId que le gérant
+    // On demande à Firebase : "Donne-moi TOUS les utilisateurs qui ont l'étiquette de MON entreprise"
     const qUsers = query(
         collection(db, "users"), 
-        where("companyId", "==", currentUser.companyId) // 🔒 SÉCURITÉ : cloisonnement par entreprise
+        where("companyId", "==", currentUser.companyId) // 🔒 C'est ici que se fait l'étanchéité entre entreprises
     );
 
     const unsubUsers = onSnapshot(qUsers, (snapshot) => {
       const users = snapshot.docs
-        // On exclut les super admins et les utilisateurs "orphelins" ou "en attente" qui n'ont pas de rôle défini
-        .filter(d => {
-            const data = d.data();
-            return data.role !== 'super_admin' && data.status !== 'pending_assignment'; 
+        .map(d => ({ id: d.id, ...d.data() })) 
+        .filter((user: any) => {
+            // A. On cache le Super Admin (c'est vous, vous n'êtes pas un "employé" à piloter)
+            if (user.role === 'super_admin') return false;
+            
+            // B. On exclut les utilisateurs qui seraient techniquement là mais marqués "Non assigné"
+            // (Sécurité supplémentaire au cas où le companyId serait mal renseigné)
+            if (user.companyName === "Non assigné") return false;
+
+            // C. IMPORTANT : On NE FILTRE PLUS sur le statut 'active'. 
+            // On accepte 'pending', 'invited', etc. tant qu'ils sont liés à l'entreprise.
+            
+            return true;
         })
-        .map(d => {
-            const data = d.data();
+        .map((data: any) => {
             const initials = (data.displayName || data.email || "??").substring(0, 2).toUpperCase();
             const colors = ["bg-purple-500", "bg-blue-500", "bg-pink-500", "bg-indigo-500", "bg-emerald-500"];
             
             return {
-                id: d.id,
+                id: data.id,
                 name: data.displayName || data.email,
                 role: data.role || "Employé",
                 hoursContract: Number(data.contractHours) || 35,
                 initials,
                 color: colors[initials.charCodeAt(0) % colors.length],
+                // On affiche le statut pour info si ce n'est pas actif
+                status: data.status, 
                 progress: 0 
             };
         });
@@ -53,7 +63,7 @@ export function usePilotage() {
     });
 
     // --- B. CHARGEMENT DES OBJECTIFS ---
-    // On ne charge que les objectifs de CETTE entreprise
+    // Pareil, on ne charge que les objectifs de CETTE entreprise
     const qObj = query(
         collection(db, "objectives"), 
         where("companyId", "==", currentUser.companyId), // 🔒 SÉCURITÉ
@@ -67,9 +77,10 @@ export function usePilotage() {
     });
 
     return () => { unsubUsers(); unsubObj(); }
-  }, [currentUser?.companyId]); // On recharge si l'utilisateur change (rare)
+  }, [currentUser?.companyId]);
 
   // 2. Calculs Globaux (KPIs)
+  // On inclut tout le monde dans le calcul des heures, même ceux en attente (car ils sont prévus au planning)
   const totalHours = team.reduce((acc, curr) => acc + curr.hoursContract, 0);
   
   const globalProgress = objectives.length > 0 
@@ -91,15 +102,14 @@ export function usePilotage() {
       return acc + objMax;
   }, 0);
 
-  // 3. Actions (Création / Mise à jour)
-
+  // 3. Actions
   const createObjective = async (data: any) => {
-      if (!currentUser?.companyId) return false; // Sécurité
+      if (!currentUser?.companyId) return false; 
 
       try {
           await addDoc(collection(db, "objectives"), {
               ...data,
-              companyId: currentUser.companyId, // 🔒 On associe l'objectif à l'entreprise
+              companyId: currentUser.companyId, // 🔒 L'objectif appartient à l'entreprise
               current: data.direction === 'descending' ? data.target * 1.5 : 0,
               paliers: [],
               history: [],
