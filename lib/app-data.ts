@@ -548,24 +548,25 @@ export const usefulSites: UsefulSite[] = [
     id: "s3",
     name: "PouvoirPlus",
     description: "Profitez de remises tout au long de l'année sur plus de 100 000 offres.",
-    url: "https://firebasestorage.googleapis.com/v0/b/objectif-restaurant.firebasestorage.app/o/app-icons%2FIMG_6446.PNG?alt=media&token=478608b3-fff7-4ad8-9276-7bef8c636932",
+    url: "https://pouvoirplus.com",
     category: "avantages",
-    // Pas d'image fournie, je laisse vide ou tu peux mettre un lien générique
+    icon: "https://firebasestorage.googleapis.com/v0/b/objectif-restaurant.firebasestorage.app/o/app-icons%2FIMG_6446.PNG?alt=media&token=478608b3-fff7-4ad8-9276-7bef8c636932",
   },
   {
     id: "s4",
     name: "Combo",
     description: "Logiciel de planning et de gestion pour organiser vos équipes.",
-    url: "https://firebasestorage.googleapis.com/v0/b/objectif-restaurant.firebasestorage.app/o/app-icons%2FIMG_6448%202.PNG?alt=media&token=2d09b395-bfc6-4168-a927-ad7360ec8f4a",
+    url: "https://combohr.com/fr",
     category: "planning",
+    icon: "https://firebasestorage.googleapis.com/v0/b/objectif-restaurant.firebasestorage.app/o/app-icons%2FIMG_6448%202.PNG?alt=media&token=2d09b395-bfc6-4168-a927-ad7360ec8f4a",
   },
   {
     id: "s5",
     name: "Alan",
     description: "Votre partenaire santé qui prévient, assure et accompagne au quotidien.",
-    url: "https://firebasestorage.googleapis.com/v0/b/objectif-restaurant.firebasestorage.app/o/app-icons%2FIMG_6751%202.PNG?alt=media&token=c0b02b41-be18-4924-8eb9-0ad8b0b247f8",
+    url: "https://alan.com/login",
     category: "sante",
-    icon: "https://firebasestorage.googleapis.com/v0/b/objectif-restaurant.firebasestorage.app/o/app-icons%2FIMG_6751.PNG?alt=media&token=db4ff3b0-cd27-41ec-942d-e7be00caf653"
+    icon: "https://firebasestorage.googleapis.com/v0/b/objectif-restaurant.firebasestorage.app/o/app-icons%2FIMG_6751.PNG?alt=media&token=db4ff3b0-cd27-41ec-942d-e7be00caf653",
   },
   {
     id: "s6",
