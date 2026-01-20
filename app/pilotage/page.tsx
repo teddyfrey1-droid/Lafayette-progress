@@ -6,11 +6,11 @@ import { BottomNav } from "@/components/pulse/bottom-nav"
 import { PermissionGate } from "@/components/auth/permission-gate"
 import { usePermissions } from "@/hooks/use-permissions"
 import { useObjectives } from "@/hooks/use-objectives"
-import { useAuth } from "@/components/auth/auth-provider" // 👈 Ajouté pour sécuriser par entreprise
+import { useAuth } from "@/components/auth/auth-provider"
 import {
   Target, TrendingUp, TrendingDown, Clock, Plus, Edit3, Trash2, X, Check, Euro, Users,
   Layers, AlertCircle, Save, Wallet, ChevronDown, ChevronUp, Calendar, Loader2,
-  Percent, Hash, AlertTriangle, ThumbsUp, CalendarDays, Crown, Lock
+  Percent, Hash, AlertTriangle, ThumbsUp, CalendarDays, Crown, Lock, EyeOff
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -62,7 +62,7 @@ const OBJECTIVE_PRESETS = [
 ]
 
 export default function PilotagePage() {
-  const { profile } = useAuth() // 👈 Récupère l'utilisateur connecté
+  const { profile } = useAuth()
   const { canEdit } = usePermissions()
   const { objectives, loading: loadingObj } = useObjectives()
   const { toast } = useToast()
@@ -82,11 +82,11 @@ export default function PilotagePage() {
   const [budgetMax, setBudgetMax] = useState(2000)
   const [simulatedPaliers, setSimulatedPaliers] = useState<Record<string, Record<string, number>>>({})
 
-  // 1. CHARGEMENT DES DONNÉES (SÉCURISÉ)
+  // 1. CHARGEMENT DES DONNÉES (SÉCURISÉ PAR ENTREPRISE)
   useEffect(() => {
     if (!profile?.companyId) return;
 
-    // On charge UNIQUEMENT les utilisateurs de l'entreprise connectée
+    // Filtre Firebase strict sur companyId
     const q = query(
         collection(db, "users"), 
         where("companyId", "==", profile.companyId)
@@ -97,7 +97,9 @@ export default function PilotagePage() {
         .map(doc => {
             const data = doc.data();
             
-            // 🛑 FILTRE STRICT : On vire les Super Admin et les "Non assigné"
+            // 🛑 FILTRE JS STRICT
+            // On exclut explicitement les "Non assigné" et "Super Admin"
+            // On garde ceux qui sont "En attente" (pending) s'ils ont le bon companyId
             if (data.role === 'super_admin') return null;
             if (data.companyName === 'Non assigné') return null;
 
@@ -113,7 +115,7 @@ export default function PilotagePage() {
                 color: colors[initials.charCodeAt(0) % colors.length]
             }
       })
-      // On garde uniquement les utilisateurs valides (non null)
+      // Nettoyage des null
       setTeamMembers(members.filter(Boolean) as TeamMember[])
     })
 
@@ -148,7 +150,7 @@ export default function PilotagePage() {
     const objectiveCosts: any[] = []
     let totalCost = 0
 
-    // Vérifier si le principal est atteint
+    // Vérifier si le principal est atteint (Gatekeeper)
     const principalObj = objectives.find((o: any) => o.type === 'principal');
     const isPrincipalMet = !principalObj || (principalObj.direction === 'descending' 
         ? ((principalObj.current || 0) <= (principalObj.target || 1)) 
@@ -158,17 +160,13 @@ export default function PilotagePage() {
     objectives.forEach((obj: any) => {
       if (!obj.isActive && activeTab !== 'pilotage') return;
 
-      // Si c'est un secondaire et que le principal bloque -> coût 0
-      if (obj.type === 'secondaire' && !isPrincipalMet) {
-          objectiveCosts.push({ id: obj.id, title: obj.title, cost: 0, paliers: [] });
-          return;
-      }
-
+      // Si secondaire et principal non atteint -> Potentiel 0 dans le calcul courant (mais on garde le potentiel max pour le budget)
+      // Pour le budget GLOBAL PREVISIONNEL, on compte tout comme si c'était atteint.
+      
       let objCost = 0
       const paliersList: any[] = []
 
       if (obj.paliers && obj.paliers.length > 0) {
-          // On prend le cumul des paliers pour le budget max
           const maxReward = obj.paliers.reduce((acc:number, p:any) => acc + (simulatedPaliers[obj.id]?.[p.id] ?? p.reward), 0);
           objCost = maxReward;
           obj.paliers.forEach((p: any) => {
@@ -190,7 +188,7 @@ export default function PilotagePage() {
       teamTotalCost,
       budgetDiff: budgetMax - teamTotalCost,
       isOverBudget: teamTotalCost > budgetMax,
-      totalCostPerPerson: totalCost, 
+      totalCostPerPerson: totalCost, // C'est le MAX possible par personne à 35h
       activeObjectivesCount: objectives.filter(o => o.isActive).length,
       isPrincipalMet
     }
@@ -206,10 +204,6 @@ export default function PilotagePage() {
       } catch (e) {
           toast({ title: "Erreur sauvegarde", variant: "destructive" });
       }
-  }
-
-  const handleToggleActive = async (obj: any) => {
-      await updateDoc(doc(db, "objectives", obj.id), { isActive: !obj.isActive });
   }
 
   const handleSaveSimulation = async () => {
@@ -248,6 +242,7 @@ export default function PilotagePage() {
             current: 0,
             paliers: [],
             history: [],
+            isConfidential: data.isConfidential || false,
             createdAt: new Date().toISOString()
         });
         setShowAddObjective(false);
@@ -274,18 +269,20 @@ export default function PilotagePage() {
       }
   }
 
-  // MISE À JOUR PROGRESSION
-  const updateProgress = async (amount: number) => {
+  // MISE À JOUR PROGRESSION (Avec Date)
+  const updateProgress = async (amount: number, dateStr?: string) => {
       if (!selectedObj) return;
-      const todayStr = format(new Date(), "d MMM", { locale: fr });
+      const targetDate = dateStr ? new Date(dateStr) : new Date();
+      const formattedDate = format(targetDate, "d MMM", { locale: fr });
+      
       try {
         await updateDoc(doc(db, "objectives", selectedObj.id), {
             current: increment(amount),
             history: arrayUnion({
-                date: todayStr,
+                date: formattedDate,
                 value: amount,
                 change: amount,
-                timestamp: new Date().toISOString()
+                timestamp: targetDate.toISOString()
             })
         });
         toast({ title: "Mise à jour réussie" });
@@ -332,6 +329,17 @@ export default function PilotagePage() {
             </div>
         </div>
 
+        {/* ALERTE BLOCAGE */}
+        {!simulationData.isPrincipalMet && objectives.some(o => o.type === 'principal') && (
+            <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                <Lock className="w-5 h-5 text-amber-600" />
+                <div className="flex-1">
+                    <p className="text-sm font-bold text-amber-700">Objectif Principal non atteint</p>
+                    <p className="text-xs text-amber-600/80">Les primes secondaires sont verrouillées.</p>
+                </div>
+            </div>
+        )}
+
         {/* Navigation Onglets */}
         <div className="bg-muted/50 p-1 rounded-2xl flex mb-6">
             <button onClick={() => setActiveTab("objectifs")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "objectifs" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}>
@@ -371,7 +379,10 @@ export default function PilotagePage() {
                                     <Target className="w-4 h-4" />
                                     <span className={cn("text-xs font-bold uppercase tracking-wider", obj.type === 'principal' ? "text-amber-400" : "")}>{obj.type === 'principal' ? 'Principal' : 'Secondaire'}</span>
                                 </div>
-                                {isLocked && <Badge variant="secondary" className="bg-amber-100 text-amber-700 gap-1"><Lock className="w-3 h-3"/> En attente</Badge>}
+                                <div className="flex gap-2">
+                                    {obj.isConfidential && <Badge variant="secondary" className="gap-1 text-[10px]"><EyeOff className="w-3 h-3"/> Caché</Badge>}
+                                    {isLocked && <Badge variant="secondary" className="bg-amber-100 text-amber-700 gap-1"><Lock className="w-3 h-3"/> En attente</Badge>}
+                                </div>
                             </div>
                             <div className="flex flex-col items-center justify-center mb-6">
                                 <CircularProgress value={obj.current} max={obj.target} direction={obj.direction} />
@@ -393,7 +404,7 @@ export default function PilotagePage() {
             </div>
         )}
 
-        {/* --- ONGLET 4 : EQUIPE (DESIGN RÉTABLI) --- */}
+        {/* --- ONGLET 4 : EQUIPE (Design KPI + Footer) --- */}
         {activeTab === "equipe" && (
             <div className="space-y-6 animate-in fade-in">
                 {/* 3 CARTES DU HAUT (Design Screen 1) */}
@@ -416,7 +427,6 @@ export default function PilotagePage() {
                 </div>
 
                 <div className="flex items-center justify-between"><h2 className="font-semibold text-sm">Primes au prorata</h2><span className="text-xs text-muted-foreground">Base {baseHours}h</span></div>
-                
                 <div className="space-y-3">
                     {teamMembers.map((member) => {
                         const ratio = member.contractHours / baseHours;
@@ -424,19 +434,11 @@ export default function PilotagePage() {
                         return (
                             <div key={member.id} className="pulse-card p-4">
                                 <div className="flex items-center gap-3 mb-3">
-                                    <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm", member.color)}>
-                                        {member.initials}
-                                    </div>
+                                    <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm", member.color)}>{member.initials}</div>
                                     <div className="flex-1 min-w-0"><p className="font-medium text-sm truncate">{member.name}</p><p className="text-xs text-muted-foreground">{member.role}</p></div>
-                                    <div className="text-right">
-                                        <p className="text-lg font-bold text-purple-400">{potentialPrime}€</p>
-                                        <p className="text-[10px] text-muted-foreground">potentiel</p>
-                                    </div>
+                                    <div className="text-right"><p className="text-lg font-bold text-purple-400">{potentialPrime}€</p><p className="text-[10px] text-muted-foreground">potentiel</p></div>
                                 </div>
-                                <div className="flex justify-between items-center text-xs text-muted-foreground mt-2">
-                                    <span>Contrat: {member.contractHours}h</span>
-                                    <span>Ratio: {Math.round(ratio * 100)}%</span>
-                                </div>
+                                <div className="flex justify-between items-center text-xs text-muted-foreground mt-2"><span>Contrat: {member.contractHours}h</span><span>Ratio: {Math.round(ratio * 100)}%</span></div>
                                 <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mt-2"><div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(100, ratio * 100)}%` }} /></div>
                             </div>
                         )
@@ -446,20 +448,14 @@ export default function PilotagePage() {
                 {/* FOOTER BUDGET (Design Screen 2) */}
                 <div className="mt-4 p-5 rounded-2xl bg-[#0f0f11] border border-white/5 text-white">
                     <div className="flex justify-between items-end mb-1">
-                        <div>
-                            <p className="text-xs text-white/60 mb-1">Budget total primes</p>
-                            <p className="text-3xl font-bold">{simulationData.teamTotalCost}€</p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-[10px] text-white/40 mb-1">Si 100% atteint</p>
-                            <p className="text-sm font-medium text-purple-400">{simulationData.totalCostPerPerson}€ / personne <span className="text-white/40 font-normal">(base 35h)</span></p>
-                        </div>
+                        <div><p className="text-xs text-white/60 mb-1">Budget total primes</p><p className="text-3xl font-bold">{simulationData.teamTotalCost}€</p></div>
+                        <div className="text-right"><p className="text-[10px] text-white/40 mb-1">Potentiel Maximum (Cumulé)</p><p className="text-sm font-medium text-purple-400">{simulationData.totalCostPerPerson}€ / personne <span className="text-white/40 font-normal">(base 35h)</span></p></div>
                     </div>
                 </div>
             </div>
         )}
 
-        {/* ... (ONGLETS PALIERS et PILOTAGE conservés tels quels) ... */}
+        {/* ... (ONGLETS PALIERS/BUDGET conservés) ... */}
         {activeTab === "paliers" && (
             <div className="space-y-4 animate-in fade-in">
                 {objectives.filter((o:any) => o.isActive).map((obj: any) => (
@@ -510,23 +506,8 @@ export default function PilotagePage() {
       </main>
 
       {/* --- MODALES --- */}
-
-      {/* 4. ADD OBJECTIVE (AVEC SWITCH) */}
-      {showAddObjective && (
-          <AddObjectiveAdvancedModal 
-            onClose={() => setShowAddObjective(false)} 
-            onConfirm={handleCreateObjective} 
-          />
-      )}
-
-      {/* 5. PLANIFICATION (NOUVEAU - AVEC TUILES ET SWITCH) */}
-      {showPlanning && (
-          <AddPlanningAdvancedModal
-            onClose={() => setShowPlanning(false)}
-            onConfirm={handleCreatePlanning}
-          />
-      )}
-
+      {showAddObjective && <AddObjectiveAdvancedModal onClose={() => setShowAddObjective(false)} onConfirm={handleCreateObjective} />}
+      {showPlanning && <AddPlanningAdvancedModal onClose={() => setShowPlanning(false)} onConfirm={handleCreatePlanning} />}
       {showAddPalier && <AddPalierModal onClose={() => setShowAddPalier(null)} onConfirm={(n, t, r) => handleAddPalierConfirm(showAddPalier, n, t, r)} objective={objectives.find((o:any) => o.id === showAddPalier)} />}
       
       {editingPalier && (
@@ -568,19 +549,20 @@ export default function PilotagePage() {
 
 // --- SOUS-COMPOSANTS ---
 
-// 1. MODAL CRÉATION (AVEC SWITCH PRINCIPAL)
+// 1. MODAL CRÉATION (AVEC SWITCH PRINCIPAL + CONFIDENTIEL)
 function AddObjectiveAdvancedModal({ onClose, onConfirm }: { onClose: () => void, onConfirm: (data: any) => void }) {
     const [selectedPreset, setSelectedPreset] = useState<string>("ca")
     const [title, setTitle] = useState("Chiffre d'Affaires")
     const [target, setTarget] = useState("")
     const [description, setDescription] = useState("")
     const [isPrincipal, setIsPrincipal] = useState(false)
+    const [isConfidential, setIsConfidential] = useState(false)
 
     useEffect(() => { const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset); if(p) { setTitle(p.label); setDescription(p.desc); } }, [selectedPreset])
 
     const handleSubmit = () => {
         const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)!
-        onConfirm({ title, description, target, unit: p.unit, direction: p.direction, type: isPrincipal ? 'principal' : 'secondaire' })
+        onConfirm({ title, description, target, unit: p.unit, direction: p.direction, type: isPrincipal ? 'principal' : 'secondaire', isConfidential })
     }
 
     return (
@@ -588,9 +570,15 @@ function AddObjectiveAdvancedModal({ onClose, onConfirm }: { onClose: () => void
             <div className="bg-card w-full max-w-md rounded-t-3xl sm:rounded-2xl p-6 space-y-6 pb-10" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center"><h2 className="text-lg font-bold">Nouvel Objectif</h2><Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5"/></Button></div>
                 <div className="space-y-4">
-                    <div className="bg-muted/30 p-3 rounded-xl flex items-center justify-between border border-border">
-                        <Label className="text-sm font-bold flex items-center gap-2"><Crown className={cn("w-4 h-4", isPrincipal ? "text-amber-500" : "text-muted-foreground")} /> Objectif Principal</Label>
-                        <Switch checked={isPrincipal} onCheckedChange={setIsPrincipal} />
+                    <div className="flex gap-2">
+                        <div className="bg-muted/30 p-3 rounded-xl flex-1 flex items-center justify-between border border-border">
+                            <Label className="text-xs font-bold flex items-center gap-1"><Crown className="w-3 h-3 text-amber-500" /> Principal</Label>
+                            <Switch checked={isPrincipal} onCheckedChange={setIsPrincipal} />
+                        </div>
+                        <div className="bg-muted/30 p-3 rounded-xl flex-1 flex items-center justify-between border border-border">
+                            <Label className="text-xs font-bold flex items-center gap-1"><EyeOff className="w-3 h-3 text-muted-foreground" /> Masquer</Label>
+                            <Switch checked={isConfidential} onCheckedChange={setIsConfidential} />
+                        </div>
                     </div>
                     <div><Label className="mb-2 block">Type d'objectif</Label><div className="grid grid-cols-3 gap-2">{OBJECTIVE_PRESETS.map(preset => (<button key={preset.id} onClick={() => setSelectedPreset(preset.id)} className={cn("flex flex-col items-center justify-center gap-1 p-3 rounded-xl border transition-all text-xs text-center h-20", selectedPreset === preset.id ? "border-purple-500 bg-purple-500/10 text-purple-500 font-semibold ring-1 ring-purple-500/20" : "border-border bg-muted/20 text-muted-foreground hover:bg-muted")}><preset.icon className="w-5 h-5" /><span>{preset.label}</span></button>))}</div></div>
                     <div><Label>Titre</Label><Input value={title} onChange={e => setTitle(e.target.value)} className="mt-1.5"/></div>
@@ -639,29 +627,13 @@ function AddPlanningAdvancedModal({ onClose, onConfirm }: { onClose: () => void,
     )
 }
 
-function AddPalierModal({ onClose, onConfirm, objective }: { onClose: () => void, onConfirm: (n: string, t: number, r: number) => void, objective: any }) {
-    const [name, setName] = useState("")
-    const [threshold, setThreshold] = useState("")
-    const [reward, setReward] = useState("")
-    const isDescending = objective?.direction === 'descending'
-    return (
-        <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={onClose}>
-          <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
-            <h2 className="font-semibold mb-6 text-lg">Ajouter un palier</h2>
-            <div className="space-y-4">
-              <div><Label>Nom</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Niveau 1" className="rounded-xl mt-1" /></div>
-              <div><Label>{isDescending ? `Seuil max autorisé (${objective.unit})` : `Seuil à atteindre (${objective.unit})`}</Label><Input type="number" value={threshold} onChange={e => setThreshold(e.target.value)} placeholder="1000" className="rounded-xl mt-1" /></div>
-              <div><Label>Récompense (€)</Label><Input type="number" value={reward} onChange={e => setReward(e.target.value)} placeholder="50" className="rounded-xl mt-1" /></div>
-              <Button className="w-full rounded-xl" onClick={() => onConfirm(name, Number(threshold), Number(reward))} disabled={!name || !threshold}><Plus className="w-4 h-4 mr-2" /> Ajouter</Button>
-            </div>
-          </div>
-        </div>
-    )
-}
-
-function ObjectiveDetailDrawer({ objective, onClose, onUpdateProgress }: { objective: any, onClose: () => void, onUpdateProgress: (amount: number) => void }) {
+// 3. DETAIL DRAWER (AVEC DATE ET HISTORIQUE FULL)
+function ObjectiveDetailDrawer({ objective, onClose, onUpdateProgress }: { objective: any, onClose: () => void, onUpdateProgress: (amount: number, date?: string) => void }) {
     const [updateVal, setUpdateVal] = useState("")
+    const [updateDate, setUpdateDate] = useState("") 
+
     if (!objective) return null
+
     return (
         <Drawer open={!!objective} onOpenChange={(open) => !open && onClose()}>
             <DrawerContent className="max-h-[95vh] outline-none">
@@ -671,9 +643,25 @@ function ObjectiveDetailDrawer({ objective, onClose, onUpdateProgress }: { objec
                         <div className="text-center space-y-1"><Badge variant="outline" className="mb-2 border-purple-500/30 text-purple-400 bg-purple-500/10">{objective.type === "principal" ? "Principal" : "Secondaire"}</Badge><DrawerTitle className="text-2xl font-bold">{objective.title}</DrawerTitle><p className="text-sm text-muted-foreground px-4">{objective.description}</p></div>
                     </DrawerHeader>
                     <div className="p-4 space-y-6 overflow-y-auto max-h-[60vh]">
-                        <div className="flex flex-col items-center"><CircularProgress value={objective.current || 0} max={objective.target || 1} direction={objective.direction} size={160} strokeWidth={12} /></div>
-                        <div className="bg-purple-500/5 border border-purple-500/20 p-4 rounded-2xl space-y-3"><h3 className="font-bold text-sm flex items-center gap-2"><Wallet className="w-4 h-4 text-purple-500" /> Mettre à jour la progression</h3><div className="flex gap-2"><Input type="number" placeholder="Montant..." value={updateVal} onChange={(e) => setUpdateVal(e.target.value)} className="bg-background" /><Button onClick={() => { onUpdateProgress(Number(updateVal)); setUpdateVal(""); }} className="bg-purple-600 hover:bg-purple-700"><Plus className="w-4 h-4" /></Button></div></div>
-                        <div><h3 className="font-bold text-base mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-purple-500" /> Historique récent</h3><div className="space-y-1">{objective.history && objective.history.length > 0 ? ([...objective.history].reverse().slice(0, 5).map((h: any, i: number) => (<div key={i} className="flex justify-between items-center p-3 rounded-xl hover:bg-muted/30 transition-colors border-b border-border/40 last:border-0"><div className="flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-purple-500" /><span className="text-sm font-medium">{h.date}</span></div><div className="flex items-center gap-4"><span className="font-bold text-sm">{(h.value||0).toLocaleString()} {objective.unit}</span><span className="text-xs font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded">+{h.change}</span></div></div>))) : (<p className="text-sm text-muted-foreground italic">Aucun historique.</p>)}</div></div>
+                        <div className="flex flex-col items-center"><CircularProgress value={objective.current} max={objective.target} direction={objective.direction} size={160} strokeWidth={12} /></div>
+                        
+                        {/* Mise à jour avec DATE */}
+                        <div className="bg-purple-500/5 border border-purple-500/20 p-4 rounded-2xl space-y-3">
+                            <h3 className="font-bold text-sm flex items-center gap-2"><Wallet className="w-4 h-4 text-purple-500" /> Mettre à jour la progression</h3>
+                            <div className="flex gap-2">
+                                <Input type="number" placeholder="Montant..." value={updateVal} onChange={(e) => setUpdateVal(e.target.value)} className="bg-background flex-1" />
+                                <Input type="date" value={updateDate} onChange={(e) => setUpdateDate(e.target.value)} className="bg-background w-32" />
+                                <Button onClick={() => { onUpdateProgress(Number(updateVal), updateDate); setUpdateVal(""); setUpdateDate(""); }} className="bg-purple-600 hover:bg-purple-700"><Plus className="w-4 h-4" /></Button>
+                            </div>
+                        </div>
+
+                        {/* Historique ILLIMITÉ */}
+                        <div>
+                            <h3 className="font-bold text-base mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-purple-500" /> Historique complet</h3>
+                            <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+                                {objective.history && objective.history.length > 0 ? ([...objective.history].reverse().map((h: any, i: number) => (<div key={i} className="flex justify-between items-center p-3 rounded-xl hover:bg-muted/30 transition-colors border-b border-border/40 last:border-0"><div className="flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-purple-500" /><span className="text-sm font-medium">{h.date}</span></div><div className="flex items-center gap-4"><span className="font-bold text-sm">{(h.value||0).toLocaleString()} {objective.unit}</span><span className="text-xs font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded">+{h.change}</span></div></div>))) : (<p className="text-sm text-muted-foreground italic">Aucun historique.</p>)}
+                            </div>
+                        </div>
                     </div>
                     <DrawerFooter className="pt-2"><DrawerClose asChild><Button variant="outline" className="w-full rounded-xl">Fermer</Button></DrawerClose></DrawerFooter>
                 </div>
@@ -682,6 +670,7 @@ function ObjectiveDetailDrawer({ objective, onClose, onUpdateProgress }: { objec
     )
 }
 
+// 4. JAUGE SÉCURISÉE
 function CircularProgress({ value, max, size = 180, strokeWidth = 12, direction = "ascending" }: { value: number, max: number, size?: number, strokeWidth?: number, direction?: string }) {
     const safeValue = value || 0; const safeMax = max || 1;
     const radius = (size - strokeWidth) / 2; const circumference = radius * 2 * Math.PI;
