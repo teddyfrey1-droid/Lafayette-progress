@@ -5,15 +5,15 @@ import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
 import { PermissionGate } from "@/components/auth/permission-gate"
 import { ProgressRing } from "@/components/pulse/progress-ring"
-import { PalierTimeline } from "@/components/pulse/palier-timeline"
 import { CelebrationModal } from "@/components/pulse/celebration-modal"
-import { Target, ChevronRight, Sparkles, Info, TrendingUp, Loader2, Lock, EyeOff } from "lucide-react"
+import { Target, ChevronRight, Sparkles, Info, TrendingUp, Loader2, Lock, EyeOff, ChevronLeft, CheckCircle2, Circle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { Progress } from "@/components/ui/progress"
 import { useObjectives } from "@/hooks/use-objectives"
 import { Badge } from "@/components/ui/badge"
 
+// --- COMPOSANT HISTORIQUE (SÉCURISÉ) ---
 const MockHistory = ({ target }: { target: number }) => (
   <div className="flex items-end gap-1 h-12 mt-4 opacity-70">
      {[40, 50, 65, 70, 55, 80, 75].map((h, i) => (
@@ -27,14 +27,14 @@ export default function ObjectivesPage() {
   const [selectedObjective, setSelectedObjective] = useState<any | null>(null)
   const [showCelebration, setShowCelebration] = useState(false)
 
+  // Filtrage
   const principalObjective = objectives.find((o: any) => o.type === "principal" && o.isActive)
   const secondaryObjectives = objectives.filter((o: any) => (o.type === "secondaire" || !o.type) && o.isActive)
 
-  // SÉCURITÉ : Conversion en nombres pour éviter les crashs
-  const pCurrent = Number(principalObjective?.current || 0)
-  const pTarget = Number(principalObjective?.target || 1)
-
-  // Vérification Gatekeeper
+  // Gatekeeper: Si le principal n'est pas atteint, on bloque les secondaires
+  const pCurrent = Number(principalObjective?.current || 0);
+  const pTarget = Number(principalObjective?.target || 1);
+  
   const isPrincipalMet = !principalObjective || (
       principalObjective.direction === 'descending' 
       ? pCurrent <= pTarget 
@@ -49,17 +49,19 @@ export default function ObjectivesPage() {
     )
   }
 
-  // VUE DÉTAIL (CLIC)
+  // --- VUE DÉTAIL (CLIC) ---
   if (selectedObjective) {
     return (
-      <ObjectiveDetail
+      <ObjectiveDetailView
         objective={selectedObjective}
         onBack={() => setSelectedObjective(null)}
       />
     )
   }
 
-  // VUE LISTE (DASHBOARD)
+  // --- VUE DASHBOARD (LISTE) ---
+  
+  // Calcul progression principal
   let principalProgress = 0;
   if (principalObjective) {
       if (principalObjective.direction === 'descending') {
@@ -69,7 +71,7 @@ export default function ObjectivesPage() {
       }
   }
 
-  // Recherche du prochain palier pour l'objectif principal
+  // Prochain palier principal
   const nextPalier = principalObjective?.paliers?.find((p: any) => 
      principalObjective.direction === 'descending' ? Number(p.threshold) < pCurrent : Number(p.threshold) > pCurrent
   );
@@ -85,7 +87,7 @@ export default function ObjectivesPage() {
             <p className="text-sm text-muted-foreground mt-1">Suivez votre progression et débloquez vos primes</p>
           </div>
 
-          {/* OBJECTIF PRINCIPAL */}
+          {/* SECTION OBJECTIF PRINCIPAL */}
           <section className="space-y-4">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" />
@@ -106,6 +108,7 @@ export default function ObjectivesPage() {
                   />
                   <h3 className="font-semibold mt-3">{principalObjective.title}</h3>
                   <p className="text-sm text-muted-foreground mt-1">{principalObjective.description}</p>
+                  
                   <div className="flex items-center gap-2 mt-2">
                     <span className="text-xs px-2 py-1 rounded-full bg-primary/15 text-primary font-medium">Principal</span>
                     {!principalObjective.isConfidential && principalObjective.paliers && (
@@ -157,7 +160,7 @@ export default function ObjectivesPage() {
             )}
           </section>
 
-          {/* OBJECTIFS SECONDAIRES */}
+          {/* SECTION OBJECTIFS SECONDAIRES */}
           <section className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -169,7 +172,6 @@ export default function ObjectivesPage() {
 
             <div className="grid gap-3">
               {secondaryObjectives.map((obj: any) => {
-                // SÉCURISATION DES DONNÉES SECONDAIRES
                 const current = Number(obj.current || 0);
                 const target = Number(obj.target || 1);
                 const isConfidential = obj.isConfidential || obj.hideRevenue;
@@ -260,23 +262,24 @@ export default function ObjectivesPage() {
   )
 }
 
-// --- VUE DÉTAIL ---
-function ObjectiveDetail({ objective, onBack }: { objective: any, onBack: () => void }) {
-  // CRÉATION D'UN OBJET SÉCURISÉ ("SAFE OBJECT")
-  // On s'assure ici que TOUTES les valeurs numériques sont bien des nombres et existent.
-  // C'est cet objet "safeObj" qu'on utilisera et qu'on passera aux enfants.
+// --- VUE DÉTAIL (CLIC) ---
+function ObjectiveDetailView({ objective, onBack }: { objective: any, onBack: () => void }) {
+  // CRÉATION OBJET "SAFE" (Nettoyage des données pour éviter les crashs)
   const safeObj = {
       ...objective,
       current: Number(objective.current || 0),
       target: Number(objective.target || 1),
+      unit: objective.unit || "",
+      // Nettoyage des paliers un par un
       paliers: (objective.paliers || []).map((p:any) => ({
           ...p,
           threshold: Number(p.threshold || 0),
-          reward: Number(p.reward || 0)
+          reward: Number(p.reward || 0),
+          name: p.name || "Palier"
       }))
   };
 
-  const isPrimary = safeObj.type === "principal"
+  const isPrimary = safeObj.type === "principal";
   const isConfidential = safeObj.isConfidential || safeObj.hideRevenue;
   
   let progress = 0;
@@ -292,13 +295,15 @@ function ObjectiveDetail({ objective, onBack }: { objective: any, onBack: () => 
   ).length;
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <div className="min-h-screen bg-background pb-32 animate-in slide-in-from-right duration-300">
       <Header />
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
+        {/* Bouton Retour */}
         <Button variant="ghost" onClick={onBack} className="rounded-xl -ml-2">
-          <ChevronRight className="w-4 h-4 rotate-180 mr-1" /> Retour
+          <ChevronLeft className="w-4 h-4 mr-1" /> Retour
         </Button>
 
+        {/* En-tête Objectif */}
         <div className="text-center space-y-3">
           <div className={cn("w-14 h-14 mx-auto rounded-2xl flex items-center justify-center", isPrimary ? "bg-primary/15" : "bg-accent/15")}>
             <Target className={cn("w-7 h-7", isPrimary ? "text-primary" : "text-accent")} />
@@ -312,19 +317,21 @@ function ObjectiveDetail({ objective, onBack }: { objective: any, onBack: () => 
           </div>
         </div>
 
+        {/* Grosse Jauge Circulaire */}
         <div className="flex justify-center py-4">
           <ProgressRing
             progress={progress}
             size={130}
             strokeWidth={10}
             showPercentage={true}
-            // ICI ON EST SÛR QUE safeObj.current EST UN NOMBRE
+            // SÉCURITÉ : .toLocaleString() est appliqué sur des Nombres garantis
             sublabel={isConfidential 
                 ? "Données masquées" 
                 : `${safeObj.current.toLocaleString()} / ${safeObj.target.toLocaleString()} ${safeObj.unit}`}
           />
         </div>
 
+        {/* Grille de Stats (Comme v0.pdf) */}
         <div className="grid grid-cols-3 gap-3">
           <div className="pulse-card p-3 text-center">
             <p className="text-lg font-bold">{isConfidential ? "?" : maxReward}€</p>
@@ -340,23 +347,83 @@ function ObjectiveDetail({ objective, onBack }: { objective: any, onBack: () => 
           </div>
         </div>
 
-        <section className="space-y-4">
+        {/* Historique Graphique */}
+        <div>
+            <h3 className="font-bold text-sm mb-4 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-primary" /> Historique de progression
+            </h3>
+            <div className="h-32 flex items-end gap-2 px-2 border-b border-border/50 pb-2">
+                {(safeObj.history && safeObj.history.length > 0 ? safeObj.history.slice(-7) : []).map((h:any, i:number) => (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
+                        <div className="w-full bg-muted rounded-t-sm relative h-full flex items-end overflow-hidden">
+                            <div 
+                                className="w-full bg-primary transition-all duration-500 group-hover:bg-primary/80"
+                                style={{ height: `${Math.min(100, ( (Number(h.value) || 0) / safeObj.target ) * 100)}%` }}
+                            />
+                        </div>
+                        <span className="text-[9px] text-muted-foreground">{h.date?.split(' ')[0]}</span>
+                    </div>
+                ))}
+                {(!safeObj.history || safeObj.history.length === 0) && (
+                    <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground italic bg-muted/20 rounded-xl">
+                        Pas d'historique disponible
+                    </div>
+                )}
+            </div>
+        </div>
+
+        {/* Timeline Verticale (Implémentée en dur pour éviter les bugs externes) */}
+        <section className="space-y-4 pt-2">
           <h2 className="font-semibold flex items-center gap-2">
             <Target className="w-5 h-5 text-primary" />
-            Paliers de récompense
+            Paliers à atteindre
           </h2>
-          {/* On passe l'objet SÉCURISÉ au composant timeline */}
-          <PalierTimeline objective={safeObj} />
+          
+          <div className="relative pl-2 space-y-0">
+             {/* Ligne verticale */}
+             <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-border -z-10" />
+
+             {safeObj.paliers.sort((a:any, b:any) => a.threshold - b.threshold).map((palier: any, index: number) => {
+                 const isReached = safeObj.direction === 'descending' ? safeObj.current <= palier.threshold : safeObj.current >= palier.threshold;
+                 
+                 return (
+                     <div key={index} className="flex items-start gap-4 py-3 group">
+                         {/* Cercle Indicateur */}
+                         <div className={cn(
+                             "w-10 h-10 rounded-full flex items-center justify-center border-4 shrink-0 transition-all z-10",
+                             isReached 
+                                 ? "bg-primary border-background text-white shadow-md shadow-primary/20 scale-110" 
+                                 : "bg-background border-muted text-muted-foreground"
+                         )}>
+                             {isReached ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
+                         </div>
+
+                         {/* Carte Palier */}
+                         <div className={cn(
+                             "flex-1 p-3 rounded-xl border transition-all",
+                             isReached ? "bg-primary/5 border-primary/20" : "bg-card border-border"
+                         )}>
+                             <div className="flex justify-between items-start mb-1">
+                                 <span className={cn("font-bold text-sm", isReached && "text-primary")}>{palier.name}</span>
+                                 <Badge variant={isReached ? "default" : "outline"} className="text-[10px] h-5">
+                                     {isReached ? "Débloqué" : "Verrouillé"}
+                                 </Badge>
+                             </div>
+                             <div className="flex justify-between items-center text-xs mt-2">
+                                 <span className="text-muted-foreground">Objectif: <strong className="text-foreground">{palier.threshold.toLocaleString()} {safeObj.unit}</strong></span>
+                                 <span className="font-bold text-primary">+{palier.reward}€</span>
+                             </div>
+                         </div>
+                     </div>
+                 )
+             })}
+
+             {safeObj.paliers.length === 0 && (
+                 <p className="text-sm text-muted-foreground italic pl-8">Aucun palier configuré.</p>
+             )}
+          </div>
         </section>
 
-        <div className="pulse-card p-4 bg-muted/30">
-          <div className="flex items-start gap-3">
-            <Info className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
-            <p className="text-xs text-muted-foreground">
-              Continuez vos efforts ! Les mises à jour sont effectuées quotidiennement par votre manager.
-            </p>
-          </div>
-        </div>
       </main>
       <BottomNav />
     </div>
