@@ -6,7 +6,6 @@ import { BottomNav } from "@/components/pulse/bottom-nav"
 import { PermissionGate } from "@/components/auth/permission-gate"
 import { usePermissions } from "@/hooks/use-permissions"
 import { useObjectives } from "@/hooks/use-objectives"
-import { useCurrentUser } from "@/lib/use-current-user" // 👈 INDISPENSABLE POUR LE FILTRE
 import {
   Target, TrendingUp, TrendingDown, Clock, Plus, Edit3, Trash2, X, Check, Euro, Users,
   Layers, AlertCircle, Save, Wallet, ChevronDown, ChevronUp, Calendar, Loader2,
@@ -25,13 +24,12 @@ import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
 
 // Imports Firebase
-// 👇 AJOUTEZ BIEN "where" ICI
-import { doc, updateDoc, addDoc, collection, onSnapshot, query, getDoc, setDoc, deleteDoc, where } from "firebase/firestore"
+import { doc, updateDoc, addDoc, collection, onSnapshot, query, getDoc, setDoc, deleteDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase/client"
 
 // --- TYPES ---
 
-type ObjectiveDirection = "ascending" | "descending"
+type ObjectiveDirection = "ascending" | "descending" // Monter (CA) ou Descendre (Erreurs)
 type TabValue = "objectifs" | "paliers" | "pilotage" | "equipe"
 
 interface EditingPalier {
@@ -49,6 +47,7 @@ interface TeamMember {
   contractHours: number
 }
 
+// Liste des modèles d'objectifs pour faciliter la création
 const OBJECTIVE_PRESETS = [
   { id: "ca", label: "Chiffre d'Affaires", icon: Euro, unit: "€", direction: "ascending", desc: "Augmenter le revenu" },
   { id: "error", label: "Taux d'erreur", icon: AlertTriangle, unit: "%", direction: "descending", desc: "Réduire les erreurs (qualité)" },
@@ -60,7 +59,6 @@ const OBJECTIVE_PRESETS = [
 export default function PilotagePage() {
   const { canEdit } = usePermissions()
   const { objectives, loading: loadingObj } = useObjectives()
-  const user = useCurrentUser() // 👈 Récupère l'utilisateur connecté
   const { toast } = useToast()
 
   const [activeTab, setActiveTab] = useState<TabValue>("pilotage")
@@ -78,18 +76,9 @@ export default function PilotagePage() {
   const [simulatedPaliers, setSimulatedPaliers] = useState<Record<string, Record<string, number>>>({})
   const [expandedObjective, setExpandedObjective] = useState<string | null>(null)
 
-  // 1. CHARGEMENT DES DONNÉES (AVEC FILTRE)
+  // 1. CHARGEMENT DES DONNÉES
   useEffect(() => {
-    // Si l'utilisateur n'est pas encore chargé ou n'a pas d'entreprise, on attend
-    if (!user || !user.company) return;
-
-    // 👇 C'EST ICI QUE LA MAGIE OPÈRE : FILTRE PAR ENTREPRISE
-    const q = query(
-        collection(db, "users"), 
-        where("company", "==", user.company)
-    );
-
-    const unsubUsers = onSnapshot(q, (snapshot) => {
+    const unsubUsers = onSnapshot(query(collection(db, "users")), (snapshot) => {
       const members = snapshot.docs.map(doc => ({
         id: doc.id,
         name: doc.data().displayName || doc.data().email || "Inconnu",
@@ -109,7 +98,7 @@ export default function PilotagePage() {
     loadConfig();
 
     return () => unsubUsers();
-  }, [user]) // 👈 On recharge quand l'utilisateur est détecté
+  }, [])
 
   // 2. SYNCHRONISATION SIMULATION
   useEffect(() => {
@@ -144,7 +133,7 @@ export default function PilotagePage() {
             paliersList.push({ id: p.id, name: p.name, reward })
           })
       } 
-      // Logique Prime Fixe
+      // Logique Prime Fixe (Legacy fallback)
       else {
           objCost = obj.fixedReward || 0;
       }
@@ -169,9 +158,14 @@ export default function PilotagePage() {
   // --- HELPER PROGRESSION ---
   const calculateProgress = (current: number, target: number, direction: ObjectiveDirection) => {
       if (direction === 'descending') {
+          // Pour "Moins de 1%", si on est à 5%, c'est 0% de réussite. Si on est à 0.5%, c'est 100%.
+          // On assume une base de départ (ex: 10% d'erreur) pour l'affichage, ou on simplifie.
+          // Simplification : Si current <= target, c'est gagné.
           if (current <= target) return 100;
+          // Sinon on affiche une jauge inverse simple : Target / Current (plus current est grand, plus ratio est petit)
           return Math.max(0, Math.min(100, (target / (current || 1)) * 100));
       }
+      // Standard Ascending
       return Math.min(100, Math.max(0, (current / (target || 1)) * 100));
   }
 
@@ -220,6 +214,7 @@ export default function PilotagePage() {
       }
   }
 
+  // GESTION PALIERS
   const handleAddPalierConfirm = async (objectiveId: string, name: string, threshold: number, reward: number) => {
       const obj = objectives.find((o: any) => o.id === objectiveId);
       if(!obj) return;
@@ -261,18 +256,19 @@ export default function PilotagePage() {
       toast({ title: "Palier supprimé" });
   }
 
+  // CRÉATION OBJECTIF AVANCÉE
   const handleCreateObjective = async (data: any) => {
       try {
         await addDoc(collection(db, "objectives"), {
             title: data.title,
             description: data.description || "",
             isActive: true,
-            type: "secondary", 
+            type: "secondary", // Défaut, modifiable après
             target: Number(data.target),
             unit: data.unit,
-            direction: data.direction,
+            direction: data.direction, // "ascending" | "descending"
             reward: 0,
-            progress: data.direction === "descending" ? Number(data.target) * 2 : 0, 
+            progress: data.direction === "descending" ? Number(data.target) * 2 : 0, // Si descendant, on commence "haut" pour simuler
             paliers: [],
             createdAt: new Date()
         });
@@ -295,10 +291,7 @@ export default function PilotagePage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Pilotage</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-                {/* Indicateur de filtre */}
-                {user?.company ? `${user.company}` : "Gérez les objectifs"}
-            </p>
+            <p className="text-sm text-muted-foreground mt-0.5">Gérez les objectifs et les primes</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="rounded-xl gap-2 bg-transparent" onClick={() => setShowEditHours(true)}>
@@ -477,7 +470,7 @@ export default function PilotagePage() {
             <div className="space-y-3">
               {teamMembers.map((member) => {
                 const ratio = member.contractHours / baseHours;
-                const potentialPrime = Math.round(simulationData.teamTotalCost * (ratio / (teamMembers.length || 1))); // Approximatif pour visuel
+                const potentialPrime = Math.round(simulationData.teamTotalCost * (ratio / teamMembers.length)); // Approximatif pour visuel
                 return (
                   <div key={member.id} className="pulse-card p-4">
                     <div className="flex items-center gap-3 mb-3">
@@ -489,14 +482,14 @@ export default function PilotagePage() {
                   </div>
                 )
               })}
-              {teamMembers.length === 0 && <p className="text-center text-muted-foreground">Aucun membre dans cette équipe.</p>}
             </div>
           </TabsContent>
         </Tabs>
       </main>
 
-      {/* --- MODALES ET SOUS-COMPOSANTS --- */}
-      
+      {/* --- MODALES --- */}
+
+      {/* 1. EDIT HEURES */}
       {showEditHours && (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={() => setShowEditHours(false)}>
           <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
@@ -509,6 +502,7 @@ export default function PilotagePage() {
         </div>
       )}
 
+      {/* 2. EDIT PALIER */}
       {editingPalier && (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={() => setEditingPalier(null)}>
           <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
@@ -526,6 +520,7 @@ export default function PilotagePage() {
         </div>
       )}
 
+      {/* 3. ADD PALIER */}
       {showAddPalier && (
         <AddPalierModal 
             onClose={() => setShowAddPalier(null)} 
@@ -534,6 +529,7 @@ export default function PilotagePage() {
         />
       )}
 
+      {/* 4. ADD OBJECTIVE (AVANCÉ) */}
       {showAddObjective && (
           <AddObjectiveAdvancedModal 
             onClose={() => setShowAddObjective(false)} 
@@ -541,6 +537,7 @@ export default function PilotagePage() {
           />
       )}
 
+      {/* 5. DETAIL OBJECTIF */}
       {showObjectiveDetail && (
         <ObjectiveDetailModal 
             objectiveId={showObjectiveDetail} 
@@ -563,14 +560,22 @@ function AddObjectiveAdvancedModal({ onClose, onConfirm }: { onClose: () => void
     const [target, setTarget] = useState("")
     const [description, setDescription] = useState("")
 
+    // Met à jour les champs quand on change de preset
     useEffect(() => {
         const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)
-        if(p) { setTitle(p.label); setDescription(p.desc) }
+        if(p) {
+            setTitle(p.label)
+            setDescription(p.desc)
+        }
     }, [selectedPreset])
 
     const handleSubmit = () => {
         const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)!
-        onConfirm({ title, description, target, unit: p.unit, direction: p.direction })
+        onConfirm({
+            title, description, target,
+            unit: p.unit,
+            direction: p.direction
+        })
     }
 
     return (
@@ -580,22 +585,52 @@ function AddObjectiveAdvancedModal({ onClose, onConfirm }: { onClose: () => void
                     <h2 className="text-lg font-bold">Nouvel Objectif</h2>
                     <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5"/></Button>
                 </div>
+
                 <div className="space-y-4">
+                    {/* Selecteur de Type */}
                     <div>
                         <Label className="mb-2 block">Type d'objectif</Label>
                         <div className="grid grid-cols-3 gap-2">
                             {OBJECTIVE_PRESETS.map(preset => (
-                                <button key={preset.id} onClick={() => setSelectedPreset(preset.id)} className={cn("flex flex-col items-center justify-center gap-1 p-3 rounded-xl border transition-all text-xs text-center h-20", selectedPreset === preset.id ? "border-primary bg-primary/10 text-primary font-semibold ring-2 ring-primary/20" : "border-border bg-muted/20 text-muted-foreground hover:bg-muted")}>
-                                    <preset.icon className="w-5 h-5" /><span>{preset.label}</span>
+                                <button 
+                                    key={preset.id}
+                                    onClick={() => setSelectedPreset(preset.id)}
+                                    className={cn(
+                                        "flex flex-col items-center justify-center gap-1 p-3 rounded-xl border transition-all text-xs text-center h-20",
+                                        selectedPreset === preset.id 
+                                            ? "border-primary bg-primary/10 text-primary font-semibold ring-2 ring-primary/20" 
+                                            : "border-border bg-muted/20 text-muted-foreground hover:bg-muted"
+                                    )}
+                                >
+                                    <preset.icon className="w-5 h-5" />
+                                    <span>{preset.label}</span>
                                 </button>
                             ))}
                         </div>
                     </div>
-                    <div><Label>Titre</Label><Input value={title} onChange={e => setTitle(e.target.value)} className="mt-1.5"/></div>
+
+                    <div><Label>Titre personnalisé</Label><Input value={title} onChange={e => setTitle(e.target.value)} className="mt-1.5"/></div>
+                    
                     <div className="grid grid-cols-2 gap-4">
-                        <div><Label>Cible</Label><Input type="number" value={target} onChange={e => setTarget(e.target.value)} placeholder="0" className="mt-1.5 font-bold" /></div>
-                        <div><Label>Unité</Label><div className="flex h-10 items-center justify-center rounded-md border bg-muted font-bold text-muted-foreground mt-1.5">{OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)?.unit}</div></div>
+                        <div>
+                            <Label>Cible à atteindre</Label>
+                            <Input type="number" value={target} onChange={e => setTarget(e.target.value)} placeholder="0" className="mt-1.5 font-bold" />
+                        </div>
+                        <div>
+                            <Label>Unité</Label>
+                            <div className="flex h-10 items-center justify-center rounded-md border bg-muted font-bold text-muted-foreground mt-1.5">
+                                {OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)?.unit}
+                            </div>
+                        </div>
                     </div>
+
+                    <div className="bg-blue-50 p-3 rounded-lg text-xs text-blue-700 flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                        {OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)?.direction === 'descending' 
+                            ? "Info : Pour cet objectif, la progression augmentera quand la valeur diminuera (ex: moins d'erreurs)." 
+                            : "Info : La progression augmentera quand la valeur augmentera (ex: plus de CA)."}
+                    </div>
+
                     <Button className="w-full py-6 text-base" onClick={handleSubmit} disabled={!target}>Créer l'objectif</Button>
                 </div>
             </div>
@@ -604,17 +639,34 @@ function AddObjectiveAdvancedModal({ onClose, onConfirm }: { onClose: () => void
 }
 
 function AddPalierModal({ onClose, onConfirm, objective }: { onClose: () => void, onConfirm: (n: string, t: number, r: number) => void, objective: any }) {
-    const [name, setName] = useState(""); const [threshold, setThreshold] = useState(""); const [reward, setReward] = useState("")
+    const [name, setName] = useState("")
+    const [threshold, setThreshold] = useState("")
+    const [reward, setReward] = useState("")
+    
     const isDescending = objective?.direction === 'descending'
+
     return (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={onClose}>
           <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
             <h2 className="font-semibold mb-6 text-lg">Ajouter un palier</h2>
             <div className="space-y-4">
               <div><Label>Nom</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Niveau 1" className="rounded-xl mt-1" /></div>
-              <div><Label>{isDescending ? `Seuil max (${objective.unit})` : `Seuil à atteindre (${objective.unit})`}</Label><Input type="number" value={threshold} onChange={e => setThreshold(e.target.value)} placeholder="1000" className="rounded-xl mt-1" /></div>
+              
+              <div>
+                  <Label>
+                      {isDescending ? `Seuil max autorisé (${objective.unit})` : `Seuil à atteindre (${objective.unit})`}
+                  </Label>
+                  <Input type="number" value={threshold} onChange={e => setThreshold(e.target.value)} placeholder="1000" className="rounded-xl mt-1" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                      {isDescending ? "La prime sera débloquée si la valeur est EN-DESSOUS de ce chiffre." : "La prime sera débloquée si la valeur est AU-DESSUS de ce chiffre."}
+                  </p>
+              </div>
+
               <div><Label>Récompense (€)</Label><Input type="number" value={reward} onChange={e => setReward(e.target.value)} placeholder="50" className="rounded-xl mt-1" /></div>
-              <Button className="w-full rounded-xl" onClick={() => onConfirm(name, Number(threshold), Number(reward))} disabled={!name || !threshold}><Plus className="w-4 h-4 mr-2" /> Ajouter</Button>
+              
+              <Button className="w-full rounded-xl" onClick={() => onConfirm(name, Number(threshold), Number(reward))} disabled={!name || !threshold}>
+                <Plus className="w-4 h-4 mr-2" /> Ajouter
+              </Button>
             </div>
           </div>
         </div>
@@ -622,21 +674,42 @@ function AddPalierModal({ onClose, onConfirm, objective }: { onClose: () => void
 }
 
 function ObjectiveDetailModal({ objectiveId, onClose, objectivesList }: { objectiveId: string, onClose: () => void, objectivesList: any[] }) {
-  const objective = objectivesList.find((o) => o.id === objectiveId);
-  const handleDelete = async () => { if(confirm("Supprimer cet objectif ?")) { await deleteDoc(doc(db, "objectives", objectiveId)); onClose() } }
+  const objective = objectivesList.find((o) => o.id === objectiveId)
+  const handleDelete = async () => {
+      if(confirm("Supprimer cet objectif ?")) {
+          await deleteDoc(doc(db, "objectives", objectiveId))
+          onClose()
+      }
+  }
+  
   if (!objective) return null
+
   return (
     <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-card w-full max-w-sm rounded-2xl p-6 space-y-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-start">
-            <div><h2 className="font-bold text-lg">{objective.title}</h2><Badge variant="outline" className="mt-1">{objective.direction === 'descending' ? 'Objectif de réduction' : 'Objectif de croissance'}</Badge></div>
+            <div>
+                <h2 className="font-bold text-lg">{objective.title}</h2>
+                <Badge variant="outline" className="mt-1">{objective.direction === 'descending' ? 'Objectif de réduction' : 'Objectif de croissance'}</Badge>
+            </div>
             <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5" /></Button>
         </div>
+
         <div className="space-y-4">
-            <div className="flex justify-between p-3 bg-muted/50 rounded-lg"><span className="text-sm">Cible actuelle</span><span className="font-bold">{objective.target} {objective.unit}</span></div>
-            <div className="flex justify-between p-3 bg-muted/50 rounded-lg"><span className="text-sm">Progression</span><span className="font-bold">{objective.progress} {objective.unit}</span></div>
+            <div className="flex justify-between p-3 bg-muted/50 rounded-lg">
+                <span className="text-sm">Cible actuelle</span>
+                <span className="font-bold">{objective.target} {objective.unit}</span>
+            </div>
+            <div className="flex justify-between p-3 bg-muted/50 rounded-lg">
+                <span className="text-sm">Progression</span>
+                <span className="font-bold">{objective.progress} {objective.unit}</span>
+            </div>
         </div>
-        <div className="pt-4 flex gap-3"><Button variant="destructive" className="flex-1" onClick={handleDelete}><Trash2 className="w-4 h-4 mr-2"/> Supprimer</Button><Button variant="outline" className="flex-1" onClick={onClose}>Fermer</Button></div>
+
+        <div className="pt-4 flex gap-3">
+            <Button variant="destructive" className="flex-1" onClick={handleDelete}><Trash2 className="w-4 h-4 mr-2"/> Supprimer</Button>
+            <Button variant="outline" className="flex-1" onClick={onClose}>Fermer</Button>
+        </div>
       </div>
     </div>
   )
