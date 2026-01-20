@@ -3,23 +3,15 @@ import { db } from "@/lib/firebase/client"
 
 export type LogAction = "LOGIN" | "CREATE" | "UPDATE" | "DELETE" | "NAVIGATE"
 
-interface LogParams {
-  userId: string
-  userName: string
-  userRole: string
-  companyId: string
-  companyName: string
-  action: LogAction
-  details: string
-}
-
-export const logSystemAction = async (params: LogParams) => {
+export const logSystemAction = async (params: {
+  userId: string, userName: string, userRole: string, 
+  companyId: string, companyName: string, 
+  action: LogAction, details: string
+}) => {
   try {
     await addDoc(collection(db, "system_logs"), {
       ...params,
       timestamp: new Date().toISOString()
     })
-  } catch (error) {
-    console.error("Erreur lors de l'enregistrement du log:", error)
-  }
+  } catch (e) { console.error("Log error", e) }
 }
