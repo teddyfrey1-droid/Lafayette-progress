@@ -14,7 +14,6 @@ import { Progress } from "@/components/ui/progress"
 import { useObjectives } from "@/hooks/use-objectives"
 import { Badge } from "@/components/ui/badge"
 
-// Historique visuel (Mock pour l'instant pour le design)
 const MockHistory = ({ target }: { target: number }) => (
   <div className="flex items-end gap-1 h-12 mt-4 opacity-70">
      {[40, 50, 65, 70, 55, 80, 75].map((h, i) => (
@@ -28,12 +27,9 @@ export default function ObjectivesPage() {
   const [selectedObjective, setSelectedObjective] = useState<any | null>(null)
   const [showCelebration, setShowCelebration] = useState(false)
 
-  // Filtrage des objectifs depuis la base de données
   const principalObjective = objectives.find((o: any) => o.type === "principal" && o.isActive)
   const secondaryObjectives = objectives.filter((o: any) => (o.type === "secondaire" || !o.type) && o.isActive)
 
-  // Vérification si le principal est atteint (Gatekeeper)
-  // Utilisation sécurisée de .current
   const isPrincipalMet = !principalObjective || (
       principalObjective.direction === 'descending' 
       ? (principalObjective.current || 0) <= (principalObjective.target || 1) 
@@ -48,7 +44,6 @@ export default function ObjectivesPage() {
     )
   }
 
-  // Si un objectif est sélectionné, on affiche le détail
   if (selectedObjective) {
     return (
       <ObjectiveDetail
@@ -58,11 +53,12 @@ export default function ObjectivesPage() {
     )
   }
 
-  // Calcul de la progression principale sécurisée
-  // CORRECTION : On utilise 'current' au lieu de 'progress'
+  // SÉCURITÉ : On utilise des valeurs par défaut pour éviter le crash
   const currentP = principalObjective?.current || 0;
   const targetP = principalObjective?.target || 1;
-  const isConfidentialP = principalObjective?.isConfidential || principalObjective?.hideRevenue;
+  const nextPalier = principalObjective?.paliers?.find((p: any) => 
+     principalObjective.direction === 'descending' ? p.threshold < currentP : p.threshold > currentP
+  );
   
   let principalProgress = 0;
   if (principalObjective) {
@@ -79,13 +75,11 @@ export default function ObjectivesPage() {
         <Header />
 
         <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
-          {/* Page Title */}
           <div>
             <h1 className="text-2xl font-bold">Objectifs</h1>
             <p className="text-sm text-muted-foreground mt-1">Suivez votre progression et débloquez vos primes</p>
           </div>
 
-          {/* Principal Objective Section */}
           <section className="space-y-4">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" />
@@ -102,57 +96,49 @@ export default function ObjectivesPage() {
                     progress={principalProgress} 
                     size={100} 
                     strokeWidth={8} 
-                    showPercentage={!isConfidentialP} 
+                    showPercentage={!principalObjective.isConfidential} 
                   />
                   <h3 className="font-semibold mt-3">{principalObjective.title}</h3>
                   <p className="text-sm text-muted-foreground mt-1">{principalObjective.description}</p>
                   <div className="flex items-center gap-2 mt-2">
-                    <span className="text-xs px-2 py-1 rounded-full bg-primary/15 text-primary font-medium">
-                      Principal
-                    </span>
-                    {!isConfidentialP && principalObjective.paliers && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-primary/15 text-primary font-medium">Principal</span>
+                    {!principalObjective.isConfidential && principalObjective.paliers && (
                         <span className="text-xs text-muted-foreground">
-                            Prime max: {principalObjective.paliers.reduce((acc:number, p:any) => acc + p.reward, 0)}€
+                            Max: {(principalObjective.paliers.reduce((acc:number, p:any) => acc + (p.reward || 0), 0) || 0)}€
                         </span>
                     )}
                   </div>
                 </div>
 
-                {/* Progress Bar */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Progression</span>
                     <span className="font-semibold">
-                      {isConfidentialP 
+                      {principalObjective.isConfidential 
                         ? <span className="flex items-center gap-1 italic opacity-70"><EyeOff className="w-3 h-3"/> Masqué</span> 
-                        : `${currentP.toLocaleString()} / ${targetP.toLocaleString()} ${principalObjective.unit}`}
+                        : `${(currentP || 0).toLocaleString()} / ${(targetP || 0).toLocaleString()} ${principalObjective.unit}`}
                     </span>
                   </div>
-                  <Progress
-                    value={principalProgress}
-                    className="h-2 [&>div]:bg-gradient-to-r [&>div]:from-primary [&>div]:to-accent"
-                  />
+                  <Progress value={principalProgress} className="h-2 [&>div]:bg-gradient-to-r [&>div]:from-primary [&>div]:to-accent" />
                 </div>
 
-                {/* Mock History */}
                 <div className="mt-4 pt-4 border-t border-border/50">
                   <p className="text-xs text-muted-foreground mb-1">Tendance</p>
                   <MockHistory target={targetP} />
                 </div>
 
-                {/* Next Palier */}
-                {principalObjective.paliers?.find((p: any) => p.threshold > currentP) && (
+                {/* SÉCURITÉ : Protection de l'affichage du palier */}
+                {nextPalier && (
                   <div className="mt-4 p-3 rounded-xl bg-muted/50 flex items-center justify-between">
                     <div>
                       <p className="text-xs text-muted-foreground">Prochain palier</p>
-                      <p className="font-medium text-sm">
-                        {principalObjective.paliers.find((p: any) => p.threshold > currentP)?.name}
-                      </p>
+                      <p className="font-medium text-sm">{nextPalier.name}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">Cible</p>
                       <p className="font-semibold text-primary">
-                        {principalObjective.paliers.find((p: any) => p.threshold > currentP)?.threshold.toLocaleString()} {principalObjective.unit}
+                        {/* 🛑 C'est ici que ça plantait : on sécurise avec ( || 0) */}
+                        {(nextPalier.threshold || 0).toLocaleString()} {principalObjective.unit}
                       </p>
                     </div>
                     <ChevronRight className="w-5 h-5 text-muted-foreground" />
@@ -167,7 +153,6 @@ export default function ObjectivesPage() {
             )}
           </section>
 
-          {/* Secondary Objectives Section */}
           <section className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -179,10 +164,9 @@ export default function ObjectivesPage() {
 
             <div className="grid gap-3">
               {secondaryObjectives.map((obj: any) => {
-                // CORRECTION : Utilisation de .current + Sécurité || 0
+                // SÉCURITÉ
                 const current = obj.current || 0;
                 const target = obj.target || 1;
-                const isConfidential = obj.isConfidential || obj.hideRevenue;
                 
                 let progress = 0;
                 if (obj.direction === 'descending') {
@@ -192,7 +176,7 @@ export default function ObjectivesPage() {
                 }
 
                 const nextPalier = obj.paliers?.find((p: any) => p.threshold > current)
-                const isLocked = !isPrincipalMet; // Verrouillé si principal non atteint
+                const isLocked = !isPrincipalMet; 
 
                 return (
                   <div 
@@ -211,13 +195,12 @@ export default function ObjectivesPage() {
                       <p className="text-xs text-muted-foreground line-clamp-1">{obj.description}</p>
                     </div>
 
-                    {/* Progress */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-center gap-2">
                         <span className="text-lg font-bold">
-                          {isConfidential ? `${Math.round(progress)}%` : current.toLocaleString()}
+                          {obj.isConfidential ? `${Math.round(progress)}%` : (current || 0).toLocaleString()}
                           <span className="text-sm font-normal text-muted-foreground ml-1">
-                            {isConfidential ? "" : `/ ${target.toLocaleString()} ${obj.unit}`}
+                            {obj.isConfidential ? "" : `/ ${(target || 0).toLocaleString()} ${obj.unit}`}
                           </span>
                         </span>
                       </div>
@@ -227,7 +210,6 @@ export default function ObjectivesPage() {
                       </div>
                     </div>
 
-                    {/* Next Palier */}
                     {nextPalier && !isLocked && (
                       <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
@@ -253,7 +235,6 @@ export default function ObjectivesPage() {
             </div>
           </section>
 
-          {/* Info */}
           <div className="pulse-card p-4 bg-muted/30">
             <div className="flex items-start gap-3">
               <Info className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
@@ -263,31 +244,16 @@ export default function ObjectivesPage() {
             </div>
           </div>
         </main>
-
         <BottomNav />
-
-        <CelebrationModal
-          open={showCelebration}
-          onClose={() => setShowCelebration(false)}
-          title="Nouveau Succès !"
-          subtitle="Vous avez débloqué un nouveau palier"
-          type="achievement"
-        />
+        <CelebrationModal open={showCelebration} onClose={() => setShowCelebration(false)} title="Succès !" subtitle="Palier débloqué" type="achievement" />
       </div>
     </PermissionGate>
   )
 }
 
-// Vue Détail Simplifiée et Dynamique
-function ObjectiveDetail({
-  objective,
-  onBack,
-}: {
-  objective: any
-  onBack: () => void
-}) {
+function ObjectiveDetail({ objective, onBack }: { objective: any, onBack: () => void }) {
   const isPrimary = objective.type === "principal"
-  // CORRECTION : Utilisation de .current + Sécurité || 0
+  // SÉCURITÉ : Valeurs par défaut
   const current = objective.current || 0;
   const target = objective.target || 1;
   const isConfidential = objective.isConfidential || objective.hideRevenue;
@@ -299,7 +265,7 @@ function ObjectiveDetail({
       progress = Math.min(100, (current / target) * 100);
   }
 
-  const maxReward = objective.paliers?.reduce((acc:number, p:any) => acc + p.reward, 0) || 0;
+  const maxReward = objective.paliers?.reduce((acc:number, p:any) => acc + (p.reward || 0), 0) || 0;
   const unlockedPaliers = objective.paliers?.filter((p: any) => 
       objective.direction === 'descending' ? current <= p.threshold : current >= p.threshold
   ).length || 0;
@@ -307,30 +273,17 @@ function ObjectiveDetail({
   return (
     <div className="min-h-screen bg-background pb-32">
       <Header />
-
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
-        {/* Back button */}
         <Button variant="ghost" onClick={onBack} className="rounded-xl -ml-2">
-          <ChevronRight className="w-4 h-4 rotate-180 mr-1" />
-          Retour
+          <ChevronRight className="w-4 h-4 rotate-180 mr-1" /> Retour
         </Button>
 
         <div className="text-center space-y-3">
-          <div
-            className={cn(
-              "w-14 h-14 mx-auto rounded-2xl flex items-center justify-center",
-              isPrimary ? "bg-primary/15" : "bg-accent/15",
-            )}
-          >
+          <div className={cn("w-14 h-14 mx-auto rounded-2xl flex items-center justify-center", isPrimary ? "bg-primary/15" : "bg-accent/15")}>
             <Target className={cn("w-7 h-7", isPrimary ? "text-primary" : "text-accent")} />
           </div>
           <div>
-            <span
-              className={cn(
-                "text-xs font-medium px-3 py-1 rounded-full",
-                isPrimary ? "bg-primary/15 text-primary" : "bg-accent/15 text-accent",
-              )}
-            >
+            <span className={cn("text-xs font-medium px-3 py-1 rounded-full", isPrimary ? "bg-primary/15 text-primary" : "bg-accent/15 text-accent")}>
               {isPrimary ? "Objectif Principal" : "Objectif Secondaire"}
             </span>
             <h1 className="text-xl font-bold mt-3">{objective.title}</h1>
@@ -344,16 +297,15 @@ function ObjectiveDetail({
             size={130}
             strokeWidth={10}
             showPercentage={true}
+            // SÉCURITÉ : .toLocaleString() protégé
             sublabel={isConfidential 
                 ? "Données masquées" 
-                : `${current.toLocaleString()} / ${target.toLocaleString()} ${objective.unit}`}
+                : `${(current || 0).toLocaleString()} / ${(target || 0).toLocaleString()} ${objective.unit}`}
           />
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           <div className="pulse-card p-3 text-center">
-            {/* Si confidentiel, on ne montre pas l'argent */}
             <p className="text-lg font-bold">{isConfidential ? "?" : maxReward}€</p>
             <p className="text-xs text-muted-foreground">Prime max</p>
           </div>
@@ -367,17 +319,15 @@ function ObjectiveDetail({
           </div>
         </div>
 
-        {/* Paliers section */}
         <section className="space-y-4">
           <h2 className="font-semibold flex items-center gap-2">
             <Target className="w-5 h-5 text-primary" />
             Paliers de récompense
           </h2>
-          {/* On passe l'objectif sécurisé au composant */}
+          {/* On passe l'objectif sécurisé */}
           <PalierTimeline objective={{...objective, current}} />
         </section>
 
-        {/* Info */}
         <div className="pulse-card p-4 bg-muted/30">
           <div className="flex items-start gap-3">
             <Info className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
@@ -387,7 +337,6 @@ function ObjectiveDetail({
           </div>
         </div>
       </main>
-
       <BottomNav />
     </div>
   )
