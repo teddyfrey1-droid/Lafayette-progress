@@ -548,7 +548,7 @@ export const usefulSites: UsefulSite[] = [
     id: "s3",
     name: "PouvoirPlus",
     description: "Profitez de remises tout au long de l'année sur plus de 100 000 offres.",
-    url: "https://www.pouvoirplus.fr",
+    url: "https://firebasestorage.googleapis.com/v0/b/objectif-restaurant.firebasestorage.app/o/app-icons%2FIMG_6446.PNG?alt=media&token=478608b3-fff7-4ad8-9276-7bef8c636932",
     category: "avantages",
     // Pas d'image fournie, je laisse vide ou tu peux mettre un lien générique
   },
@@ -556,14 +556,14 @@ export const usefulSites: UsefulSite[] = [
     id: "s4",
     name: "Combo",
     description: "Logiciel de planning et de gestion pour organiser vos équipes.",
-    url: "https://www.combo.com",
+    url: "https://firebasestorage.googleapis.com/v0/b/objectif-restaurant.firebasestorage.app/o/app-icons%2FIMG_6448%202.PNG?alt=media&token=2d09b395-bfc6-4168-a927-ad7360ec8f4a",
     category: "planning",
   },
   {
     id: "s5",
     name: "Alan",
     description: "Votre partenaire santé qui prévient, assure et accompagne au quotidien.",
-    url: "https://www.alan.com",
+    url: "https://firebasestorage.googleapis.com/v0/b/objectif-restaurant.firebasestorage.app/o/app-icons%2FIMG_6751%202.PNG?alt=media&token=c0b02b41-be18-4924-8eb9-0ad8b0b247f8",
     category: "sante",
     icon: "https://firebasestorage.googleapis.com/v0/b/objectif-restaurant.firebasestorage.app/o/app-icons%2FIMG_6751.PNG?alt=media&token=db4ff3b0-cd27-41ec-942d-e7be00caf653"
   },
@@ -571,7 +571,7 @@ export const usefulSites: UsefulSite[] = [
     id: "s6",
     name: "Ameli",
     description: "Le site de l'Assurance Maladie pour gérer vos remboursements.",
-    url: "https://www.ameli.fr",
+    url: "https://firebasestorage.googleapis.com/v0/b/objectif-restaurant.firebasestorage.app/o/app-icons%2FIMG_6757.PNG?alt=media&token=1acdf731-867b-4b49-a055-1766aa14a04b",
     category: "sante",
     // Tu peux réutiliser le logo CPAM si besoin
   },
@@ -606,20 +606,6 @@ export const usefulSites: UsefulSite[] = [
     url: "https://www.francetravail.fr",
     category: "emploi",
     icon: "https://firebasestorage.googleapis.com/v0/b/objectif-restaurant.firebasestorage.app/o/app-icons%2FIMG_6756.PNG?alt=media&token=a15b8dff-7b2c-4d45-a137-2586b238a468"
-  },
-  {
-    id: "s11",
-    name: "CPAM",
-    description: "Caisse Primaire d'Assurance Maladie.",
-    url: "https://www.ameli.fr",
-    category: "sante",
-  },
-  {
-    id: "s12",
-    name: "1% Logement",
-    description: "Aides au logement pour les salariés d'entreprises privées.",
-    url: "https://www.actionlogement.fr",
-    category: "logement",
   },
 ]
 
