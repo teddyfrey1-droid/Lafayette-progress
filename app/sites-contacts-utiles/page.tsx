@@ -5,8 +5,9 @@ import { Suspense, useState, useRef } from "react"
 import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
 import { PermissionGate } from "@/components/auth/permission-gate"
-import { usefulSites, siteCategories, usefulContacts, currentUser } from "@/lib/demo-data"
-import type { UsefulSite, SiteCategory } from "@/lib/demo-data"
+// 👇 C'est ici le changement important : on utilise app-data
+import { usefulSites, siteCategories, usefulContacts, currentUser } from "@/lib/app-data"
+import type { UsefulSite, SiteCategory } from "@/lib/app-data"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -14,7 +15,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-
   Plus,
   ExternalLink,
   Pencil,
@@ -53,9 +53,14 @@ const iconMap: Record<string, React.ElementType> = {
 
 function SitesContactsContent() {
   const isAdmin = currentUser.role === "admin" || currentUser.role === "manager"
+  
+  // Ces états sont initialisés avec tes données de base (app-data).
+  // Si tu modifies quelque chose ici via l'interface, React le mettra à jour visuellement.
+  // Note: Pour sauvegarder définitivement les ajouts d'une nouvelle entreprise, il faudrait connecter le "saveSite" à une base de données.
   const [sites, setSites] = useState<UsefulSite[]>(usefulSites)
   const [categories, setCategories] = useState<SiteCategory[]>(siteCategories)
   const [contacts, setContacts] = useState(usefulContacts)
+  
   const [activeCategory, setActiveCategory] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [editMode, setEditMode] = useState(false)
@@ -99,23 +104,10 @@ function SitesContactsContent() {
 
   const filteredContacts = contacts.filter((contact) => {
     return (
-    
       contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       contact.role.toLowerCase().includes(searchQuery.toLowerCase())
     )
   })
-
-  // Group sites by category for display
-  const sitesByCategory = categories.reduce(
-    (acc, category) => {
-      const categorySites = sites.filter((site) => site.category === category.id)
-      if (categorySites.length > 0) {
-        acc[category.id] = categorySites
-      }
-      return acc
-    },
-    {} as Record<string, UsefulSite[]>,
-  )
 
   const openSiteDialog = (site?: UsefulSite) => {
     if (site) {
@@ -139,7 +131,6 @@ function SitesContactsContent() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      // Check if file is PNG or image
       if (!file.type.startsWith("image/")) {
         alert("Veuillez sélectionner une image (PNG, JPG, etc.)")
         return
@@ -710,14 +701,14 @@ function SiteCard({
     <div className="p-4 rounded-2xl bg-card border border-border">
       <div className="flex items-start gap-4">
         <div
-          className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+          className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
           style={{ backgroundColor: `${category?.color}20` }}
         >
           {site.icon ? (
             <img
               src={site.icon || "/placeholder.svg"}
               alt={site.name}
-              className="w-full h-full object-cover rounded-xl"
+              className="w-full h-full object-contain"
             />
           ) : (
             <Icon className="w-6 h-6" style={{ color: category?.color }} />
@@ -767,12 +758,12 @@ export default function SitesContactsUtilesPage() {
   return (
     <PermissionGate moduleId="sites" redirect>
       <div className="min-h-screen bg-background pb-32">
-      <Header />
-      <Suspense fallback={null}>
-        <SitesContactsContent />
-      </Suspense>
-      <BottomNav />
-    </div>
+        <Header />
+        <Suspense fallback={null}>
+          <SitesContactsContent />
+        </Suspense>
+        <BottomNav />
+      </div>
     </PermissionGate>
   )
 }
