@@ -9,7 +9,7 @@ import { useObjectives } from "@/hooks/use-objectives"
 import {
   Target, TrendingUp, TrendingDown, Clock, Plus, Edit3, Trash2, X, Check, Euro, Users,
   Layers, AlertCircle, Save, Wallet, ChevronDown, ChevronUp, Calendar, Loader2,
-  Percent, Hash, AlertTriangle, ThumbsUp
+  Percent, Hash, AlertTriangle, ThumbsUp, CalendarDays
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -52,7 +52,7 @@ interface TeamMember {
   color: string
 }
 
-// Liste des modèles d'objectifs (Exactement comme sur votre screen)
+// Liste des modèles d'objectifs (Pour création immédiate ET planification)
 const OBJECTIVE_PRESETS = [
   { id: "ca", label: "Chiffre d'Affaires", icon: Euro, unit: "€", direction: "ascending", desc: "Augmenter le revenu" },
   { id: "error", label: "Taux d'erreur", icon: AlertTriangle, unit: "%", direction: "descending", desc: "Réduire les erreurs (qualité)" },
@@ -66,7 +66,7 @@ export default function PilotagePage() {
   const { objectives, loading: loadingObj } = useObjectives()
   const { toast } = useToast()
 
-  const [activeTab, setActiveTab] = useState<TabValue>("objectifs") // Par défaut sur objectifs comme sur le screen
+  const [activeTab, setActiveTab] = useState<TabValue>("objectifs") 
   const [baseHours, setBaseHours] = useState(35)
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   
@@ -74,18 +74,19 @@ export default function PilotagePage() {
   const [showEditHours, setShowEditHours] = useState(false)
   const [editingPalier, setEditingPalier] = useState<EditingPalier | null>(null)
   const [showAddPalier, setShowAddPalier] = useState<string | null>(null)
-  const [selectedObj, setSelectedObj] = useState<any | null>(null) // Pour le détail (Drawer)
+  const [selectedObj, setSelectedObj] = useState<any | null>(null) 
   const [showAddObjective, setShowAddObjective] = useState(false)
+  const [showPlanning, setShowPlanning] = useState(false) // Nouvel état pour le drawer planification
   
   const [budgetMax, setBudgetMax] = useState(2000)
   const [simulatedPaliers, setSimulatedPaliers] = useState<Record<string, Record<string, number>>>({})
   const [expandedObjective, setExpandedObjective] = useState<string | null>(null)
 
-  // 1. CHARGEMENT DES DONNÉES (Équipe + Config)
+  // 1. CHARGEMENT DES DONNÉES
   useEffect(() => {
     const unsubUsers = onSnapshot(query(collection(db, "users")), (snapshot) => {
       const members = snapshot.docs
-        .filter(d => d.data().role !== 'super_admin') // On cache le super admin des stats d'équipe
+        .filter(d => d.data().role !== 'super_admin') 
         .map(doc => {
             const data = doc.data();
             const initials = (data.displayName || data.email || "??").substring(0, 2).toUpperCase();
@@ -140,11 +141,7 @@ export default function PilotagePage() {
       let objCost = 0
       const paliersList: any[] = []
 
-      // Si Paliers
       if (obj.paliers && obj.paliers.length > 0) {
-          // On prend le palier max atteint ou simulé
-          // Pour le budget max, on prend la somme de tous les paliers (si cumulatifs) ou le plus haut
-          // Ici on assume cumulatif pour le budget max potentiel
           const maxReward = obj.paliers.reduce((acc:number, p:any) => acc + (simulatedPaliers[obj.id]?.[p.id] ?? p.reward), 0);
           objCost = maxReward;
           
@@ -159,8 +156,6 @@ export default function PilotagePage() {
       totalCost += objCost
     })
 
-    // Coût équipe = Coût Objectifs * (Somme des ratios horaires)
-    // Ex: si 2 employés à 35h, ratio total = 2. Si 1 à 35h et 1 à 17.5h, ratio = 1.5
     const totalTeamRatio = teamMembers.reduce((sum, m) => sum + (m.contractHours / baseHours), 0);
     const teamTotalCost = Math.round(totalCost * totalTeamRatio);
 
@@ -169,7 +164,7 @@ export default function PilotagePage() {
       teamTotalCost,
       budgetDiff: budgetMax - teamTotalCost,
       isOverBudget: teamTotalCost > budgetMax,
-      totalCostPerPerson: totalCost // Prime max pour un 35h
+      totalCostPerPerson: totalCost 
     }
   }, [objectives, simulatedPaliers, baseHours, budgetMax, teamMembers, activeTab])
 
@@ -201,7 +196,6 @@ export default function PilotagePage() {
                   reward: changes[p.id] !== undefined ? changes[p.id] : p.reward
               }));
 
-              // Recalcul du total théorique si nécessaire, sinon on laisse le front gérer
               await updateDoc(doc(db, "objectives", obj.id), { paliers: newPaliers });
           });
 
@@ -245,14 +239,14 @@ export default function PilotagePage() {
       toast({ title: "Palier supprimé" });
   }
 
-  // CRÉATION OBJECTIF (Le cœur de votre demande)
+  // CRÉATION OBJECTIF
   const handleCreateObjective = async (data: any) => {
       try {
         await addDoc(collection(db, "objectives"), {
             title: data.title,
             description: data.description || "",
             isActive: true,
-            type: "principal", // Par défaut, on peut changer ensuite
+            type: "principal",
             target: Number(data.target),
             unit: data.unit,
             direction: data.direction,
@@ -268,7 +262,22 @@ export default function PilotagePage() {
       }
   }
 
-  // MISE À JOUR PROGRESSION (Depuis le Drawer)
+  // PLANIFICATION (Sauvegarde)
+  const handleCreatePlanning = async (data: any) => {
+      try {
+          await addDoc(collection(db, "plannings"), {
+              ...data,
+              createdAt: new Date().toISOString(),
+              status: "scheduled"
+          });
+          setShowPlanning(false);
+          toast({ title: "Objectif planifié", description: `Début : ${data.startMonth} ${data.startYear}` });
+      } catch (e) {
+          toast({ title: "Erreur", variant: "destructive" });
+      }
+  }
+
+  // MISE À JOUR PROGRESSION
   const updateProgress = async (amount: number) => {
       if (!selectedObj) return;
       const todayStr = format(new Date(), "d MMM", { locale: fr });
@@ -298,72 +307,69 @@ export default function PilotagePage() {
 
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
         
-        {/* Navigation Onglets (Style Segmented Control comme demandé) */}
+        {/* Header avec bouton Planifier */}
+        <div className="flex items-center justify-between">
+            <div>
+                <h1 className="text-2xl font-bold tracking-tight">Pilotage</h1>
+                <p className="text-sm text-muted-foreground mt-0.5">Gérez les objectifs et les primes</p>
+            </div>
+            <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="rounded-xl gap-2 bg-transparent border-muted-foreground/20" onClick={() => setShowPlanning(true)}>
+                    <Calendar className="w-4 h-4" /> Planifier
+                </Button>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted/50 border border-border text-xs font-medium">
+                    <Clock className="w-3.5 h-3.5" /> 35h
+                </div>
+            </div>
+        </div>
+
+        {/* Navigation Onglets */}
         <div className="bg-muted/50 p-1 rounded-2xl flex mb-6">
-            <button 
-                onClick={() => setActiveTab("objectifs")}
-                className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "objectifs" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}
-            >
+            <button onClick={() => setActiveTab("objectifs")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "objectifs" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}>
                 <Target className="w-4 h-4" /> Objectifs
             </button>
-            <button 
-                onClick={() => setActiveTab("paliers")}
-                className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "paliers" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}
-            >
+            <button onClick={() => setActiveTab("paliers")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "paliers" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}>
                 <Layers className="w-4 h-4" /> Paliers
             </button>
-            <button 
-                onClick={() => setActiveTab("pilotage")}
-                className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "pilotage" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}
-            >
+            <button onClick={() => setActiveTab("pilotage")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "pilotage" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}>
                 <Wallet className="w-4 h-4" /> Budget
             </button>
-            <button 
-                onClick={() => setActiveTab("equipe")}
-                className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "equipe" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}
-            >
+            <button onClick={() => setActiveTab("equipe")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "equipe" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}>
                 <Users className="w-4 h-4" /> Équipe
             </button>
         </div>
 
-        {/* --- ONGLET 1 : OBJECTIFS (Dashboard Visuel) --- */}
+        {/* --- ONGLET 1 : OBJECTIFS --- */}
         {activeTab === "objectifs" && (
             <div className="space-y-6 animate-in fade-in">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className="text-2xl font-bold">Objectifs</h1>
-                        <p className="text-sm text-muted-foreground">Suivez votre progression</p>
+                        <h2 className="font-semibold text-sm">Vos objectifs en cours</h2>
+                        <p className="text-xs text-muted-foreground">Progression en temps réel</p>
                     </div>
-                    {/* BOUTON CRÉER (Connected) */}
                     <Button size="sm" className="rounded-full bg-purple-500 hover:bg-purple-600 text-white px-4" onClick={() => setShowAddObjective(true)}>
                         <Plus className="w-4 h-4 mr-2" /> Créer
                     </Button>
                 </div>
 
-                {/* Liste des objectifs (Jauges) */}
                 {objectives.map((obj: any) => (
                     <div key={obj.id} onClick={() => setSelectedObj(obj)} className="pulse-card p-6 bg-gradient-to-b from-card to-muted/20 cursor-pointer hover:border-primary/50 transition-all group">
                         <div className="flex items-center gap-2 mb-4 text-purple-400">
                             <Target className="w-4 h-4" />
                             <span className="text-xs font-bold uppercase tracking-wider">{obj.type === 'principal' ? 'Principal' : 'Secondaire'}</span>
                         </div>
-
                         <div className="flex flex-col items-center justify-center mb-6">
                             <CircularProgress value={obj.current} max={obj.target} direction={obj.direction} />
                             <h2 className="text-xl font-bold mt-4">{obj.title}</h2>
                             <p className="text-center text-xs text-muted-foreground mt-1 max-w-[280px] leading-relaxed">{obj.description}</p>
                         </div>
-
                         <div className="space-y-2 mb-6">
                             <div className="flex justify-between text-sm font-medium">
                                 <span className="text-muted-foreground">Progression</span>
                                 <span>{obj.current.toLocaleString()} / {obj.target.toLocaleString()} {obj.unit}</span>
                             </div>
                             <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                                <div 
-                                    className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-1000" 
-                                    style={{ width: `${Math.min((obj.current / obj.target) * 100, 100)}%` }}
-                                />
+                                <div className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min((obj.current / obj.target) * 100, 100)}%` }} />
                             </div>
                         </div>
                     </div>
@@ -404,7 +410,7 @@ export default function PilotagePage() {
             </div>
         )}
 
-        {/* --- ONGLET 3 : PILOTAGE (Budget) --- */}
+        {/* --- ONGLET 3 : PILOTAGE --- */}
         {activeTab === "pilotage" && (
             <div className="space-y-4 animate-in fade-in">
                 <div className="pulse-card p-4">
@@ -520,7 +526,15 @@ export default function PilotagePage() {
           />
       )}
 
-      {/* 5. DRAWER DÉTAIL & MISE À JOUR (SCREENSHOT 2 & 3) */}
+      {/* 5. PLANIFICATION (NOUVEAU - AVEC TUILES) */}
+      {showPlanning && (
+          <AddPlanningAdvancedModal
+            onClose={() => setShowPlanning(false)}
+            onConfirm={handleCreatePlanning}
+          />
+      )}
+
+      {/* 6. DRAWER DÉTAIL & MISE À JOUR (SCREENSHOT 2 & 3) */}
       <ObjectiveDetailDrawer 
         objective={selectedObj} 
         onClose={() => setSelectedObj(null)} 
@@ -568,7 +582,7 @@ function AddObjectiveAdvancedModal({ onClose, onConfirm }: { onClose: () => void
                 </div>
 
                 <div className="space-y-4">
-                    {/* Grille de Tuiles (Comme le screenshot) */}
+                    {/* Grille de Tuiles */}
                     <div>
                         <Label className="mb-2 block">Type d'objectif</Label>
                         <div className="grid grid-cols-3 gap-2">
@@ -608,11 +622,105 @@ function AddObjectiveAdvancedModal({ onClose, onConfirm }: { onClose: () => void
                     <div className="bg-blue-500/10 p-3 rounded-lg text-xs text-blue-500 flex items-start gap-2 border border-blue-500/20">
                         <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                         {OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)?.direction === 'descending' 
-                            ? "Info : La progression augmentera quand la valeur diminuera (ex: moins d'erreurs)." 
-                            : "Info : La progression augmentera quand la valeur augmentera (ex: plus de CA)."}
+                            ? "Info : Progression inversée (ex: moins d'erreurs = mieux)." 
+                            : "Info : Progression normale (ex: plus de CA = mieux)."}
                     </div>
 
                     <Button className="w-full py-6 text-base bg-purple-600 hover:bg-purple-700" onClick={handleSubmit} disabled={!target}>Créer l'objectif</Button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// 2. LE MODAL DE PLANIFICATION AVEC LES MÊMES TUILES
+function AddPlanningAdvancedModal({ onClose, onConfirm }: { onClose: () => void, onConfirm: (data: any) => void }) {
+    const [selectedPreset, setSelectedPreset] = useState<string>("ca")
+    const [startMonth, setStartMonth] = useState("Février")
+    const [startYear, setStartYear] = useState("2026")
+    const [duration, setDuration] = useState(1)
+    const [title, setTitle] = useState("Chiffre d'Affaires")
+    const [target, setTarget] = useState("")
+
+    // MAJ du titre quand on change de tuile
+    useEffect(() => {
+        const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)
+        if(p) setTitle(p.label)
+    }, [selectedPreset])
+
+    const handleSubmit = () => {
+        const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)!
+        onConfirm({
+            title, target,
+            unit: p.unit,
+            direction: p.direction,
+            startMonth, startYear, duration
+        })
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm flex items-end sm:items-center justify-center" onClick={onClose}>
+            <div className="bg-card w-full max-w-md rounded-t-3xl sm:rounded-2xl p-6 space-y-6 pb-10" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center">
+                    <h2 className="text-lg font-bold">Programmer un objectif</h2>
+                    <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5"/></Button>
+                </div>
+
+                <div className="space-y-5">
+                    {/* Date et Durée */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label className="mb-2 block">Mois de début</Label>
+                            <Select value={startMonth} onValueChange={setStartMonth}>
+                                <SelectTrigger className="h-10 bg-muted/30"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    {["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"].map(m => (
+                                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <Label className="mb-2 block">Durée</Label>
+                            <Select value={duration.toString()} onValueChange={v => setDuration(Number(v))}>
+                                <SelectTrigger className="h-10 bg-muted/30"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    {[1, 3, 6, 12].map(d => <SelectItem key={d} value={d.toString()}>{d} mois</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    {/* Grille de Tuiles (REPRISE À L'IDENTIQUE) */}
+                    <div>
+                        <Label className="mb-2 block">Type d'objectif à planifier</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {OBJECTIVE_PRESETS.map(preset => (
+                                <button 
+                                    key={preset.id}
+                                    onClick={() => setSelectedPreset(preset.id)}
+                                    className={cn(
+                                        "flex flex-col items-center justify-center gap-1 p-3 rounded-xl border transition-all text-xs text-center h-20",
+                                        selectedPreset === preset.id 
+                                            ? "border-purple-500 bg-purple-500/10 text-purple-500 font-semibold ring-1 ring-purple-500/20" 
+                                            : "border-border bg-muted/20 text-muted-foreground hover:bg-muted"
+                                    )}
+                                >
+                                    <preset.icon className="w-5 h-5" />
+                                    <span>{preset.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div><Label>Cible prévue</Label><Input type="number" value={target} onChange={e => setTarget(e.target.value)} className="mt-1.5 font-bold" placeholder="0" /></div>
+
+                    <div className="bg-purple-500/10 p-3 rounded-lg text-xs text-purple-600 flex items-start gap-2 border border-purple-500/20">
+                        <CalendarDays className="w-4 h-4 shrink-0 mt-0.5" />
+                        Info : Cet objectif s'activera automatiquement en {startMonth} {startYear} pour {duration} mois.
+                    </div>
+
+                    <Button className="w-full py-6 text-base bg-purple-600 hover:bg-purple-700" onClick={handleSubmit} disabled={!target}>Valider la planification</Button>
                 </div>
             </div>
         </div>
@@ -651,7 +759,7 @@ function AddPalierModal({ onClose, onConfirm, objective }: { onClose: () => void
     )
 }
 
-// 2. LE DRAWER DE DÉTAIL (SCREENSHOT 2 & 3)
+// 3. LE DRAWER DE DÉTAIL (SCREENSHOT 2 & 3)
 function ObjectiveDetailDrawer({ objective, onClose, onUpdateProgress }: { objective: any, onClose: () => void, onUpdateProgress: (amount: number) => void }) {
     const [updateVal, setUpdateVal] = useState("")
 
@@ -734,7 +842,7 @@ function ObjectiveDetailDrawer({ objective, onClose, onUpdateProgress }: { objec
     )
 }
 
-// 3. JAUGE CIRCULAIRE
+// 4. JAUGE CIRCULAIRE
 function CircularProgress({ value, max, size = 180, strokeWidth = 12, direction = "ascending" }: { value: number, max: number, size?: number, strokeWidth?: number, direction?: string }) {
     const radius = (size - strokeWidth) / 2
     const circumference = radius * 2 * Math.PI
