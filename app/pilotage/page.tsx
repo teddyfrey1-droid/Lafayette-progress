@@ -79,8 +79,10 @@ export default function PilotagePage() {
   const [showAddObjective, setShowAddObjective] = useState(false)
   const [showPlanning, setShowPlanning] = useState(false)
   
+  // Simulation Budget
   const [budgetMax, setBudgetMax] = useState(2000)
   const [simulatedPaliers, setSimulatedPaliers] = useState<Record<string, Record<string, number>>>({})
+  const [expandedSim, setExpandedSim] = useState<string | null>(null) // Pour l'accordéon de simulation
 
   // 1. CHARGEMENT
   useEffect(() => {
@@ -89,7 +91,10 @@ export default function PilotagePage() {
     const unsubUsers = onSnapshot(q, (snapshot) => {
       const members = snapshot.docs.map(doc => {
             const data = doc.data();
+            // On inclut tout le monde SAUF super_admin et non assigné.
+            // Les status 'pending' et 'disabled' SONT INCLUS comme demandé.
             if (data.role === 'super_admin' || data.companyName === 'Non assigné') return null;
+            
             const initials = (data.displayName || data.email || "??").substring(0, 2).toUpperCase();
             const colors = ["bg-purple-500", "bg-blue-500", "bg-pink-500", "bg-indigo-500", "bg-emerald-500"];
             return {
@@ -111,9 +116,9 @@ export default function PilotagePage() {
     return () => unsubUsers();
   }, [profile?.companyId])
 
-  // 2. SYNCHRONISATION SIMULATION
+  // 2. INIT SIMULATION
   useEffect(() => {
-    if (objectives.length > 0) {
+    if (objectives.length > 0 && Object.keys(simulatedPaliers).length === 0) {
         const initial: Record<string, Record<string, number>> = {}
         objectives.forEach((obj: any) => {
           initial[obj.id] = {}
@@ -123,10 +128,9 @@ export default function PilotagePage() {
     }
   }, [objectives])
 
-  // 3. CALCULS INTELLIGENTS
+  // 3. CALCULS INTELLIGENTS (Avec Simulation Active)
   const simulationData = useMemo(() => {
-    const objectiveCosts: any[] = []
-    let totalCost = 0
+    let totalCostPerPerson = 0
 
     const principalObj = objectives.find((o: any) => o.type === 'principal');
     const isPrincipalMet = !principalObj || (principalObj.direction === 'descending' 
@@ -135,115 +139,77 @@ export default function PilotagePage() {
     );
 
     objectives.forEach((obj: any) => {
+      // Dans l'onglet pilotage, on compte tout comme si c'était actif pour la simulation
       if (!obj.isActive && activeTab !== 'pilotage') return;
-      if (obj.type === 'secondaire' && !isPrincipalMet) {
-          objectiveCosts.push({ id: obj.id, title: obj.title, cost: 0, paliers: [] });
+      
+      // Si l'objectif principal n'est pas atteint, les secondaires valent 0 (sauf en mode simulation pure)
+      if (obj.type === 'secondaire' && !isPrincipalMet && activeTab !== 'pilotage') {
           return;
       }
-      let objCost = 0
-      const paliersList: any[] = []
+
+      let objMaxReward = 0
       if (obj.paliers && obj.paliers.length > 0) {
-          const maxReward = obj.paliers.reduce((acc:number, p:any) => acc + (simulatedPaliers[obj.id]?.[p.id] ?? p.reward), 0);
-          objCost = maxReward;
-          obj.paliers.forEach((p: any) => { paliersList.push({ id: p.id, name: p.name, reward: simulatedPaliers[obj.id]?.[p.id] ?? p.reward }) })
+          // On utilise les valeurs simulées (sliders) ou les valeurs réelles par défaut
+          objMaxReward = obj.paliers.reduce((acc:number, p:any) => {
+             const reward = simulatedPaliers[obj.id]?.[p.id] ?? p.reward;
+             return acc + reward;
+          }, 0);
       } else {
-          objCost = obj.fixedReward || 0;
+          objMaxReward = obj.fixedReward || 0;
       }
-      objectiveCosts.push({ id: obj.id, title: obj.title, cost: objCost, paliers: paliersList })
-      totalCost += objCost
+      totalCostPerPerson += objMaxReward
     })
 
     const totalTeamRatio = teamMembers.reduce((sum, m) => sum + (m.contractHours / baseHours), 0);
-    const teamTotalCost = Math.round(totalCost * totalTeamRatio);
+    const teamTotalCost = Math.round(totalCostPerPerson * totalTeamRatio);
 
     return {
-      objectiveCosts, teamTotalCost, budgetDiff: budgetMax - teamTotalCost, isOverBudget: teamTotalCost > budgetMax,
-      totalCostPerPerson: totalCost, 
-      activeObjectivesCount: objectives.filter(o => o.isActive).length, isPrincipalMet
+      teamTotalCost, 
+      budgetDiff: budgetMax - teamTotalCost, 
+      isOverBudget: teamTotalCost > budgetMax,
+      totalCostPerPerson, 
+      activeObjectivesCount: objectives.filter(o => o.isActive).length, 
+      isPrincipalMet
     }
   }, [objectives, simulatedPaliers, baseHours, budgetMax, teamMembers, activeTab])
 
   // ACTIONS
-  const handleUpdateBaseHours = async () => {
-      try {
-          await setDoc(doc(db, "config", "pilotage"), { baseHours, budgetMax }, { merge: true });
-          setShowEditHours(false);
-          toast({ title: "Configuration sauvegardée" });
-      } catch (e) { toast({ title: "Erreur", variant: "destructive" }); }
+  const handleSimulateChange = (objId: string, palierId: string, value: number) => {
+    setSimulatedPaliers(prev => ({
+        ...prev,
+        [objId]: {
+            ...prev[objId],
+            [palierId]: value
+        }
+    }))
   }
 
-  const handleCreateObjective = async (data: any) => {
-      if (!profile?.companyId) return;
+  const handleSaveSimulation = async () => {
       try {
-        await addDoc(collection(db, "objectives"), {
-            companyId: profile.companyId,
-            title: data.title,
-            description: data.description || "",
-            isActive: true,
-            type: data.type || "secondaire",
-            target: Number(data.target),
-            unit: data.unit,
-            direction: data.direction,
-            current: 0,
-            paliers: [],
-            history: [],
-            isConfidential: data.isConfidential || false,
-            createdAt: new Date().toISOString()
+        const updates = Object.keys(simulatedPaliers).map(async (objId) => {
+            const obj = objectives.find(o => o.id === objId);
+            if (!obj) return;
+            const newPaliers = obj.paliers.map((p: any) => ({
+                ...p,
+                reward: simulatedPaliers[objId][p.id] ?? p.reward
+            }));
+            await updateDoc(doc(db, "objectives", objId), { paliers: newPaliers });
         });
-        setShowAddObjective(false);
-        toast({ title: "Objectif créé", description: "Configurez les paliers dans l'onglet dédié." });
-      } catch(e) {
-        toast({ title: "Erreur création", variant: "destructive" });
-      }
-  }
-
-  const handleCreatePlanning = async (data: any) => {
-      if (!profile?.companyId) return;
-      try {
-          await addDoc(collection(db, "plannings"), {
-              companyId: profile.companyId,
-              ...data,
-              createdAt: new Date().toISOString(),
-              status: "scheduled"
-          });
-          setShowPlanning(false);
-          toast({ title: "Objectif planifié", description: `Début : ${data.startMonth} ${data.startYear}` });
+        await Promise.all(updates);
+        await setDoc(doc(db, "config", "pilotage"), { baseHours, budgetMax }, { merge: true });
+        toast({ title: "Configuration sauvegardée" });
       } catch (e) {
-          toast({ title: "Erreur", variant: "destructive" });
+        toast({ title: "Erreur sauvegarde", variant: "destructive" });
       }
   }
 
-  const updateProgress = async (amount: number, dateStr?: string) => {
-      if (!selectedObj) return;
-      const targetDate = dateStr ? new Date(dateStr) : new Date();
-      const formattedDate = format(targetDate, "d MMM", { locale: fr });
-      
-      try {
-        await updateDoc(doc(db, "objectives", selectedObj.id), {
-            current: increment(amount),
-            history: arrayUnion({
-                date: formattedDate,
-                value: amount,
-                change: amount,
-                timestamp: targetDate.toISOString()
-            })
-        });
-        toast({ title: "Mise à jour réussie" });
-      } catch (e) { toast({ title: "Erreur", variant: "destructive" }); }
-  }
-
-  // PALIERS
-  const handleAddPalierConfirm = async (objectiveId: string, name: string, threshold: number, reward: number) => {
-      const obj = objectives.find((o: any) => o.id === objectiveId);
-      if(!obj) return;
-      const newPalier = { id: `p-${Date.now()}`, name, threshold, reward };
-      const newPaliers = [...(obj.paliers || []), newPalier];
-      await updateDoc(doc(db, "objectives", objectiveId), { paliers: newPaliers });
-      setShowAddPalier(null);
-      toast({ title: "Palier ajouté" });
-  }
+  const handleUpdateBaseHours = async () => { try { await setDoc(doc(db, "config", "pilotage"), { baseHours, budgetMax }, { merge: true }); setShowEditHours(false); toast({ title: "Configuration sauvegardée" }); } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } }
+  const handleCreateObjective = async (data: any) => { if (!profile?.companyId) return; try { await addDoc(collection(db, "objectives"), { companyId: profile.companyId, title: data.title, description: data.description || "", isActive: true, type: data.type || "secondaire", target: Number(data.target), unit: data.unit, direction: data.direction, current: 0, paliers: [], history: [], isConfidential: data.isConfidential || false, createdAt: new Date().toISOString() }); setShowAddObjective(false); toast({ title: "Objectif créé" }); } catch(e) { toast({ title: "Erreur", variant: "destructive" }); } }
+  const handleCreatePlanning = async (data: any) => { if (!profile?.companyId) return; try { await addDoc(collection(db, "plannings"), { companyId: profile.companyId, ...data, createdAt: new Date().toISOString(), status: "scheduled" }); setShowPlanning(false); toast({ title: "Planifié" }); } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } }
+  const updateProgress = async (amount: number, dateStr?: string) => { if (!selectedObj) return; const targetDate = dateStr ? new Date(dateStr) : new Date(); const formattedDate = format(targetDate, "d MMM", { locale: fr }); try { await updateDoc(doc(db, "objectives", selectedObj.id), { current: increment(amount), history: arrayUnion({ date: formattedDate, value: amount, change: amount, timestamp: targetDate.toISOString() }) }); toast({ title: "Mise à jour réussie" }); } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } }
+  const handleAddPalierConfirm = async (objectiveId: string, name: string, threshold: number, reward: number) => { const obj = objectives.find((o: any) => o.id === objectiveId); if(!obj) return; const newPalier = { id: `p-${Date.now()}`, name, threshold, reward }; const newPaliers = [...(obj.paliers || []), newPalier]; await updateDoc(doc(db, "objectives", objectiveId), { paliers: newPaliers }); setShowAddPalier(null); toast({ title: "Palier ajouté" }); }
   const handleUpdatePalierConfirm = async () => { if(!editingPalier) return; const obj = objectives.find((o: any) => o.id === editingPalier.objectiveId); if(!obj) return; const newPaliers = obj.paliers.map((p: any) => p.id === editingPalier.palierId ? { ...p, name: editingPalier.name, threshold: editingPalier.threshold, reward: editingPalier.reward } : p); await updateDoc(doc(db, "objectives", editingPalier.objectiveId), { paliers: newPaliers }); setEditingPalier(null); toast({ title: "Palier modifié" }); }
-  const handleDeletePalier = async () => { if(!editingPalier) return; if(!confirm("Supprimer ce palier ?")) return; const obj = objectives.find((o: any) => o.id === editingPalier.objectiveId); if(!obj) return; const newPaliers = obj.paliers.filter((p: any) => p.id !== editingPalier.palierId); await updateDoc(doc(db, "objectives", editingPalier.objectiveId), { paliers: newPaliers }); setEditingPalier(null); toast({ title: "Palier supprimé" }); }
+  const handleDeletePalier = async () => { if(!editingPalier) return; if(!confirm("Supprimer ?")) return; const obj = objectives.find((o: any) => o.id === editingPalier.objectiveId); if(!obj) return; const newPaliers = obj.paliers.filter((p: any) => p.id !== editingPalier.palierId); await updateDoc(doc(db, "objectives", editingPalier.objectiveId), { paliers: newPaliers }); setEditingPalier(null); toast({ title: "Supprimé" }); }
 
   if (loadingObj) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary w-8 h-8"/></div>;
 
@@ -254,12 +220,12 @@ export default function PilotagePage() {
 
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
         
-        {/* Header */}
+        {/* Header Global */}
         <div className="flex items-center justify-between">
             <div><h1 className="text-2xl font-bold tracking-tight">Pilotage</h1><p className="text-sm text-muted-foreground mt-0.5">Gérez les objectifs et les primes</p></div>
             <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" className="rounded-xl gap-2 bg-transparent border-muted-foreground/20" onClick={() => setShowPlanning(true)}><Calendar className="w-4 h-4" /> Planifier</Button>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted/50 border border-border text-xs font-medium"><Clock className="w-3.5 h-3.5" /> 35h</div>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted/50 border border-border text-xs font-medium cursor-pointer hover:bg-muted" onClick={() => setShowEditHours(true)}><Clock className="w-3.5 h-3.5" /> {baseHours}h</div>
             </div>
         </div>
 
@@ -324,6 +290,93 @@ export default function PilotagePage() {
             </div>
         )}
 
+        {/* --- ONGLET 3 : PILOTAGE (SIMULATION RESTAURÉE) --- */}
+        {activeTab === "pilotage" && (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="pulse-card p-5 bg-[#0f0f11] border border-white/5">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center"><Edit3 className="w-5 h-5 text-purple-500" /></div>
+                        <div><h3 className="font-semibold text-sm text-white">Ajustement des primes</h3><p className="text-xs text-white/60">Modifiez les montants pour simuler</p></div>
+                    </div>
+                    
+                    {/* Liste des objectifs en accordéon */}
+                    <div className="space-y-3">
+                        {objectives.map((obj: any) => {
+                            const isExpanded = expandedSim === obj.id;
+                            const currentSimReward = obj.paliers?.reduce((acc: number, p: any) => acc + (simulatedPaliers[obj.id]?.[p.id] ?? p.reward), 0) || 0;
+                            return (
+                                <div key={obj.id} className="bg-card/5 rounded-xl border border-white/5 overflow-hidden transition-all">
+                                    <div 
+                                        className="p-3 flex items-center justify-between cursor-pointer hover:bg-white/5"
+                                        onClick={() => setExpandedSim(isExpanded ? null : obj.id)}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            {obj.type === 'principal' ? <Crown className="w-4 h-4 text-amber-500"/> : <Target className="w-4 h-4 text-purple-400"/>}
+                                            <span className="text-sm font-medium text-white">{obj.title}</span>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-sm font-bold text-purple-400">{currentSimReward}€</span>
+                                            {isExpanded ? <ChevronUp className="w-4 h-4 text-white/40"/> : <ChevronDown className="w-4 h-4 text-white/40"/>}
+                                        </div>
+                                    </div>
+                                    
+                                    {isExpanded && obj.paliers && (
+                                        <div className="p-4 space-y-5 bg-black/20 border-t border-white/5">
+                                            {obj.paliers.map((p: any, idx: number) => {
+                                                const val = simulatedPaliers[obj.id]?.[p.id] ?? p.reward;
+                                                return (
+                                                    <div key={p.id} className="space-y-3">
+                                                        <div className="flex justify-between items-center text-xs">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="bg-white/10 px-1.5 py-0.5 rounded text-white/70">{idx + 1}</span>
+                                                                <span className="text-white/80">{p.name}</span>
+                                                            </div>
+                                                            <span className="font-bold text-purple-400">{val}€</span>
+                                                        </div>
+                                                        <Slider 
+                                                            value={[val]} 
+                                                            max={500} 
+                                                            step={5} 
+                                                            onValueChange={(vals) => handleSimulateChange(obj.id, p.id, vals[0])}
+                                                            className="py-1"
+                                                        />
+                                                        <div className="flex justify-between text-[10px] text-white/30 px-1">
+                                                            <span>0€</span>
+                                                            <span>250€</span>
+                                                            <span>500€</span>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                            {(!obj.paliers || obj.paliers.length === 0) && <p className="text-xs text-white/40 italic">Aucun palier configurable.</p>}
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+
+                {/* Résumé Budget Fixe en bas */}
+                <div className="fixed bottom-[88px] left-4 right-4 max-w-lg mx-auto bg-card border-t border-x border-border rounded-t-2xl p-4 shadow-2xl z-10">
+                     <div className="space-y-3">
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground">Coût max par personne (35h)</span>
+                            <span className="font-bold text-white">{simulationData.totalCostPerPerson}€</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground">Coût total équipe (Estimé)</span>
+                            <span className={cn("font-bold text-lg", simulationData.isOverBudget ? "text-red-400" : "text-purple-400")}>{simulationData.teamTotalCost}€</span>
+                        </div>
+                        <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold" onClick={handleSaveSimulation}>
+                            <Save className="w-4 h-4 mr-2"/> Enregistrer la configuration
+                        </Button>
+                     </div>
+                </div>
+                <div className="h-32"/> {/* Spacer pour le fixed footer */}
+            </div>
+        )}
+
         {/* --- ONGLET 4 : EQUIPE --- */}
         {activeTab === "equipe" && (
             <div className="space-y-6 animate-in fade-in">
@@ -362,6 +415,7 @@ export default function PilotagePage() {
                             </div>
                         )
                     })}
+                    {teamMembers.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">Aucun collaborateur trouvé.</p>}
                 </div>
 
                 <div className="mt-4 p-5 rounded-2xl bg-[#0f0f11] border border-white/5 text-white">
@@ -373,6 +427,7 @@ export default function PilotagePage() {
             </div>
         )}
 
+        {/* --- ONGLET 2 : PALIERS (Simple liste pour éditer la structure) --- */}
         {activeTab === "paliers" && (
             <div className="space-y-4 animate-in fade-in">
                 {objectives.filter((o:any) => o.isActive).map((obj: any) => (
@@ -400,41 +455,14 @@ export default function PilotagePage() {
             </div>
         )}
 
-        {activeTab === "pilotage" && (
-            <div className="space-y-4 animate-in fade-in">
-                <div className="pulse-card p-4">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"><Wallet className="w-5 h-5 text-primary" /></div>
-                        <div className="flex-1"><h3 className="font-semibold text-sm">Simulation Budgétaire</h3><p className="text-xs text-muted-foreground">Potentiel Maximum (Cumulé)</p></div>
-                    </div>
-                    <div className="mb-4 space-y-4">
-                        <div><Label className="text-xs text-muted-foreground mb-1 block">Budget Max (€)</Label><Input type="number" value={budgetMax} onChange={(e) => setBudgetMax(Number(e.target.value))} className="rounded-xl text-lg font-bold" /></div>
-                        <div className="flex justify-between items-center text-sm"><span className="text-muted-foreground">Pour un 35h (Max) :</span><span className="font-bold text-primary">{simulationData.totalCostPerPerson}€</span></div>
-                    </div>
-                    <div className={cn("p-4 rounded-xl mb-4", simulationData.isOverBudget ? "bg-red-500/10 border border-red-500/30" : "bg-green-500/10 border border-green-500/30")}>
-                        <div className="flex items-center justify-between mb-2"><span className="text-xs font-medium">Coût total équipe</span><span className={cn("text-lg font-bold", simulationData.isOverBudget ? "text-red-400" : "text-green-400")}>{simulationData.teamTotalCost}€</span></div>
-                        <div className="h-3 bg-muted rounded-full overflow-hidden mb-2"><div className={cn("h-full rounded-full transition-all", simulationData.isOverBudget ? "bg-red-500" : "bg-green-500")} style={{ width: `${Math.min((simulationData.teamTotalCost / budgetMax) * 100, 100)}%` }} /></div>
-                        <div className="flex items-center justify-between text-xs"><span className="text-muted-foreground">Budget: {budgetMax}€</span><span className={cn("font-semibold", simulationData.isOverBudget ? "text-red-400" : "text-green-400")}>{simulationData.isOverBudget ? "Dépassement: " : "Reste: "}{Math.abs(simulationData.budgetDiff)}€</span></div>
-                    </div>
-                </div>
-            </div>
-        )}
-
       </main>
 
-      {/* --- MODALES --- */}
+      {/* --- MODALES & DRAWERS --- */}
       {showAddObjective && <AddObjectiveAdvancedModal onClose={() => setShowAddObjective(false)} onConfirm={handleCreateObjective} />}
-      
       {showPlanning && <AddPlanningAdvancedModal onClose={() => setShowPlanning(false)} onConfirm={handleCreatePlanning} />}
-      
       {showAddPalier && (
-        <AddPalierModal 
-            onClose={() => setShowAddPalier(null)} 
-            onConfirm={(n, t, r) => handleAddPalierConfirm(showAddPalier, n, t, r)} 
-            objective={objectives.find((o:any) => o.id === showAddPalier)} 
-        />
+        <AddPalierModal onClose={() => setShowAddPalier(null)} onConfirm={(n, t, r) => handleAddPalierConfirm(showAddPalier, n, t, r)} objective={objectives.find((o:any) => o.id === showAddPalier)} />
       )}
-      
       {editingPalier && (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={() => setEditingPalier(null)}>
           <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
@@ -451,13 +479,13 @@ export default function PilotagePage() {
           </div>
         </div>
       )}
-
       {showEditHours && (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={() => setShowEditHours(false)}>
           <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
             <h2 className="font-semibold mb-4 text-lg">Configuration Horaire</h2>
             <div className="space-y-4">
               <div><Label className="text-sm">Heures temps plein (référence)</Label><Input type="number" value={baseHours} onChange={(e) => setBaseHours(Number(e.target.value))} className="rounded-xl mt-2" /></div>
+              <div><Label className="text-sm">Budget Max (€)</Label><Input type="number" value={budgetMax} onChange={(e) => setBudgetMax(Number(e.target.value))} className="rounded-xl mt-2" /></div>
               <Button className="w-full rounded-xl" onClick={handleUpdateBaseHours}><Save className="w-4 h-4 mr-2" /> Enregistrer</Button>
             </div>
           </div>
@@ -523,9 +551,7 @@ function AddPlanningAdvancedModal({ onClose, onConfirm }: { onClose: () => void,
     const [target, setTarget] = useState("")
     const [isPrincipal, setIsPrincipal] = useState(false)
     const [isConfidential, setIsConfidential] = useState(false)
-    const [paliers, setPaliers] = useState<any[]>([]) // Liste locale des paliers
-    
-    // Etats pour l'ajout d'un palier
+    const [paliers, setPaliers] = useState<any[]>([]) 
     const [palierName, setPalierName] = useState("")
     const [palierThreshold, setPalierThreshold] = useState("")
     const [palierReward, setPalierReward] = useState("")
@@ -537,63 +563,31 @@ function AddPlanningAdvancedModal({ onClose, onConfirm }: { onClose: () => void,
         setPaliers([...paliers, { id: Date.now().toString(), name: palierName, threshold: Number(palierThreshold), reward: Number(palierReward) }]);
         setPalierName(""); setPalierThreshold(""); setPalierReward("");
     }
-
-    const handleRemovePalier = (id: string) => {
-        setPaliers(paliers.filter(p => p.id !== id));
-    }
-
+    const handleRemovePalier = (id: string) => { setPaliers(paliers.filter(p => p.id !== id)); }
     const handleSubmit = () => {
         const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)!
-        onConfirm({ 
-            title, target, unit: p.unit, direction: p.direction, 
-            startMonth, startYear, duration, 
-            type: isPrincipal ? 'principal' : 'secondaire', 
-            isConfidential,
-            paliers // On envoie les paliers configurés
-        })
+        onConfirm({ title, target, unit: p.unit, direction: p.direction, startMonth, startYear, duration, type: isPrincipal ? 'principal' : 'secondaire', isConfidential, paliers })
     }
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm flex items-end sm:items-center justify-center" onClick={onClose}>
             <div className="bg-card w-full max-w-md rounded-t-3xl sm:rounded-2xl p-6 space-y-6 pb-10 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center"><h2 className="text-lg font-bold">Programmer un objectif</h2><Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5"/></Button></div>
-                
                 <div className="space-y-5">
-                    {/* ... (Date, Durée, Switches - IDENTIQUES) ... */}
                     <div className="grid grid-cols-2 gap-4"><div><Label className="mb-2 block">Mois de début</Label><Select value={startMonth} onValueChange={setStartMonth}><SelectTrigger className="h-10 bg-muted/30"><SelectValue /></SelectTrigger><SelectContent>{["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"].map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select></div><div><Label className="mb-2 block">Année</Label><Select value={startYear} onValueChange={setStartYear}><SelectTrigger className="h-10 bg-muted/30"><SelectValue /></SelectTrigger><SelectContent>{["2025", "2026", "2027"].map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent></Select></div></div>
                     <div><Label className="mb-2 block">Durée</Label><div className="flex gap-2">{[1, 3, 6, 12].map(d => (<button key={d} onClick={() => setDuration(d)} className={cn("flex-1 py-2 rounded-lg text-sm border transition-all", duration === d ? "bg-purple-600 text-white border-purple-600" : "bg-muted/20 border-border text-muted-foreground")}>{d} mois</button>))}</div></div>
                     <div className="flex gap-2">
                         <div className="bg-muted/30 p-3 rounded-xl flex-1 flex items-center justify-between border border-border"><Label className="text-xs font-bold flex items-center gap-1"><Crown className="w-3 h-3 text-amber-500" /> Principal</Label><Switch checked={isPrincipal} onCheckedChange={setIsPrincipal} /></div>
                         <div className="bg-muted/30 p-3 rounded-xl flex-1 flex items-center justify-between border border-border"><Label className="text-xs font-bold flex items-center gap-1"><EyeOff className="w-3 h-3 text-muted-foreground" /> Masquer</Label><Switch checked={isConfidential} onCheckedChange={setIsConfidential} /></div>
                     </div>
-
                     <div><Label className="mb-2 block">Type d'objectif</Label><div className="grid grid-cols-3 gap-2">{OBJECTIVE_PRESETS.map(preset => (<button key={preset.id} onClick={() => setSelectedPreset(preset.id)} className={cn("flex flex-col items-center justify-center gap-1 p-3 rounded-xl border transition-all text-xs text-center h-20", selectedPreset === preset.id ? "border-purple-500 bg-purple-500/10 text-purple-500 font-semibold ring-1 ring-purple-500/20" : "border-border bg-muted/20 text-muted-foreground hover:bg-muted")}><preset.icon className="w-5 h-5" /><span>{preset.label}</span></button>))}</div></div>
                     <div><Label>Cible prévue</Label><Input type="number" value={target} onChange={e => setTarget(e.target.value)} className="mt-1.5 font-bold" placeholder="0" /></div>
-
-                    {/* CONFIGURATION DES PALIERS (NOUVEAU) */}
                     <div className="border-t border-border pt-4">
                         <Label className="mb-3 block text-sm font-semibold">Configuration des paliers</Label>
-                        <div className="space-y-3 mb-4">
-                            {paliers.map((p, idx) => (
-                                <div key={p.id} className="flex items-center justify-between bg-muted/20 p-2 rounded-lg text-sm">
-                                    <span className="font-medium text-xs">{idx + 1}. {p.name} (Seuil: {p.threshold})</span>
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-bold text-green-600">+{p.reward}€</span>
-                                        <button onClick={() => handleRemovePalier(p.id)}><Trash2 className="w-4 h-4 text-muted-foreground hover:text-red-500" /></button>
-                                    </div>
-                                </div>
-                            ))}
-                            {paliers.length === 0 && <p className="text-xs text-muted-foreground italic text-center py-2">Aucun palier configuré</p>}
-                        </div>
-                        
-                        <div className="grid grid-cols-3 gap-2 items-end">
-                            <div><Label className="text-[10px] mb-1">Nom</Label><Input value={palierName} onChange={e => setPalierName(e.target.value)} placeholder="Niveau 1" className="h-8 text-xs" /></div>
-                            <div><Label className="text-[10px] mb-1">Seuil</Label><Input type="number" value={palierThreshold} onChange={e => setPalierThreshold(e.target.value)} placeholder="1000" className="h-8 text-xs" /></div>
-                            <div><Label className="text-[10px] mb-1">Prime</Label><Input type="number" value={palierReward} onChange={e => setPalierReward(e.target.value)} placeholder="50" className="h-8 text-xs" /></div>
-                        </div>
+                        <div className="space-y-3 mb-4">{paliers.map((p, idx) => (<div key={p.id} className="flex items-center justify-between bg-muted/20 p-2 rounded-lg text-sm"><span className="font-medium text-xs">{idx + 1}. {p.name} (Seuil: {p.threshold})</span><div className="flex items-center gap-2"><span className="font-bold text-green-600">+{p.reward}€</span><button onClick={() => handleRemovePalier(p.id)}><Trash2 className="w-4 h-4 text-muted-foreground hover:text-red-500" /></button></div></div>))}{paliers.length === 0 && <p className="text-xs text-muted-foreground italic text-center py-2">Aucun palier configuré</p>}</div>
+                        <div className="grid grid-cols-3 gap-2 items-end"><div><Label className="text-[10px] mb-1">Nom</Label><Input value={palierName} onChange={e => setPalierName(e.target.value)} placeholder="Niveau 1" className="h-8 text-xs" /></div><div><Label className="text-[10px] mb-1">Seuil</Label><Input type="number" value={palierThreshold} onChange={e => setPalierThreshold(e.target.value)} placeholder="1000" className="h-8 text-xs" /></div><div><Label className="text-[10px] mb-1">Prime</Label><Input type="number" value={palierReward} onChange={e => setPalierReward(e.target.value)} placeholder="50" className="h-8 text-xs" /></div></div>
                         <Button variant="outline" size="sm" className="w-full mt-2 h-8 text-xs" onClick={handleAddPalier} disabled={!palierName || !palierThreshold || !palierReward}><Plus className="w-3 h-3 mr-1" /> Ajouter ce palier</Button>
                     </div>
-
                     <Button className="w-full py-6 text-base bg-purple-600 hover:bg-purple-700" onClick={handleSubmit} disabled={!target}>Valider la planification</Button>
                 </div>
             </div>
@@ -629,70 +623,18 @@ function ObjectiveDetailDrawer({ objective, onClose, onUpdateProgress }: { objec
 
     return (
         <Drawer open={!!objective} onOpenChange={(open) => !open && onClose()}>
-            {/* AJOUT : bg-card et rounded-t-3xl pour le style, et h-[96vh] pour forcer la hauteur max */}
             <DrawerContent className="fixed bottom-0 left-0 right-0 h-[96vh] flex flex-col outline-none bg-card rounded-t-3xl">
-                
-                {/* AJOUT : overflow-hidden ici est CRUCIAL pour que le scroll interne fonctionne */}
                 <div className="w-full max-w-lg mx-auto flex flex-col h-full overflow-hidden">
-                    
                     <DrawerHeader className="text-left border-b border-border/50 pb-4 shrink-0">
-                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-purple-500/10 mx-auto mb-3">
-                            <Target className="w-6 h-6 text-purple-500" />
-                        </div>
-                        <div className="text-center space-y-1">
-                            <Badge variant="outline" className="mb-2 border-purple-500/30 text-purple-400 bg-purple-500/10">
-                                {objective.type === "principal" ? "Principal" : "Secondaire"}
-                            </Badge>
-                            <DrawerTitle className="text-2xl font-bold">{objective.title}</DrawerTitle>
-                            <p className="text-sm text-muted-foreground px-4">{objective.description}</p>
-                        </div>
+                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-purple-500/10 mx-auto mb-3"><Target className="w-6 h-6 text-purple-500" /></div>
+                        <div className="text-center space-y-1"><Badge variant="outline" className="mb-2 border-purple-500/30 text-purple-400 bg-purple-500/10">{objective.type === "principal" ? "Principal" : "Secondaire"}</Badge><DrawerTitle className="text-2xl font-bold">{objective.title}</DrawerTitle><p className="text-sm text-muted-foreground px-4">{objective.description}</p></div>
                     </DrawerHeader>
-                    
-                    {/* Le flex-1 overflow-y-auto fonctionne maintenant car le parent a overflow-hidden */}
                     <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                        <div className="flex flex-col items-center">
-                            <CircularProgress value={objective.current} max={objective.target} direction={objective.direction} size={160} strokeWidth={12} />
-                        </div>
-                        
-                        <div className="bg-purple-500/5 border border-purple-500/20 p-4 rounded-2xl space-y-3">
-                            <h3 className="font-bold text-sm flex items-center gap-2">
-                                <Wallet className="w-4 h-4 text-purple-500" /> Mettre à jour la progression
-                            </h3>
-                            <div className="flex gap-2">
-                                <Input type="number" placeholder="Montant..." value={updateVal} onChange={(e) => setUpdateVal(e.target.value)} className="bg-background flex-1" />
-                                <Input type="date" value={updateDate} onChange={(e) => setUpdateDate(e.target.value)} className="bg-background w-32" />
-                                <Button onClick={() => { onUpdateProgress(Number(updateVal), updateDate); setUpdateVal(""); setUpdateDate(""); }} className="bg-purple-600 hover:bg-purple-700">
-                                    <Plus className="w-4 h-4" />
-                                </Button>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h3 className="font-bold text-base mb-3 flex items-center gap-2">
-                                <TrendingUp className="w-4 h-4 text-purple-500" /> Historique complet
-                            </h3>
-                            <div className="space-y-1 pb-4"> {/* Petit padding bottom pour ne pas coller au bouton fermer */}
-                                {objective.history && objective.history.length > 0 ? ([...objective.history].reverse().map((h: any, i: number) => (
-                                    <div key={i} className="flex justify-between items-center p-3 rounded-xl hover:bg-muted/30 transition-colors border-b border-border/40 last:border-0">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-2 h-2 rounded-full bg-purple-500" />
-                                            <span className="text-sm font-medium">{h.date}</span>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                            <span className="font-bold text-sm">{(h.value||0).toLocaleString()} {objective.unit}</span>
-                                            <span className="text-xs font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded">+{h.change}</span>
-                                        </div>
-                                    </div>
-                                ))) : (<p className="text-sm text-muted-foreground italic">Aucun historique.</p>)}
-                            </div>
-                        </div>
+                        <div className="flex flex-col items-center"><CircularProgress value={objective.current} max={objective.target} direction={objective.direction} size={160} strokeWidth={12} /></div>
+                        <div className="bg-purple-500/5 border border-purple-500/20 p-4 rounded-2xl space-y-3"><h3 className="font-bold text-sm flex items-center gap-2"><Wallet className="w-4 h-4 text-purple-500" /> Mettre à jour la progression</h3><div className="flex gap-2"><Input type="number" placeholder="Montant..." value={updateVal} onChange={(e) => setUpdateVal(e.target.value)} className="bg-background flex-1" /><Input type="date" value={updateDate} onChange={(e) => setUpdateDate(e.target.value)} className="bg-background w-32" /><Button onClick={() => { onUpdateProgress(Number(updateVal), updateDate); setUpdateVal(""); setUpdateDate(""); }} className="bg-purple-600 hover:bg-purple-700"><Plus className="w-4 h-4" /></Button></div></div>
+                        <div><h3 className="font-bold text-base mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-purple-500" /> Historique complet</h3><div className="space-y-1 pb-4">{objective.history && objective.history.length > 0 ? ([...objective.history].reverse().map((h: any, i: number) => (<div key={i} className="flex justify-between items-center p-3 rounded-xl hover:bg-muted/30 transition-colors border-b border-border/40 last:border-0"><div className="flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-purple-500" /><span className="text-sm font-medium">{h.date}</span></div><div className="flex items-center gap-4"><span className="font-bold text-sm">{(h.value||0).toLocaleString()} {objective.unit}</span><span className="text-xs font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded">+{h.change}</span></div></div>))) : (<p className="text-sm text-muted-foreground italic">Aucun historique.</p>)}</div></div>
                     </div>
-                    
-                    <DrawerFooter className="pt-2 pb-6 px-4 shrink-0 bg-card border-t border-border/50">
-                        <DrawerClose asChild>
-                            <Button variant="outline" className="w-full rounded-xl">Fermer</Button>
-                        </DrawerClose>
-                    </DrawerFooter>
+                    <DrawerFooter className="pt-2 pb-6 px-4 shrink-0 bg-card border-t border-border/50"><DrawerClose asChild><Button variant="outline" className="w-full rounded-xl">Fermer</Button></DrawerClose></DrawerFooter>
                 </div>
             </DrawerContent>
         </Drawer>
