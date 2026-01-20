@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { collection, onSnapshot, query, doc, updateDoc, arrayUnion, increment, addDoc, orderBy, where, setDoc } from "firebase/firestore"
+import { collection, onSnapshot, query, doc, updateDoc, arrayUnion, increment, addDoc, orderBy, where } from "firebase/firestore"
 import { db } from "@/lib/firebase/client"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
@@ -15,25 +15,17 @@ export function usePilotage() {
   const [objectives, setObjectives] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  // 1. Charger les données en temps réel
+  // 1. Charger les données (Filtrage sécurisé inchangé)
   useEffect(() => {
     if (!currentUser?.companyId) return;
 
-    // --- A. ÉQUIPE (Avec filtre sécurisé) ---
-    const qUsers = query(
-        collection(db, "users"), 
-        where("companyId", "==", currentUser.companyId)
-    );
-
+    const qUsers = query(collection(db, "users"), where("companyId", "==", currentUser.companyId));
     const unsubUsers = onSnapshot(qUsers, (snapshot) => {
       const users = snapshot.docs
         .map(d => ({ id: d.id, ...d.data() })) 
         .filter((user: any) => {
-            // On cache le Super Admin
             if (user.role === 'super_admin') return false;
-            // On cache les "Non assignés" (Sécurité)
             if (user.companyName === "Non assigné") return false;
-            // On garde tout le reste (Actif, En attente, Suspendu...)
             return true;
         })
         .map((data: any) => {
@@ -54,13 +46,7 @@ export function usePilotage() {
       setTeam(users);
     });
 
-    // --- B. OBJECTIFS ---
-    const qObj = query(
-        collection(db, "objectives"), 
-        where("companyId", "==", currentUser.companyId),
-        orderBy("createdAt", "desc")
-    );
-
+    const qObj = query(collection(db, "objectives"), where("companyId", "==", currentUser.companyId), orderBy("createdAt", "desc"));
     const unsubObj = onSnapshot(qObj, (snapshot) => {
       const objs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       setObjectives(objs);
@@ -73,19 +59,30 @@ export function usePilotage() {
   // 2. Calculs Globaux
   const totalHours = team.reduce((acc, curr) => acc + curr.hoursContract, 0);
   
+  // Logique Gatekeeper (Principal bloquant)
+  const principalObj = objectives.find((o: any) => o.type === 'principal');
+  const isPrincipalMet = !principalObj || (
+      principalObj.direction === 'descending' 
+      ? (principalObj.current || 0) <= (principalObj.target || 1) 
+      : (principalObj.current || 0) >= (principalObj.target || 1)
+  );
+
   const globalProgress = objectives.length > 0 
     ? Math.round(objectives.reduce((acc, curr: any) => {
+        if (curr.type === 'secondaire' && !isPrincipalMet) return acc + 0;
+
         let p = 0;
         if (curr.direction === 'descending') {
-             p = curr.current <= curr.target ? 100 : Math.max(0, (curr.target / (curr.current || 1)) * 100);
+             p = (curr.current || 0) <= (curr.target || 1) ? 100 : Math.max(0, ((curr.target || 1) / (curr.current || 1)) * 100);
         } else {
-             p = Math.min(100, (curr.current / curr.target) * 100);
+             p = Math.min(100, ((curr.current || 0) / (curr.target || 1)) * 100);
         }
         return acc + p;
     }, 0) / objectives.length)
     : 0;
 
   const totalPotentialBonus = objectives.reduce((acc, obj: any) => {
+      // Pour le budget, on compte TOUT le potentiel (même si bloqué actuellement), car on prévoit le max
       const objMax = obj.paliers?.length > 0 
         ? obj.paliers.reduce((sum:number, p:any) => sum + p.reward, 0)
         : (obj.reward || 0);
@@ -104,35 +101,16 @@ export function usePilotage() {
               paliers: [],
               history: [],
               isActive: true,
+              // isConfidential est passé dans data
               createdAt: new Date().toISOString()
           });
           return true;
       } catch (e) { return false; }
   }
 
-  const updateObjectiveProgress = async (objectiveId: string, amount: number) => {
-    const objRef = doc(db, "objectives", objectiveId);
-    const todayStr = format(new Date(), "d MMM", { locale: fr }); 
-    try {
-        await updateDoc(objRef, {
-            current: increment(amount), 
-            history: arrayUnion({
-                date: todayStr,
-                value: amount, 
-                change: amount,
-                timestamp: new Date().toISOString()
-            })
-        });
-        return true;
-    } catch (e) { return false; }
-  };
-
-  // --- NOUVELLE FONCTION PLANIFICATION ---
   const savePlanning = async (data: any) => {
       if (!currentUser?.companyId) return false;
       try {
-          // On sauvegarde la plannification dans une sous-collection ou un document dédié
-          // Ici on utilise une collection 'plannings' liée à l'entreprise
           await addDoc(collection(db, "plannings"), {
               ...data,
               companyId: currentUser.companyId,
@@ -140,21 +118,29 @@ export function usePilotage() {
               status: "scheduled"
           });
           return true;
-      } catch (e) {
-          console.error(e);
-          return false;
-      }
+      } catch (e) { return false; }
   }
 
-  return {
-    team,
-    objectives,
-    loading,
-    totalHours,
-    globalProgress,
-    totalPotentialBonus,
-    createObjective,
-    updateObjectiveProgress,
-    savePlanning // Exporter la fonction
-  }
+  // MISE À JOUR AVEC DATE PERSONNALISÉE
+  const updateObjectiveProgress = async (objectiveId: string, amount: number, dateObj?: Date) => {
+    const objRef = doc(db, "objectives", objectiveId);
+    // Si date fournie, on l'utilise, sinon aujourd'hui
+    const targetDate = dateObj || new Date();
+    const dateStr = format(targetDate, "d MMM", { locale: fr }); 
+
+    try {
+        await updateDoc(objRef, {
+            current: increment(amount), 
+            history: arrayUnion({
+                date: dateStr,
+                value: amount, 
+                change: amount,
+                timestamp: targetDate.toISOString() // Date réelle de l'événement
+            })
+        });
+        return true;
+    } catch (e) { return false; }
+  };
+
+  return { team, objectives, loading, totalHours, globalProgress, totalPotentialBonus, createObjective, updateObjectiveProgress, savePlanning, isPrincipalMet }
 }
