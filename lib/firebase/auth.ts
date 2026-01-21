@@ -10,6 +10,17 @@ export async function signIn(email: string, password: string) {
   return signInWithEmailAndPassword(auth, email, password)
 }
 
+// Compatibility: ConnexionClient expects signInWithEmail
+export async function signInWithEmail(
+  input: { email: string; password: string } | string,
+  password?: string,
+) {
+  if (typeof input === "string") {
+    return signIn(input, password || "")
+  }
+  return signIn(input.email, input.password)
+}
+
 export async function createUserProfile(
   uid: string,
   email: string,
