@@ -1,0 +1,198 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function hasUserDoc() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function me() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function myRole() {
+      return hasUserDoc() ? (me().role != null ? me().role : 'employe') : 'employe';
+    }
+
+    function roleRank(r) {
+      return r == 'super_admin' ? 0
+        : r == 'admin' ? 1
+        : r == 'gerant' ? 2
+        : r == 'directeur' ? 3
+        : r == 'manager' ? 4
+        : r == 'assistant_manager' ? 5
+        : r == 'employe' ? 6
+        : 99;
+    }
+
+    function isAtLeast(min) {
+      return roleRank(myRole()) <= roleRank(min);
+    }
+
+    function isSuperAdmin() {
+      return roleRank(myRole()) == 0;
+    }
+
+    function myTenant() {
+      // Default tenant for legacy single-tenant installs
+      return hasUserDoc()
+        ? (me().companyId != null ? me().companyId
+          : (me().company != null ? me().company
+            : 'default'))
+        : 'default';
+    }
+
+    function tenantOf(d) {
+      return d.companyId != null ? d.companyId
+        : (d.company != null ? d.company
+          : 'default');
+    }
+
+    function isDocTenantCompatible(d) {
+      // If user is in a non-default tenant, deny access to docs with no tenant fields
+      return myTenant() == 'default' || tenantOf(d) != 'default';
+    }
+
+    function sameTenant(d) {
+      return isSuperAdmin() || (tenantOf(d) == myTenant() && isDocTenantCompatible(d));
+    }
+
+    function isTimestampOrString(x) {
+      return x is timestamp || x is string;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- USERS ---
+    match /users/{userId} {
+      allow read: if signedIn() && (
+        userId == request.auth.uid
+        || (isAtLeast('manager') && sameTenant(resource.data))
+        || isSuperAdmin()
+      );
+
+      // Allow the app to bootstrap a minimal user profile on first login
+      allow create: if signedIn()
+        && userId == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && (request.resource.data.displayName is string)
+        && (request.resource.data.role == null || request.resource.data.role == 'employe' || request.resource.data.role == 'employee')
+        && (request.resource.data.companyId == null || request.resource.data.companyId == myTenant() || request.resource.data.companyId == 'default')
+        && (request.resource.data.company == null || request.resource.data.company == myTenant() || request.resource.data.company == 'default')
+        && (request.resource.data.createdAt == null || isTimestampOrString(request.resource.data.createdAt))
+        && (request.resource.data.updatedAt == null || isTimestampOrString(request.resource.data.updatedAt));
+
+      allow update: if signedIn() && (
+        // Self update: cannot change role or tenant
+        (userId == request.auth.uid
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email
+          && (request.resource.data.role == resource.data.role)
+          && (tenantOf(request.resource.data) == tenantOf(resource.data))
+        )
+        // Admin update within tenant (cannot assign super_admin)
+        || (isAtLeast('admin')
+          && sameTenant(resource.data)
+          && tenantOf(request.resource.data) == myTenant()
+          && request.resource.data.role != 'super_admin'
+        )
+        // Super admin can update anything
+        || isSuperAdmin()
+      );
+
+      allow delete: if isSuperAdmin() || (isAtLeast('admin') && sameTenant(resource.data));
+    }
+
+    // --- OBJECTIVES ---
+    match /objectives/{objectiveId} {
+      allow read: if signedIn() && sameTenant(resource.data);
+
+      allow create: if signedIn()
+        && isAtLeast('manager')
+        && tenantOf(request.resource.data) == myTenant()
+        && (request.resource.data.title is string)
+        && (request.resource.data.createdAt == null || isTimestampOrString(request.resource.data.createdAt));
+
+      allow update: if signedIn()
+        && isAtLeast('manager')
+        && sameTenant(resource.data)
+        && tenantOf(request.resource.data) == myTenant();
+
+      allow delete: if signedIn() && (isAtLeast('admin') && sameTenant(resource.data));
+    }
+
+    // --- PRIMES HISTORY ---
+    match /primes_history/{primeId} {
+      allow read: if signedIn() && sameTenant(resource.data) && (
+        resource.data.userId == request.auth.uid
+        || isAtLeast('admin')
+        || isSuperAdmin()
+      );
+
+      allow create: if signedIn()
+        && isAtLeast('admin')
+        && tenantOf(request.resource.data) == myTenant()
+        && (request.resource.data.amount is number)
+        && (request.resource.data.month is string);
+
+      allow update: if signedIn()
+        && isAtLeast('admin')
+        && sameTenant(resource.data)
+        && tenantOf(request.resource.data) == myTenant();
+
+      allow delete: if signedIn() && isAtLeast('admin') && sameTenant(resource.data);
+    }
+
+    // --- PLANNINGS ---
+    match /plannings/{planningId} {
+      allow read: if signedIn() && sameTenant(resource.data);
+      allow create: if signedIn() && isAtLeast('manager') && tenantOf(request.resource.data) == myTenant();
+      allow update: if signedIn() && isAtLeast('manager') && sameTenant(resource.data) && tenantOf(request.resource.data) == myTenant();
+      allow delete: if signedIn() && isAtLeast('admin') && sameTenant(resource.data);
+    }
+
+    // --- SYSTEM LOGS ---
+    match /system_logs/{logId} {
+      allow read: if signedIn() && isAtLeast('admin') && sameTenant(resource.data);
+
+      allow create: if signedIn()
+        && tenantOf(request.resource.data) == myTenant()
+        && request.resource.data.userId == request.auth.uid
+        && (request.resource.data.timestamp == null || isTimestampOrString(request.resource.data.timestamp));
+
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // --- LOGS (super-admin console) ---
+    match /logs/{logId} {
+      allow read, create, update, delete: if isSuperAdmin();
+    }
+
+    // --- COMPANIES (super-admin console) ---
+
+
+match /pilotage_config/{tenantId} {
+  // Tenant-scoped pilotage configuration (baseHours, budgetMax, etc.)
+  allow read: if signedIn() && (isSuperAdmin() || tenantId == myTenant());
+  allow create, update, delete: if signedIn() && (isSuperAdmin() || (tenantId == myTenant() && isAtLeast('gerant')));
+}
+
+    match /companies/{companyId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    // --- CONFIG ---
+    match /config/{docId} {
+      // RBAC roles config is currently global.
+      allow read: if signedIn();
+      allow write: if isSuperAdmin() || isAtLeast('admin');
+    }
+  }
+}
