@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- FONCTIONS UTILITAIRES ---
+
+    // Vérifie si l'utilisateur est connecté
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Vérifie si c'est VOUS (l'admin suprême)
+    function isOwnerAdmin() {
+      return signedIn() && request.auth.token.email == 'teddy.frey1@gmail.com';
+    }
+
+    // --- RÈGLES ---
+
+    // Par défaut : Tout est interdit (sécurité)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 1. UTILISATEURS
+    // Lecture : Tout le monde connecté peut lire (pour voir la liste dans "Équipe")
+    // Création : Tout le monde connecté (Inscription)
+    // Modification : Soit c'est mon propre compte, soit je suis Admin
+    match /users/{userId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if signedIn() && (request.auth.uid == userId || isOwnerAdmin());
+      allow delete: if isOwnerAdmin();
+    }
+
+    // 2. OBJECTIFS (Pour le Dashboard et Paramètres)
+    // Lecture/Écriture : Tout le monde connecté (pour que les jauges se mettent à jour)
+    match /objectives/{objectiveId} {
+      allow read: if signedIn();
+      allow write: if signedIn();
+    }
+    
+    // 3. PRIMES (Pour l'historique)
+    // Lecture/Écriture : Tout le monde connecté
+    match /primes_history/{primeId} {
+      allow read: if signedIn();
+      allow write: if signedIn();
+    }
+    
+    // 4. CONFIGURATION (Si vous utilisez la gestion des rôles avancée)
+    match /config/{document=**} {
+      allow read: if signedIn();
+      allow write: if signedIn();
+    }
+  }
+}
