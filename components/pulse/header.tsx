@@ -11,6 +11,7 @@ import Link from "next/link"
 
 interface HeaderProps {
   title?: string
+  subtitle?: string
   showBack?: boolean
   className?: string
 }
@@ -57,5 +58,22 @@ export function Header({ title, showBack = false, className }: HeaderProps) {
 
       <SideDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </>
+  )
+}
+
+// Compat export: some pages expect a `PulseHeader` component with an optional `subtitle` prop.
+// We keep the design consistent by reusing the existing Header and rendering
+// a light text block below it when `title`/`subtitle` are provided.
+export function PulseHeader({ title, subtitle, showBack, className }: HeaderProps) {
+  return (
+    <div>
+      <Header title={title} showBack={showBack} className={className} />
+      {(title || subtitle) && (
+        <div className="max-w-lg mx-auto px-4 pt-4">
+          {title ? <h1 className="text-xl font-semibold">{title}</h1> : null}
+          {subtitle ? <p className="text-sm text-muted-foreground mt-1">{subtitle}</p> : null}
+        </div>
+      )}
+    </div>
   )
 }
