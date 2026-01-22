@@ -29,33 +29,49 @@ export default function DashboardPage() {
     if (obj.isActive) {
        acc.totalObjectives++;
        
-       // Le potentiel MAX de cet objectif (tous paliers cumulés ou prime fixe)
+       // Le potentiel MAX de cet objectif
        const maxReward = obj.reward || 0;
        acc.totalPotential += maxReward;
 
-       let unlockedForThisObj = 0;
+       // ⚠️ CORRECTION 1 : Sécurisation de la variable (supporte 'progress' et 'current')
+       const currentVal = obj.progress ?? obj.current ?? 0;
+       const targetVal = obj.target || 1;
 
-       // Gestion de la direction (Monter ou Descendre ?)
+       // --- NOUVEAU : CALCUL DE LA PROGRESSION LISSÉE (VISUELLE) ---
+       // On calcule un % d'avancement (0 à 1) pour faire bouger la jauge en continu
+       let objRatio = 0;
+       if (obj.direction === 'descending') {
+           // Cas descendant (ex: moins d'erreurs = mieux)
+           objRatio = currentVal <= targetVal 
+              ? 1 
+              : Math.max(0, targetVal / (currentVal || 1));
+       } else {
+           // Cas classique (plus de ventes = mieux)
+           objRatio = Math.min(1, Math.max(0, currentVal / targetVal));
+       }
+       
+       // On ajoute cette "progression virtuelle" au total pondéré
+       acc.totalWeightedProgress += (objRatio * maxReward);
+
+       // --- CALCUL DE L'ARGENT RÉEL (PALIERS) ---
+       // (Reste identique pour l'affichage "Acquis" en euros)
+       let unlockedForThisObj = 0;
        const isDescending = obj.direction === 'descending';
 
-       // --- CAS 1 : PALIERS ---
        if (obj.paliers && obj.paliers.length > 0) {
          obj.paliers.forEach((p: any) => {
-             // Vérification intelligente selon la direction
              const thresholdReached = isDescending 
-                ? (obj.progress <= p.threshold && obj.progress !== 0) // Cas descendant (ex: erreurs)
-                : obj.progress >= p.threshold; // Cas ascendant (ex: CA)
+                ? (currentVal <= p.threshold && currentVal !== 0) 
+                : currentVal >= p.threshold; 
 
              if (thresholdReached) {
                  unlockedForThisObj += p.reward;
              }
          });
-       }
-       // --- CAS 2 : OBJECTIF UNIQUE (FIXE) ---
-       else {
+       } else {
          const targetReached = isDescending
-            ? (obj.progress <= obj.target && obj.progress !== 0)
-            : obj.progress >= obj.target;
+            ? (currentVal <= targetVal && currentVal !== 0)
+            : currentVal >= targetVal;
             
          if (targetReached) {
              unlockedForThisObj += maxReward;
@@ -65,20 +81,19 @@ export default function DashboardPage() {
        acc.unlockedAmount += unlockedForThisObj;
     }
     return acc;
-  }, { totalPotential: 0, unlockedAmount: 0, totalObjectives: 0 });
+  }, { totalPotential: 0, unlockedAmount: 0, totalObjectives: 0, totalWeightedProgress: 0 });
 
-  // 4. Calcul du pourcentage GLOBAL (Pondéré par l'argent)
-  // Si j'ai débloqué 500€ sur un potentiel de 1000€, je suis à 50% du mois.
+  // 4. Calcul du pourcentage GLOBAL (Basé sur la progression pondérée)
+  // ⚠️ CORRECTION 2 : On utilise le progrès pondéré au lieu de l'argent débloqué
   const mainProgress = stats.totalPotential > 0 
-    ? (stats.unlockedAmount / stats.totalPotential) * 100 
+    ? (stats.totalWeightedProgress / stats.totalPotential) * 100 
     : 0;
   
-  // 5. Application du Ratio heures sur les montants finaux (Net à payer)
+  // 5. Application du Ratio heures
   const potentialProRata = stats.totalPotential * ratio;
   const unlockedProRata = stats.unlockedAmount * ratio;
   const pendingProRata = potentialProRata - unlockedProRata;
 
-  // Configuration dates
   const endOfMonth = new Date();
   endOfMonth.setMonth(endOfMonth.getMonth() + 1);
   endOfMonth.setDate(0);
@@ -99,7 +114,6 @@ export default function DashboardPage() {
       <Header />
 
       <main className="px-4 py-6 max-w-lg mx-auto">
-        {/* Header Bonjour */}
         <div className="text-center mb-6">
           <p className="text-lg font-medium text-muted-foreground mb-1">
             Bonjour, {firstName} 👋
@@ -114,10 +128,10 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Jauge Principale (Dynamique) */}
+        {/* Jauge Principale */}
         <div className="flex justify-center mb-6">
           <MainGauge
-            progress={mainProgress} // 👈 La vraie progression pondérée
+            progress={mainProgress} 
             unlockedAmount={unlockedProRata} 
             pendingAmount={pendingProRata}
             size={220}
@@ -125,12 +139,10 @@ export default function DashboardPage() {
           />
         </div>
 
-        {/* Compte à rebours */}
         <div className="mb-8">
           <CountdownTimer targetDate={endOfMonth} />
         </div>
 
-        {/* Grille de Statistiques */}
         <div className="grid grid-cols-2 gap-3 mb-6">
           <div className="p-4 rounded-2xl bg-card border border-border">
             <div className="flex items-center gap-2 mb-2">
@@ -169,7 +181,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Liens de Navigation */}
         <div className="space-y-2">
           <Link href="/objectifs" className="flex items-center justify-between p-4 rounded-2xl bg-card border border-border hover:border-primary/50 transition-colors">
             <div className="flex items-center gap-3">
