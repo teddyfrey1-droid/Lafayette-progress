@@ -2,58 +2,49 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- FONCTIONS UTILITAIRES ---
-
+    // --- HELPERS ---
     function signedIn() {
       return request.auth != null;
     }
 
-    // Sécurité : On vérifie si l'utilisateur a le rôle "admin" dans son token
-    // (Cela nécessite d'avoir configuré les Custom Claims, ou de lire le doc user)
+    // Vérifie si l'utilisateur a le rôle 'admin' (correspond à UserRole.ADMIN)
     function isAdmin() {
-      return signedIn() && (
-        request.auth.token.role == 'admin' || 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
-      );
+      return signedIn() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // (Optionnel) Si vous avez des Managers
+    function isManager() {
+       return signedIn() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'manager';
     }
 
-    // --- RÈGLES ---
-
-    // Par défaut : Tout est interdit
+    // --- RULES ---
+    
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // 1. UTILISATEURS
     match /users/{userId} {
-      // Tout le monde connecté peut voir les profils (pour l'affichage d'équipe)
       allow read: if signedIn();
-      
-      // Création autorisée à l'inscription (vérification minimale)
       allow create: if signedIn() && request.auth.uid == userId;
-      
-      // Modification : Soi-même OU un Admin
+      // Admin peut tout modifier, l'utilisateur peut se modifier lui-même
       allow update: if signedIn() && (request.auth.uid == userId || isAdmin());
-      
-      // Suppression : Admin seulement
       allow delete: if isAdmin();
     }
 
-    // 2. OBJECTIFS
+    // Protection stricte des objectifs
     match /objectives/{objectiveId} {
       allow read: if signedIn();
-      // Seuls les admins ou managers peuvent modifier les objectifs
-      allow write: if isAdmin(); 
+      // Admin OU Manager peut écrire (si vous utilisez les managers)
+      allow write: if isAdmin() || isManager();
     }
     
-    // 3. HISTORIQUE DES PRIMES
     match /primes_history/{primeId} {
-      // Chacun peut voir ses propres primes, les admins voient tout
       allow read: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow write: if isAdmin();
     }
     
-    // 4. CONFIGURATION GLOBALE
     match /config/{document=**} {
       allow read: if signedIn();
       allow write: if isAdmin();
