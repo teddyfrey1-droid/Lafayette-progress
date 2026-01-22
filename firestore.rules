@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- HELPERS ---
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Vérifie si l'utilisateur a le rôle 'admin' (correspond à UserRole.ADMIN)
+    function isAdmin() {
+      return signedIn() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // (Optionnel) Si vous avez des Managers
+    function isManager() {
+       return signedIn() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'manager';
+    }
+
+    // --- RULES ---
+    
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.auth.uid == userId;
+      // Admin peut tout modifier, l'utilisateur peut se modifier lui-même
+      allow update: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Protection stricte des objectifs
+    match /objectives/{objectiveId} {
+      allow read: if signedIn();
+      // Admin OU Manager peut écrire (si vous utilisez les managers)
+      allow write: if isAdmin() || isManager();
+    }
+    
+    match /primes_history/{primeId} {
+      allow read: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+    
+    match /config/{document=**} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+  }
+}
