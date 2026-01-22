@@ -566,15 +566,15 @@ export const usefulSites: UsefulSite[] = [
     description: "Votre partenaire santé qui prévient, assure et accompagne au quotidien.",
     url: "https://alan.com/login",
     category: "sante",
-    icon: "https://firebasestorage.googleapis.com/v0/b/objectif-restaurant.firebasestorage.app/o/app-icons%2FIMG_6751.PNG?alt=media&token=db4ff3b0-cd27-41ec-942d-e7be00caf653",
+    icon: "https://firebasestorage.googleapis.com/v0/b/objectif-restaurant.firebasestorage.app/o/app-icons%2FIMG_6751%202.PNG?alt=media&token=c0b02b41-be18-4924-8eb9-0ad8b0b247f8",
   },
   {
     id: "s6",
     name: "Ameli",
     description: "Le site de l'Assurance Maladie pour gérer vos remboursements.",
-    url: "https://firebasestorage.googleapis.com/v0/b/objectif-restaurant.firebasestorage.app/o/app-icons%2FIMG_6757.PNG?alt=media&token=1acdf731-867b-4b49-a055-1766aa14a04b",
+    url: "https://assure.ameli.fr/",
     category: "sante",
-    // Tu peux réutiliser le logo CPAM si besoin
+    icon:"https://firebasestorage.googleapis.com/v0/b/objectif-restaurant.firebasestorage.app/o/app-icons%2FIMG_6757.PNG?alt=media&token=1acdf731-867b-4b49-a055-1766aa14a04b",
   },
   {
     id: "s7",
