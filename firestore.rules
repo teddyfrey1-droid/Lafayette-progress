@@ -1,48 +1,62 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // --- FONCTIONS UTILITAIRES ---
+
     function signedIn() {
       return request.auth != null;
     }
 
-    // Minimal "admin" check for now.
-    // For stronger RBAC, use custom claims managed server-side.
-    function isOwnerAdmin() {
-      return signedIn() && request.auth.token.email == 'teddy.frey1@gmail.com';
+    // Sécurité : On vérifie si l'utilisateur a le rôle "admin" dans son token
+    // (Cela nécessite d'avoir configuré les Custom Claims, ou de lire le doc user)
+    function isAdmin() {
+      return signedIn() && (
+        request.auth.token.role == 'admin' || 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
     }
 
-    // Default deny
+    // --- RÈGLES ---
+
+    // Par défaut : Tout est interdit
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // User profiles
+    // 1. UTILISATEURS
     match /users/{userId} {
-      allow read: if signedIn() && (userId == request.auth.uid || isOwnerAdmin());
+      // Tout le monde connecté peut voir les profils (pour l'affichage d'équipe)
+      allow read: if signedIn();
+      
+      // Création autorisée à l'inscription (vérification minimale)
+      allow create: if signedIn() && request.auth.uid == userId;
+      
+      // Modification : Soi-même OU un Admin
+      allow update: if signedIn() && (request.auth.uid == userId || isAdmin());
+      
+      // Suppression : Admin seulement
+      allow delete: if isAdmin();
+    }
 
-      allow create: if signedIn()
-        && userId == request.auth.uid
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.email == request.auth.token.email
-        && request.resource.data.displayName is string
-        && request.resource.data.role in ['admin', 'manager', 'employee']
-        && ((request.resource.data.role == 'admin' && isOwnerAdmin()) || request.resource.data.role != 'admin')
-        && request.resource.data.createdAt is timestamp
-        && request.resource.data.updatedAt is timestamp;
-
-      allow update: if signedIn() && (
-        // Self-update: cannot change uid/email/role
-        (userId == request.auth.uid
-          && request.resource.data.uid == resource.data.uid
-          && request.resource.data.email == resource.data.email
-          && request.resource.data.role == resource.data.role
-          && request.resource.data.displayName is string
-          && request.resource.data.updatedAt is timestamp
-        )
-        || isOwnerAdmin()
-      );
-
-      allow delete: if isOwnerAdmin();
+    // 2. OBJECTIFS
+    match /objectives/{objectiveId} {
+      allow read: if signedIn();
+      // Seuls les admins ou managers peuvent modifier les objectifs
+      allow write: if isAdmin(); 
+    }
+    
+    // 3. HISTORIQUE DES PRIMES
+    match /primes_history/{primeId} {
+      // Chacun peut voir ses propres primes, les admins voient tout
+      allow read: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+    
+    // 4. CONFIGURATION GLOBALE
+    match /config/{document=**} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
     }
   }
 }
