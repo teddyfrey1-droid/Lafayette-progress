@@ -1,4 +1,35 @@
-// lib/rbac-schema.ts
+// --- 1. DÉFINITION DES RÔLES (ENUM) ---
+// C'est la base de votre système.
+export enum UserRole {
+  SUPER_ADMIN = 'super_admin',
+  ADMIN = 'admin',
+  GERANT = 'gerant',    // Ajouté car présent dans vos DEFAULT_ROLES
+  MANAGER = 'manager',
+  EMPLOYEE = 'employee' // Standardisé (était 'employe' ou 'employée')
+}
+
+// Labels pour l'affichage dans l'interface (Menu déroulant, Profil...)
+export const ROLES_LABEL = {
+  [UserRole.SUPER_ADMIN]: "Super Admin",
+  [UserRole.ADMIN]: "Administrateur",
+  [UserRole.GERANT]: "Gérant",
+  [UserRole.MANAGER]: "Manager",
+  [UserRole.EMPLOYEE]: "Collaborateur"
+};
+
+// --- 2. TYPES UTILISATEUR ---
+export interface AppUser {
+  uid: string;
+  email: string;
+  displayName: string;
+  role: UserRole;
+  company: string;
+  disabled: boolean;
+  contractHours?: number;
+  // ... autres champs
+}
+
+// --- 3. SYSTÈME DE PERMISSIONS (RBAC) ---
 
 export type PermissionAction = "view" | "edit" | "delete" | "create" | "manage" | string;
 
@@ -93,14 +124,22 @@ export const RBAC_SCHEMA: Record<string, PermissionModule> = {
       access: "Accéder au simulateur",
       save: "Enregistrer les modifications budgétaires"
     }
+  },
+  notifications: {
+      label: "Notifications",
+      actions: {
+          view: "Voir ses notifications"
+      }
   }
 };
 
-// Rôles par défaut pour initialiser la base de données
+// --- 4. RÔLES PAR DÉFAUT ---
+// Configuration initiale des permissions pour chaque rôle
 export const DEFAULT_ROLES = {
-  super_admin: { label: "Super Admin", permissions: { "*": true } }, // Tout permis
-  admin: { label: "Admin", permissions: { "*": true } },
-  gerant: { 
+  [UserRole.SUPER_ADMIN]: { label: "Super Admin", permissions: { "*": true } }, // Tout permis
+  [UserRole.ADMIN]: { label: "Admin", permissions: { "*": true } },
+  
+  [UserRole.GERANT]: { 
     label: "Gérant", 
     permissions: { 
       dashboard: { view: true, view_stats: true },
@@ -114,7 +153,8 @@ export const DEFAULT_ROLES = {
       diffusion: { view: true, send: true }
     } 
   },
-  manager: {
+  
+  [UserRole.MANAGER]: {
     label: "Manager",
     permissions: {
       dashboard: { view: true, view_stats: false },
@@ -126,7 +166,8 @@ export const DEFAULT_ROLES = {
       diffusion: { view: true, send: false }
     }
   },
-  employe: {
+  
+  [UserRole.EMPLOYEE]: {
     label: "Employé",
     permissions: {
       dashboard: { view: true },
