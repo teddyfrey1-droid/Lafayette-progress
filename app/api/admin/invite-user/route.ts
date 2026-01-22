@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { sendWelcomeEmail } from "@/app/lib/email-service"; // Ajustez le chemin si nécessaire (ex: "@/lib/email-service")
-import { UserRole } from "@/app/lib/rbac-schema"; // Import des types
+import { sendWelcomeEmail } from "@/lib/email-service"; // Ajustez le chemin si nécessaire (ex: "@/lib/email-service")
+import { UserRole } from "@/lib/rbac-schema"; // Import des types
 
 export async function POST(req: Request) {
   console.log("🚀 [API] Début invitation Pulse App");
