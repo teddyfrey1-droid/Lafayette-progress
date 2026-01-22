@@ -1,77 +1,74 @@
-"use client";
-
 import { useState, useEffect } from "react";
-import { collection, query, onSnapshot, orderBy, doc, updateDoc, deleteDoc, addDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
+import { collection, query, orderBy, limit, getDocs } from "firebase/firestore"; // <-- on utilise getDocs ici, plus onSnapshot
+import { useCurrentUser } from "@/lib/use-current-user";
 
 export interface PrimeHistory {
   id: string;
-  month: string; // ex: "Janvier 2025"
-  date: Date;
+  userId: string;
   amount: number;
-  status: "pending" | "validated" | "paid";
-  userId?: string; // Pour savoir à qui appartient la prime (si individuel)
+  reason: string;
+  date: any; // Timestamp
+  validatedBy?: string;
 }
 
 export function usePrimes() {
+  const { userData, loading: authLoading } = useCurrentUser();
   const [primes, setPrimes] = useState<PrimeHistory[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Écoute la collection "primes_history" en temps réel
-    const q = query(collection(db, "primes_history"), orderBy("date", "desc"));
+    // Si l'utilisateur charge encore, on attend
+    if (authLoading) return;
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const items: PrimeHistory[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        items.push({
+    const fetchPrimes = async () => {
+      setLoading(true);
+      try {
+        let q;
+
+        // Optimisation : On ne charge que les 50 dernières primes pour éviter de tout lire
+        if (userData?.role === "admin" || userData?.role === "gerant") {
+          // L'admin voit tout l'historique global
+          q = query(
+            collection(db, "primes_history"),
+            orderBy("date", "desc"),
+            limit(50)
+          );
+        } else if (userData?.uid) {
+          // L'employé ne voit que SES primes (Sécurité + Économie)
+          // Note: Il faut un index composite dans Firebase pour faire 'where' + 'orderBy'
+          // Si ça plante, cliquez sur le lien dans la console du navigateur pour créer l'index.
+          q = query(
+            collection(db, "primes_history"),
+            where("userId", "==", userData.uid), 
+            orderBy("date", "desc"),
+            limit(20)
+          );
+        } else {
+          setLoading(false);
+          return;
+        }
+
+        const snapshot = await getDocs(q); // <-- Lecture unique (pas de temps réel)
+        
+        const items = snapshot.docs.map((doc) => ({
           id: doc.id,
-          month: data.month,
-          amount: data.amount,
-          status: data.status,
-          date: data.date?.toDate ? data.date.toDate() : new Date(),
-          userId: data.userId
-        });
-      });
-      setPrimes(items);
-      setLoading(false);
-    });
+          ...doc.data(),
+        })) as PrimeHistory[];
 
-    return () => unsubscribe();
-  }, []);
+        setPrimes(items);
+      } catch (error) {
+        console.error("Erreur chargement primes:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Actions Admin
-  const updatePrime = async (id: string, data: Partial<PrimeHistory>) => {
-    try {
-      await updateDoc(doc(db, "primes_history", id), data);
-    } catch (error) {
-      console.error("Erreur update:", error);
-      throw error;
-    }
-  };
+    fetchPrimes();
+  }, [userData, authLoading]); // Se relance uniquement si l'utilisateur change
 
-  const deletePrime = async (id: string) => {
-    if(!confirm("Êtes-vous sûr de vouloir supprimer cet historique ?")) return;
-    try {
-      await deleteDoc(doc(db, "primes_history", id));
-    } catch (error) {
-      console.error("Erreur delete:", error);
-      throw error;
-    }
-  };
-
-  const addPrime = async (prime: Omit<PrimeHistory, "id">) => {
-    try {
-      await addDoc(collection(db, "primes_history"), {
-        ...prime,
-        date: Timestamp.fromDate(prime.date)
-      });
-    } catch (error) {
-      console.error("Erreur add:", error);
-      throw error;
-    }
-  }
-
-  return { primes, loading, updatePrime, deletePrime, addPrime };
+  return { primes, loading };
 }
+
+// Petit helper pour ajouter 'where' si besoin
+import { where } from "firebase/firestore";
