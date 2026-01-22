@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button"
 import { PulseLogo } from "./pulse-logo"
 import { useState } from "react"
 import { useAuth } from "@/components/auth/auth-provider"
+import { useCurrentUser } from "@/lib/use-current-user" // 👈 Import important
 import { signOut } from "@/lib/firebase/auth"
 import { usePermissions } from "@/hooks/use-permissions"
 
@@ -33,6 +34,7 @@ interface SideDrawerProps {
   onClose: () => void
 }
 
+// Configuration du menu
 const menuItems: Array<{
   href: string
   icon: any
@@ -53,48 +55,33 @@ const menuItems: Array<{
   { href: "/aide", icon: HelpCircle, label: "Aide" },
 ]
 
-function initials(name: string | null | undefined) {
-  if (!name || typeof name !== 'string') return "U"
-  
-  const parts = name
-    .trim()
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    
-  if (parts.length === 0) return "U"
-  return parts.map((p) => p[0]).join("").toUpperCase()
-}
-
 export function SideDrawer({ open, onClose }: SideDrawerProps) {
   const pathname = usePathname()
-  // Note : useRouter n'est plus nécessaire ici pour la déconnexion car on utilise window.location
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   
-  // Récupération des données utilisateur réelles via le contexte Auth
-  const { user, profile } = useAuth()
+  // 1. On utilise le Hook optimisé pour avoir les données propres (Prénom, Nom, Rôle...)
+  const user = useCurrentUser()
   const { canView, loading: permissionsLoading } = usePermissions()
 
-  // Détermination des valeurs d'affichage avec fallback
-  const displayName = profile?.displayName || user?.displayName || "Utilisateur"
-  const role = profile?.role || "employee"
-  const firstName = displayName.split(" ")[0] || "Utilisateur"
-  const isAdmin = role === "admin" || role === "super_admin" || role === "manager"
-  
-  // Récupération de la société du profil
-  const companyName = profile?.company || "Heiko"
+  // 2. Fonction pour transformer le code technique (ex: 'gerant') en texte affichable
+  const getRoleLabel = (role: string) => {
+    switch (role?.toLowerCase()) {
+      case 'admin': 
+      case 'super_admin': return 'Administrateur';
+      case 'gerant': return 'Gérant'; // 👈 C'est ici que ça corrige votre problème
+      case 'manager': return 'Manager';
+      default: return 'Salarié';
+    }
+  }
 
   const handleLogout = async () => {
     setShowLogoutConfirm(false)
     onClose()
     try {
       await signOut()
-      // CORRECTION : On force le rechargement complet de la page vers /connexion
-      // Cela nettoie tous les états en mémoire et le cache du navigateur
       window.location.href = "/connexion"
     } catch (error) {
       console.error("Erreur lors de la déconnexion", error)
-      // Redirection forcée même en cas d'erreur pour ne pas bloquer l'utilisateur
       window.location.href = "/connexion"
     }
   }
@@ -128,13 +115,15 @@ export function SideDrawer({ open, onClose }: SideDrawerProps) {
           {/* User Info Header (Qui je suis) */}
           <div className="p-4 border-b border-border bg-muted/20">
             <div className="flex items-center gap-3">
-              <div className="relative p-2.5 rounded-xl bg-primary/10">
-                <User className="w-5 h-5 text-primary" />
+              <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 text-primary font-bold">
+                {/* Initiales calculées automatiquement par le hook */}
+                {(user.firstName?.[0] || "") + (user.lastName?.[0] || "")}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground truncate">{firstName}</p>
+                <p className="text-sm font-semibold text-foreground truncate">{user.displayName}</p>
                 <p className="text-xs text-muted-foreground capitalize">
-                  {role === "admin" || role === "super_admin" ? "Administrateur" : role === "manager" ? "Manager" : "Salarié"}
+                  {/* Affichage correct du rôle */}
+                  {getRoleLabel(user.role)}
                 </p>
               </div>
             </div>
@@ -200,7 +189,7 @@ export function SideDrawer({ open, onClose }: SideDrawerProps) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Société / Site</p>
-                <p className="font-semibold text-sm truncate text-foreground">{companyName}</p>
+                <p className="font-semibold text-sm truncate text-foreground">{user.companyName || "Heiko"}</p>
               </div>
             </div>
           </div>
