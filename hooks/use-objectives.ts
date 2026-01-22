@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-// Ajout de 'where' pour le filtre et 'useMemo' pour la performance
 import { collection, query, onSnapshot, orderBy, where } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
+import { useAuth } from "@/components/auth/auth-provider"; // 👈 Ajout important
 
 export interface Objective {
   id: string;
@@ -22,21 +22,24 @@ export interface Objective {
 }
 
 export function useObjectives() {
+  const { profile } = useAuth(); // 👈 Récupération du profil
   const [objectives, setObjectives] = useState<Objective[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // ⚡ OPTIMISATION COÛT : On ne charge que les objectifs ACTIFS (isActive == true)
-    // Cela évite de charger les vieux objectifs archivés inutiles pour le dashboard.
-    // Note : Si la console affiche une erreur "Index required", cliquez sur le lien dans la console pour le créer.
+    // Si on n'a pas encore l'info de la société, on ne fait rien pour éviter des erreurs
+    if (!profile?.companyId) return;
+
+    // ⚡ REQUÊTE CORRIGÉE : On ajoute le filtre companyId
+    // Note : Regardez la console de votre navigateur. Si une erreur rouge apparaît,
+    // cliquez sur le lien "Create index" fourni par Firebase.
     const q = query(
       collection(db, "objectives"), 
+      where("companyId", "==", profile.companyId), // 👈 Le filtre manquant est ici !
       where("isActive", "==", true), 
       orderBy("createdAt", "desc")
     );
 
-    // On garde le temps réel (onSnapshot) ici car c'est motivant de voir les jauges bouger !
-    // Comme il y a peu d'objectifs actifs (5 à 10 max), ce n'est pas cher.
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const items: Objective[] = [];
       
@@ -63,15 +66,11 @@ export function useObjectives() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [profile?.companyId]); // 👈 On relance l'effet si l'ID société change
 
   // --- 🚀 CALCULS OPTIMISÉS (useMemo) ---
-  // On ne recalcule que si la liste 'objectives' change
-  
   const { totalPotential, globalProgress } = useMemo(() => {
-    // 1. Somme totale
     const total = objectives.reduce((acc, obj) => {
-      // Sécurité supplémentaire : on ne compte pas si inactif (même si le filtre le fait déjà)
       if (obj.isActive === false) return acc; 
       
       const objMax = obj.paliers && obj.paliers.length > 0 
@@ -81,16 +80,13 @@ export function useObjectives() {
       return acc + objMax;
     }, 0);
 
-    // 2. Progression moyenne
     const count = objectives.length;
     const progress = count > 0 
       ? Math.round(objectives.reduce((acc, curr) => {
         let p = 0;
         if (curr.direction === 'descending') {
-             // Exemple : Taux d'erreur. Cible 2%, Actuel 5% => 40% de réussite (0.4)
              p = curr.current <= curr.target ? 100 : Math.max(0, (curr.target / (curr.current || 1)) * 100);
         } else {
-             // Sens normal (CA)
              p = Math.min(100, Math.max(0, (curr.current / curr.target) * 100));
         }
         return acc + p;
