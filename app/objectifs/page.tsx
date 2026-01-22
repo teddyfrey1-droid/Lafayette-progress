@@ -6,12 +6,16 @@ import { BottomNav } from "@/components/pulse/bottom-nav"
 import { PermissionGate } from "@/components/auth/permission-gate"
 import { ProgressRing } from "@/components/pulse/progress-ring"
 import { CelebrationModal } from "@/components/pulse/celebration-modal"
-import { Target, ChevronRight, Sparkles, Info, TrendingUp, Loader2, Lock, EyeOff, ChevronLeft, CheckCircle2, Circle } from "lucide-react"
+import { Target, ChevronRight, Sparkles, Info, TrendingUp, Loader2, Lock, EyeOff, ChevronLeft, CheckCircle2, Circle, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { Progress } from "@/components/ui/progress"
 import { useObjectives } from "@/hooks/use-objectives"
 import { Badge } from "@/components/ui/badge"
+import { usePermissions } from "@/hooks/use-permissions" // 👈 Import droits
+import { deleteDoc, doc } from "firebase/firestore" // 👈 Import suppression
+import { db } from "@/lib/firebase/client" // 👈 Import base de données
+import { useToast } from "@/hooks/use-toast" // 👈 Import notifications
 
 // --- COMPOSANT HISTORIQUE (SÉCURISÉ) ---
 const MockHistory = ({ target }: { target: number }) => (
@@ -24,6 +28,9 @@ const MockHistory = ({ target }: { target: number }) => (
 
 export default function ObjectivesPage() {
   const { objectives, loading } = useObjectives()
+  const { canEdit } = usePermissions() // 👈 Récupération des droits
+  const { toast } = useToast()
+  
   const [selectedObjective, setSelectedObjective] = useState<any | null>(null)
   const [showCelebration, setShowCelebration] = useState(false)
 
@@ -41,6 +48,18 @@ export default function ObjectivesPage() {
       : pCurrent >= pTarget
   );
 
+  // 🔴 FONCTION DE SUPPRESSION
+  const handleDelete = async (id: string) => {
+    if (!confirm("Voulez-vous vraiment supprimer cet objectif ?")) return;
+    try {
+        await deleteDoc(doc(db, "objectives", id));
+        toast({ title: "Objectif supprimé" });
+        setSelectedObjective(null); // Retour liste
+    } catch (e) {
+        toast({ title: "Erreur", variant: "destructive" });
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -55,6 +74,8 @@ export default function ObjectivesPage() {
       <ObjectiveDetailView
         objective={selectedObjective}
         onBack={() => setSelectedObjective(null)}
+        onDelete={() => handleDelete(selectedObjective.id)} // 👈 Passage de la fonction
+        canEdit={canEdit} // 👈 Passage des droits
       />
     )
   }
@@ -263,14 +284,22 @@ export default function ObjectivesPage() {
 }
 
 // --- VUE DÉTAIL (CLIC) ---
-function ObjectiveDetailView({ objective, onBack }: { objective: any, onBack: () => void }) {
-  // CRÉATION OBJET "SAFE" (Nettoyage des données pour éviter les crashs)
+function ObjectiveDetailView({ 
+    objective, 
+    onBack,
+    onDelete, // 👈 Nouvelle prop
+    canEdit   // 👈 Nouvelle prop
+}: { 
+    objective: any, 
+    onBack: () => void,
+    onDelete: () => void,
+    canEdit: boolean
+}) {
   const safeObj = {
       ...objective,
       current: Number(objective.current || 0),
       target: Number(objective.target || 1),
       unit: objective.unit || "",
-      // Nettoyage des paliers un par un
       paliers: (objective.paliers || []).map((p:any) => ({
           ...p,
           threshold: Number(p.threshold || 0),
@@ -298,10 +327,20 @@ function ObjectiveDetailView({ objective, onBack }: { objective: any, onBack: ()
     <div className="min-h-screen bg-background pb-32 animate-in slide-in-from-right duration-300">
       <Header />
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
-        {/* Bouton Retour */}
-        <Button variant="ghost" onClick={onBack} className="rounded-xl -ml-2">
-          <ChevronLeft className="w-4 h-4 mr-1" /> Retour
-        </Button>
+        
+        {/* Header avec bouton Retour ET Supprimer (si admin) */}
+        <div className="flex items-center justify-between">
+            <Button variant="ghost" onClick={onBack} className="rounded-xl -ml-2">
+              <ChevronLeft className="w-4 h-4 mr-1" /> Retour
+            </Button>
+            
+            {/* 🔴 BOUTON SUPPRIMER SÉCURISÉ */}
+            {canEdit && (
+                <Button variant="ghost" size="icon" className="text-red-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl" onClick={onDelete}>
+                    <Trash2 className="w-5 h-5" />
+                </Button>
+            )}
+        </div>
 
         {/* En-tête Objectif */}
         <div className="text-center space-y-3">
@@ -324,7 +363,6 @@ function ObjectiveDetailView({ objective, onBack }: { objective: any, onBack: ()
             size={130}
             strokeWidth={10}
             showPercentage={true}
-            // SÉCURITÉ : .toLocaleString() est appliqué sur des Nombres garantis
             sublabel={isConfidential 
                 ? "Données masquées" 
                 : `${safeObj.current.toLocaleString()} / ${safeObj.target.toLocaleString()} ${safeObj.unit}`}
@@ -372,7 +410,7 @@ function ObjectiveDetailView({ objective, onBack }: { objective: any, onBack: ()
             </div>
         </div>
 
-        {/* Timeline Verticale (Implémentée en dur pour éviter les bugs externes) */}
+        {/* Timeline Verticale */}
         <section className="space-y-4 pt-2">
           <h2 className="font-semibold flex items-center gap-2">
             <Target className="w-5 h-5 text-primary" />
@@ -380,7 +418,6 @@ function ObjectiveDetailView({ objective, onBack }: { objective: any, onBack: ()
           </h2>
           
           <div className="relative pl-2 space-y-0">
-             {/* Ligne verticale */}
              <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-border -z-10" />
 
              {safeObj.paliers.sort((a:any, b:any) => a.threshold - b.threshold).map((palier: any, index: number) => {
@@ -388,7 +425,6 @@ function ObjectiveDetailView({ objective, onBack }: { objective: any, onBack: ()
                  
                  return (
                      <div key={index} className="flex items-start gap-4 py-3 group">
-                         {/* Cercle Indicateur */}
                          <div className={cn(
                              "w-10 h-10 rounded-full flex items-center justify-center border-4 shrink-0 transition-all z-10",
                              isReached 
@@ -398,7 +434,6 @@ function ObjectiveDetailView({ objective, onBack }: { objective: any, onBack: ()
                              {isReached ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
                          </div>
 
-                         {/* Carte Palier */}
                          <div className={cn(
                              "flex-1 p-3 rounded-xl border transition-all",
                              isReached ? "bg-primary/5 border-primary/20" : "bg-card border-border"
