@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
+import { useState, useEffect, useMemo } from "react";
+// Ajout de 'where' pour le filtre et 'useMemo' pour la performance
+import { collection, query, onSnapshot, orderBy, where } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 
-// On définit une interface locale souple pour éviter les conflits de types
 export interface Objective {
   id: string;
   title: string;
@@ -15,7 +15,7 @@ export interface Objective {
   type?: "principal" | "secondaire";
   direction?: "ascending" | "descending";
   isActive?: boolean;
-  deadline?: Date; // Le champ critique
+  deadline?: Date;
   paliers?: { level: number; reward: number; threshold: number; reached: boolean }[];
   reward?: number;
   createdAt?: any;
@@ -26,28 +26,32 @@ export function useObjectives() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // On garde 'orderBy' pour que les objectifs ne changent pas de place tout seuls
-    const q = query(collection(db, "objectives"), orderBy("createdAt", "desc"));
+    // ⚡ OPTIMISATION COÛT : On ne charge que les objectifs ACTIFS (isActive == true)
+    // Cela évite de charger les vieux objectifs archivés inutiles pour le dashboard.
+    // Note : Si la console affiche une erreur "Index required", cliquez sur le lien dans la console pour le créer.
+    const q = query(
+      collection(db, "objectives"), 
+      where("isActive", "==", true), 
+      orderBy("createdAt", "desc")
+    );
 
+    // On garde le temps réel (onSnapshot) ici car c'est motivant de voir les jauges bouger !
+    // Comme il y a peu d'objectifs actifs (5 à 10 max), ce n'est pas cher.
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const items: Objective[] = [];
       
       snapshot.forEach((doc) => {
         const data = doc.data();
         
-        // --- 🛡️ SÉCURITÉ DATE (VOTRE CODE) ---
-        // On gère le cas où deadline existe ou non, et si c'est un Timestamp Firestore
         let deadline = null;
         if (data.deadline) {
-            // Si c'est un Timestamp Firestore, on a la fonction .toDate()
-            // Sinon on essaie de le parser comme une date standard
             deadline = data.deadline?.toDate ? data.deadline.toDate() : new Date(data.deadline);
         }
 
         items.push({ 
           id: doc.id, 
           ...data,
-          deadline: deadline // On applique la date convertie
+          deadline: deadline
         } as Objective);
       });
 
@@ -61,40 +65,45 @@ export function useObjectives() {
     return () => unsubscribe();
   }, []);
 
-  // --- 🚀 CALCULS AUTOMATIQUES (POUR LE DASHBOARD) ---
+  // --- 🚀 CALCULS OPTIMISÉS (useMemo) ---
+  // On ne recalcule que si la liste 'objectives' change
   
-  // 1. Somme totale des primes potentielles
-  const totalPotential = objectives.reduce((acc, obj) => {
-      if (!obj.isActive) return acc; // On ne compte pas les inactifs
+  const { totalPotential, globalProgress } = useMemo(() => {
+    // 1. Somme totale
+    const total = objectives.reduce((acc, obj) => {
+      // Sécurité supplémentaire : on ne compte pas si inactif (même si le filtre le fait déjà)
+      if (obj.isActive === false) return acc; 
       
-      // Si paliers, on additionne tout, sinon on prend la reward fixe
       const objMax = obj.paliers && obj.paliers.length > 0 
         ? obj.paliers.reduce((sum, p) => sum + (p.reward || 0), 0)
         : (obj.reward || 0);
         
       return acc + objMax;
-  }, 0);
+    }, 0);
 
-  // 2. Progression globale moyenne (Pour la jauge du dashboard)
-  const activeObjectives = objectives.filter(o => o.isActive);
-  const globalProgress = activeObjectives.length > 0 
-    ? Math.round(activeObjectives.reduce((acc, curr) => {
+    // 2. Progression moyenne
+    const count = objectives.length;
+    const progress = count > 0 
+      ? Math.round(objectives.reduce((acc, curr) => {
         let p = 0;
-        // Gestion sens inverse (ex: Taux d'erreur)
         if (curr.direction === 'descending') {
+             // Exemple : Taux d'erreur. Cible 2%, Actuel 5% => 40% de réussite (0.4)
              p = curr.current <= curr.target ? 100 : Math.max(0, (curr.target / (curr.current || 1)) * 100);
         } else {
-             // Sens normal (ex: CA)
+             // Sens normal (CA)
              p = Math.min(100, Math.max(0, (curr.current / curr.target) * 100));
         }
         return acc + p;
-    }, 0) / activeObjectives.length)
-    : 0;
+      }, 0) / count)
+      : 0;
+
+      return { totalPotential: total, globalProgress: progress };
+  }, [objectives]);
 
   return { 
     objectives, 
     loading,
-    totalPotential, // Ajouté pour le Dashboard
-    globalProgress  // Ajouté pour le Dashboard
+    totalPotential,
+    globalProgress
   };
 }
