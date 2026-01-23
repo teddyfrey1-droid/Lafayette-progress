@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
 import { PermissionGate } from "@/components/auth/permission-gate"
+import { logSystemAction } from "@/lib/logger" // 👈 Import pour le test
 import {
   Shield, Users, Search, Building2, ChevronRight, Edit3, CheckCircle2,
   XCircle, Activity, TrendingUp, LogIn, Monitor, Smartphone, MapPin,
@@ -129,7 +130,7 @@ export default function CentreControlePage() {
 function CentreControlePageContent() {
   const { toast } = useToast()
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<TabType>("overview")
+  const [activeTab, setActiveTab] = useState<TabType>("logs") // Force logs par défaut
   const [searchQuery, setSearchQuery] = useState("")
   
   // Sélections & Édition
@@ -158,6 +159,24 @@ function CentreControlePageContent() {
     status: "active",
     contactEmail: ""
   })
+
+  // --- FONCTION DE TEST MANUEL ---
+  const handleTestLog = async () => {
+    try {
+        await logSystemAction({
+            userId: "test-user-id",
+            userName: "Testeur Admin",
+            userRole: "admin",
+            companyId: "test-company",
+            companyName: "Test Company",
+            action: "TEST_MANUEL",
+            details: "Ceci est un test manuel depuis le bouton rouge"
+        });
+        alert("Log de test envoyé ! Rafraîchissez la liste.");
+    } catch (e) {
+        alert("Erreur d'envoi : " + e);
+    }
+  }
 
   // --- TRAITEMENT DES LOGS (GROUPEMENT) ---
   const groupedLogs = useMemo(() => {
@@ -439,7 +458,7 @@ function CentreControlePageContent() {
       }))
     })
 
-    // 🔴 CORRECTION ICI : On écoute "system_logs" au lieu de "logs"
+    // 🔴 LECTURE DES LOGS (AVEC LIMITE POUR EVITER SURCHARGE)
     const unsubLogs = onSnapshot(query(collection(db, "system_logs"), orderBy("timestamp", "desc"), limit(500)), (snapshot) => {
       setLogsState(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LogEntry)))
     })
@@ -721,6 +740,11 @@ function CentreControlePageContent() {
 
         {/* Search */}
         <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input placeholder="Rechercher..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 rounded-xl" /></div>
+
+        {/* 🔴 BOUTON DE TEST MANUEL (ICI) 🔴 */}
+        <Button onClick={handleTestLog} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold animate-pulse">
+            🚨 CLIQUER POUR TESTER LES LOGS
+        </Button>
 
         {/* --- ONGLETS --- */}
         {activeTab === "overview" && (
