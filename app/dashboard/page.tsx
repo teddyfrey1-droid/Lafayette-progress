@@ -16,54 +16,61 @@ export default function DashboardPage() {
   const user = useCurrentUser()
   const { objectives, loading: objLoading } = useObjectives()
   
-  // 1. Récupération du prénom
   const firstName = user.firstName || "Collaborateur";
-
-  // 2. Calcul du Pro-Rata (Heures contrat vs 35h)
   const userHours = user.contractHours || 35;
   const baseHours = 35;
   const ratio = userHours / baseHours;
 
-  // 3. Calculs dynamiques (Moteur Financier & Physique)
+  // --- MOTEUR DE CALCUL AMÉLIORÉ ---
   const stats = objectives.reduce((acc: any, obj: any) => {
     if (obj.isActive) {
        acc.totalObjectives++;
        
-       // 🔴 CORRECTION : Calcul du potentiel MAX (Paliers OU Fixe)
+       // 1. Calcul du Potentiel Financier (Paliers cumulés ou Fixe)
        let maxReward = 0;
        if (obj.paliers && obj.paliers.length > 0) {
-           // Si paliers, on additionne toutes les primes des paliers
            maxReward = obj.paliers.reduce((sum: number, p: any) => sum + (Number(p.reward) || 0), 0);
        } else {
-           // Sinon, on prend la prime fixe
            maxReward = Number(obj.reward) || 0;
        }
-       
        acc.totalPotential += maxReward;
 
-       // Sécurisation de la variable (supporte 'progress' et 'current')
+       // 2. Définition du "Vrai Sommet" (Dénominateur)
+       // Si j'ai une cible à 100, mais un palier "Expert" à 150, mon 100% c'est 150.
        const currentVal = obj.progress ?? obj.current ?? 0;
-       const targetVal = obj.target || 1;
+       const explicitTarget = obj.target || 1;
+       
+       // On cherche le seuil le plus difficile à atteindre parmi les paliers
+       let ultimateTarget = explicitTarget;
+       if (obj.paliers && obj.paliers.length > 0) {
+           const maxThreshold = Math.max(...obj.paliers.map((p: any) => Number(p.threshold)));
+           // Si c'est descendant (ex: erreurs), le "top" est le seuil le plus BAS (le plus dur)
+           // Si c'est ascendant (ex: CA), le "top" est le seuil le plus HAUT
+           if (obj.direction !== 'descending') {
+               if (maxThreshold > ultimateTarget) ultimateTarget = maxThreshold;
+           } else {
+                // Pour le descendant, c'est plus complexe, on garde la target de base pour simplifier la jauge visuelle
+           }
+       }
 
-       // --- CALCUL DE LA PROGRESSION RÉELLE (VISUELLE 0-1) ---
+       // 3. Calcul du Ratio d'avancement (0 à 1)
        let objRatio = 0;
        if (obj.direction === 'descending') {
-           // Cas descendant (ex: Taux d'erreur, moins c'est mieux)
-           objRatio = currentVal <= targetVal 
+           // Cas descendant (Moins c'est mieux)
+           // Si je suis en dessous de la cible, c'est gagné (100%)
+           objRatio = currentVal <= explicitTarget 
               ? 1 
-              : Math.max(0, targetVal / (currentVal || 1));
+              : Math.max(0, explicitTarget / (currentVal || 1));
        } else {
-           // Cas classique (CA, Ventes, etc.)
-           objRatio = Math.min(1, Math.max(0, currentVal / targetVal));
+           // Cas montant (Plus c'est mieux)
+           // On compare par rapport au "Vrai Sommet" (ultimateTarget)
+           objRatio = Math.min(1, Math.max(0, currentVal / ultimateTarget));
        }
        
-       // On ajoute au cumul pour la moyenne physique
+       // On cumule les % d'avancement pour faire une moyenne globale équitable
        acc.sumOfRatios += objRatio;
 
-       // On ajoute au cumul pour la moyenne financière pondérée
-       acc.totalWeightedProgress += (objRatio * maxReward);
-
-       // --- CALCUL DE L'ARGENT RÉELLEMENT DÉBLOQUÉ (PALIERS) ---
+       // 4. Calcul de l'argent "débloqué" (Réel)
        let unlockedForThisObj = 0;
        const isDescending = obj.direction === 'descending';
 
@@ -79,36 +86,29 @@ export default function DashboardPage() {
          });
        } else {
          const targetReached = isDescending
-            ? (currentVal <= targetVal && currentVal !== 0)
-            : currentVal >= targetVal;
+            ? (currentVal <= explicitTarget && currentVal !== 0)
+            : currentVal >= explicitTarget;
             
          if (targetReached) {
              unlockedForThisObj += maxReward;
          }
        }
-
        acc.unlockedAmount += unlockedForThisObj;
     }
     return acc;
-  }, { totalPotential: 0, unlockedAmount: 0, totalObjectives: 0, totalWeightedProgress: 0, sumOfRatios: 0 });
+  }, { totalPotential: 0, unlockedAmount: 0, totalObjectives: 0, sumOfRatios: 0 });
 
-  // 4. Calcul du pourcentage GLOBAL (Double stratégie)
-  let mainProgress = 0;
+  // 4. Calcul du Pourcentage Global (Moyenne des efforts)
+  // Si j'ai 2 objectifs : un fini (100%) et un vide (0%), la jauge sera à 50%.
+  const mainProgress = stats.totalObjectives > 0 
+    ? (stats.sumOfRatios / stats.totalObjectives) * 100 
+    : 0;
   
-  if (stats.totalPotential > 0) {
-      // CAS 1 : Il y a de l'argent à gagner -> On se base sur l'argent (Motivation financière)
-      mainProgress = (stats.totalWeightedProgress / stats.totalPotential) * 100;
-  } else if (stats.totalObjectives > 0) {
-      // CAS 2 : Pas d'argent configuré (0€) -> On se base sur l'avancement pur (Motivation performance)
-      mainProgress = (stats.sumOfRatios / stats.totalObjectives) * 100;
-  }
-  
-  // 5. Application du Ratio heures sur les montants finaux
+  // 5. Application du Ratio heures
   const potentialProRata = stats.totalPotential * ratio;
   const unlockedProRata = stats.unlockedAmount * ratio;
   const pendingProRata = potentialProRata - unlockedProRata;
 
-  // Configuration dates
   const endOfMonth = new Date();
   endOfMonth.setMonth(endOfMonth.getMonth() + 1);
   endOfMonth.setDate(0);
@@ -143,14 +143,14 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Jauge Principale (Agrandie à 250px) */}
+        {/* Jauge Principale Agrandie */}
         <div className="flex justify-center mb-6">
           <MainGauge
             progress={mainProgress} 
             unlockedAmount={unlockedProRata} 
             pendingAmount={pendingProRata}
-            size={250} 
-            strokeWidth={16}
+            size={260} // 👈 Cercle plus grand pour aérer le texte
+            strokeWidth={18}
           />
         </div>
 
@@ -158,7 +158,6 @@ export default function DashboardPage() {
           <CountdownTimer targetDate={endOfMonth} />
         </div>
 
-        {/* Grille de Statistiques */}
         <div className="grid grid-cols-2 gap-3 mb-6">
           <div className="p-4 rounded-2xl bg-card border border-border">
             <div className="flex items-center gap-2 mb-2">
@@ -197,7 +196,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Liens de Navigation */}
         <div className="space-y-2">
           <Link href="/objectifs" className="flex items-center justify-between p-4 rounded-2xl bg-card border border-border hover:border-primary/50 transition-colors">
             <div className="flex items-center gap-3">
