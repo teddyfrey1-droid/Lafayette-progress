@@ -8,9 +8,9 @@ import { usePermissions } from "@/hooks/use-permissions"
 import { useObjectives } from "@/hooks/use-objectives"
 import { useAuth } from "@/components/auth/auth-provider"
 import {
-  Target, TrendingUp, Clock, Plus, Edit3, Trash2, X, Euro, Users,
+  Target, TrendingUp, TrendingDown, Minus, Clock, Plus, Edit3, Trash2, X, Euro, Users,
   Layers, Save, Wallet, ChevronDown, ChevronUp, Calendar, Loader2,
-  Percent, Hash, AlertTriangle, ThumbsUp, Crown, Lock, EyeOff, Trash
+  Percent, Hash, AlertTriangle, ThumbsUp, Crown, Lock, EyeOff, CheckCircle2
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -24,15 +24,14 @@ import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from "@/components/ui/drawer"
 
-// Imports Firebase
 import { doc, updateDoc, addDoc, collection, onSnapshot, query, getDoc, setDoc, deleteDoc, arrayUnion, increment, where } from "firebase/firestore"
 import { db } from "@/lib/firebase/client"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 
-// --- TYPES ---
+// --- TYPES & CONSTANTES ---
 
-type TabValue = "objectifs" | "paliers" | "pilotage" | "equipe"
+type TabValue = "objectifs" | "budget" | "equipe"
 
 interface EditingPalier {
   objectiveId: string
@@ -51,7 +50,6 @@ interface TeamMember {
   color: string
 }
 
-// Liste des modèles d'objectifs
 const OBJECTIVE_PRESETS = [
   { id: "ca", label: "Chiffre d'Affaires", icon: Euro, unit: "€", direction: "ascending", desc: "Augmenter le revenu" },
   { id: "error", label: "Taux d'erreur", icon: AlertTriangle, unit: "%", direction: "descending", desc: "Réduire les erreurs" },
@@ -70,7 +68,6 @@ export default function PilotagePage() {
   const [baseHours, setBaseHours] = useState(35)
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   
-  // États d'édition
   const [showEditHours, setShowEditHours] = useState(false)
   const [editingPalier, setEditingPalier] = useState<EditingPalier | null>(null)
   const [showAddPalier, setShowAddPalier] = useState<string | null>(null)
@@ -78,24 +75,20 @@ export default function PilotagePage() {
   const [showAddObjective, setShowAddObjective] = useState(false)
   const [showPlanning, setShowPlanning] = useState(false)
   
-  // Simulation Budget
   const [budgetMax, setBudgetMax] = useState(2000)
   const [simulatedPaliers, setSimulatedPaliers] = useState<Record<string, Record<string, number>>>({})
   const [expandedSim, setExpandedSim] = useState<string | null>(null)
 
-  // 1. TRIER LES OBJECTIFS (Principal en premier, puis date)
-  // C'est ce qui règle votre problème d'ordre
+  // 1. TRIER LES OBJECTIFS
   const sortedObjectives = useMemo(() => {
     return [...objectives].sort((a, b) => {
-      // Le principal toujours en premier
       if (a.type === 'principal') return -1;
       if (b.type === 'principal') return 1;
-      // Ensuite par date de création (récent en haut)
       return (b.createdAt || '').localeCompare(a.createdAt || '');
     });
   }, [objectives]);
 
-  // 2. CHARGEMENT
+  // CHARGEMENT DATA
   useEffect(() => {
     if (!profile?.companyId) return;
     const q = query(collection(db, "users"), where("companyId", "==", profile.companyId));
@@ -125,7 +118,7 @@ export default function PilotagePage() {
     return () => unsubUsers();
   }, [profile?.companyId])
 
-  // 3. INIT SIMULATION
+  // INIT SIMULATION
   useEffect(() => {
     if (objectives.length > 0 && Object.keys(simulatedPaliers).length === 0) {
         const initial: Record<string, Record<string, number>> = {}
@@ -137,10 +130,9 @@ export default function PilotagePage() {
     }
   }, [objectives])
 
-  // 4. CALCULS INTELLIGENTS
+  // CALCULS BUDGET
   const simulationData = useMemo(() => {
     let totalCostPerPerson = 0
-
     const principalObj = objectives.find((o: any) => o.type === 'principal');
     const isPrincipalMet = !principalObj || (principalObj.direction === 'descending' 
         ? ((principalObj.current || 0) <= (principalObj.target || 1)) 
@@ -148,17 +140,11 @@ export default function PilotagePage() {
     );
 
     objectives.forEach((obj: any) => {
-      // Dans l'onglet budget, on simule tout comme actif pour voir le potentiel total
-      if (!obj.isActive && activeTab !== 'pilotage') return;
-      
-      // Si on n'est pas dans le budget, on applique le blocage du principal
-      if (obj.type === 'secondaire' && !isPrincipalMet && activeTab !== 'pilotage') {
-          return;
-      }
+      if (!obj.isActive && activeTab !== 'budget') return;
+      if (obj.type === 'secondaire' && !isPrincipalMet && activeTab !== 'budget') return;
 
       let objMaxReward = 0
       if (obj.paliers && obj.paliers.length > 0) {
-          // On utilise les valeurs simulées
           objMaxReward = obj.paliers.reduce((acc:number, p:any) => {
              const reward = simulatedPaliers[obj.id]?.[p.id] ?? p.reward;
              return acc + reward;
@@ -174,17 +160,12 @@ export default function PilotagePage() {
     const budgetUsage = Math.min(100, (teamTotalCost / (budgetMax || 1)) * 100);
 
     return {
-      teamTotalCost, 
-      budgetDiff: budgetMax - teamTotalCost, 
-      isOverBudget: teamTotalCost > budgetMax,
-      budgetUsage,
-      totalCostPerPerson, 
-      activeObjectivesCount: objectives.filter(o => o.isActive).length, 
-      isPrincipalMet
+      teamTotalCost, budgetDiff: budgetMax - teamTotalCost, isOverBudget: teamTotalCost > budgetMax, budgetUsage,
+      totalCostPerPerson, activeObjectivesCount: objectives.filter(o => o.isActive).length, isPrincipalMet
     }
   }, [objectives, simulatedPaliers, baseHours, budgetMax, teamMembers, activeTab])
 
-  // ACTIONS
+  // --- ACTIONS ---
   const handleSimulateChange = (objId: string, palierId: string, value: number) => {
     setSimulatedPaliers(prev => ({ ...prev, [objId]: { ...prev[objId], [palierId]: value } }))
   }
@@ -199,28 +180,47 @@ export default function PilotagePage() {
         });
         await Promise.all(updates);
         await setDoc(doc(db, "config", "pilotage"), { baseHours, budgetMax }, { merge: true });
-        toast({ title: "Configuration sauvegardée ✅", description: "Les primes ont été mises à jour." });
+        toast({ title: "Configuration sauvegardée ✅" });
       } catch (e) { toast({ title: "Erreur sauvegarde", variant: "destructive" }); }
   }
 
   const handleUpdateBaseHours = async () => { try { await setDoc(doc(db, "config", "pilotage"), { baseHours, budgetMax }, { merge: true }); setShowEditHours(false); toast({ title: "Config sauvegardée" }); } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } }
   const handleCreateObjective = async (data: any) => { if (!profile?.companyId) return; try { await addDoc(collection(db, "objectives"), { companyId: profile.companyId, title: data.title, description: data.description || "", isActive: true, type: data.type || "secondaire", target: Number(data.target), unit: data.unit, direction: data.direction, current: 0, paliers: [], history: [], isConfidential: data.isConfidential || false, createdAt: new Date().toISOString() }); setShowAddObjective(false); toast({ title: "Objectif créé" }); } catch(e) { toast({ title: "Erreur", variant: "destructive" }); } }
   const handleCreatePlanning = async (data: any) => { if (!profile?.companyId) return; try { await addDoc(collection(db, "plannings"), { companyId: profile.companyId, ...data, createdAt: new Date().toISOString(), status: "scheduled" }); setShowPlanning(false); toast({ title: "Planifié" }); } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } }
-  const updateProgress = async (amount: number, dateStr?: string) => { if (!selectedObj) return; const targetDate = dateStr ? new Date(dateStr) : new Date(); const formattedDate = format(targetDate, "d MMM", { locale: fr }); try { await updateDoc(doc(db, "objectives", selectedObj.id), { current: increment(amount), history: arrayUnion({ date: formattedDate, value: amount, change: amount, timestamp: targetDate.toISOString() }) }); toast({ title: "Mise à jour réussie" }); } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } }
+  
+  const updateProgress = async (amount: number, dateStr?: string) => { 
+    if (!selectedObj) return; 
+    const targetDate = dateStr ? new Date(dateStr) : new Date(); 
+    const formattedDate = format(targetDate, "d MMM", { locale: fr }); 
+    
+    try { 
+        await updateDoc(doc(db, "objectives", selectedObj.id), { 
+            current: increment(amount), 
+            history: arrayUnion({ 
+                date: formattedDate, 
+                value: amount, 
+                change: amount, 
+                timestamp: targetDate.toISOString() 
+            }) 
+        }); 
+        toast({ title: "Mise à jour réussie" }); 
+    } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } 
+  }
+
   const handleAddPalierConfirm = async (objectiveId: string, name: string, threshold: number, reward: number) => { const obj = objectives.find((o: any) => o.id === objectiveId); if(!obj) return; const newPalier = { id: `p-${Date.now()}`, name, threshold, reward }; const newPaliers = [...(obj.paliers || []), newPalier]; await updateDoc(doc(db, "objectives", objectiveId), { paliers: newPaliers }); setShowAddPalier(null); toast({ title: "Palier ajouté" }); }
   const handleUpdatePalierConfirm = async () => { if(!editingPalier) return; const obj = objectives.find((o: any) => o.id === editingPalier.objectiveId); if(!obj) return; const newPaliers = obj.paliers.map((p: any) => p.id === editingPalier.palierId ? { ...p, name: editingPalier.name, threshold: editingPalier.threshold, reward: editingPalier.reward } : p); await updateDoc(doc(db, "objectives", editingPalier.objectiveId), { paliers: newPaliers }); setEditingPalier(null); toast({ title: "Palier modifié" }); }
   const handleDeletePalier = async () => { if(!editingPalier) return; if(!confirm("Supprimer ?")) return; const obj = objectives.find((o: any) => o.id === editingPalier.objectiveId); if(!obj) return; const newPaliers = obj.paliers.filter((p: any) => p.id !== editingPalier.palierId); await updateDoc(doc(db, "objectives", editingPalier.objectiveId), { paliers: newPaliers }); setEditingPalier(null); toast({ title: "Supprimé" }); }
-  
-  // FONCTION SUPPRESSION
-  const handleDeleteObjective = async (id: string) => {
-    if (!confirm("Supprimer cet objectif est irréversible. Continuer ?")) return;
-    try {
-        await deleteDoc(doc(db, "objectives", id));
-        toast({ title: "Objectif supprimé" });
-        setSelectedObj(null);
-    } catch (e) {
-        toast({ title: "Erreur lors de la suppression", variant: "destructive" });
-    }
+  const handleDeleteObjective = async (id: string) => { if (!confirm("Supprimer cet objectif ?")) return; try { await deleteDoc(doc(db, "objectives", id)); toast({ title: "Supprimé" }); setSelectedObj(null); } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } }
+
+  // --- HELPERS TENDANCE ---
+  const getTrend = (obj: any) => {
+    if (!obj.history || obj.history.length === 0) return { icon: Minus, color: "text-muted-foreground", bg: "bg-muted", text: "Stable" };
+    const lastEntry = obj.history[obj.history.length - 1];
+    
+    if (lastEntry.change > 0) return { icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-500/10 border-emerald-200", text: `+${lastEntry.change}` };
+    if (lastEntry.change < 0) return { icon: TrendingDown, color: "text-red-600", bg: "bg-red-500/10 border-red-200", text: `${lastEntry.change}` };
+    
+    return { icon: Minus, color: "text-muted-foreground", bg: "bg-muted", text: "Stable" };
   }
 
   if (loadingObj) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary w-8 h-8"/></div>;
@@ -231,8 +231,6 @@ export default function PilotagePage() {
       <Header />
 
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
-        
-        {/* En-tête */}
         <div className="flex items-center justify-between">
             <div><h1 className="text-2xl font-bold tracking-tight">Pilotage</h1><p className="text-sm text-muted-foreground mt-0.5">Centre de contrôle</p></div>
             <div className="flex items-center gap-2">
@@ -241,46 +239,42 @@ export default function PilotagePage() {
             </div>
         </div>
 
-        {/* Alerte si Objectif Principal non atteint */}
         {!simulationData.isPrincipalMet && objectives.some(o => o.type === 'principal') && (
             <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
                 <Lock className="w-5 h-5 text-amber-600" />
-                <div className="flex-1">
-                    <p className="text-sm font-bold text-amber-700">Primes verrouillées</p>
-                    <p className="text-xs text-amber-600/80">L'objectif principal n'est pas encore atteint.</p>
-                </div>
+                <div className="flex-1"><p className="text-sm font-bold text-amber-700">Primes verrouillées</p><p className="text-xs text-amber-600/80">L'objectif principal n'est pas encore atteint.</p></div>
             </div>
         )}
 
-        {/* Navigation */}
         <div className="bg-muted/50 p-1 rounded-2xl flex mb-6">
             <button onClick={() => setActiveTab("objectifs")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "objectifs" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}><Target className="w-4 h-4" /> Objectifs</button>
-            <button onClick={() => setActiveTab("pilotage")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "pilotage" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}><Wallet className="w-4 h-4" /> Budget</button>
+            <button onClick={() => setActiveTab("budget")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "budget" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}><Wallet className="w-4 h-4" /> Budget</button>
             <button onClick={() => setActiveTab("equipe")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "equipe" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}><Users className="w-4 h-4" /> Équipe</button>
         </div>
 
-        {/* --- ONGLET 1 : OBJECTIFS --- */}
         {activeTab === "objectifs" && (
             <div className="space-y-6 animate-in fade-in">
                 <div className="flex justify-between items-center">
                     <div><h2 className="font-semibold text-sm">Objectifs actifs</h2><p className="text-xs text-muted-foreground">Progression en temps réel</p></div>
                     <Button size="sm" className="rounded-full bg-purple-500 hover:bg-purple-600 text-white px-4" onClick={() => setShowAddObjective(true)}><Plus className="w-4 h-4 mr-2" /> Créer</Button>
                 </div>
-                
-                {/* 🔴 UTILISATION DE sortedObjectives ICI POUR L'ORDRE */}
                 {sortedObjectives.map((obj: any) => {
                     const isLocked = obj.type === 'secondaire' && !simulationData.isPrincipalMet;
+                    const trend = getTrend(obj);
+                    
                     return (
-                        <div key={obj.id} onClick={() => setSelectedObj(obj)} className={cn("pulse-card p-6 bg-gradient-to-b from-card to-muted/20 cursor-pointer hover:border-primary/50 transition-all group", isLocked && "opacity-60 grayscale-[0.5]")}>
+                        <div key={obj.id} onClick={() => setSelectedObj(obj)} className={cn("pulse-card p-6 bg-gradient-to-b from-card to-muted/20 cursor-pointer hover:border-primary/50 transition-all group relative overflow-hidden", isLocked && "opacity-60 grayscale-[0.5]")}>
+                            {/* Tendance Badge Flottant */}
+                            <div className={cn("absolute top-4 right-4 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border backdrop-blur-sm shadow-sm", trend.bg, trend.color)}>
+                                <trend.icon className="w-3 h-3" />
+                                {trend.text}
+                            </div>
+
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-2 text-purple-400">
                                     {obj.type === 'principal' && <Crown className="w-4 h-4 text-amber-400" />}
                                     <Target className="w-4 h-4" />
                                     <span className={cn("text-xs font-bold uppercase tracking-wider", obj.type === 'principal' ? "text-amber-400" : "")}>{obj.type === 'principal' ? 'Principal' : 'Secondaire'}</span>
-                                </div>
-                                <div className="flex gap-2">
-                                    {obj.isConfidential && <Badge variant="secondary" className="gap-1 text-[10px]"><EyeOff className="w-3 h-3"/> Caché</Badge>}
-                                    {isLocked && <Badge variant="secondary" className="bg-amber-100 text-amber-700 gap-1"><Lock className="w-3 h-3"/> En attente</Badge>}
                                 </div>
                             </div>
                             <div className="flex flex-col items-center justify-center mb-6">
@@ -289,13 +283,8 @@ export default function PilotagePage() {
                                 <p className="text-center text-xs text-muted-foreground mt-1 max-w-[280px] leading-relaxed">{obj.description}</p>
                             </div>
                             <div className="space-y-2 mb-6">
-                                <div className="flex justify-between text-sm font-medium">
-                                    <span className="text-muted-foreground">Progression</span>
-                                    <span>{(obj.current || 0).toLocaleString()} / {(obj.target || 0).toLocaleString()} {obj.unit}</span>
-                                </div>
-                                <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                                    <div className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(((obj.current || 0) / (obj.target || 1)) * 100, 100)}%` }} />
-                                </div>
+                                <div className="flex justify-between text-sm font-medium"><span className="text-muted-foreground">Progression</span><span>{(obj.current || 0).toLocaleString()} / {(obj.target || 0).toLocaleString()} {obj.unit}</span></div>
+                                <div className="h-2.5 bg-muted rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(((obj.current || 0) / (obj.target || 1)) * 100, 100)}%` }} /></div>
                             </div>
                         </div>
                     )
@@ -303,190 +292,25 @@ export default function PilotagePage() {
             </div>
         )}
 
-        {/* --- ONGLET 2 : BUDGET --- */}
-        {activeTab === "pilotage" && (
-            <div className="space-y-6 animate-in fade-in">
-                
-                {/* 🔴 LES 3 CARRÉS D'INFORMATION */}
+        {activeTab === "budget" && (
+           <div className="space-y-6 animate-in fade-in">
                 <div className="grid grid-cols-3 gap-3">
-                    <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none">
-                        <div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center mb-2"><Target className="w-4 h-4 text-purple-500" /></div>
-                        <span className="text-xl font-bold">{simulationData.activeObjectivesCount}</span>
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Objectifs</span>
-                    </div>
-                    <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none">
-                        <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center mb-2"><Euro className="w-4 h-4 text-blue-500" /></div>
-                        <span className="text-xl font-bold">{simulationData.totalCostPerPerson}€</span>
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Max / Pers</span>
-                    </div>
-                    <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none">
-                        <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center mb-2"><Users className="w-4 h-4 text-emerald-500" /></div>
-                        <span className="text-xl font-bold">{teamMembers.length}</span>
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Équipe</span>
-                    </div>
+                    <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none"><div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center mb-2"><Target className="w-4 h-4 text-purple-500" /></div><span className="text-xl font-bold">{simulationData.activeObjectivesCount}</span><span className="text-[10px] text-muted-foreground uppercase font-bold">Objectifs</span></div>
+                    <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none"><div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center mb-2"><Euro className="w-4 h-4 text-blue-500" /></div><span className="text-xl font-bold">{simulationData.totalCostPerPerson}€</span><span className="text-[10px] text-muted-foreground uppercase font-bold">Max / Pers</span></div>
+                    <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none"><div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center mb-2"><Users className="w-4 h-4 text-emerald-500" /></div><span className="text-xl font-bold">{teamMembers.length}</span><span className="text-[10px] text-muted-foreground uppercase font-bold">Équipe</span></div>
                 </div>
-
-                {/* JAUGE DE SANTÉ BUDGÉTAIRE */}
-                <div className={cn(
-                    "p-5 rounded-2xl border transition-all duration-500", 
-                    simulationData.isOverBudget 
-                        ? "bg-red-500/10 border-red-500/30" 
-                        : "bg-emerald-500/10 border-emerald-500/30"
-                )}>
-                    <div className="flex justify-between items-center mb-3">
-                        <div className="flex items-center gap-2">
-                            <div className={cn("p-2 rounded-lg", simulationData.isOverBudget ? "bg-red-500 text-white" : "bg-emerald-500 text-white")}>
-                                <Wallet className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-sm">
-                                    {simulationData.isOverBudget ? "Attention Budget !" : "Budget Maîtrisé"}
-                                </h3>
-                                <p className="text-xs text-muted-foreground">Coût total estimé</p>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <span className={cn("text-2xl font-black", simulationData.isOverBudget ? "text-red-500" : "text-emerald-500")}>
-                                {simulationData.teamTotalCost}€
-                            </span>
-                            <p className="text-[10px] text-muted-foreground">sur {budgetMax}€ max</p>
-                        </div>
-                    </div>
-                    <div className="relative h-4 bg-background/50 rounded-full overflow-hidden border border-black/5 dark:border-white/5">
-                        <div 
-                            className={cn("absolute left-0 top-0 bottom-0 transition-all duration-500", simulationData.isOverBudget ? "bg-red-500" : "bg-emerald-500")}
-                            style={{ width: `${Math.min(100, simulationData.budgetUsage)}%` }}
-                        />
-                        <div className="absolute top-0 bottom-0 w-0.5 bg-foreground/30 z-10" style={{ left: '100%' }} /> 
-                    </div>
-                </div>
-
-                {/* SIMULATEUR */}
-                <div className="pulse-card p-5 bg-card border-border">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center"><Edit3 className="w-5 h-5 text-purple-500" /></div>
-                        <div><h3 className="font-semibold text-sm">Ajuster les primes</h3><p className="text-xs text-muted-foreground">Simulez l'impact financier</p></div>
-                    </div>
-                    
-                    <div className="space-y-3">
-                        {/* 🔴 UTILISATION DE sortedObjectives ICI AUSSI POUR L'ORDRE */}
-                        {sortedObjectives.map((obj: any) => {
-                            const isExpanded = expandedSim === obj.id;
-                            const currentSimReward = obj.paliers?.reduce((acc: number, p: any) => acc + (simulatedPaliers[obj.id]?.[p.id] ?? p.reward), 0) || 0;
-                            return (
-                                <div key={obj.id} className="bg-muted/30 rounded-xl border border-border/50 overflow-hidden transition-all">
-                                    <div 
-                                        className="p-3 flex items-center justify-between cursor-pointer hover:bg-muted/50"
-                                        onClick={() => setExpandedSim(isExpanded ? null : obj.id)}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            {obj.type === 'principal' ? <Crown className="w-4 h-4 text-amber-500"/> : <Target className="w-4 h-4 text-purple-400"/>}
-                                            <span className="text-sm font-medium">{obj.title}</span>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <Badge variant="outline" className="bg-background text-purple-500 border-purple-200">
-                                                {currentSimReward}€
-                                            </Badge>
-                                            {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground"/> : <ChevronDown className="w-4 h-4 text-muted-foreground"/>}
-                                        </div>
-                                    </div>
-                                    
-                                    {isExpanded && obj.paliers && (
-                                        <div className="p-4 space-y-6 bg-background/50 border-t border-border/50 animate-in slide-in-from-top-2">
-                                            {(!obj.paliers || obj.paliers.length === 0) && (
-                                                <div className="text-center py-2">
-                                                    <p className="text-xs text-muted-foreground mb-2">Aucun palier configuré.</p>
-                                                    <Button size="sm" variant="outline" onClick={() => setShowAddPalier(obj.id)}>Ajouter un palier</Button>
-                                                </div>
-                                            )}
-
-                                            {obj.paliers.map((p: any, idx: number) => {
-                                                const val = simulatedPaliers[obj.id]?.[p.id] ?? p.reward;
-                                                return (
-                                                    <div key={p.id} className="space-y-3">
-                                                        <div className="flex justify-between items-center text-xs">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">{idx + 1}</span>
-                                                                <span className="font-medium">{p.name} <span className="text-muted-foreground">({p.threshold} {obj.unit})</span></span>
-                                                            </div>
-                                                            <div className="flex gap-2">
-                                                                <span className="font-bold text-lg text-primary">{val}€</span>
-                                                                <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => setEditingPalier({ objectiveId: obj.id, palierId: p.id, name: p.name, threshold: p.threshold, reward: p.reward })}><Edit3 className="w-3 h-3"/></Button>
-                                                            </div>
-                                                        </div>
-                                                        <Slider value={[val]} max={500} step={5} onValueChange={(vals) => handleSimulateChange(obj.id, p.id, vals[0])} className="py-1" />
-                                                    </div>
-                                                )
-                                            })}
-                                            
-                                            {obj.paliers && obj.paliers.length > 0 && (
-                                                <Button size="sm" variant="ghost" className="w-full text-xs text-muted-foreground h-8 mt-2" onClick={() => setShowAddPalier(obj.id)}>
-                                                    <Plus className="w-3 h-3 mr-1"/> Ajouter un autre palier
-                                                </Button>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            )
-                        })}
-                    </div>
-                </div>
-
-                <div className="fixed bottom-[88px] left-4 right-4 max-w-lg mx-auto bg-card border border-border rounded-2xl p-4 shadow-2xl z-10 animate-in slide-in-from-bottom-4">
-                     <div className="space-y-3">
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground">Coût max par personne (35h)</span>
-                            <span className="font-bold">{simulationData.totalCostPerPerson}€</span>
-                        </div>
-                        <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-lg shadow-purple-500/20" onClick={handleSaveSimulation}>
-                            <Save className="w-4 h-4 mr-2"/> Valider cette configuration
-                        </Button>
-                     </div>
-                </div>
-                <div className="h-32"/>
-            </div>
+                <div className={cn("p-5 rounded-2xl border transition-all duration-500", simulationData.isOverBudget ? "bg-red-500/10 border-red-500/30" : "bg-emerald-500/10 border-emerald-500/30")}><div className="flex justify-between items-center mb-3"><div className="flex items-center gap-2"><div className={cn("p-2 rounded-lg", simulationData.isOverBudget ? "bg-red-500 text-white" : "bg-emerald-500 text-white")}><Wallet className="w-5 h-5" /></div><div><h3 className="font-bold text-sm">{simulationData.isOverBudget ? "Attention Budget !" : "Budget Maîtrisé"}</h3><p className="text-xs text-muted-foreground">Coût total estimé</p></div></div><div className="text-right"><span className={cn("text-2xl font-black", simulationData.isOverBudget ? "text-red-500" : "text-emerald-500")}>{simulationData.teamTotalCost}€</span><p className="text-[10px] text-muted-foreground">sur {budgetMax}€ max</p></div></div><div className="relative h-4 bg-background/50 rounded-full overflow-hidden border border-black/5 dark:border-white/5"><div className={cn("absolute left-0 top-0 bottom-0 transition-all duration-500", simulationData.isOverBudget ? "bg-red-500" : "bg-emerald-500")} style={{ width: `${Math.min(100, simulationData.budgetUsage)}%` }} /><div className="absolute top-0 bottom-0 w-0.5 bg-foreground/30 z-10" style={{ left: '100%' }} /></div></div>
+                <div className="pulse-card p-5 bg-card border-border"><div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center"><Edit3 className="w-5 h-5 text-purple-500" /></div><div><h3 className="font-semibold text-sm">Ajuster les primes</h3><p className="text-xs text-muted-foreground">Simulez l'impact financier</p></div></div><div className="space-y-3">{sortedObjectives.map((obj: any) => { const isExpanded = expandedSim === obj.id; const currentSimReward = obj.paliers?.reduce((acc: number, p: any) => acc + (simulatedPaliers[obj.id]?.[p.id] ?? p.reward), 0) || 0; return (<div key={obj.id} className="bg-muted/30 rounded-xl border border-border/50 overflow-hidden transition-all"><div className="p-3 flex items-center justify-between cursor-pointer hover:bg-muted/50" onClick={() => setExpandedSim(isExpanded ? null : obj.id)}><div className="flex items-center gap-3">{obj.type === 'principal' ? <Crown className="w-4 h-4 text-amber-500"/> : <Target className="w-4 h-4 text-purple-400"/>}<span className="text-sm font-medium">{obj.title}</span></div><div className="flex items-center gap-3"><Badge variant="outline" className="bg-background text-purple-500 border-purple-200">{currentSimReward}€</Badge>{isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground"/> : <ChevronDown className="w-4 h-4 text-muted-foreground"/>}</div></div>{isExpanded && obj.paliers && (<div className="p-4 space-y-6 bg-background/50 border-t border-border/50 animate-in slide-in-from-top-2">{(!obj.paliers || obj.paliers.length === 0) && (<div className="text-center py-2"><p className="text-xs text-muted-foreground mb-2">Aucun palier configuré.</p><Button size="sm" variant="outline" onClick={() => setShowAddPalier(obj.id)}>Ajouter un palier</Button></div>)}{obj.paliers.map((p: any, idx: number) => { const val = simulatedPaliers[obj.id]?.[p.id] ?? p.reward; return (<div key={p.id} className="space-y-3"><div className="flex justify-between items-center text-xs"><div className="flex items-center gap-2"><span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">{idx + 1}</span><span className="font-medium">{p.name} <span className="text-muted-foreground">({p.threshold} {obj.unit})</span></span></div><div className="flex gap-2"><span className="font-bold text-lg text-primary">{val}€</span><Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => setEditingPalier({ objectiveId: obj.id, palierId: p.id, name: p.name, threshold: p.threshold, reward: p.reward })}><Edit3 className="w-3 h-3"/></Button></div></div><Slider value={[val]} max={500} step={5} onValueChange={(vals) => handleSimulateChange(obj.id, p.id, vals[0])} className="py-1" /></div>)})} {obj.paliers && obj.paliers.length > 0 && (<Button size="sm" variant="ghost" className="w-full text-xs text-muted-foreground h-8 mt-2" onClick={() => setShowAddPalier(obj.id)}><Plus className="w-3 h-3 mr-1"/> Ajouter un autre palier</Button>)}</div>)}</div>)})}</div></div>
+                <div className="fixed bottom-[88px] left-4 right-4 max-w-lg mx-auto bg-card border border-border rounded-2xl p-4 shadow-2xl z-10 animate-in slide-in-from-bottom-4"><div className="space-y-3"><div className="flex justify-between items-center text-sm"><span className="text-muted-foreground">Coût max par personne (35h)</span><span className="font-bold">{simulationData.totalCostPerPerson}€</span></div><Button className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-lg shadow-purple-500/20" onClick={handleSaveSimulation}><Save className="w-4 h-4 mr-2"/> Valider cette configuration</Button></div></div><div className="h-32"/>
+           </div>
         )}
 
-        {/* --- ONGLET 3 : EQUIPE --- */}
         {activeTab === "equipe" && (
-            <div className="space-y-6 animate-in fade-in">
-                <div className="grid grid-cols-3 gap-3">
-                    <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none">
-                        <div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center mb-2"><Target className="w-4 h-4 text-purple-500" /></div>
-                        <span className="text-xl font-bold">{simulationData.activeObjectivesCount}</span>
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Objectifs</span>
-                    </div>
-                    <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none">
-                        <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center mb-2"><Euro className="w-4 h-4 text-blue-500" /></div>
-                        <span className="text-xl font-bold">{simulationData.totalCostPerPerson}€</span>
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Max / Pers</span>
-                    </div>
-                    <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none">
-                        <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center mb-2"><Users className="w-4 h-4 text-emerald-500" /></div>
-                        <span className="text-xl font-bold">{teamMembers.length}</span>
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Équipe</span>
-                    </div>
-                </div>
-
+             <div className="space-y-6 animate-in fade-in">
+                <div className="grid grid-cols-3 gap-3"><div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none"><div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center mb-2"><Target className="w-4 h-4 text-purple-500" /></div><span className="text-xl font-bold">{simulationData.activeObjectivesCount}</span><span className="text-[10px] text-muted-foreground uppercase font-bold">Objectifs</span></div><div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none"><div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center mb-2"><Euro className="w-4 h-4 text-blue-500" /></div><span className="text-xl font-bold">{simulationData.totalCostPerPerson}€</span><span className="text-[10px] text-muted-foreground uppercase font-bold">Max / Pers</span></div><div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none"><div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center mb-2"><Users className="w-4 h-4 text-emerald-500" /></div><span className="text-xl font-bold">{teamMembers.length}</span><span className="text-[10px] text-muted-foreground uppercase font-bold">Équipe</span></div></div>
                 <div className="flex items-center justify-between"><h2 className="font-semibold text-sm">Détail par collaborateur</h2><span className="text-xs text-muted-foreground">Base {baseHours}h</span></div>
-                <div className="space-y-3">
-                    {teamMembers.map((member) => {
-                        const ratio = member.contractHours / baseHours;
-                        const potentialPrime = Math.round(simulationData.totalCostPerPerson * ratio);
-                        return (
-                            <div key={member.id} className="pulse-card p-4">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm", member.color)}>{member.initials}</div>
-                                    <div className="flex-1 min-w-0"><p className="font-medium text-sm truncate">{member.name}</p><p className="text-xs text-muted-foreground">{member.role}</p></div>
-                                    <div className="text-right"><p className="text-lg font-bold text-purple-400">{potentialPrime}€</p><p className="text-[10px] text-muted-foreground">potentiel</p></div>
-                                </div>
-                                <div className="flex justify-between items-center text-xs text-muted-foreground mt-2"><span>Contrat: {member.contractHours}h</span><span>Ratio: {Math.round(ratio * 100)}%</span></div>
-                                <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mt-2"><div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(100, ratio * 100)}%` }} /></div>
-                            </div>
-                        )
-                    })}
-                </div>
-            </div>
+                <div className="space-y-3">{teamMembers.map((member) => { const ratio = member.contractHours / baseHours; const potentialPrime = Math.round(simulationData.totalCostPerPerson * ratio); return (<div key={member.id} className="pulse-card p-4"><div className="flex items-center gap-3 mb-3"><div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm", member.color)}>{member.initials}</div><div className="flex-1 min-w-0"><p className="font-medium text-sm truncate">{member.name}</p><p className="text-xs text-muted-foreground">{member.role}</p></div><div className="text-right"><p className="text-lg font-bold text-purple-400">{potentialPrime}€</p><p className="text-[10px] text-muted-foreground">potentiel</p></div></div><div className="flex justify-between items-center text-xs text-muted-foreground mt-2"><span>Contrat: {member.contractHours}h</span><span>Ratio: {Math.round(ratio * 100)}%</span></div><div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mt-2"><div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(100, ratio * 100)}%` }} /></div></div>)})}</div>
+             </div>
         )}
 
       </main>
@@ -494,9 +318,7 @@ export default function PilotagePage() {
       {/* --- MODALES & DRAWERS --- */}
       {showAddObjective && <AddObjectiveAdvancedModal onClose={() => setShowAddObjective(false)} onConfirm={handleCreateObjective} />}
       {showPlanning && <AddPlanningAdvancedModal onClose={() => setShowPlanning(false)} onConfirm={handleCreatePlanning} />}
-      {showAddPalier && (
-        <AddPalierModal onClose={() => setShowAddPalier(null)} onConfirm={(n, t, r) => handleAddPalierConfirm(showAddPalier, n, t, r)} objective={objectives.find((o:any) => o.id === showAddPalier)} />
-      )}
+      {showAddPalier && <AddPalierModal onClose={() => setShowAddPalier(null)} onConfirm={(n, t, r) => handleAddPalierConfirm(showAddPalier, n, t, r)} objective={objectives.find((o:any) => o.id === showAddPalier)} />}
       
       {editingPalier && (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={() => setEditingPalier(null)}>
@@ -515,7 +337,7 @@ export default function PilotagePage() {
         </div>
       )}
 
-      {showEditHours && (
+       {showEditHours && (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={() => setShowEditHours(false)}>
           <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
             <h2 className="font-semibold mb-4 text-lg">Configuration Générale</h2>
@@ -528,6 +350,7 @@ export default function PilotagePage() {
         </div>
       )}
 
+      {/* Drawer Détail avec Timeline */}
       <ObjectiveDetailDrawer 
         objective={selectedObj} 
         onClose={() => setSelectedObj(null)} 
@@ -550,28 +373,16 @@ function AddObjectiveAdvancedModal({ onClose, onConfirm }: { onClose: () => void
     const [description, setDescription] = useState("")
     const [isPrincipal, setIsPrincipal] = useState(false)
     const [isConfidential, setIsConfidential] = useState(false)
-
     useEffect(() => { const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset); if(p) { setTitle(p.label); setDescription(p.desc); } }, [selectedPreset])
-
-    const handleSubmit = () => {
-        const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)!
-        onConfirm({ title, description, target, unit: p.unit, direction: p.direction, type: isPrincipal ? 'principal' : 'secondaire', isConfidential })
-    }
-
+    const handleSubmit = () => { const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)!; onConfirm({ title, description, target, unit: p.unit, direction: p.direction, type: isPrincipal ? 'principal' : 'secondaire', isConfidential }) }
     return (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm flex items-end sm:items-center justify-center" onClick={onClose}>
             <div className="bg-card w-full max-w-md rounded-t-3xl sm:rounded-2xl p-6 space-y-6 pb-10" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center"><h2 className="text-lg font-bold">Nouvel Objectif</h2><Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5"/></Button></div>
                 <div className="space-y-4">
                     <div className="flex gap-2">
-                        <div className="bg-muted/30 p-3 rounded-xl flex-1 flex items-center justify-between border border-border">
-                            <Label className="text-xs font-bold flex items-center gap-1"><Crown className="w-3 h-3 text-amber-500" /> Principal</Label>
-                            <Switch checked={isPrincipal} onCheckedChange={setIsPrincipal} />
-                        </div>
-                        <div className="bg-muted/30 p-3 rounded-xl flex-1 flex items-center justify-between border border-border">
-                            <Label className="text-xs font-bold flex items-center gap-1"><EyeOff className="w-3 h-3 text-muted-foreground" /> Masquer</Label>
-                            <Switch checked={isConfidential} onCheckedChange={setIsConfidential} />
-                        </div>
+                        <div className="bg-muted/30 p-3 rounded-xl flex-1 flex items-center justify-between border border-border"><Label className="text-xs font-bold flex items-center gap-1"><Crown className="w-3 h-3 text-amber-500" /> Principal</Label><Switch checked={isPrincipal} onCheckedChange={setIsPrincipal} /></div>
+                        <div className="bg-muted/30 p-3 rounded-xl flex-1 flex items-center justify-between border border-border"><Label className="text-xs font-bold flex items-center gap-1"><EyeOff className="w-3 h-3 text-muted-foreground" /> Masquer</Label><Switch checked={isConfidential} onCheckedChange={setIsConfidential} /></div>
                     </div>
                     <div><Label className="mb-2 block">Type d'objectif</Label><div className="grid grid-cols-3 gap-2">{OBJECTIVE_PRESETS.map(preset => (<button key={preset.id} onClick={() => setSelectedPreset(preset.id)} className={cn("flex flex-col items-center justify-center gap-1 p-3 rounded-xl border transition-all text-xs text-center h-20", selectedPreset === preset.id ? "border-purple-500 bg-purple-500/10 text-purple-500 font-semibold ring-1 ring-purple-500/20" : "border-border bg-muted/20 text-muted-foreground hover:bg-muted")}><preset.icon className="w-5 h-5" /><span>{preset.label}</span></button>))}</div></div>
                     <div><Label>Titre</Label><Input value={title} onChange={e => setTitle(e.target.value)} className="mt-1.5"/></div>
@@ -596,20 +407,10 @@ function AddPlanningAdvancedModal({ onClose, onConfirm }: { onClose: () => void,
     const [palierName, setPalierName] = useState("")
     const [palierThreshold, setPalierThreshold] = useState("")
     const [palierReward, setPalierReward] = useState("")
-
     useEffect(() => { const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset); if(p) setTitle(p.label); }, [selectedPreset])
-
-    const handleAddPalier = () => {
-        if (!palierName || !palierThreshold || !palierReward) return;
-        setPaliers([...paliers, { id: Date.now().toString(), name: palierName, threshold: Number(palierThreshold), reward: Number(palierReward) }]);
-        setPalierName(""); setPalierThreshold(""); setPalierReward("");
-    }
+    const handleAddPalier = () => { if (!palierName || !palierThreshold || !palierReward) return; setPaliers([...paliers, { id: Date.now().toString(), name: palierName, threshold: Number(palierThreshold), reward: Number(palierReward) }]); setPalierName(""); setPalierThreshold(""); setPalierReward(""); }
     const handleRemovePalier = (id: string) => { setPaliers(paliers.filter(p => p.id !== id)); }
-    const handleSubmit = () => {
-        const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)!
-        onConfirm({ title, target, unit: p.unit, direction: p.direction, startMonth, startYear, duration, type: isPrincipal ? 'principal' : 'secondaire', isConfidential, paliers })
-    }
-
+    const handleSubmit = () => { const p = OBJECTIVE_PRESETS.find(p => p.id === selectedPreset)!; onConfirm({ title, target, unit: p.unit, direction: p.direction, startMonth, startYear, duration, type: isPrincipal ? 'principal' : 'secondaire', isConfidential, paliers }) }
     return (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm flex items-end sm:items-center justify-center" onClick={onClose}>
             <div className="bg-card w-full max-w-md rounded-t-3xl sm:rounded-2xl p-6 space-y-6 pb-10 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
@@ -617,19 +418,7 @@ function AddPlanningAdvancedModal({ onClose, onConfirm }: { onClose: () => void,
                 <div className="space-y-5">
                     <div className="grid grid-cols-2 gap-4"><div><Label className="mb-2 block">Mois de début</Label><Select value={startMonth} onValueChange={setStartMonth}><SelectTrigger className="h-10 bg-muted/30"><SelectValue /></SelectTrigger><SelectContent>{["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"].map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select></div><div><Label className="mb-2 block">Année</Label><Select value={startYear} onValueChange={setStartYear}><SelectTrigger className="h-10 bg-muted/30"><SelectValue /></SelectTrigger><SelectContent>{["2025", "2026", "2027"].map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent></Select></div></div>
                     <div><Label className="mb-2 block">Durée</Label><div className="flex gap-2">{[1, 3, 6, 12].map(d => (<button key={d} onClick={() => setDuration(d)} className={cn("flex-1 py-2 rounded-lg text-sm border transition-all", duration === d ? "bg-purple-600 text-white border-purple-600" : "bg-muted/20 border-border text-muted-foreground")}>{d} mois</button>))}</div></div>
-                    <div className="flex gap-2">
-                        <div className="bg-muted/30 p-3 rounded-xl flex-1 flex items-center justify-between border border-border"><Label className="text-xs font-bold flex items-center gap-1"><Crown className="w-3 h-3 text-amber-500" /> Principal</Label><Switch checked={isPrincipal} onCheckedChange={setIsPrincipal} /></div>
-                        <div className="bg-muted/30 p-3 rounded-xl flex-1 flex items-center justify-between border border-border"><Label className="text-xs font-bold flex items-center gap-1"><EyeOff className="w-3 h-3 text-muted-foreground" /> Masquer</Label><Switch checked={isConfidential} onCheckedChange={setIsConfidential} /></div>
-                    </div>
-                    <div><Label className="mb-2 block">Type d'objectif</Label><div className="grid grid-cols-3 gap-2">{OBJECTIVE_PRESETS.map(preset => (<button key={preset.id} onClick={() => setSelectedPreset(preset.id)} className={cn("flex flex-col items-center justify-center gap-1 p-3 rounded-xl border transition-all text-xs text-center h-20", selectedPreset === preset.id ? "border-purple-500 bg-purple-500/10 text-purple-500 font-semibold ring-1 ring-purple-500/20" : "border-border bg-muted/20 text-muted-foreground hover:bg-muted")}><preset.icon className="w-5 h-5" /><span>{preset.label}</span></button>))}</div></div>
-                    <div><Label>Cible prévue</Label><Input type="number" value={target} onChange={e => setTarget(e.target.value)} className="mt-1.5 font-bold" placeholder="0" /></div>
-                    <div className="border-t border-border pt-4">
-                        <Label className="mb-3 block text-sm font-semibold">Configuration des paliers</Label>
-                        <div className="space-y-3 mb-4">{paliers.map((p, idx) => (<div key={p.id} className="flex items-center justify-between bg-muted/20 p-2 rounded-lg text-sm"><span className="font-medium text-xs">{idx + 1}. {p.name} (Seuil: {p.threshold})</span><div className="flex items-center gap-2"><span className="font-bold text-green-600">+{p.reward}€</span><button onClick={() => handleRemovePalier(p.id)}><Trash2 className="w-4 h-4 text-muted-foreground hover:text-red-500" /></button></div></div>))}{paliers.length === 0 && <p className="text-xs text-muted-foreground italic text-center py-2">Aucun palier configuré</p>}</div>
-                        <div className="grid grid-cols-3 gap-2 items-end"><div><Label className="text-[10px] mb-1">Nom</Label><Input value={palierName} onChange={e => setPalierName(e.target.value)} placeholder="Niveau 1" className="h-8 text-xs" /></div><div><Label className="text-[10px] mb-1">Seuil</Label><Input type="number" value={palierThreshold} onChange={e => setPalierThreshold(e.target.value)} placeholder="1000" className="h-8 text-xs" /></div><div><Label className="text-[10px] mb-1">Prime</Label><Input type="number" value={palierReward} onChange={e => setPalierReward(e.target.value)} placeholder="50" className="h-8 text-xs" /></div></div>
-                        <Button variant="outline" size="sm" className="w-full mt-2 h-8 text-xs" onClick={handleAddPalier} disabled={!palierName || !palierThreshold || !palierReward}><Plus className="w-3 h-3 mr-1" /> Ajouter ce palier</Button>
-                    </div>
-                    <Button className="w-full py-6 text-base bg-purple-600 hover:bg-purple-700" onClick={handleSubmit} disabled={!target}>Valider la planification</Button>
+                     <Button className="w-full py-6 text-base bg-purple-600 hover:bg-purple-700" onClick={handleSubmit} disabled={!target}>Valider la planification</Button>
                 </div>
             </div>
         </div>
@@ -656,40 +445,85 @@ function AddPalierModal({ onClose, onConfirm, objective }: { onClose: () => void
     )
 }
 
-function ObjectiveDetailDrawer({ 
-    objective, 
-    onClose, 
-    onUpdateProgress,
-    onDelete 
-}: { 
-    objective: any, 
-    onClose: () => void, 
-    onUpdateProgress: (amount: number, date?: string) => void,
-    onDelete: () => void 
-}) {
+function ObjectiveDetailDrawer({ objective, onClose, onUpdateProgress, onDelete }: { objective: any, onClose: () => void, onUpdateProgress: (amount: number, date?: string) => void, onDelete: () => void }) {
     const [updateVal, setUpdateVal] = useState("")
     const [updateDate, setUpdateDate] = useState("")
 
     if (!objective) return null
 
+    // Trier l'historique (le plus récent en haut)
+    const sortedHistory = [...(objective.history || [])].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
     return (
         <Drawer open={!!objective} onOpenChange={(open) => !open && onClose()}>
             <DrawerContent className="fixed bottom-0 left-0 right-0 h-[96vh] flex flex-col outline-none bg-card rounded-t-3xl">
                 <div className="w-full max-w-lg mx-auto flex flex-col h-full overflow-hidden">
-                    <DrawerHeader className="text-left border-b border-border/50 pb-4 shrink-0">
-                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-purple-500/10 mx-auto mb-3"><Target className="w-6 h-6 text-purple-500" /></div>
-                        <div className="text-center space-y-1"><Badge variant="outline" className="mb-2 border-purple-500/30 text-purple-400 bg-purple-500/10">{objective.type === "principal" ? "Principal" : "Secondaire"}</Badge><DrawerTitle className="text-2xl font-bold">{objective.title}</DrawerTitle><p className="text-sm text-muted-foreground px-4">{objective.description}</p></div>
+                    <DrawerHeader className="text-left border-b border-border/50 pb-4 shrink-0 bg-background/50 backdrop-blur-md sticky top-0 z-10">
+                        <div className="flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-purple-500/10 to-blue-500/10 mx-auto mb-3 shadow-sm border border-purple-100">
+                            <Target className="w-7 h-7 text-purple-600" />
+                        </div>
+                        <div className="text-center space-y-1">
+                            <Badge variant="secondary" className="mb-2 bg-purple-50 text-purple-700 border-purple-100">{objective.type === "principal" ? "Principal" : "Secondaire"}</Badge>
+                            <DrawerTitle className="text-2xl font-bold tracking-tight">{objective.title}</DrawerTitle>
+                            <p className="text-sm text-muted-foreground px-4 max-w-xs mx-auto">{objective.description}</p>
+                        </div>
                     </DrawerHeader>
-                    <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                        <div className="flex flex-col items-center"><CircularProgress value={objective.current} max={objective.target} direction={objective.direction} size={160} strokeWidth={12} /></div>
-                        <div className="bg-purple-500/5 border border-purple-500/20 p-4 rounded-2xl space-y-3"><h3 className="font-bold text-sm flex items-center gap-2"><Wallet className="w-4 h-4 text-purple-500" /> Mettre à jour la progression</h3><div className="flex gap-2"><Input type="number" placeholder="Montant..." value={updateVal} onChange={(e) => setUpdateVal(e.target.value)} className="bg-background flex-1" /><Input type="date" value={updateDate} onChange={(e) => setUpdateDate(e.target.value)} className="bg-background w-32" /><Button onClick={() => { onUpdateProgress(Number(updateVal), updateDate); setUpdateVal(""); setUpdateDate(""); }} className="bg-purple-600 hover:bg-purple-700"><Plus className="w-4 h-4" /></Button></div></div>
-                        <div><h3 className="font-bold text-base mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-purple-500" /> Historique complet</h3><div className="space-y-1 pb-4">{objective.history && objective.history.length > 0 ? ([...objective.history].reverse().map((h: any, i: number) => (<div key={i} className="flex justify-between items-center p-3 rounded-xl hover:bg-muted/30 transition-colors border-b border-border/40 last:border-0"><div className="flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-purple-500" /><span className="text-sm font-medium">{h.date}</span></div><div className="flex items-center gap-4"><span className="font-bold text-sm">{(h.value||0).toLocaleString()} {objective.unit}</span><span className="text-xs font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded">+{h.change}</span></div></div>))) : (<p className="text-sm text-muted-foreground italic">Aucun historique.</p>)}</div></div>
+                    
+                    <div className="flex-1 overflow-y-auto p-4 space-y-8 pb-32">
+                        {/* Jauge Circulaire */}
+                        <div className="flex flex-col items-center py-4">
+                            <CircularProgress value={objective.current} max={objective.target} direction={objective.direction} size={180} strokeWidth={16} />
+                        </div>
+
+                        {/* Input Mise à jour */}
+                        <div className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-3">
+                            <h3 className="font-bold text-sm flex items-center gap-2"><Wallet className="w-4 h-4 text-purple-500" /> Mettre à jour</h3>
+                            <div className="flex gap-2">
+                                <Input type="number" placeholder="Montant..." value={updateVal} onChange={(e) => setUpdateVal(e.target.value)} className="bg-background flex-1 h-12 text-lg font-medium" />
+                                <Input type="date" value={updateDate} onChange={(e) => setUpdateDate(e.target.value)} className="bg-background w-36 h-12" />
+                                <Button onClick={() => { onUpdateProgress(Number(updateVal), updateDate); setUpdateVal(""); setUpdateDate(""); }} className="bg-purple-600 hover:bg-purple-700 h-12 w-12 rounded-xl shadow-lg shadow-purple-500/20"><Plus className="w-6 h-6" /></Button>
+                            </div>
+                        </div>
+
+                        {/* 🔴 TIMELINE VERTICALE */}
+                        <div className="relative pl-2">
+                            <h3 className="font-bold text-base mb-6 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-purple-500" /> Historique</h3>
+                            
+                            {/* Ligne verticale */}
+                            <div className="absolute left-[23px] top-10 bottom-0 w-0.5 bg-gradient-to-b from-purple-200 to-transparent dark:from-purple-900" />
+
+                            <div className="space-y-6">
+                                {sortedHistory.length > 0 ? (
+                                    sortedHistory.map((h: any, i: number) => (
+                                        <div key={i} className="relative flex gap-4 items-start group animate-in slide-in-from-bottom-2" style={{ animationDelay: `${i * 50}ms` }}>
+                                            {/* Point */}
+                                            <div className="z-10 w-3.5 h-3.5 rounded-full bg-background border-[3px] border-purple-500 mt-1.5 shrink-0 shadow-sm ring-4 ring-background" />
+                                            
+                                            <div className="flex-1">
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <span className="text-sm font-semibold text-foreground">{h.date}</span>
+                                                    <Badge variant="outline" className={cn("text-xs font-bold", h.change > 0 ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-red-50 text-red-600 border-red-200")}>
+                                                        {h.change > 0 ? "+" : ""}{h.change} {objective.unit}
+                                                    </Badge>
+                                                </div>
+                                                <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded-lg inline-block">
+                                                    Nouvelle valeur : <span className="font-medium text-foreground">{h.value} {objective.unit}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-8 text-muted-foreground text-sm italic bg-muted/20 rounded-xl">Aucune activité enregistrée.</div>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                    <DrawerFooter className="pt-2 pb-6 px-4 shrink-0 bg-card border-t border-border/50 flex-col gap-2">
-                        <Button variant="destructive" className="w-full rounded-xl gap-2" onClick={onDelete}>
-                            <Trash2 className="w-4 h-4" /> Supprimer l'objectif
+                    
+                    <DrawerFooter className="pt-4 pb-8 px-4 shrink-0 bg-background/80 backdrop-blur-md border-t border-border/50 flex-col gap-2 z-20">
+                        <Button variant="outline" className="w-full rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={onDelete}>
+                            <Trash2 className="w-4 h-4 mr-2" /> Supprimer l'objectif
                         </Button>
-                        <DrawerClose asChild><Button variant="outline" className="w-full rounded-xl">Fermer</Button></DrawerClose>
+                        <DrawerClose asChild><Button variant="secondary" className="w-full rounded-xl">Fermer</Button></DrawerClose>
                     </DrawerFooter>
                 </div>
             </DrawerContent>
@@ -706,7 +540,7 @@ function CircularProgress({ value, max, size = 180, strokeWidth = 12, direction 
     return (
         <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
             <svg width={size} height={size} className="transform -rotate-90"><circle cx={size / 2} cy={size / 2} r={radius} stroke="currentColor" strokeWidth={strokeWidth} fill="transparent" className="text-muted/20" /><circle cx={size / 2} cy={size / 2} r={radius} stroke="url(#gradient)" strokeWidth={strokeWidth} fill="transparent" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000 ease-out" /><defs><linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#3b82f6" /><stop offset="100%" stopColor="#a855f7" /></linearGradient></defs></svg>
-            <div className="absolute flex flex-col items-center"><span className="text-4xl font-bold tracking-tighter">{Math.round(percentage)}%</span><span className="text-[10px] text-muted-foreground mt-1 font-medium">{safeValue.toLocaleString()} / {safeMax.toLocaleString()}</span></div>
+            <div className="absolute flex flex-col items-center"><span className="text-4xl font-black tracking-tighter text-foreground">{Math.round(percentage)}%</span><span className="text-[10px] text-muted-foreground mt-1 font-medium bg-muted/40 px-2 py-0.5 rounded-full">{safeValue.toLocaleString()} / {safeMax.toLocaleString()}</span></div>
         </div>
     )
 }
