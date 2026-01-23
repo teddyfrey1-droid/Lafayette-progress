@@ -8,22 +8,21 @@ import { usePermissions } from "@/hooks/use-permissions"
 import { useObjectives } from "@/hooks/use-objectives"
 import { useAuth } from "@/components/auth/auth-provider"
 import {
-  Target, TrendingUp, Clock, Plus, Edit3, Trash2, X, Check, Euro, Users,
-  Layers, AlertCircle, Save, Wallet, ChevronDown, ChevronUp, Calendar, Loader2,
+  Target, TrendingUp, Clock, Plus, Edit3, Trash2, X, Euro, Users,
+  Layers, Save, Wallet, ChevronDown, ChevronUp, Calendar, Loader2,
   Percent, Hash, AlertTriangle, ThumbsUp, Crown, Lock, EyeOff, Trash
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger, DrawerFooter, DrawerClose } from "@/components/ui/drawer"
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from "@/components/ui/drawer"
 
 // Imports Firebase
 import { doc, updateDoc, addDoc, collection, onSnapshot, query, getDoc, setDoc, deleteDoc, arrayUnion, increment, where } from "firebase/firestore"
@@ -84,7 +83,19 @@ export default function PilotagePage() {
   const [simulatedPaliers, setSimulatedPaliers] = useState<Record<string, Record<string, number>>>({})
   const [expandedSim, setExpandedSim] = useState<string | null>(null)
 
-  // 1. CHARGEMENT
+  // 1. TRIER LES OBJECTIFS (Principal en premier, puis date)
+  // C'est ce qui règle votre problème d'ordre
+  const sortedObjectives = useMemo(() => {
+    return [...objectives].sort((a, b) => {
+      // Le principal toujours en premier
+      if (a.type === 'principal') return -1;
+      if (b.type === 'principal') return 1;
+      // Ensuite par date de création (récent en haut)
+      return (b.createdAt || '').localeCompare(a.createdAt || '');
+    });
+  }, [objectives]);
+
+  // 2. CHARGEMENT
   useEffect(() => {
     if (!profile?.companyId) return;
     const q = query(collection(db, "users"), where("companyId", "==", profile.companyId));
@@ -114,7 +125,7 @@ export default function PilotagePage() {
     return () => unsubUsers();
   }, [profile?.companyId])
 
-  // 2. INIT SIMULATION
+  // 3. INIT SIMULATION
   useEffect(() => {
     if (objectives.length > 0 && Object.keys(simulatedPaliers).length === 0) {
         const initial: Record<string, Record<string, number>> = {}
@@ -126,7 +137,7 @@ export default function PilotagePage() {
     }
   }, [objectives])
 
-  // 3. CALCULS INTELLIGENTS
+  // 4. CALCULS INTELLIGENTS
   const simulationData = useMemo(() => {
     let totalCostPerPerson = 0
 
@@ -137,15 +148,17 @@ export default function PilotagePage() {
     );
 
     objectives.forEach((obj: any) => {
-      // Dans l'onglet budget (appelé 'pilotage' ici pour l'ID), on simule tout comme actif
+      // Dans l'onglet budget, on simule tout comme actif pour voir le potentiel total
       if (!obj.isActive && activeTab !== 'pilotage') return;
       
+      // Si on n'est pas dans le budget, on applique le blocage du principal
       if (obj.type === 'secondaire' && !isPrincipalMet && activeTab !== 'pilotage') {
           return;
       }
 
       let objMaxReward = 0
       if (obj.paliers && obj.paliers.length > 0) {
+          // On utilise les valeurs simulées
           objMaxReward = obj.paliers.reduce((acc:number, p:any) => {
              const reward = simulatedPaliers[obj.id]?.[p.id] ?? p.reward;
              return acc + reward;
@@ -197,7 +210,7 @@ export default function PilotagePage() {
   const handleAddPalierConfirm = async (objectiveId: string, name: string, threshold: number, reward: number) => { const obj = objectives.find((o: any) => o.id === objectiveId); if(!obj) return; const newPalier = { id: `p-${Date.now()}`, name, threshold, reward }; const newPaliers = [...(obj.paliers || []), newPalier]; await updateDoc(doc(db, "objectives", objectiveId), { paliers: newPaliers }); setShowAddPalier(null); toast({ title: "Palier ajouté" }); }
   const handleUpdatePalierConfirm = async () => { if(!editingPalier) return; const obj = objectives.find((o: any) => o.id === editingPalier.objectiveId); if(!obj) return; const newPaliers = obj.paliers.map((p: any) => p.id === editingPalier.palierId ? { ...p, name: editingPalier.name, threshold: editingPalier.threshold, reward: editingPalier.reward } : p); await updateDoc(doc(db, "objectives", editingPalier.objectiveId), { paliers: newPaliers }); setEditingPalier(null); toast({ title: "Palier modifié" }); }
   const handleDeletePalier = async () => { if(!editingPalier) return; if(!confirm("Supprimer ?")) return; const obj = objectives.find((o: any) => o.id === editingPalier.objectiveId); if(!obj) return; const newPaliers = obj.paliers.filter((p: any) => p.id !== editingPalier.palierId); await updateDoc(doc(db, "objectives", editingPalier.objectiveId), { paliers: newPaliers }); setEditingPalier(null); toast({ title: "Supprimé" }); }
-
+  
   // FONCTION SUPPRESSION
   const handleDeleteObjective = async (id: string) => {
     if (!confirm("Supprimer cet objectif est irréversible. Continuer ?")) return;
@@ -228,6 +241,7 @@ export default function PilotagePage() {
             </div>
         </div>
 
+        {/* Alerte si Objectif Principal non atteint */}
         {!simulationData.isPrincipalMet && objectives.some(o => o.type === 'principal') && (
             <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
                 <Lock className="w-5 h-5 text-amber-600" />
@@ -252,7 +266,9 @@ export default function PilotagePage() {
                     <div><h2 className="font-semibold text-sm">Objectifs actifs</h2><p className="text-xs text-muted-foreground">Progression en temps réel</p></div>
                     <Button size="sm" className="rounded-full bg-purple-500 hover:bg-purple-600 text-white px-4" onClick={() => setShowAddObjective(true)}><Plus className="w-4 h-4 mr-2" /> Créer</Button>
                 </div>
-                {objectives.map((obj: any) => {
+                
+                {/* 🔴 UTILISATION DE sortedObjectives ICI POUR L'ORDRE */}
+                {sortedObjectives.map((obj: any) => {
                     const isLocked = obj.type === 'secondaire' && !simulationData.isPrincipalMet;
                     return (
                         <div key={obj.id} onClick={() => setSelectedObj(obj)} className={cn("pulse-card p-6 bg-gradient-to-b from-card to-muted/20 cursor-pointer hover:border-primary/50 transition-all group", isLocked && "opacity-60 grayscale-[0.5]")}>
@@ -287,11 +303,11 @@ export default function PilotagePage() {
             </div>
         )}
 
-        {/* --- ONGLET 2 : BUDGET (AVEC LES 3 CARRÉS AJOUTÉS) --- */}
+        {/* --- ONGLET 2 : BUDGET --- */}
         {activeTab === "pilotage" && (
             <div className="space-y-6 animate-in fade-in">
                 
-                {/* 🔴 LES 3 CARRÉS D'INFORMATION (DUPLIQUÉS DE L'ONGLET ÉQUIPE) */}
+                {/* 🔴 LES 3 CARRÉS D'INFORMATION */}
                 <div className="grid grid-cols-3 gap-3">
                     <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none">
                         <div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center mb-2"><Target className="w-4 h-4 text-purple-500" /></div>
@@ -336,7 +352,6 @@ export default function PilotagePage() {
                             <p className="text-[10px] text-muted-foreground">sur {budgetMax}€ max</p>
                         </div>
                     </div>
-                    {/* Barre visuelle */}
                     <div className="relative h-4 bg-background/50 rounded-full overflow-hidden border border-black/5 dark:border-white/5">
                         <div 
                             className={cn("absolute left-0 top-0 bottom-0 transition-all duration-500", simulationData.isOverBudget ? "bg-red-500" : "bg-emerald-500")}
@@ -354,7 +369,8 @@ export default function PilotagePage() {
                     </div>
                     
                     <div className="space-y-3">
-                        {objectives.map((obj: any) => {
+                        {/* 🔴 UTILISATION DE sortedObjectives ICI AUSSI POUR L'ORDRE */}
+                        {sortedObjectives.map((obj: any) => {
                             const isExpanded = expandedSim === obj.id;
                             const currentSimReward = obj.paliers?.reduce((acc: number, p: any) => acc + (simulatedPaliers[obj.id]?.[p.id] ?? p.reward), 0) || 0;
                             return (
@@ -469,7 +485,6 @@ export default function PilotagePage() {
                             </div>
                         )
                     })}
-                    {teamMembers.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">Aucun collaborateur trouvé.</p>}
                 </div>
             </div>
         )}
@@ -483,7 +498,6 @@ export default function PilotagePage() {
         <AddPalierModal onClose={() => setShowAddPalier(null)} onConfirm={(n, t, r) => handleAddPalierConfirm(showAddPalier, n, t, r)} objective={objectives.find((o:any) => o.id === showAddPalier)} />
       )}
       
-      {/* Modale Edition Palier */}
       {editingPalier && (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={() => setEditingPalier(null)}>
           <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
@@ -501,7 +515,6 @@ export default function PilotagePage() {
         </div>
       )}
 
-      {/* Modale Heures & Budget */}
       {showEditHours && (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={() => setShowEditHours(false)}>
           <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
@@ -515,7 +528,6 @@ export default function PilotagePage() {
         </div>
       )}
 
-      {/* Drawer Détail Objectif (Avec Suppression) */}
       <ObjectiveDetailDrawer 
         objective={selectedObj} 
         onClose={() => setSelectedObj(null)} 
