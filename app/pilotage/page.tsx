@@ -8,22 +8,22 @@ import { usePermissions } from "@/hooks/use-permissions"
 import { useObjectives } from "@/hooks/use-objectives"
 import { useAuth } from "@/components/auth/auth-provider"
 import {
-  Target, TrendingUp, Clock, Plus, Edit3, Trash2, X, Euro, Users,
-  Layers, Save, Wallet, ChevronDown, ChevronUp, Calendar, Loader2,
-  Percent, Hash, AlertTriangle, ThumbsUp, Crown, Lock, EyeOff
+  Target, TrendingUp, Clock, Plus, Edit3, Trash2, X, Check, Euro, Users,
+  Layers, AlertCircle, Save, Wallet, ChevronDown, ChevronUp, Calendar, Loader2,
+  Percent, Hash, AlertTriangle, ThumbsUp, Crown, Lock, EyeOff, Trash
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from "@/components/ui/drawer"
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger, DrawerFooter, DrawerClose } from "@/components/ui/drawer"
 
 // Imports Firebase
 import { doc, updateDoc, addDoc, collection, onSnapshot, query, getDoc, setDoc, deleteDoc, arrayUnion, increment, where } from "firebase/firestore"
@@ -33,7 +33,7 @@ import { fr } from "date-fns/locale"
 
 // --- TYPES ---
 
-type TabValue = "objectifs" | "budget" | "equipe"
+type TabValue = "objectifs" | "paliers" | "pilotage" | "equipe"
 
 interface EditingPalier {
   objectiveId: string
@@ -114,7 +114,7 @@ export default function PilotagePage() {
     return () => unsubUsers();
   }, [profile?.companyId])
 
-  // 2. INIT SIMULATION (Dès qu'on charge les objectifs, on prépare le simulateur)
+  // 2. INIT SIMULATION
   useEffect(() => {
     if (objectives.length > 0 && Object.keys(simulatedPaliers).length === 0) {
         const initial: Record<string, Record<string, number>> = {}
@@ -126,7 +126,7 @@ export default function PilotagePage() {
     }
   }, [objectives])
 
-  // 3. MOTEUR DE CALCUL (Le Cerveau du Simulateur)
+  // 3. CALCULS INTELLIGENTS
   const simulationData = useMemo(() => {
     let totalCostPerPerson = 0
 
@@ -137,26 +137,25 @@ export default function PilotagePage() {
     );
 
     objectives.forEach((obj: any) => {
-      // Dans l'onglet budget, on simule comme si TOUT était actif et atteint
-      if (!obj.isActive && activeTab !== 'budget') return;
+      // Dans l'onglet budget (appelé 'pilotage' ici pour l'ID), on simule tout comme actif
+      if (!obj.isActive && activeTab !== 'pilotage') return;
       
-      // Si on n'est pas dans le budget, on applique les règles strictes (Principal bloquant)
-      if (obj.type === 'secondaire' && !isPrincipalMet && activeTab !== 'budget') {
+      if (obj.type === 'secondaire' && !isPrincipalMet && activeTab !== 'pilotage') {
           return;
       }
 
       let objMaxReward = 0
       if (obj.paliers && obj.paliers.length > 0) {
-          // On additionne les récompenses simulées (sliders)
           objMaxReward = obj.paliers.reduce((acc:number, p:any) => {
              const reward = simulatedPaliers[obj.id]?.[p.id] ?? p.reward;
              return acc + reward;
           }, 0);
+      } else {
+          objMaxReward = obj.fixedReward || 0;
       }
       totalCostPerPerson += objMaxReward
     })
 
-    // Calcul du coût total de l'équipe (Prorata heures)
     const totalTeamRatio = teamMembers.reduce((sum, m) => sum + (m.contractHours / baseHours), 0);
     const teamTotalCost = Math.round(totalCostPerPerson * totalTeamRatio);
     const budgetUsage = Math.min(100, (teamTotalCost / (budgetMax || 1)) * 100);
@@ -172,8 +171,7 @@ export default function PilotagePage() {
     }
   }, [objectives, simulatedPaliers, baseHours, budgetMax, teamMembers, activeTab])
 
-  // --- ACTIONS ---
-
+  // ACTIONS
   const handleSimulateChange = (objId: string, palierId: string, value: number) => {
     setSimulatedPaliers(prev => ({ ...prev, [objId]: { ...prev[objId], [palierId]: value } }))
   }
@@ -188,7 +186,7 @@ export default function PilotagePage() {
         });
         await Promise.all(updates);
         await setDoc(doc(db, "config", "pilotage"), { baseHours, budgetMax }, { merge: true });
-        toast({ title: "Configuration sauvegardée ✅", description: "Les primes ont été mises à jour pour tout le monde." });
+        toast({ title: "Configuration sauvegardée ✅", description: "Les primes ont été mises à jour." });
       } catch (e) { toast({ title: "Erreur sauvegarde", variant: "destructive" }); }
   }
 
@@ -202,10 +200,10 @@ export default function PilotagePage() {
 
   // FONCTION SUPPRESSION
   const handleDeleteObjective = async (id: string) => {
-    if (!confirm("⚠️ Attention : Supprimer cet objectif est irréversible. Continuer ?")) return;
+    if (!confirm("Supprimer cet objectif est irréversible. Continuer ?")) return;
     try {
         await deleteDoc(doc(db, "objectives", id));
-        toast({ title: "🗑️ Objectif supprimé" });
+        toast({ title: "Objectif supprimé" });
         setSelectedObj(null);
     } catch (e) {
         toast({ title: "Erreur lors de la suppression", variant: "destructive" });
@@ -221,7 +219,7 @@ export default function PilotagePage() {
 
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
         
-        {/* En-tête de la page */}
+        {/* En-tête */}
         <div className="flex items-center justify-between">
             <div><h1 className="text-2xl font-bold tracking-tight">Pilotage</h1><p className="text-sm text-muted-foreground mt-0.5">Centre de contrôle</p></div>
             <div className="flex items-center gap-2">
@@ -230,7 +228,6 @@ export default function PilotagePage() {
             </div>
         </div>
 
-        {/* Alerte si Objectif Principal non atteint */}
         {!simulationData.isPrincipalMet && objectives.some(o => o.type === 'principal') && (
             <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
                 <Lock className="w-5 h-5 text-amber-600" />
@@ -241,14 +238,14 @@ export default function PilotagePage() {
             </div>
         )}
 
-        {/* Menu de Navigation (Tabs) */}
+        {/* Navigation */}
         <div className="bg-muted/50 p-1 rounded-2xl flex mb-6">
             <button onClick={() => setActiveTab("objectifs")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "objectifs" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}><Target className="w-4 h-4" /> Objectifs</button>
-            <button onClick={() => setActiveTab("budget")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "budget" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}><Wallet className="w-4 h-4" /> Budget</button>
+            <button onClick={() => setActiveTab("pilotage")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "pilotage" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}><Wallet className="w-4 h-4" /> Budget</button>
             <button onClick={() => setActiveTab("equipe")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "equipe" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}><Users className="w-4 h-4" /> Équipe</button>
         </div>
 
-        {/* --- ONGLET 1 : OBJECTIFS (Liste classique) --- */}
+        {/* --- ONGLET 1 : OBJECTIFS --- */}
         {activeTab === "objectifs" && (
             <div className="space-y-6 animate-in fade-in">
                 <div className="flex justify-between items-center">
@@ -290,11 +287,30 @@ export default function PilotagePage() {
             </div>
         )}
 
-        {/* --- ONGLET 2 : BUDGET & SIMULATEUR (C'est ici la magie) --- */}
-        {activeTab === "budget" && (
+        {/* --- ONGLET 2 : BUDGET (AVEC LES 3 CARRÉS AJOUTÉS) --- */}
+        {activeTab === "pilotage" && (
             <div className="space-y-6 animate-in fade-in">
                 
-                {/* JAUGE DE SANTÉ BUDGÉTAIRE (Ludique) */}
+                {/* 🔴 LES 3 CARRÉS D'INFORMATION (DUPLIQUÉS DE L'ONGLET ÉQUIPE) */}
+                <div className="grid grid-cols-3 gap-3">
+                    <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none">
+                        <div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center mb-2"><Target className="w-4 h-4 text-purple-500" /></div>
+                        <span className="text-xl font-bold">{simulationData.activeObjectivesCount}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Objectifs</span>
+                    </div>
+                    <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none">
+                        <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center mb-2"><Euro className="w-4 h-4 text-blue-500" /></div>
+                        <span className="text-xl font-bold">{simulationData.totalCostPerPerson}€</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Max / Pers</span>
+                    </div>
+                    <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none">
+                        <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center mb-2"><Users className="w-4 h-4 text-emerald-500" /></div>
+                        <span className="text-xl font-bold">{teamMembers.length}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Équipe</span>
+                    </div>
+                </div>
+
+                {/* JAUGE DE SANTÉ BUDGÉTAIRE */}
                 <div className={cn(
                     "p-5 rounded-2xl border transition-all duration-500", 
                     simulationData.isOverBudget 
@@ -308,7 +324,7 @@ export default function PilotagePage() {
                             </div>
                             <div>
                                 <h3 className="font-bold text-sm">
-                                    {simulationData.isOverBudget ? "Attention Budget ! 😱" : "Budget Maîtrisé 😌"}
+                                    {simulationData.isOverBudget ? "Attention Budget !" : "Budget Maîtrisé"}
                                 </h3>
                                 <p className="text-xs text-muted-foreground">Coût total estimé</p>
                             </div>
@@ -320,23 +336,17 @@ export default function PilotagePage() {
                             <p className="text-[10px] text-muted-foreground">sur {budgetMax}€ max</p>
                         </div>
                     </div>
-                    {/* La barre de progression visuelle */}
+                    {/* Barre visuelle */}
                     <div className="relative h-4 bg-background/50 rounded-full overflow-hidden border border-black/5 dark:border-white/5">
                         <div 
                             className={cn("absolute left-0 top-0 bottom-0 transition-all duration-500", simulationData.isOverBudget ? "bg-red-500" : "bg-emerald-500")}
                             style={{ width: `${Math.min(100, simulationData.budgetUsage)}%` }}
                         />
-                        {/* Marqueur de limite */}
                         <div className="absolute top-0 bottom-0 w-0.5 bg-foreground/30 z-10" style={{ left: '100%' }} /> 
-                    </div>
-                    <div className="flex justify-between text-[10px] mt-1.5 font-medium text-muted-foreground">
-                        <span>0€</span>
-                        <span>{Math.round(budgetMax / 2)}€</span>
-                        <span>{budgetMax}€</span>
                     </div>
                 </div>
 
-                {/* SIMULATEUR ACCORDÉON (Style "Edit") */}
+                {/* SIMULATEUR */}
                 <div className="pulse-card p-5 bg-card border-border">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center"><Edit3 className="w-5 h-5 text-purple-500" /></div>
@@ -367,8 +377,6 @@ export default function PilotagePage() {
                                     
                                     {isExpanded && obj.paliers && (
                                         <div className="p-4 space-y-6 bg-background/50 border-t border-border/50 animate-in slide-in-from-top-2">
-                                            
-                                            {/* Bouton pour ajouter un palier si vide */}
                                             {(!obj.paliers || obj.paliers.length === 0) && (
                                                 <div className="text-center py-2">
                                                     <p className="text-xs text-muted-foreground mb-2">Aucun palier configuré.</p>
@@ -390,13 +398,7 @@ export default function PilotagePage() {
                                                                 <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => setEditingPalier({ objectiveId: obj.id, palierId: p.id, name: p.name, threshold: p.threshold, reward: p.reward })}><Edit3 className="w-3 h-3"/></Button>
                                                             </div>
                                                         </div>
-                                                        <Slider 
-                                                            value={[val]} 
-                                                            max={500} 
-                                                            step={5} 
-                                                            onValueChange={(vals) => handleSimulateChange(obj.id, p.id, vals[0])}
-                                                            className="py-1"
-                                                        />
+                                                        <Slider value={[val]} max={500} step={5} onValueChange={(vals) => handleSimulateChange(obj.id, p.id, vals[0])} className="py-1" />
                                                     </div>
                                                 )
                                             })}
@@ -414,7 +416,6 @@ export default function PilotagePage() {
                     </div>
                 </div>
 
-                {/* Footer Fixe avec Résumé */}
                 <div className="fixed bottom-[88px] left-4 right-4 max-w-lg mx-auto bg-card border border-border rounded-2xl p-4 shadow-2xl z-10 animate-in slide-in-from-bottom-4">
                      <div className="space-y-3">
                         <div className="flex justify-between items-center text-sm">
@@ -430,7 +431,7 @@ export default function PilotagePage() {
             </div>
         )}
 
-        {/* --- ONGLET 3 : EQUIPE (Résultats) --- */}
+        {/* --- ONGLET 3 : EQUIPE --- */}
         {activeTab === "equipe" && (
             <div className="space-y-6 animate-in fade-in">
                 <div className="grid grid-cols-3 gap-3">
