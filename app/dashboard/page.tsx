@@ -24,37 +24,46 @@ export default function DashboardPage() {
   const baseHours = 35;
   const ratio = userHours / baseHours;
 
-  // 3. Calculs dynamiques (Moteur Financier)
+  // 3. Calculs dynamiques (Moteur Financier & Physique)
   const stats = objectives.reduce((acc: any, obj: any) => {
     if (obj.isActive) {
        acc.totalObjectives++;
        
-       // Le potentiel MAX de cet objectif
-       const maxReward = obj.reward || 0;
+       // 🔴 CORRECTION : Calcul du potentiel MAX (Paliers OU Fixe)
+       let maxReward = 0;
+       if (obj.paliers && obj.paliers.length > 0) {
+           // Si paliers, on additionne toutes les primes des paliers
+           maxReward = obj.paliers.reduce((sum: number, p: any) => sum + (Number(p.reward) || 0), 0);
+       } else {
+           // Sinon, on prend la prime fixe
+           maxReward = Number(obj.reward) || 0;
+       }
+       
        acc.totalPotential += maxReward;
 
-       // ⚠️ CORRECTION 1 : Sécurisation de la variable (supporte 'progress' et 'current')
+       // Sécurisation de la variable (supporte 'progress' et 'current')
        const currentVal = obj.progress ?? obj.current ?? 0;
        const targetVal = obj.target || 1;
 
-       // --- NOUVEAU : CALCUL DE LA PROGRESSION LISSÉE (VISUELLE) ---
-       // On calcule un % d'avancement (0 à 1) pour faire bouger la jauge en continu
+       // --- CALCUL DE LA PROGRESSION RÉELLE (VISUELLE 0-1) ---
        let objRatio = 0;
        if (obj.direction === 'descending') {
-           // Cas descendant (ex: moins d'erreurs = mieux)
+           // Cas descendant (ex: Taux d'erreur, moins c'est mieux)
            objRatio = currentVal <= targetVal 
               ? 1 
               : Math.max(0, targetVal / (currentVal || 1));
        } else {
-           // Cas classique (plus de ventes = mieux)
+           // Cas classique (CA, Ventes, etc.)
            objRatio = Math.min(1, Math.max(0, currentVal / targetVal));
        }
        
-       // On ajoute cette "progression virtuelle" au total pondéré
+       // On ajoute au cumul pour la moyenne physique
+       acc.sumOfRatios += objRatio;
+
+       // On ajoute au cumul pour la moyenne financière pondérée
        acc.totalWeightedProgress += (objRatio * maxReward);
 
-       // --- CALCUL DE L'ARGENT RÉEL (PALIERS) ---
-       // (Reste identique pour l'affichage "Acquis" en euros)
+       // --- CALCUL DE L'ARGENT RÉELLEMENT DÉBLOQUÉ (PALIERS) ---
        let unlockedForThisObj = 0;
        const isDescending = obj.direction === 'descending';
 
@@ -65,7 +74,7 @@ export default function DashboardPage() {
                 : currentVal >= p.threshold; 
 
              if (thresholdReached) {
-                 unlockedForThisObj += p.reward;
+                 unlockedForThisObj += (Number(p.reward) || 0);
              }
          });
        } else {
@@ -81,19 +90,25 @@ export default function DashboardPage() {
        acc.unlockedAmount += unlockedForThisObj;
     }
     return acc;
-  }, { totalPotential: 0, unlockedAmount: 0, totalObjectives: 0, totalWeightedProgress: 0 });
+  }, { totalPotential: 0, unlockedAmount: 0, totalObjectives: 0, totalWeightedProgress: 0, sumOfRatios: 0 });
 
-  // 4. Calcul du pourcentage GLOBAL (Basé sur la progression pondérée)
-  // ⚠️ CORRECTION 2 : On utilise le progrès pondéré au lieu de l'argent débloqué
-  const mainProgress = stats.totalPotential > 0 
-    ? (stats.totalWeightedProgress / stats.totalPotential) * 100 
-    : 0;
+  // 4. Calcul du pourcentage GLOBAL (Double stratégie)
+  let mainProgress = 0;
   
-  // 5. Application du Ratio heures
+  if (stats.totalPotential > 0) {
+      // CAS 1 : Il y a de l'argent à gagner -> On se base sur l'argent (Motivation financière)
+      mainProgress = (stats.totalWeightedProgress / stats.totalPotential) * 100;
+  } else if (stats.totalObjectives > 0) {
+      // CAS 2 : Pas d'argent configuré (0€) -> On se base sur l'avancement pur (Motivation performance)
+      mainProgress = (stats.sumOfRatios / stats.totalObjectives) * 100;
+  }
+  
+  // 5. Application du Ratio heures sur les montants finaux
   const potentialProRata = stats.totalPotential * ratio;
   const unlockedProRata = stats.unlockedAmount * ratio;
   const pendingProRata = potentialProRata - unlockedProRata;
 
+  // Configuration dates
   const endOfMonth = new Date();
   endOfMonth.setMonth(endOfMonth.getMonth() + 1);
   endOfMonth.setDate(0);
@@ -128,14 +143,14 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Jauge Principale */}
+        {/* Jauge Principale (Agrandie à 250px) */}
         <div className="flex justify-center mb-6">
           <MainGauge
             progress={mainProgress} 
             unlockedAmount={unlockedProRata} 
             pendingAmount={pendingProRata}
-            size={220}
-            strokeWidth={14}
+            size={250} 
+            strokeWidth={16}
           />
         </div>
 
@@ -143,6 +158,7 @@ export default function DashboardPage() {
           <CountdownTimer targetDate={endOfMonth} />
         </div>
 
+        {/* Grille de Statistiques */}
         <div className="grid grid-cols-2 gap-3 mb-6">
           <div className="p-4 rounded-2xl bg-card border border-border">
             <div className="flex items-center gap-2 mb-2">
@@ -181,6 +197,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Liens de Navigation */}
         <div className="space-y-2">
           <Link href="/objectifs" className="flex items-center justify-between p-4 rounded-2xl bg-card border border-border hover:border-primary/50 transition-colors">
             <div className="flex items-center gap-3">
