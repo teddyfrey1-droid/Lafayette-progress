@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
@@ -11,7 +11,7 @@ import {
   Calendar, Mail, Phone, ArrowLeft, Settings, History, BarChart3, Globe,
   Truck, Target, Coins, FileText, Plus, Trash2, Briefcase, AlertCircle,
   PieChart, UserX, MoreHorizontal, ChevronDown, KeyRound, Send, Loader2,
-  User, Lock, Save, X, Clock
+  User, Lock, Save, X, Clock, FileEdit, Zap, MousePointerClick, CalendarDays, Laptop
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -26,11 +26,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { useToast } from "@/hooks/use-toast"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 // Imports Firebase
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, deleteDoc, serverTimestamp } from "firebase/firestore"
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, deleteDoc, serverTimestamp, limit } from "firebase/firestore"
 import { signInWithCustomToken, signOut } from "firebase/auth"
 import { db, auth } from "@/lib/firebase/client"
+import { format, formatDistanceToNow } from "date-fns"
+import { fr } from "date-fns/locale"
 
 // --- TYPES ---
 
@@ -74,18 +77,33 @@ interface User {
   createdAt: string
 }
 
-interface ConnectionLog {
+// Log optimisé pour l'affichage timeline
+interface LogEntry {
   id: string
   userId: string
   userName: string
+  userRole: string
+  companyId: string
   companyName: string
   action: string
-  device: string
-  browser: string
-  ip: string
-  location: string
+  details: string
   timestamp: string
-  success: boolean
+  device?: string
+}
+
+interface GroupedUserLog {
+  userId: string
+  userName: string
+  userRole: string
+  lastActive: string
+  logs: LogEntry[]
+}
+
+interface GroupedCompanyLog {
+  companyId: string
+  companyName: string
+  lastActive: string
+  users: GroupedUserLog[]
 }
 
 // Fonctionnalités par défaut
@@ -117,7 +135,7 @@ function CentreControlePageContent() {
   // Sélections & Édition
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
-  const [editingUser, setEditingUser] = useState<User | null>(null) // Pour le drawer d'édition
+  const [editingUser, setEditingUser] = useState<User | null>(null)
   
   // Modales & Collapsibles
   const [isAddCompanyOpen, setIsAddCompanyOpen] = useState(false)
@@ -125,11 +143,12 @@ function CentreControlePageContent() {
   const [isCompanySelectorOpen, setIsCompanySelectorOpen] = useState(false)
   const [companySearchQuery, setCompanySearchQuery] = useState("")
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const [expandedUserIds, setExpandedUserIds] = useState<string[]>([]) // Pour la timeline logs
 
   // Données Firebase
   const [companiesState, setCompaniesState] = useState<Company[]>([])
   const [usersState, setUsersState] = useState<User[]>([])
-  const [logsState, setLogsState] = useState<ConnectionLog[]>([])
+  const [logsState, setLogsState] = useState<LogEntry[]>([])
 
   // Formulaire Nouvelle Entreprise
   const [newCompany, setNewCompany] = useState({
@@ -139,6 +158,57 @@ function CentreControlePageContent() {
     status: "active",
     contactEmail: ""
   })
+
+  // --- TRAITEMENT DES LOGS (GROUPEMENT) ---
+  const groupedLogs = useMemo(() => {
+    const companiesMap: Record<string, GroupedCompanyLog> = {}
+    
+    logsState.forEach(log => {
+      // Filtre de recherche sur les logs
+      if (searchQuery && activeTab === "logs" &&
+          !log.companyName.toLowerCase().includes(searchQuery.toLowerCase()) && 
+          !log.userName.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return
+      }
+
+      // Init Entreprise
+      if (!companiesMap[log.companyId]) {
+        companiesMap[log.companyId] = {
+          companyId: log.companyId,
+          companyName: log.companyName || "Entreprise Inconnue",
+          lastActive: log.timestamp,
+          users: []
+        }
+      }
+
+      // Init Utilisateur
+      let userGroup = companiesMap[log.companyId].users.find(u => u.userId === log.userId)
+      if (!userGroup) {
+        userGroup = {
+          userId: log.userId,
+          userName: log.userName || "Utilisateur Inconnu",
+          userRole: log.userRole,
+          lastActive: log.timestamp,
+          logs: []
+        }
+        companiesMap[log.companyId].users.push(userGroup)
+      }
+
+      userGroup.logs.push(log)
+    })
+
+    // Tri Entreprises par activité récente
+    const sorted = Object.values(companiesMap).sort((a, b) => 
+      new Date(b.lastActive).getTime() - new Date(a.lastActive).getTime()
+    )
+
+    // Tri Users par activité récente
+    sorted.forEach(company => {
+        company.users.sort((a, b) => new Date(b.lastActive).getTime() - new Date(a.lastActive).getTime())
+    })
+
+    return sorted
+  }, [logsState, searchQuery, activeTab])
 
   // --- HELPERS VISUELS ---
 
@@ -161,33 +231,43 @@ function CentreControlePageContent() {
     }
   }
 
+  const getActionIcon = (action: string) => {
+    const a = (action || "").toUpperCase();
+    if (a.includes("LOGIN")) return <LogIn className="w-3.5 h-3.5" />
+    if (a.includes("CREATE")) return <Zap className="w-3.5 h-3.5" />
+    if (a.includes("UPDATE")) return <FileEdit className="w-3.5 h-3.5" />
+    if (a.includes("DELETE")) return <Trash2 className="w-3.5 h-3.5" />
+    return <MousePointerClick className="w-3.5 h-3.5" />
+  }
+
+  const getActionStyle = (action: string) => {
+    const a = (action || "").toUpperCase();
+    if (a.includes("LOGIN")) return "bg-emerald-500/10 text-emerald-600 border-emerald-200"
+    if (a.includes("CREATE")) return "bg-blue-500/10 text-blue-600 border-blue-200"
+    if (a.includes("UPDATE")) return "bg-amber-500/10 text-amber-600 border-amber-200"
+    if (a.includes("DELETE")) return "bg-red-500/10 text-red-600 border-red-200"
+    return "bg-slate-100 text-slate-600 border-slate-200"
+  }
+
   // --- ACTIONS SUPER ADMIN ---
 
-  // 1. Mise à jour complète utilisateur via API
   const handleFullUpdateUser = async (formData: any) => {
     try {
         const res = await fetch("/api/admin/invite-user", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-               uid: editingUser?.id,
-               ...formData
-            }),
+            body: JSON.stringify({ uid: editingUser?.id, ...formData }),
         });
-        
         if (!res.ok) throw new Error("Erreur API");
-        
         setEditingUser(null);
-        toast({ title: "Utilisateur mis à jour", description: "Les informations ont été synchronisées." });
+        toast({ title: "Utilisateur mis à jour" });
     } catch (error) {
-        console.error(error);
         toast({ title: "Erreur", description: "Échec de la mise à jour.", variant: "destructive" });
     }
   };
 
-  // 2. Se connecter en tant que (Impersonate)
   const handleImpersonate = async (uid: string) => {
-    if (!confirm("⚠️ ATTENTION : Vous allez être déconnecté de votre compte Admin et connecté en tant que cet utilisateur.")) return;
+    if (!confirm("⚠️ ATTENTION : Vous allez être connecté en tant que cet utilisateur.")) return;
     try {
         const res = await fetch("/api/admin/user-actions", {
             method: "POST",
@@ -208,7 +288,6 @@ function CentreControlePageContent() {
     }
   }
 
-  // 3. Reset Mot de Passe (API)
   const handleSendResetEmail = async (email: string, name: string) => {
     if (!email) return;
     try {
@@ -238,7 +317,7 @@ function CentreControlePageContent() {
       setNewCompany({ name: "", industry: "", plan: "starter", status: "active", contactEmail: "" })
       toast({ title: "Entreprise créée" })
     } catch (e) {
-      toast({ title: "Erreur", description: "Impossible de créer l'entreprise.", variant: "destructive" })
+      toast({ title: "Erreur", variant: "destructive" })
     }
   }
 
@@ -250,7 +329,7 @@ function CentreControlePageContent() {
       }
       toast({ title: "Mise à jour réussie" })
     } catch (e) {
-      toast({ title: "Erreur", description: "La mise à jour a échoué.", variant: "destructive" })
+      toast({ title: "Erreur", variant: "destructive" })
     }
   }
 
@@ -296,7 +375,7 @@ function CentreControlePageContent() {
         if (selectedUser?.id === uid) setSelectedUser(null);
         toast({ title: "Utilisateur supprimé" });
     } catch (e) {
-        toast({ title: "Erreur", description: "Impossible de supprimer le compte.", variant: "destructive" });
+        toast({ title: "Erreur", variant: "destructive" });
     }
   }
 
@@ -360,8 +439,9 @@ function CentreControlePageContent() {
       }))
     })
 
-    const unsubLogs = onSnapshot(query(collection(db, "logs"), orderBy("timestamp", "desc")), (snapshot) => {
-      setLogsState(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ConnectionLog)))
+    // 🔴 CORRECTION ICI : On écoute "system_logs" au lieu de "logs"
+    const unsubLogs = onSnapshot(query(collection(db, "system_logs"), orderBy("timestamp", "desc"), limit(500)), (snapshot) => {
+      setLogsState(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LogEntry)))
     })
 
     return () => { unsubUsers(); unsubCompanies(); unsubLogs() }
@@ -375,6 +455,11 @@ function CentreControlePageContent() {
   const filteredCompanies = companiesState.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
   const filteredUsers = usersState.filter(u => u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase()))
   const filteredCompaniesForSelect = companiesState.filter(c => c.name.toLowerCase().includes(companySearchQuery.toLowerCase()))
+
+  // Helper toggle users dans logs
+  const toggleUserLogs = (userId: string) => {
+      setExpandedUserIds(prev => prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId])
+  }
 
   // --- VUE DÉTAIL ENTREPRISE ---
   if (selectedCompany) {
@@ -486,7 +571,6 @@ function CentreControlePageContent() {
                         <div>
                             <div className="flex items-center gap-2">
                                 <h1 className="text-xl font-bold">{selectedUser.name}</h1>
-                                {/* BOUTON MODIFIER */}
                                 <Button size="sm" variant="outline" className="h-7 w-7 p-0 rounded-full" onClick={() => setEditingUser(selectedUser)}>
                                     <Edit3 className="w-3 h-3 text-muted-foreground" />
                                 </Button>
@@ -588,13 +672,13 @@ function CentreControlePageContent() {
                             {userLogs.length === 0 && <p className="text-sm text-muted-foreground">Aucune donnée.</p>}
                             {userLogs.slice(0, 5).map(log => (
                                 <div key={log.id} className="flex gap-3 text-sm bg-muted/30 p-2 rounded-lg">
-                                    <div className={cn("w-1.5 h-1.5 rounded-full mt-1.5 shrink-0", log.success ? "bg-emerald-500" : "bg-red-500")} />
+                                    <div className="mt-1">{getActionIcon(log.action)}</div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex justify-between">
                                             <p className="font-medium truncate">{log.action}</p>
-                                            <span className="text-xs text-muted-foreground">{log.timestamp?.split(" ")[1]}</span>
+                                            <span className="text-xs text-muted-foreground">{log.timestamp?.split("T")[1]?.slice(0,5)}</span>
                                         </div>
-                                        <p className="text-xs text-muted-foreground truncate">{log.browser} • {log.ip}</p>
+                                        <p className="text-xs text-muted-foreground truncate">{log.details}</p>
                                     </div>
                                 </div>
                             ))}
@@ -676,7 +760,6 @@ function CentreControlePageContent() {
           </div>
         )}
 
-        {/* ONGLETS UTILISATEURS */}
         {activeTab === "users" && (
           <div className="space-y-6">
             {orphanedUsers.length > 0 && (
@@ -776,13 +859,125 @@ function CentreControlePageContent() {
           </div>
         )}
 
-        {/* Logs Tab */}
+        {/* --- ONGLET LOGS / CONNEXIONS (VUE AVANCÉE) --- */}
         {activeTab === "logs" && (
-          <div className="space-y-3">
-            {logsState.length === 0 && <p className="text-center text-sm text-muted-foreground py-4">Aucun log récent.</p>}
-            {logsState.map((log) => (
-              <div key={log.id} className="pulse-card p-3 flex items-center gap-3"><div className={cn("w-2 h-2 rounded-full", log.success ? "bg-emerald-500" : "bg-red-500")} /><div className="flex-1"><p className="text-sm font-medium">{log.userName}</p><p className="text-xs text-muted-foreground">{log.action}</p></div><span className="text-xs text-muted-foreground">{log.timestamp?.split(" ")[1]}</span></div>
-            ))}
+          <div className="space-y-6">
+            <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wider ml-1">Flux d'activité par Structure</h2>
+            
+            <Accordion type="multiple" className="space-y-4">
+            {groupedLogs.map((company) => (
+                <AccordionItem 
+                    key={company.companyId} 
+                    value={company.companyId} 
+                    className="border border-border/60 rounded-2xl bg-card shadow-sm overflow-hidden"
+                >
+                  <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center gap-4 w-full">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0">
+                        <Building2 className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <div className="text-left flex-1">
+                        <h3 className="font-bold text-lg leading-none">{company.companyName}</h3>
+                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                           {company.users.length} collaborateurs • <span className="text-indigo-500">Actif {formatDistanceToNow(new Date(company.lastActive), { addSuffix: true, locale: fr })}</span>
+                        </p>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+
+                  <AccordionContent className="px-0 pb-0 bg-muted/20 border-t border-border/50">
+                    <div className="p-3 grid gap-3">
+                      {company.users.map((user) => {
+                        const isExpanded = expandedUserIds.includes(user.userId)
+                        
+                        return (
+                          <div key={user.userId} className={cn("rounded-xl border transition-all duration-300 overflow-hidden bg-background", isExpanded ? "border-indigo-200 shadow-md" : "border-transparent shadow-sm")}>
+                            
+                            {/* En-tête Utilisateur */}
+                            <div 
+                              onClick={() => toggleUserLogs(user.userId)}
+                              className="p-3 flex items-center justify-between cursor-pointer hover:bg-muted/50"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="relative">
+                                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold border border-slate-300">
+                                    {user.userName.substring(0, 2).toUpperCase()}
+                                    </div>
+                                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-semibold text-sm">{user.userName}</p>
+                                    <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal text-muted-foreground">{user.userRole}</Badge>
+                                  </div>
+                                  <p className="text-[10px] text-muted-foreground">
+                                    {user.logs.length} actions • Dernier: {format(new Date(user.lastActive), "HH:mm")}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className={cn("w-8 h-8 flex items-center justify-center rounded-full transition-transform bg-muted/50", isExpanded && "rotate-180 bg-indigo-50 text-indigo-600")}>
+                                <Shield className="w-4 h-4" />
+                              </div>
+                            </div>
+
+                            {/* Timeline des Logs */}
+                            {isExpanded && (
+                              <div className="bg-slate-50/50 dark:bg-slate-900/50 p-4 border-t border-border/50">
+                                <div className="relative pl-4 space-y-6">
+                                    {/* Ligne verticale de timeline */}
+                                    <div className="absolute left-[21px] top-2 bottom-4 w-0.5 bg-slate-200 dark:bg-slate-800" />
+
+                                    {user.logs.map((log) => (
+                                        <div key={log.id} className="relative flex gap-4 items-start group">
+                                            {/* Point sur la timeline */}
+                                            <div className="z-10 w-3 h-3 rounded-full bg-white border-2 border-indigo-400 mt-1.5 shrink-0 group-hover:scale-125 transition-transform shadow-sm" />
+                                            
+                                            <div className="flex-1 min-w-0 bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <Badge variant="outline" className={cn("text-[10px] px-2 py-0.5 gap-1.5 border font-bold", getActionStyle(log.action))}>
+                                                        {getActionIcon(log.action)}
+                                                        {log.action}
+                                                    </Badge>
+                                                    <span className="text-[10px] text-muted-foreground font-mono bg-muted/50 px-1.5 rounded">
+                                                        {format(new Date(log.timestamp), "HH:mm:ss")}
+                                                    </span>
+                                                </div>
+                                                
+                                                <p className="text-sm text-foreground/90 leading-snug">{log.details}</p>
+                                                
+                                                <div className="mt-2 flex items-center gap-3 text-[10px] text-muted-foreground">
+                                                    {log.device && (
+                                                        <span className="flex items-center gap-1">
+                                                            {log.device.toLowerCase().includes("mobile") ? <Smartphone className="w-3 h-3"/> : <Laptop className="w-3 h-3"/>}
+                                                            {log.device}
+                                                        </span>
+                                                    )}
+                                                    <span className="flex items-center gap-1">
+                                                        <CalendarDays className="w-3 h-3"/>
+                                                        {format(new Date(log.timestamp), "dd MMM yyyy", { locale: fr })}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+
+            {groupedLogs.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground bg-card rounded-2xl border border-dashed">
+                <Activity className="w-12 h-12 mb-3 opacity-20" />
+                <p>Aucune activité enregistrée pour le moment.</p>
+              </div>
+            )}
           </div>
         )}
       </main>
