@@ -11,8 +11,8 @@ import { Label } from "@/components/ui/label"
 import { PulseLogo } from "@/components/pulse/pulse-logo"
 import { useAuth } from "@/components/auth/auth-provider"
 import { friendlyAuthError, signInWithEmail } from "@/lib/firebase/auth"
-import { logSystemAction } from "@/lib/logger" // 👈 IMPORTANT
-import { doc, getDoc } from "firebase/firestore" // 👈 IMPORTANT
+import { logSystemAction } from "@/lib/logger" // 👈 Import important
+import { doc, getDoc } from "firebase/firestore" // 👈 Import important
 import { db } from "@/lib/firebase/client"
 import {
   Dialog,
@@ -58,7 +58,7 @@ export default function ConnexionClient() {
       const userCredential = await signInWithEmail(email.trim(), password)
       const uid = userCredential.user.uid;
 
-      // 2. 🔴 ENREGISTREMENT DU LOG (C'est ici que ça manquait)
+      // 2. 🔴 ENREGISTREMENT DU LOG (La partie manquante)
       try {
         const userDoc = await getDoc(doc(db, "users", uid));
         const userData = userDoc.data() || {};
@@ -70,7 +70,7 @@ export default function ConnexionClient() {
             companyId: userData.companyId || "none",
             companyName: userData.company || userData.companyName || "Non assigné",
             action: "LOGIN",
-            details: "Connexion réussie au tableau de bord"
+            details: "Connexion au tableau de bord"
         });
       } catch (logError) {
         console.error("Erreur log connexion", logError);
@@ -120,7 +120,10 @@ export default function ConnexionClient() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="px-4 py-4">
-        <Link href="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
           <ArrowLeft className="w-4 h-4" /> Retour
         </Link>
       </header>
@@ -138,7 +141,9 @@ export default function ConnexionClient() {
               <PulseLogo size="md" showText={true} />
             </div>
             <h1 className="text-2xl font-bold mb-2">Bon retour !</h1>
-            <p className="text-muted-foreground text-sm">Connectez-vous pour accéder à votre tableau de bord.</p>
+            <p className="text-muted-foreground text-sm">
+              Connectez-vous pour accéder à votre tableau de bord.
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -161,20 +166,40 @@ export default function ConnexionClient() {
                 <Label htmlFor="password">Mot de passe</Label>
                 <Dialog open={isResetOpen} onOpenChange={setIsResetOpen}>
                   <DialogTrigger asChild>
-                    <button type="button" className="text-xs text-primary hover:underline font-medium">Mot de passe oublié ?</button>
+                    <button type="button" className="text-xs text-primary hover:underline font-medium">
+                      Mot de passe oublié ?
+                    </button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md rounded-2xl">
                     <DialogHeader>
                       <DialogTitle>Mot de passe oublié</DialogTitle>
-                      <DialogDescription>Entrez votre adresse email. Nous vous enverrons un lien pour réinitialiser votre mot de passe.</DialogDescription>
+                      <DialogDescription>
+                        Entrez votre adresse email. Nous vous enverrons un lien pour réinitialiser votre mot de passe.
+                      </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleForgotPassword} className="space-y-4 mt-2">
                       <div className="space-y-2">
                         <Label htmlFor="reset-email">Email</Label>
-                        <Input id="reset-email" type="email" placeholder="nom@entreprise.com" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} required className="rounded-xl"/>
+                        <Input
+                          id="reset-email"
+                          type="email"
+                          placeholder="nom@entreprise.com"
+                          value={resetEmail}
+                          onChange={(e) => setResetEmail(e.target.value)}
+                          required
+                          className="rounded-xl"
+                        />
                       </div>
                       <Button type="submit" className="w-full rounded-xl" disabled={isResetting}>
-                        {isResetting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Envoi...</> : <><Mail className="w-4 h-4 mr-2" /> Envoyer le lien</>}
+                        {isResetting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Envoi...
+                          </>
+                        ) : (
+                          <>
+                            <Mail className="w-4 h-4 mr-2" /> Envoyer le lien
+                          </>
+                        )}
                       </Button>
                     </form>
                   </DialogContent>
@@ -191,7 +216,11 @@ export default function ConnexionClient() {
                   className="h-12 rounded-xl pr-10"
                   autoComplete="current-password"
                 />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
@@ -199,13 +228,26 @@ export default function ConnexionClient() {
 
             {error && <p className="text-sm text-destructive font-medium text-center bg-destructive/10 p-2 rounded-lg">{error}</p>}
 
-            <Button type="submit" className="w-full h-12 rounded-xl pulse-gradient text-white font-semibold" disabled={isLoading}>
-              {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Connexion...</> : "Se connecter"}
+            <Button
+              type="submit"
+              className="w-full h-12 rounded-xl pulse-gradient text-white font-semibold"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Connexion...
+                </>
+              ) : (
+                "Se connecter"
+              )}
             </Button>
           </form>
 
           <p className="text-center text-sm text-muted-foreground mt-6">
-            Pas encore de compte ? <Link href="/inscription" className="text-primary hover:underline font-medium">Créer un compte</Link>
+            Pas encore de compte ?{" "}
+            <Link href="/inscription" className="text-primary hover:underline font-medium">
+              Créer un compte
+            </Link>
           </p>
         </div>
       </main>
