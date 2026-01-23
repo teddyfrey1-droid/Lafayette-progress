@@ -11,6 +11,9 @@ import { Label } from "@/components/ui/label"
 import { PulseLogo } from "@/components/pulse/pulse-logo"
 import { useAuth } from "@/components/auth/auth-provider"
 import { friendlyAuthError, signInWithEmail } from "@/lib/firebase/auth"
+import { logSystemAction } from "@/lib/logger" // 👈 Import du logger
+import { doc, getDoc } from "firebase/firestore" // 👈 Nécessaire pour récupérer les infos user
+import { db } from "@/lib/firebase/client"
 import {
   Dialog,
   DialogContent,
@@ -51,7 +54,30 @@ export default function ConnexionClient() {
     setIsLoading(true)
 
     try {
-      await signInWithEmail(email.trim(), password)
+      // 1. Connexion Firebase Auth
+      const userCredential = await signInWithEmail(email.trim(), password)
+      const uid = userCredential.user.uid;
+
+      // 2. 🔴 ENREGISTREMENT DU LOG (Nouveau)
+      // On récupère vite fait le profil pour avoir le nom et l'entreprise
+      try {
+        const userDoc = await getDoc(doc(db, "users", uid));
+        const userData = userDoc.data() || {};
+        
+        await logSystemAction({
+            userId: uid,
+            userName: userData.displayName || email,
+            userRole: userData.role || "Inconnu",
+            companyId: userData.companyId || "none",
+            companyName: userData.company || userData.companyName || "Non assigné",
+            action: "LOGIN",
+            details: "Connexion réussie au tableau de bord"
+        });
+      } catch (logError) {
+        console.error("Erreur log connexion", logError);
+        // On ne bloque pas la connexion pour ça
+      }
+
       router.replace(nextUrl)
     } catch (err: unknown) {
       const code = typeof (err as any)?.code === "string" ? (err as any).code : ""
@@ -66,7 +92,6 @@ export default function ConnexionClient() {
 
     setIsResetting(true)
     try {
-      // Appel API vers Brevo
       const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
