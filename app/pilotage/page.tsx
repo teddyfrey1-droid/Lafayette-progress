@@ -8,22 +8,22 @@ import { usePermissions } from "@/hooks/use-permissions"
 import { useObjectives } from "@/hooks/use-objectives"
 import { useAuth } from "@/components/auth/auth-provider"
 import {
-  Target, TrendingUp, TrendingDown, Clock, Plus, Edit3, Trash2, X, Check, Euro, Users,
-  Layers, AlertCircle, Save, Wallet, ChevronDown, ChevronUp, Calendar, Loader2,
-  Percent, Hash, AlertTriangle, ThumbsUp, CalendarDays, Crown, Lock, EyeOff, Trash
+  Target, TrendingUp, Clock, Plus, Edit3, Trash2, X, Euro, Users,
+  Layers, Save, Wallet, ChevronDown, ChevronUp, Calendar, Loader2,
+  Percent, Hash, AlertTriangle, ThumbsUp, Crown, Lock, EyeOff
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger, DrawerFooter, DrawerClose } from "@/components/ui/drawer"
+import { Progress } from "@/components/ui/progress"
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from "@/components/ui/drawer"
 
 // Imports Firebase
 import { doc, updateDoc, addDoc, collection, onSnapshot, query, getDoc, setDoc, deleteDoc, arrayUnion, increment, where } from "firebase/firestore"
@@ -33,7 +33,7 @@ import { fr } from "date-fns/locale"
 
 // --- TYPES ---
 
-type TabValue = "objectifs" | "paliers" | "pilotage" | "equipe"
+type TabValue = "objectifs" | "budget" | "equipe"
 
 interface EditingPalier {
   objectiveId: string
@@ -114,7 +114,7 @@ export default function PilotagePage() {
     return () => unsubUsers();
   }, [profile?.companyId])
 
-  // 2. INIT SIMULATION
+  // 2. INIT SIMULATION (Dès qu'on charge les objectifs, on prépare le simulateur)
   useEffect(() => {
     if (objectives.length > 0 && Object.keys(simulatedPaliers).length === 0) {
         const initial: Record<string, Record<string, number>> = {}
@@ -126,7 +126,7 @@ export default function PilotagePage() {
     }
   }, [objectives])
 
-  // 3. CALCULS INTELLIGENTS
+  // 3. MOTEUR DE CALCUL (Le Cerveau du Simulateur)
   const simulationData = useMemo(() => {
     let totalCostPerPerson = 0
 
@@ -137,37 +137,43 @@ export default function PilotagePage() {
     );
 
     objectives.forEach((obj: any) => {
-      if (!obj.isActive && activeTab !== 'pilotage') return;
-      if (obj.type === 'secondaire' && !isPrincipalMet && activeTab !== 'pilotage') {
+      // Dans l'onglet budget, on simule comme si TOUT était actif et atteint
+      if (!obj.isActive && activeTab !== 'budget') return;
+      
+      // Si on n'est pas dans le budget, on applique les règles strictes (Principal bloquant)
+      if (obj.type === 'secondaire' && !isPrincipalMet && activeTab !== 'budget') {
           return;
       }
 
       let objMaxReward = 0
       if (obj.paliers && obj.paliers.length > 0) {
+          // On additionne les récompenses simulées (sliders)
           objMaxReward = obj.paliers.reduce((acc:number, p:any) => {
              const reward = simulatedPaliers[obj.id]?.[p.id] ?? p.reward;
              return acc + reward;
           }, 0);
-      } else {
-          objMaxReward = obj.fixedReward || 0;
       }
       totalCostPerPerson += objMaxReward
     })
 
+    // Calcul du coût total de l'équipe (Prorata heures)
     const totalTeamRatio = teamMembers.reduce((sum, m) => sum + (m.contractHours / baseHours), 0);
     const teamTotalCost = Math.round(totalCostPerPerson * totalTeamRatio);
+    const budgetUsage = Math.min(100, (teamTotalCost / (budgetMax || 1)) * 100);
 
     return {
       teamTotalCost, 
       budgetDiff: budgetMax - teamTotalCost, 
       isOverBudget: teamTotalCost > budgetMax,
+      budgetUsage,
       totalCostPerPerson, 
       activeObjectivesCount: objectives.filter(o => o.isActive).length, 
       isPrincipalMet
     }
   }, [objectives, simulatedPaliers, baseHours, budgetMax, teamMembers, activeTab])
 
-  // ACTIONS
+  // --- ACTIONS ---
+
   const handleSimulateChange = (objId: string, palierId: string, value: number) => {
     setSimulatedPaliers(prev => ({ ...prev, [objId]: { ...prev[objId], [palierId]: value } }))
   }
@@ -182,11 +188,11 @@ export default function PilotagePage() {
         });
         await Promise.all(updates);
         await setDoc(doc(db, "config", "pilotage"), { baseHours, budgetMax }, { merge: true });
-        toast({ title: "Configuration sauvegardée" });
+        toast({ title: "Configuration sauvegardée ✅", description: "Les primes ont été mises à jour pour tout le monde." });
       } catch (e) { toast({ title: "Erreur sauvegarde", variant: "destructive" }); }
   }
 
-  const handleUpdateBaseHours = async () => { try { await setDoc(doc(db, "config", "pilotage"), { baseHours, budgetMax }, { merge: true }); setShowEditHours(false); toast({ title: "Configuration sauvegardée" }); } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } }
+  const handleUpdateBaseHours = async () => { try { await setDoc(doc(db, "config", "pilotage"), { baseHours, budgetMax }, { merge: true }); setShowEditHours(false); toast({ title: "Config sauvegardée" }); } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } }
   const handleCreateObjective = async (data: any) => { if (!profile?.companyId) return; try { await addDoc(collection(db, "objectives"), { companyId: profile.companyId, title: data.title, description: data.description || "", isActive: true, type: data.type || "secondaire", target: Number(data.target), unit: data.unit, direction: data.direction, current: 0, paliers: [], history: [], isConfidential: data.isConfidential || false, createdAt: new Date().toISOString() }); setShowAddObjective(false); toast({ title: "Objectif créé" }); } catch(e) { toast({ title: "Erreur", variant: "destructive" }); } }
   const handleCreatePlanning = async (data: any) => { if (!profile?.companyId) return; try { await addDoc(collection(db, "plannings"), { companyId: profile.companyId, ...data, createdAt: new Date().toISOString(), status: "scheduled" }); setShowPlanning(false); toast({ title: "Planifié" }); } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } }
   const updateProgress = async (amount: number, dateStr?: string) => { if (!selectedObj) return; const targetDate = dateStr ? new Date(dateStr) : new Date(); const formattedDate = format(targetDate, "d MMM", { locale: fr }); try { await updateDoc(doc(db, "objectives", selectedObj.id), { current: increment(amount), history: arrayUnion({ date: formattedDate, value: amount, change: amount, timestamp: targetDate.toISOString() }) }); toast({ title: "Mise à jour réussie" }); } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } }
@@ -194,12 +200,12 @@ export default function PilotagePage() {
   const handleUpdatePalierConfirm = async () => { if(!editingPalier) return; const obj = objectives.find((o: any) => o.id === editingPalier.objectiveId); if(!obj) return; const newPaliers = obj.paliers.map((p: any) => p.id === editingPalier.palierId ? { ...p, name: editingPalier.name, threshold: editingPalier.threshold, reward: editingPalier.reward } : p); await updateDoc(doc(db, "objectives", editingPalier.objectiveId), { paliers: newPaliers }); setEditingPalier(null); toast({ title: "Palier modifié" }); }
   const handleDeletePalier = async () => { if(!editingPalier) return; if(!confirm("Supprimer ?")) return; const obj = objectives.find((o: any) => o.id === editingPalier.objectiveId); if(!obj) return; const newPaliers = obj.paliers.filter((p: any) => p.id !== editingPalier.palierId); await updateDoc(doc(db, "objectives", editingPalier.objectiveId), { paliers: newPaliers }); setEditingPalier(null); toast({ title: "Supprimé" }); }
 
-  // 🔴 NOUVELLE FONCTION DE SUPPRESSION
+  // FONCTION SUPPRESSION
   const handleDeleteObjective = async (id: string) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cet objectif ? Cette action est irréversible.")) return;
+    if (!confirm("⚠️ Attention : Supprimer cet objectif est irréversible. Continuer ?")) return;
     try {
         await deleteDoc(doc(db, "objectives", id));
-        toast({ title: "Objectif supprimé" });
+        toast({ title: "🗑️ Objectif supprimé" });
         setSelectedObj(null);
     } catch (e) {
         toast({ title: "Erreur lors de la suppression", variant: "destructive" });
@@ -214,35 +220,39 @@ export default function PilotagePage() {
       <Header />
 
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
+        
+        {/* En-tête de la page */}
         <div className="flex items-center justify-between">
-            <div><h1 className="text-2xl font-bold tracking-tight">Pilotage</h1><p className="text-sm text-muted-foreground mt-0.5">Gérez les objectifs et les primes</p></div>
+            <div><h1 className="text-2xl font-bold tracking-tight">Pilotage</h1><p className="text-sm text-muted-foreground mt-0.5">Centre de contrôle</p></div>
             <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" className="rounded-xl gap-2 bg-transparent border-muted-foreground/20" onClick={() => setShowPlanning(true)}><Calendar className="w-4 h-4" /> Planifier</Button>
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted/50 border border-border text-xs font-medium cursor-pointer hover:bg-muted" onClick={() => setShowEditHours(true)}><Clock className="w-3.5 h-3.5" /> {baseHours}h</div>
             </div>
         </div>
 
+        {/* Alerte si Objectif Principal non atteint */}
         {!simulationData.isPrincipalMet && objectives.some(o => o.type === 'principal') && (
             <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
                 <Lock className="w-5 h-5 text-amber-600" />
                 <div className="flex-1">
-                    <p className="text-sm font-bold text-amber-700">Objectif Principal non atteint</p>
-                    <p className="text-xs text-amber-600/80">Les primes secondaires sont verrouillées.</p>
+                    <p className="text-sm font-bold text-amber-700">Primes verrouillées</p>
+                    <p className="text-xs text-amber-600/80">L'objectif principal n'est pas encore atteint.</p>
                 </div>
             </div>
         )}
 
+        {/* Menu de Navigation (Tabs) */}
         <div className="bg-muted/50 p-1 rounded-2xl flex mb-6">
             <button onClick={() => setActiveTab("objectifs")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "objectifs" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}><Target className="w-4 h-4" /> Objectifs</button>
-            <button onClick={() => setActiveTab("paliers")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "paliers" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}><Layers className="w-4 h-4" /> Paliers</button>
-            <button onClick={() => setActiveTab("pilotage")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "pilotage" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}><Wallet className="w-4 h-4" /> Budget</button>
+            <button onClick={() => setActiveTab("budget")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "budget" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}><Wallet className="w-4 h-4" /> Budget</button>
             <button onClick={() => setActiveTab("equipe")} className={cn("flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2", activeTab === "equipe" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}><Users className="w-4 h-4" /> Équipe</button>
         </div>
 
+        {/* --- ONGLET 1 : OBJECTIFS (Liste classique) --- */}
         {activeTab === "objectifs" && (
             <div className="space-y-6 animate-in fade-in">
                 <div className="flex justify-between items-center">
-                    <div><h2 className="font-semibold text-sm">Vos objectifs en cours</h2><p className="text-xs text-muted-foreground">Progression en temps réel</p></div>
+                    <div><h2 className="font-semibold text-sm">Objectifs actifs</h2><p className="text-xs text-muted-foreground">Progression en temps réel</p></div>
                     <Button size="sm" className="rounded-full bg-purple-500 hover:bg-purple-600 text-white px-4" onClick={() => setShowAddObjective(true)}><Plus className="w-4 h-4 mr-2" /> Créer</Button>
                 </div>
                 {objectives.map((obj: any) => {
@@ -280,48 +290,122 @@ export default function PilotagePage() {
             </div>
         )}
 
-        {activeTab === "pilotage" && (
+        {/* --- ONGLET 2 : BUDGET & SIMULATEUR (C'est ici la magie) --- */}
+        {activeTab === "budget" && (
             <div className="space-y-6 animate-in fade-in">
-                <div className="pulse-card p-5 bg-[#0f0f11] border border-white/5">
+                
+                {/* JAUGE DE SANTÉ BUDGÉTAIRE (Ludique) */}
+                <div className={cn(
+                    "p-5 rounded-2xl border transition-all duration-500", 
+                    simulationData.isOverBudget 
+                        ? "bg-red-500/10 border-red-500/30" 
+                        : "bg-emerald-500/10 border-emerald-500/30"
+                )}>
+                    <div className="flex justify-between items-center mb-3">
+                        <div className="flex items-center gap-2">
+                            <div className={cn("p-2 rounded-lg", simulationData.isOverBudget ? "bg-red-500 text-white" : "bg-emerald-500 text-white")}>
+                                <Wallet className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-sm">
+                                    {simulationData.isOverBudget ? "Attention Budget ! 😱" : "Budget Maîtrisé 😌"}
+                                </h3>
+                                <p className="text-xs text-muted-foreground">Coût total estimé</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <span className={cn("text-2xl font-black", simulationData.isOverBudget ? "text-red-500" : "text-emerald-500")}>
+                                {simulationData.teamTotalCost}€
+                            </span>
+                            <p className="text-[10px] text-muted-foreground">sur {budgetMax}€ max</p>
+                        </div>
+                    </div>
+                    {/* La barre de progression visuelle */}
+                    <div className="relative h-4 bg-background/50 rounded-full overflow-hidden border border-black/5 dark:border-white/5">
+                        <div 
+                            className={cn("absolute left-0 top-0 bottom-0 transition-all duration-500", simulationData.isOverBudget ? "bg-red-500" : "bg-emerald-500")}
+                            style={{ width: `${Math.min(100, simulationData.budgetUsage)}%` }}
+                        />
+                        {/* Marqueur de limite */}
+                        <div className="absolute top-0 bottom-0 w-0.5 bg-foreground/30 z-10" style={{ left: '100%' }} /> 
+                    </div>
+                    <div className="flex justify-between text-[10px] mt-1.5 font-medium text-muted-foreground">
+                        <span>0€</span>
+                        <span>{Math.round(budgetMax / 2)}€</span>
+                        <span>{budgetMax}€</span>
+                    </div>
+                </div>
+
+                {/* SIMULATEUR ACCORDÉON (Style "Edit") */}
+                <div className="pulse-card p-5 bg-card border-border">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center"><Edit3 className="w-5 h-5 text-purple-500" /></div>
-                        <div><h3 className="font-semibold text-sm text-white">Ajustement des primes</h3><p className="text-xs text-white/60">Modifiez les montants pour simuler</p></div>
+                        <div><h3 className="font-semibold text-sm">Ajuster les primes</h3><p className="text-xs text-muted-foreground">Simulez l'impact financier</p></div>
                     </div>
+                    
                     <div className="space-y-3">
                         {objectives.map((obj: any) => {
                             const isExpanded = expandedSim === obj.id;
                             const currentSimReward = obj.paliers?.reduce((acc: number, p: any) => acc + (simulatedPaliers[obj.id]?.[p.id] ?? p.reward), 0) || 0;
                             return (
-                                <div key={obj.id} className="bg-card/5 rounded-xl border border-white/5 overflow-hidden transition-all">
-                                    <div className="p-3 flex items-center justify-between cursor-pointer hover:bg-white/5" onClick={() => setExpandedSim(isExpanded ? null : obj.id)}>
+                                <div key={obj.id} className="bg-muted/30 rounded-xl border border-border/50 overflow-hidden transition-all">
+                                    <div 
+                                        className="p-3 flex items-center justify-between cursor-pointer hover:bg-muted/50"
+                                        onClick={() => setExpandedSim(isExpanded ? null : obj.id)}
+                                    >
                                         <div className="flex items-center gap-3">
                                             {obj.type === 'principal' ? <Crown className="w-4 h-4 text-amber-500"/> : <Target className="w-4 h-4 text-purple-400"/>}
-                                            <span className="text-sm font-medium text-white">{obj.title}</span>
+                                            <span className="text-sm font-medium">{obj.title}</span>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            <span className="text-sm font-bold text-purple-400">{currentSimReward}€</span>
-                                            {isExpanded ? <ChevronUp className="w-4 h-4 text-white/40"/> : <ChevronDown className="w-4 h-4 text-white/40"/>}
+                                            <Badge variant="outline" className="bg-background text-purple-500 border-purple-200">
+                                                {currentSimReward}€
+                                            </Badge>
+                                            {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground"/> : <ChevronDown className="w-4 h-4 text-muted-foreground"/>}
                                         </div>
                                     </div>
+                                    
                                     {isExpanded && obj.paliers && (
-                                        <div className="p-4 space-y-5 bg-black/20 border-t border-white/5">
+                                        <div className="p-4 space-y-6 bg-background/50 border-t border-border/50 animate-in slide-in-from-top-2">
+                                            
+                                            {/* Bouton pour ajouter un palier si vide */}
+                                            {(!obj.paliers || obj.paliers.length === 0) && (
+                                                <div className="text-center py-2">
+                                                    <p className="text-xs text-muted-foreground mb-2">Aucun palier configuré.</p>
+                                                    <Button size="sm" variant="outline" onClick={() => setShowAddPalier(obj.id)}>Ajouter un palier</Button>
+                                                </div>
+                                            )}
+
                                             {obj.paliers.map((p: any, idx: number) => {
                                                 const val = simulatedPaliers[obj.id]?.[p.id] ?? p.reward;
                                                 return (
                                                     <div key={p.id} className="space-y-3">
                                                         <div className="flex justify-between items-center text-xs">
                                                             <div className="flex items-center gap-2">
-                                                                <span className="bg-white/10 px-1.5 py-0.5 rounded text-white/70">{idx + 1}</span>
-                                                                <span className="text-white/80">{p.name}</span>
+                                                                <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">{idx + 1}</span>
+                                                                <span className="font-medium">{p.name} <span className="text-muted-foreground">({p.threshold} {obj.unit})</span></span>
                                                             </div>
-                                                            <span className="font-bold text-purple-400">{val}€</span>
+                                                            <div className="flex gap-2">
+                                                                <span className="font-bold text-lg text-primary">{val}€</span>
+                                                                <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => setEditingPalier({ objectiveId: obj.id, palierId: p.id, name: p.name, threshold: p.threshold, reward: p.reward })}><Edit3 className="w-3 h-3"/></Button>
+                                                            </div>
                                                         </div>
-                                                        <Slider value={[val]} max={500} step={5} onValueChange={(vals) => handleSimulateChange(obj.id, p.id, vals[0])} className="py-1"/>
-                                                        <div className="flex justify-between text-[10px] text-white/30 px-1"><span>0€</span><span>250€</span><span>500€</span></div>
+                                                        <Slider 
+                                                            value={[val]} 
+                                                            max={500} 
+                                                            step={5} 
+                                                            onValueChange={(vals) => handleSimulateChange(obj.id, p.id, vals[0])}
+                                                            className="py-1"
+                                                        />
                                                     </div>
                                                 )
                                             })}
-                                            {(!obj.paliers || obj.paliers.length === 0) && <p className="text-xs text-white/40 italic">Aucun palier configurable.</p>}
+                                            
+                                            {obj.paliers && obj.paliers.length > 0 && (
+                                                <Button size="sm" variant="ghost" className="w-full text-xs text-muted-foreground h-8 mt-2" onClick={() => setShowAddPalier(obj.id)}>
+                                                    <Plus className="w-3 h-3 mr-1"/> Ajouter un autre palier
+                                                </Button>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -330,18 +414,15 @@ export default function PilotagePage() {
                     </div>
                 </div>
 
-                <div className="fixed bottom-[88px] left-4 right-4 max-w-lg mx-auto bg-card border-t border-x border-border rounded-t-2xl p-4 shadow-2xl z-10">
+                {/* Footer Fixe avec Résumé */}
+                <div className="fixed bottom-[88px] left-4 right-4 max-w-lg mx-auto bg-card border border-border rounded-2xl p-4 shadow-2xl z-10 animate-in slide-in-from-bottom-4">
                      <div className="space-y-3">
                         <div className="flex justify-between items-center text-sm">
                             <span className="text-muted-foreground">Coût max par personne (35h)</span>
-                            <span className="font-bold text-white">{simulationData.totalCostPerPerson}€</span>
+                            <span className="font-bold">{simulationData.totalCostPerPerson}€</span>
                         </div>
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground">Coût total équipe (Estimé)</span>
-                            <span className={cn("font-bold text-lg", simulationData.isOverBudget ? "text-red-400" : "text-purple-400")}>{simulationData.teamTotalCost}€</span>
-                        </div>
-                        <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold" onClick={handleSaveSimulation}>
-                            <Save className="w-4 h-4 mr-2"/> Enregistrer la configuration
+                        <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-lg shadow-purple-500/20" onClick={handleSaveSimulation}>
+                            <Save className="w-4 h-4 mr-2"/> Valider cette configuration
                         </Button>
                      </div>
                 </div>
@@ -349,27 +430,28 @@ export default function PilotagePage() {
             </div>
         )}
 
+        {/* --- ONGLET 3 : EQUIPE (Résultats) --- */}
         {activeTab === "equipe" && (
             <div className="space-y-6 animate-in fade-in">
                 <div className="grid grid-cols-3 gap-3">
                     <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none">
                         <div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center mb-2"><Target className="w-4 h-4 text-purple-500" /></div>
                         <span className="text-xl font-bold">{simulationData.activeObjectivesCount}</span>
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Objectifs actifs</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Objectifs</span>
                     </div>
                     <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none">
                         <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center mb-2"><Euro className="w-4 h-4 text-blue-500" /></div>
                         <span className="text-xl font-bold">{simulationData.totalCostPerPerson}€</span>
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Prime potentielle</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Max / Pers</span>
                     </div>
                     <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none">
                         <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center mb-2"><Users className="w-4 h-4 text-emerald-500" /></div>
                         <span className="text-xl font-bold">{teamMembers.length}</span>
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Collaborateurs</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Équipe</span>
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between"><h2 className="font-semibold text-sm">Primes au prorata</h2><span className="text-xs text-muted-foreground">Base {baseHours}h</span></div>
+                <div className="flex items-center justify-between"><h2 className="font-semibold text-sm">Détail par collaborateur</h2><span className="text-xs text-muted-foreground">Base {baseHours}h</span></div>
                 <div className="space-y-3">
                     {teamMembers.map((member) => {
                         const ratio = member.contractHours / baseHours;
@@ -388,40 +470,6 @@ export default function PilotagePage() {
                     })}
                     {teamMembers.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">Aucun collaborateur trouvé.</p>}
                 </div>
-
-                <div className="mt-4 p-5 rounded-2xl bg-[#0f0f11] border border-white/5 text-white">
-                    <div className="flex justify-between items-end mb-1">
-                        <div><p className="text-xs text-white/60 mb-1">Budget total primes</p><p className="text-3xl font-bold">{simulationData.teamTotalCost}€</p></div>
-                        <div className="text-right"><p className="text-[10px] text-white/40 mb-1">Potentiel Maximum (Cumulé)</p><p className="text-sm font-medium text-purple-400">{simulationData.totalCostPerPerson}€ / personne <span className="text-white/40 font-normal">(base 35h)</span></p></div>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {activeTab === "paliers" && (
-            <div className="space-y-4 animate-in fade-in">
-                {objectives.filter((o:any) => o.isActive).map((obj: any) => (
-                    <div key={obj.id} className="space-y-3">
-                        <div className="flex items-center justify-between bg-muted/30 p-2 rounded-lg">
-                            <div className="flex items-center gap-2"><Layers className="w-4 h-4 text-muted-foreground" /><span className="text-sm font-medium">{obj.title}</span></div>
-                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowAddPalier(obj.id)}><Plus className="w-3 h-3 mr-1" /> Palier</Button>
-                        </div>
-                        <div className="space-y-2 pl-2 border-l-2 border-muted">
-                            {obj.paliers?.sort((a:any, b:any) => (obj.direction === 'descending' ? b.threshold - a.threshold : a.threshold - b.threshold)).map((palier: any, index: number) => (
-                                <div key={palier.id} className="pulse-card p-3 flex items-center gap-3">
-                                    <div className="w-6 h-6 rounded-md bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">{index + 1}</div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2"><span className="text-sm font-medium">{palier.name}</span></div>
-                                        <p className="text-xs text-muted-foreground">{obj.direction === 'descending' ? "Si inférieur à" : "Si supérieur à"} : <strong>{palier.threshold} {obj.unit}</strong></p>
-                                    </div>
-                                    <div className="text-right"><p className="text-sm font-bold text-primary">+{palier.reward}€</p></div>
-                                    <Button size="icon" variant="ghost" className="w-8 h-8" onClick={() => setEditingPalier({ objectiveId: obj.id, palierId: palier.id, name: palier.name, threshold: palier.threshold, reward: palier.reward })}><Edit3 className="w-4 h-4 text-muted-foreground" /></Button>
-                                </div>
-                            ))}
-                            {(!obj.paliers || obj.paliers.length === 0) && <p className="text-xs text-muted-foreground italic pl-2">Aucun palier défini.</p>}
-                        </div>
-                    </div>
-                ))}
             </div>
         )}
 
@@ -433,6 +481,8 @@ export default function PilotagePage() {
       {showAddPalier && (
         <AddPalierModal onClose={() => setShowAddPalier(null)} onConfirm={(n, t, r) => handleAddPalierConfirm(showAddPalier, n, t, r)} objective={objectives.find((o:any) => o.id === showAddPalier)} />
       )}
+      
+      {/* Modale Edition Palier */}
       {editingPalier && (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={() => setEditingPalier(null)}>
           <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
@@ -449,20 +499,22 @@ export default function PilotagePage() {
           </div>
         </div>
       )}
+
+      {/* Modale Heures & Budget */}
       {showEditHours && (
         <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={() => setShowEditHours(false)}>
           <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
-            <h2 className="font-semibold mb-4 text-lg">Configuration Horaire</h2>
+            <h2 className="font-semibold mb-4 text-lg">Configuration Générale</h2>
             <div className="space-y-4">
               <div><Label className="text-sm">Heures temps plein (référence)</Label><Input type="number" value={baseHours} onChange={(e) => setBaseHours(Number(e.target.value))} className="rounded-xl mt-2" /></div>
-              <div><Label className="text-sm">Budget Max (€)</Label><Input type="number" value={budgetMax} onChange={(e) => setBudgetMax(Number(e.target.value))} className="rounded-xl mt-2" /></div>
+              <div><Label className="text-sm">Budget Max Global (€)</Label><Input type="number" value={budgetMax} onChange={(e) => setBudgetMax(Number(e.target.value))} className="rounded-xl mt-2" /></div>
               <Button className="w-full rounded-xl" onClick={handleUpdateBaseHours}><Save className="w-4 h-4 mr-2" /> Enregistrer</Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 🔴 MODIFICATION : On passe la fonction de suppression */}
+      {/* Drawer Détail Objectif (Avec Suppression) */}
       <ObjectiveDetailDrawer 
         objective={selectedObj} 
         onClose={() => setSelectedObj(null)} 
@@ -595,7 +647,7 @@ function ObjectiveDetailDrawer({
     objective, 
     onClose, 
     onUpdateProgress,
-    onDelete // 🔴 NOUVELLE PROP
+    onDelete 
 }: { 
     objective: any, 
     onClose: () => void, 
@@ -620,7 +672,6 @@ function ObjectiveDetailDrawer({
                         <div className="bg-purple-500/5 border border-purple-500/20 p-4 rounded-2xl space-y-3"><h3 className="font-bold text-sm flex items-center gap-2"><Wallet className="w-4 h-4 text-purple-500" /> Mettre à jour la progression</h3><div className="flex gap-2"><Input type="number" placeholder="Montant..." value={updateVal} onChange={(e) => setUpdateVal(e.target.value)} className="bg-background flex-1" /><Input type="date" value={updateDate} onChange={(e) => setUpdateDate(e.target.value)} className="bg-background w-32" /><Button onClick={() => { onUpdateProgress(Number(updateVal), updateDate); setUpdateVal(""); setUpdateDate(""); }} className="bg-purple-600 hover:bg-purple-700"><Plus className="w-4 h-4" /></Button></div></div>
                         <div><h3 className="font-bold text-base mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-purple-500" /> Historique complet</h3><div className="space-y-1 pb-4">{objective.history && objective.history.length > 0 ? ([...objective.history].reverse().map((h: any, i: number) => (<div key={i} className="flex justify-between items-center p-3 rounded-xl hover:bg-muted/30 transition-colors border-b border-border/40 last:border-0"><div className="flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-purple-500" /><span className="text-sm font-medium">{h.date}</span></div><div className="flex items-center gap-4"><span className="font-bold text-sm">{(h.value||0).toLocaleString()} {objective.unit}</span><span className="text-xs font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded">+{h.change}</span></div></div>))) : (<p className="text-sm text-muted-foreground italic">Aucun historique.</p>)}</div></div>
                     </div>
-                    {/* 🔴 FOOTER MODIFIÉ AVEC BOUTON SUPPRIMER */}
                     <DrawerFooter className="pt-2 pb-6 px-4 shrink-0 bg-card border-t border-border/50 flex-col gap-2">
                         <Button variant="destructive" className="w-full rounded-xl gap-2" onClick={onDelete}>
                             <Trash2 className="w-4 h-4" /> Supprimer l'objectif
