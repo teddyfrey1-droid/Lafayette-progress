@@ -77,7 +77,7 @@ interface User {
   createdAt: string
 }
 
-// Log optimisé pour l'affichage timeline
+// Log optimisé
 interface LogEntry {
   id: string
   userId: string
@@ -439,7 +439,7 @@ function CentreControlePageContent() {
       }))
     })
 
-    // 🔴 CORRECTION ICI : On écoute "system_logs" au lieu de "logs"
+    // 🔴 CORRECTION ICI : On écoute "system_logs" (La bonne collection)
     const unsubLogs = onSnapshot(query(collection(db, "system_logs"), orderBy("timestamp", "desc"), limit(500)), (snapshot) => {
       setLogsState(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LogEntry)))
     })
