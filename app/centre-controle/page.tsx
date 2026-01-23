@@ -77,7 +77,7 @@ interface User {
   createdAt: string
 }
 
-// Log optimisé
+// Log optimisé pour l'affichage timeline
 interface LogEntry {
   id: string
   userId: string
@@ -439,7 +439,7 @@ function CentreControlePageContent() {
       }))
     })
 
-    // 🔴 CORRECTION ICI : On écoute "system_logs" (La bonne collection)
+    // 🔴 CORRECTION ICI : On écoute "system_logs" au lieu de "logs"
     const unsubLogs = onSnapshot(query(collection(db, "system_logs"), orderBy("timestamp", "desc"), limit(500)), (snapshot) => {
       setLogsState(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LogEntry)))
     })
@@ -571,6 +571,7 @@ function CentreControlePageContent() {
                         <div>
                             <div className="flex items-center gap-2">
                                 <h1 className="text-xl font-bold">{selectedUser.name}</h1>
+                                {/* BOUTON MODIFIER */}
                                 <Button size="sm" variant="outline" className="h-7 w-7 p-0 rounded-full" onClick={() => setEditingUser(selectedUser)}>
                                     <Edit3 className="w-3 h-3 text-muted-foreground" />
                                 </Button>
@@ -760,6 +761,7 @@ function CentreControlePageContent() {
           </div>
         )}
 
+        {/* ONGLETS UTILISATEURS */}
         {activeTab === "users" && (
           <div className="space-y-6">
             {orphanedUsers.length > 0 && (
