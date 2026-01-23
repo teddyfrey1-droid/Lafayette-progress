@@ -3,12 +3,13 @@
 import { useState, useEffect } from "react"
 import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
-import { calculateProRataPrime, calculateTotalPotentialPrime } from "@/lib/demo-data"
+import { calculateTotalPotentialPrime } from "@/lib/demo-data"
 import { useAuth } from "@/components/auth/auth-provider"
 import { usePermissions } from "@/hooks/use-permissions"
 import { PermissionGate } from "@/components/auth/permission-gate"
 import { db, auth } from "@/lib/firebase/client"
-import { collection, doc, updateDoc, onSnapshot, query, orderBy, deleteDoc } from "firebase/firestore"
+// Ajout de 'where' dans les imports
+import { collection, doc, updateDoc, onSnapshot, query, orderBy, deleteDoc, where } from "firebase/firestore"
 import {
   Users,
   Search,
@@ -38,7 +39,7 @@ import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { useToast } from "@/hooks/use-toast" // Changement ici : import du hook
+import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
 
 interface TeamMember {
@@ -61,7 +62,7 @@ interface TeamMember {
 export default function TeamsPage() {
   const { profile } = useAuth()
   const { canEdit } = usePermissions()
-  const { toast } = useToast() // Utilisation du hook
+  const { toast } = useToast()
   
   const [members, setMembers] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
@@ -70,9 +71,30 @@ export default function TeamsPage() {
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null)
   const [showInvite, setShowInvite] = useState(false)
 
-  // 1. ÉCOUTE TEMPS RÉEL
+  // 1. ÉCOUTE TEMPS RÉEL (CORRIGÉE AVEC FILTRES)
   useEffect(() => {
-    const q = query(collection(db, "users"), orderBy("createdAt", "desc"));
+    // On attend que le profil soit chargé
+    if (!profile) return;
+
+    let q;
+    const usersRef = collection(db, "users");
+
+    // LOGIQUE DE FILTRAGE
+    if (profile.role === 'super_admin') {
+        // Le Super Admin voit tout le monde
+        q = query(usersRef, orderBy("createdAt", "desc"));
+    } else if (profile.companyId) {
+        // Le Gérant/Manager ne voit que SON entreprise
+        q = query(
+            usersRef, 
+            where("companyId", "==", profile.companyId),
+            orderBy("createdAt", "desc")
+        );
+    } else {
+        // Si pas d'entreprise assignée, on ne charge rien (sécurité)
+        setLoading(false);
+        return;
+    }
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const usersList: TeamMember[] = querySnapshot.docs.map((doc) => {
@@ -89,7 +111,8 @@ export default function TeamsPage() {
           baseHours: 35,
           excludeFromPrimes: data.excludeFromPrimes || false,
           disabled: data.disabled || false,
-          company: data.company || "Heiko",
+          // 🔴 CORRECTION IMPORTANTE : On vérifie companyName (nouveau) PUIS company (ancien)
+          company: data.companyName || data.company || "Non assigné",
           lastLogin: data.lastLogin || null,
           pushEnabled: data.pushEnabled || false
         }
@@ -98,16 +121,12 @@ export default function TeamsPage() {
       setLoading(false)
     }, (error) => {
       console.error("Erreur temps réel:", error)
-      toast({
-        title: "Erreur de connexion",
-        description: "Impossible d'établir la connexion temps réel.",
-        variant: "destructive",
-      })
+      // On ne bloque pas l'UI sur une erreur d'index (fréquent au début)
       setLoading(false)
     })
 
     return () => unsubscribe()
-  }, [])
+  }, [profile]) // On recharge si le profil change
 
   const filteredMembers = members.filter(
     (member) =>
@@ -137,9 +156,9 @@ export default function TeamsPage() {
       toast({ 
         title: "Utilisateur supprimé", 
         description: "Le compte a été supprimé définitivement.",
-        variant: "success" // Notification verte
+        variant: "success"
       });
-      setSelectedMember(null); // Fermer le drawer
+      setSelectedMember(null);
     } catch (error) {
       toast({ title: "Erreur", description: "Impossible de supprimer l'utilisateur.", variant: "destructive" });
     }
@@ -215,77 +234,73 @@ export default function TeamsPage() {
                <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
              </div>
           ) : (
-            filteredMembers.map((member) => {
-              const completionRate = (member.completedObjectives / (member.objectives || 1)) * 100
-              const isPending = !member.lastLogin;
+            filteredMembers.length > 0 ? (
+                filteredMembers.map((member) => {
+                const isPending = !member.lastLogin;
 
-              return (
-                <div 
-                  key={member.id} 
-                  className={cn(
-                    "pulse-card p-4 cursor-pointer hover:bg-muted/50 transition-all duration-200 relative group",
-                    member.disabled && "opacity-60 grayscale"
-                  )} 
-                  onClick={() => setSelectedMember(member)}
-                >
-                  <div className="flex items-center gap-4">
-                    {/* AVATAR + STATUS BADGE */}
-                    <div className="relative">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/80 to-accent/80 flex items-center justify-center shrink-0 overflow-hidden">
-                        {member.avatar ? (
-                            <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" />
-                        ) : (
-                            <span className="text-sm font-bold text-white">
-                            {member.name.substring(0, 2).toUpperCase()}
-                            </span>
-                        )}
-                        </div>
-                        {/* Indicateur de statut (Point Vert ou Orange) */}
-                        <div className={cn(
-                            "absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-card flex items-center justify-center",
-                            isPending ? "bg-orange-500" : "bg-green-500"
-                        )}>
-                            {isPending ? (
-                                <span className="sr-only">En attente</span>
+                return (
+                    <div 
+                    key={member.id} 
+                    className={cn(
+                        "pulse-card p-4 cursor-pointer hover:bg-muted/50 transition-all duration-200 relative group",
+                        member.disabled && "opacity-60 grayscale"
+                    )} 
+                    onClick={() => canManage && setSelectedMember(member)}
+                    >
+                    <div className="flex items-center gap-4">
+                        <div className="relative">
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/80 to-accent/80 flex items-center justify-center shrink-0 overflow-hidden">
+                            {member.avatar ? (
+                                <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" />
                             ) : (
-                                <span className="sr-only">Actif</span>
+                                <span className="text-sm font-bold text-white">
+                                {member.name.substring(0, 2).toUpperCase()}
+                                </span>
                             )}
+                            </div>
+                            <div className={cn(
+                                "absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-card flex items-center justify-center",
+                                isPending ? "bg-orange-500" : "bg-green-500"
+                            )} />
                         </div>
-                    </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-semibold text-sm truncate flex items-center gap-2">
-                          {member.name}
-                        </h3>
-                        {/* Indicateurs Badges */}
-                        <div className="flex items-center gap-1.5">
-                            {member.pushEnabled ? (
-                                <Bell className="w-3 h-3 text-primary fill-primary/20" />
-                            ) : (
-                                <BellOff className="w-3 h-3 text-muted-foreground/30" />
-                            )}
-                            
-                            {isPending && (
-                                <Badge variant="outline" className="text-[9px] h-5 px-1.5 bg-orange-500/10 text-orange-600 border-orange-200">
-                                    En attente
-                                </Badge>
-                            )}
+                        <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                            <h3 className="font-semibold text-sm truncate flex items-center gap-2">
+                            {member.name}
+                            </h3>
+                            <div className="flex items-center gap-1.5">
+                                {member.pushEnabled ? (
+                                    <Bell className="w-3 h-3 text-primary fill-primary/20" />
+                                ) : (
+                                    <BellOff className="w-3 h-3 text-muted-foreground/30" />
+                                )}
+                                
+                                {isPending && (
+                                    <Badge variant="outline" className="text-[9px] h-5 px-1.5 bg-orange-500/10 text-orange-600 border-orange-200">
+                                        En attente
+                                    </Badge>
+                                )}
+                            </div>
                         </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <p className="text-xs text-muted-foreground capitalize">{member.role === 'employee' ? 'Salarié' : member.role}</p>
-                        <span className="text-muted-foreground">•</span>
-                        <p className="text-xs text-muted-foreground truncate max-w-[120px]">{member.company}</p>
-                      </div>
-                    </div>
+                        
+                        <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-xs text-muted-foreground capitalize">{member.role === 'employee' ? 'Salarié' : member.role}</p>
+                            <span className="text-muted-foreground">•</span>
+                            <p className="text-xs text-muted-foreground truncate max-w-[120px]">{member.company}</p>
+                        </div>
+                        </div>
 
-                    <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0 opacity-50 group-hover:opacity-100" />
-                  </div>
+                        <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0 opacity-50 group-hover:opacity-100" />
+                    </div>
+                    </div>
+                )
+                })
+            ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                    <p>Aucun collaborateur trouvé.</p>
                 </div>
-              )
-            })
+            )
           )}
         </section>
       </main>
@@ -328,14 +343,14 @@ function MemberDrawer({
   onUpdate: (m: TeamMember) => void
   onDelete: (id: string) => void
 }) {
-  const { toast } = useToast() // Utilisation du hook
+  const { toast } = useToast()
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   
   const [editedRole, setEditedRole] = useState(member.role)
   const [editedHours, setEditedHours] = useState(member.contractHours.toString())
   const [editedCompany, setEditedCompany] = useState(member.company)
-  const [editedEmail, setEditedEmail] = useState(member.email) // AJOUT: State Email
+  const [editedEmail, setEditedEmail] = useState(member.email)
   const [excludeFromPrimes, setExcludeFromPrimes] = useState(member.excludeFromPrimes)
   const [linkSent, setLinkSent] = useState(false)
 
@@ -350,8 +365,7 @@ function MemberDrawer({
       })
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({} as any))
-        throw new Error((data as any)?.error || "Erreur API")
+        throw new Error("Erreur API")
       }
 
       setLinkSent(true)
@@ -369,7 +383,6 @@ function MemberDrawer({
   const handleSaveChanges = async () => {
     setIsSaving(true)
     try {
-      // UTILISATION DE L'API POUR METTRE À JOUR (Inclus changement Email)
       const res = await fetch("/api/admin/invite-user", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -379,14 +392,11 @@ function MemberDrawer({
             role: editedRole,
             contractHours: parseInt(editedHours) || 35,
             company: editedCompany,
-            // excludeFromPrimes non géré par l'API PATCH actuelle, on le met à jour directement en local si besoin 
-            // ou on ajoute le support dans l'API. Pour l'instant l'API gère email, role, hours, company.
         })
       });
 
       if(!res.ok) throw new Error("Erreur API");
 
-      // Mise à jour Firestore pour le champ local (excludeFromPrimes)
       if (excludeFromPrimes !== member.excludeFromPrimes) {
          await updateDoc(doc(db, "users", member.id), { excludeFromPrimes });
       }
@@ -403,7 +413,7 @@ function MemberDrawer({
       toast({ 
         title: "Profil mis à jour", 
         description: "Les modifications ont été enregistrées avec succès.", 
-        variant: "success" // Notification verte
+        variant: "success"
       })
       setIsEditing(false)
     } catch (error) {
@@ -422,7 +432,7 @@ function MemberDrawer({
       toast({ 
         title: "Statut mis à jour", 
         description: member.disabled ? "L'accès utilisateur a été rétabli." : "L'utilisateur a été bloqué.",
-        variant: "success" // Notification verte
+        variant: "success"
       })
     } catch (e) {
       toast({ title: "Erreur", description: "Action impossible.", variant: "destructive" })
@@ -458,7 +468,6 @@ function MemberDrawer({
             <h3 className="font-bold text-xl">{member.name}</h3>
             <p className="text-sm text-muted-foreground">{member.email}</p>
             
-            {/* Badges d'état */}
             <div className="flex justify-center gap-2 mt-4 flex-wrap">
                 {isPending ? (
                     <Badge variant="outline" className="bg-orange-500/10 text-orange-600 border-orange-200">
@@ -484,7 +493,6 @@ function MemberDrawer({
 
           {isAdmin && (
             <div className="space-y-6">
-              {/* Actions Rapides */}
               <div className="grid grid-cols-2 gap-3">
                 <Button variant="outline" className="rounded-xl h-12" onClick={handleSendActivationLink}>
                   {linkSent ? <Check className="w-4 h-4 mr-2" /> : <Send className="w-4 h-4 mr-2" />}
@@ -496,13 +504,11 @@ function MemberDrawer({
                 </Button>
               </div>
 
-              {/* Formulaire d'édition */}
               {isEditing && (
                 <div className="pulse-card p-5 space-y-4 border-primary/20 bg-primary/5 animate-in fade-in zoom-in-95 duration-200">
                   <h4 className="text-sm font-semibold text-primary mb-2">Modification</h4>
                   
                   <div className="space-y-3">
-                    {/* AJOUT: Champ Email Modifiable */}
                     <div>
                         <label className="text-xs font-medium text-muted-foreground mb-1 block">Email (Modifiable)</label>
                         <Input value={editedEmail} onChange={(e) => setEditedEmail(e.target.value)} className="bg-background" />
@@ -535,7 +541,6 @@ function MemberDrawer({
                 </div>
               )}
 
-              {/* Zone Danger */}
               <div className="pt-4 border-t border-border/50 space-y-3">
                 <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Zone de danger</h4>
                 
@@ -558,7 +563,7 @@ function MemberDrawer({
 }
 
 function InviteDrawer({ onClose, onSuccess }: { onClose: () => void, onSuccess: () => void }) {
-  const { toast } = useToast() // Utilisation du hook
+  const { toast } = useToast()
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
@@ -572,7 +577,6 @@ function InviteDrawer({ onClose, onSuccess }: { onClose: () => void, onSuccess: 
     setIsLoading(true);
 
     try {
-      // APPEL API AVEC LES NOUVEAUX CHAMPS
       const response = await fetch("/api/admin/invite-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -596,7 +600,7 @@ function InviteDrawer({ onClose, onSuccess }: { onClose: () => void, onSuccess: 
       toast({
         title: "Invitation envoyée",
         description: `Un email d'activation a été envoyé à ${firstName} ${lastName}.`,
-        variant: "success" // Notification verte
+        variant: "success"
       });
       onSuccess();
     } catch (error: any) {
