@@ -7,9 +7,9 @@ import { PermissionGate } from "@/components/auth/permission-gate"
 import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input" // Assurez-vous d'avoir ce composant
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { BadgeCheck, CheckCircle2, Clock, Coins, Pencil, Trash2, Save, X, Download } from "lucide-react"
+import { BadgeCheck, CheckCircle2, Clock, Coins, Pencil, Trash2, Save, X, Download, FileText } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { cn } from "@/lib/utils"
 import { usePrimes, PrimeHistory } from "@/hooks/use-primes"
@@ -18,6 +18,8 @@ import { exportToPulseCSV } from "@/lib/csv-export"
 import { db } from "@/lib/firebase/client"
 import { collection, getDocs, query, where } from "firebase/firestore"
 import { readDemoState } from "@/lib/demo/local-demo-store"
+// ✅ Import du générateur PDF
+import { generatePrimePDF } from "@/lib/pdf-export"
 
 // Fonction utilitaire pour l'affichage (inchangée)
 function statusMeta(status: string) {
@@ -42,7 +44,21 @@ export default function PrimesPage() {
 
   const companyId = useMemo(() => ((profile as any)?.companyId as string | undefined) || "demo-company", [profile])
 
-  // Export CSV (avec noms salariés + établissement + détail)
+  // --- NOUVEAU : GESTION PDF ---
+  const handleExportPDF = () => {
+    if (!selectedPrime) return
+    
+    generatePrimePDF({
+        userName: user.displayName || "Collaborateur",
+        companyName: ((company as any)?.name) || ((profile as any)?.companyName) || "Mon Entreprise",
+        month: selectedPrime.month,
+        status: selectedPrime.status,
+        amount: selectedPrime.amount,
+        date: selectedPrime.date.toISOString()
+    })
+  }
+
+  // --- EXPORT CSV (Code existant préservé) ---
   const handleExportCSV = async () => {
     if (primes.length === 0) return
 
@@ -72,7 +88,6 @@ export default function PrimesPage() {
           nameById[m.id] = m.displayName
         }
       } else {
-        // Firestore : lecture best-effort des users pour enrichir l'export
         try {
           const chunks: string[][] = []
           for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10))
@@ -89,7 +104,6 @@ export default function PrimesPage() {
             })
           }
         } catch (e) {
-          // Si la lecture échoue, on exporte quand même (noms vides ou userId)
           console.warn("Export CSV: impossible de charger les noms utilisateurs", e)
         }
       }
@@ -161,7 +175,7 @@ export default function PrimesPage() {
         status: editStatus as any
       });
       setIsEditing(false);
-      setSelectedPrime(null); // Fermer le drawer après sauvegarde
+      setSelectedPrime(null);
     } catch (e) {
       alert("Erreur lors de la mise à jour");
     }
@@ -172,10 +186,6 @@ export default function PrimesPage() {
     await deletePrime(selectedPrime.id);
     setSelectedPrime(null);
   }
-
-  // Si on est admin, on voit tout, sinon on pourrait filtrer par userId si nécessaire
-  // Pour l'instant on affiche l'historique global ou perso selon votre logique business. 
-  // Ici : on affiche tout ce qui vient de la collection "primes_history".
   
   return (
     <PermissionGate moduleId="primes" redirect>
@@ -307,6 +317,12 @@ export default function PrimesPage() {
                        <span className="text-3xl font-bold text-primary">{selectedPrime.amount.toLocaleString("fr-FR")} €</span>
                        <span className="text-sm text-muted-foreground mt-1">{statusMeta(selectedPrime.status).label}</span>
                     </div>
+
+                    {/* ✅ BOUTON PDF AJOUTÉ ICI */}
+                    <Button className="w-full rounded-xl py-6 shadow-md" onClick={handleExportPDF}>
+                        <FileText className="w-5 h-5 mr-2" /> 
+                        Télécharger le récapitulatif PDF
+                    </Button>
 
                     {/* Actions Admin */}
                     {user.isManagerOrAdmin && (
