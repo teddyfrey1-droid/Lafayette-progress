@@ -768,10 +768,12 @@ function ProductsDrawer({
     unitPrice: 0,
     unit: "u",
     imageUrl: "",
+    category: "",
   })
 
   const [importText, setImportText] = useState("")
   const [importUnit, setImportUnit] = useState("u")
+  const [importHint, setImportHint] = useState<string | null>(null)
 
   const products: SupplierProduct[] = Array.isArray(supplier?.products) ? supplier.products : []
 
@@ -780,6 +782,17 @@ function ProductsDrawer({
     if (!q) return true
     return (p.name || "").toLowerCase().includes(q) || (p.reference || "").toLowerCase().includes(q)
   })
+
+  const groupedEntries: Array<[string, SupplierProduct[]]> = (() => {
+    const map = new Map<string, SupplierProduct[]>()
+    for (const p of filtered) {
+      const keyRaw = (p.category || "").toString().trim()
+      const key = keyRaw ? keyRaw : "Sans catégorie"
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(p)
+    }
+    return Array.from(map.entries())
+  })()
 
   const parseNumber = (raw: string) => {
     const v = (raw || "").toString().trim().replace(",", ".").replace(/[^0-9.]/g, "")
@@ -793,7 +806,7 @@ function ProductsDrawer({
       .map((l) => l.trim())
       .filter(Boolean)
 
-    const items: Array<{ reference?: string; name: string; unitPrice: number; unit: string; imageUrl?: string }> = []
+    const items: Array<{ reference?: string; name: string; unitPrice: number; unit: string; imageUrl?: string; category?: string }> = []
     for (const line of lines) {
       const parts = line.split(/[;\t,]/).map((p) => p.trim())
       if (parts.length < 3) continue
@@ -802,9 +815,10 @@ function ProductsDrawer({
       const unitPrice = parseNumber(parts[2] || "")
       const unit = (parts[3] || "").trim() || importUnit || "u"
       const imageUrl = (parts[4] || "").trim()
+      const category = (parts[5] || "").trim()
 
       if (!name) continue
-      items.push({ reference, name, unitPrice, unit, imageUrl: imageUrl || undefined })
+      items.push({ reference, name, unitPrice, unit, imageUrl: imageUrl || undefined, category: category || undefined })
     }
     return items
   }
@@ -817,6 +831,7 @@ function ProductsDrawer({
     const unit = (productForm.unit || "u").toString()
     const reference = (productForm.reference || "").toString().trim()
     const imageUrl = (productForm.imageUrl || "").toString().trim()
+    const category = (productForm.category || "").toString().trim()
 
     try {
       await addProduct(companyId, supplier.id, {
@@ -825,8 +840,9 @@ function ProductsDrawer({
         imageUrl: imageUrl || undefined,
         unitPrice,
         unit,
+        category: category || undefined,
       })
-      setProductForm({ name: "", reference: "", unitPrice: 0, unit, imageUrl: "" })
+      setProductForm({ name: "", reference: "", unitPrice: 0, unit, imageUrl: "", category: "" })
       onRefresh()
     } catch (e) {
       console.error(e)
@@ -849,7 +865,7 @@ function ProductsDrawer({
   const handleImport = async () => {
     if (!supplier?.id) return
     const items = parseBulk(importText)
-    if (items.length === 0) return alert("Aucun produit détecté. Format attendu : Référence;Nom;Prix (Unit;ImageUrl optionnels)")
+    if (items.length === 0) return alert("Aucun produit détecté. Format attendu : Référence;Nom;Prix (Unit;ImageUrl;Catégorie optionnels)")
     try {
       const byRef = new Map<string, SupplierProduct>()
       for (const p of products) {
@@ -870,6 +886,7 @@ function ProductsDrawer({
             unit: it.unit,
             reference: it.reference || existing.reference,
             imageUrl: it.imageUrl || existing.imageUrl,
+            category: it.category || (existing as any).category,
           })
           updated += 1
         } else {
@@ -879,6 +896,7 @@ function ProductsDrawer({
             unit: it.unit,
             reference: it.reference || undefined,
             imageUrl: it.imageUrl || undefined,
+            category: it.category || undefined,
           })
           created += 1
         }
@@ -887,20 +905,144 @@ function ProductsDrawer({
       onRefresh()
       setShowImport(false)
       setImportText("")
+      setImportHint(null)
       alert(`Import terminé : ${created} créé(s), ${updated} mis à jour.`)
     } catch (e) {
       console.error(e)
+      setImportHint(null)
       alert("Erreur pendant l'import.")
     }
   }
 
+  const buildImportTextFromItems = (
+    items: Array<{ reference?: string; name: string; unitPrice: number; unit: string; imageUrl?: string; category?: string }>,
+  ) => {
+    return items
+      .map((it) => {
+        const ref = (it.reference || "").toString().trim()
+        const name = (it.name || "").toString().trim()
+        const price = Number.isFinite(it.unitPrice) ? String(it.unitPrice).replace(".", ",") : "0"
+        const unit = (it.unit || importUnit || "u").toString().trim() || "u"
+        const img = (it.imageUrl || "").toString().trim()
+        const cat = (it.category || "").toString().trim()
+        // IMPORTANT: la catégorie est en 6e colonne (après ImageUrl) pour rester compatible avec parseBulk
+        return [ref, name, price, unit, img, cat].join(";")
+      })
+      .join("\n")
+  }
+
+  const loadSheetJS = (): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      if (typeof window === "undefined") return reject(new Error("browser_only"))
+      const w = window as any
+      if (w.XLSX) return resolve(w.XLSX)
+
+      const id = "sheetjs-xlsx"
+      const existing = document.getElementById(id) as HTMLScriptElement | null
+      if (existing) {
+        existing.addEventListener("load", () => resolve((window as any).XLSX))
+        existing.addEventListener("error", () => reject(new Error("sheetjs_load_failed")))
+        return
+      }
+
+      const script = document.createElement("script")
+      script.id = id
+      script.async = true
+      script.src = "https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"
+      script.onload = () => resolve((window as any).XLSX)
+      script.onerror = () => reject(new Error("sheetjs_load_failed"))
+      document.head.appendChild(script)
+    })
+  }
+
+  const parseXlsxFile = async (file: File) => {
+    const XLSX: any = await loadSheetJS()
+    const buf = await file.arrayBuffer()
+    const wb = XLSX.read(buf, { type: "array" })
+    const sheetName = Array.isArray(wb.SheetNames) ? wb.SheetNames[0] : undefined
+    if (!sheetName) return []
+    const sheet = wb.Sheets?.[sheetName]
+    if (!sheet) return []
+
+    const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null })
+    const norm = (v: any) => (v === null || v === undefined ? "" : String(v)).trim()
+
+    // Heuristique : on cherche la ligne d'en-tête (ex: "Code article" / "Prix")
+    let headerIdx = rows.findIndex(
+      (r) =>
+        Array.isArray(r) &&
+        r.some((c) => typeof c === "string" && c.toLowerCase().includes("code")) &&
+        r.some((c) => typeof c === "string" && c.toLowerCase().includes("prix")),
+    )
+    if (headerIdx < 0) headerIdx = 0
+
+    let currentCategory = ""
+    const items: Array<{ reference?: string; name: string; unitPrice: number; unit: string; category?: string }> = []
+
+    for (let i = headerIdx + 1; i < rows.length; i++) {
+      const row = rows[i] || []
+      const isRowEmpty = row.length === 0 || row.every((cell) => norm(cell) === "")
+      if (isRowEmpty) continue
+
+      const a = row[0]
+      const b = row[1]
+      const d = row[3]
+      const e = row[4]
+
+      const aStr = norm(a)
+      const bStr = norm(b)
+      const dStr = norm(d)
+
+      // Catégorie en "ligne titre" : valeur en colonne A seule (comme dans ton fichier HEIKO)
+      if (typeof a === "string" && aStr && !bStr && !dStr) {
+        currentCategory = aStr
+        continue
+      }
+
+      const name = bStr
+      if (!name) continue
+
+      const reference = aStr
+      const unitPrice = parseNumber(dStr)
+      const unit = norm(e) || importUnit || "u"
+
+      items.push({
+        reference: reference || undefined,
+        name,
+        unitPrice,
+        unit,
+        category: currentCategory || undefined,
+      })
+    }
+
+    return items
+  }
+
   const handleFile = async (f: File | null) => {
     if (!f) return
+    setImportHint(null)
     try {
+      const name = (f.name || "").toLowerCase()
+      if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+        const items = await parseXlsxFile(f)
+        if (items.length === 0) {
+          setImportText("")
+          setImportHint("Aucun produit détecté dans le fichier.")
+          return
+        }
+
+        const cats = Array.from(new Set(items.map((it) => (it.category || "").toString().trim()).filter(Boolean)))
+        setImportText(buildImportTextFromItems(items))
+        setImportHint(`${items.length} produit(s) détecté(s)${cats.length ? ` • ${cats.length} catégorie(s)` : ""}`)
+        return
+      }
+
       const text = await f.text()
       setImportText(text)
+      setImportHint(`Fichier chargé : ${f.name}`)
     } catch (e) {
       console.error(e)
+      setImportHint(null)
       alert("Impossible de lire le fichier.")
     }
   }
@@ -936,7 +1078,16 @@ function ProductsDrawer({
           <div className="pulse-card p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-sm">Ajouter un produit</h3>
-              <Button variant="outline" size="sm" className="rounded-xl" onClick={() => setShowImport(true)} disabled={!canEdit}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-xl"
+                onClick={() => {
+                  setImportHint(null)
+                  setShowImport(true)
+                }}
+                disabled={!canEdit}
+              >
                 Importer
               </Button>
             </div>
@@ -962,6 +1113,10 @@ function ProductsDrawer({
                 <label className="text-sm font-medium">Image (URL)</label>
                 <Input value={(productForm.imageUrl || "") as any} onChange={(e) => setProductForm({ ...productForm, imageUrl: e.target.value })} className="rounded-xl mt-1" />
               </div>
+              <div className="col-span-2">
+                <label className="text-sm font-medium">Catégorie</label>
+                <Input value={(productForm.category || "") as any} onChange={(e) => setProductForm({ ...productForm, category: e.target.value })} className="rounded-xl mt-1" placeholder="Ex: LEGUMES, FRUITS, MAREE…" />
+              </div>
             </div>
 
             <div className="flex justify-end">
@@ -977,26 +1132,41 @@ function ProductsDrawer({
               <p className="text-xs text-muted-foreground">{filtered.length} / {products.length}</p>
             </div>
 
-            <div className="max-h-[45vh] overflow-y-auto divide-y divide-border">
-              {filtered.map((p) => (
-                <div key={p.id} className="p-3 flex items-center gap-3">
-                  {p.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.imageUrl} alt={p.name} className="w-10 h-10 rounded-lg object-cover border" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-xs text-muted-foreground">—</div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{p.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {p.reference ? `Ref: ${p.reference} • ` : ""}{p.unitPrice.toLocaleString("fr-FR")} € / {p.unit || "u"}
-                    </p>
+            <div className="max-h-[45vh] overflow-y-auto">
+              {groupedEntries.map(([cat, items]) => (
+                <div key={cat} className="border-b border-border last:border-b-0">
+                  <div className="px-3 py-2 bg-muted/30 flex items-center justify-between">
+                    <p className="text-xs font-semibold tracking-wide uppercase">{cat}</p>
+                    <p className="text-xs text-muted-foreground">{items.length}</p>
                   </div>
-                  {canEdit && (
-                    <Button size="icon" variant="ghost" className="rounded-lg text-red-500 hover:text-red-600 hover:bg-red-500/10" onClick={() => handleDeleteProduct(p.id)}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
+                  <div className="divide-y divide-border">
+                    {items.map((p) => (
+                      <div key={p.id} className="p-3 flex items-center gap-3">
+                        {p.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={p.imageUrl} alt={p.name} className="w-10 h-10 rounded-lg object-cover border" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-xs text-muted-foreground">—</div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{p.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {p.reference ? `Ref: ${p.reference} • ` : ""}{p.unitPrice.toLocaleString("fr-FR")} € / {p.unit || "u"}
+                          </p>
+                        </div>
+                        {canEdit && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="rounded-lg text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                            onClick={() => handleDeleteProduct(p.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
               {filtered.length === 0 && <div className="p-8 text-center text-sm text-muted-foreground">Aucun produit</div>}
@@ -1006,13 +1176,27 @@ function ProductsDrawer({
 
         {showImport && (
           <>
-            <div className="fixed inset-0 bg-black/60 z-[60]" onClick={() => setShowImport(false)} />
+            <div
+              className="fixed inset-0 bg-black/60 z-[60]"
+              onClick={() => {
+                setImportHint(null)
+                setShowImport(false)
+              }}
+            />
             <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl z-[61] max-h-[85vh] overflow-y-auto">
               <div className="sticky top-0 bg-card rounded-t-3xl p-4 border-b border-border">
                 <div className="w-12 h-1 bg-muted rounded-full mx-auto mb-4" />
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-lg">Importer Produits</h3>
-                  <Button variant="ghost" size="icon" onClick={() => setShowImport(false)} className="rounded-xl">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setImportHint(null)
+                      setShowImport(false)
+                    }}
+                    className="rounded-xl"
+                  >
                     <X className="w-5 h-5" />
                   </Button>
                 </div>
@@ -1020,7 +1204,9 @@ function ProductsDrawer({
 
               <div className="p-4 space-y-4 pb-10">
                 <div className="pulse-card p-4 space-y-3">
-                  <p className="text-sm text-muted-foreground">Format : <span className="font-medium">Référence;Nom;Prix</span> (Unit;ImageUrl optionnels)</p>
+                  <p className="text-sm text-muted-foreground">
+                    Format : <span className="font-medium">Référence;Nom;Prix</span> (Unit;ImageUrl;Catégorie optionnels)
+                  </p>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -1028,18 +1214,40 @@ function ProductsDrawer({
                       <Input value={importUnit} onChange={(e) => setImportUnit(e.target.value)} className="rounded-xl mt-1" placeholder="u" />
                     </div>
                     <div>
-                      <label className="text-sm font-medium">Fichier (CSV/TXT)</label>
-                      <Input type="file" accept=".csv,.txt,text/plain,text/csv" className="rounded-xl mt-1" onChange={(e) => handleFile(e.target.files?.[0] || null)} />
+                      <label className="text-sm font-medium">Fichier (CSV/TXT/XLSX)</label>
+                      <Input
+                        type="file"
+                        accept=".csv,.txt,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv"
+                        className="rounded-xl mt-1"
+                        onChange={(e) => handleFile(e.target.files?.[0] || null)}
+                      />
                     </div>
                   </div>
 
+                  {importHint && <p className="text-xs text-muted-foreground">{importHint}</p>}
+
                   <div>
                     <label className="text-sm font-medium">Coller le texte</label>
-                    <Textarea value={importText} onChange={(e) => setImportText(e.target.value)} className="rounded-xl mt-1 min-h-[180px]" placeholder={"REF001;Saumon frais;12.5\nREF002;Avocat;1.1"} />
+                    <Textarea
+                      value={importText}
+                      onChange={(e) => {
+                        setImportHint(null)
+                        setImportText(e.target.value)
+                      }}
+                      className="rounded-xl mt-1 min-h-[180px]"
+                      placeholder={"REF001;Saumon frais;12.5;KG;;MAREE\nREF002;Avocat;1.1;PCE;;FRUITS"}
+                    />
                   </div>
 
                   <div className="flex justify-end gap-2">
-                    <Button variant="outline" className="rounded-xl" onClick={() => setShowImport(false)}>
+                    <Button
+                      variant="outline"
+                      className="rounded-xl"
+                      onClick={() => {
+                        setImportHint(null)
+                        setShowImport(false)
+                      }}
+                    >
                       Annuler
                     </Button>
                     <Button className="rounded-xl" onClick={handleImport} disabled={!canEdit}>
