@@ -1,0 +1,271 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================
+    // Helpers
+    // =========================
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // We rely on users/{uid} for role + companyId.
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function hasUserDoc() {
+      return signedIn() && userDoc().exists();
+    }
+
+    function userData() {
+      return userDoc().data;
+    }
+
+    function role() {
+      return userData().role;
+    }
+
+    function companyId() {
+      return userData().companyId;
+    }
+
+    function isSuperAdmin() {
+      return hasUserDoc() && role() == 'super_admin';
+    }
+
+    function isAdmin() {
+      return hasUserDoc() && role() == 'admin';
+    }
+
+    function isGerant() {
+      return hasUserDoc() && role() == 'gerant';
+    }
+
+    function isDirecteur() {
+      return hasUserDoc() && role() == 'directeur';
+    }
+
+    function isManager() {
+      return hasUserDoc() && (role() == 'manager' || role() == 'assistant_manager');
+    }
+
+    function isEmploye() {
+      return hasUserDoc() && (role() == 'employe' || role() == 'employee');
+    }
+
+    function isInMyCompany(docCompanyId) {
+      return hasUserDoc() && docCompanyId != null && docCompanyId == companyId();
+    }
+
+    // Can operate suppliers/orders in own company
+    function canOperateInCompany(companyDocId) {
+      return hasUserDoc() && companyDocId == companyId() && (isAdmin() || isGerant() || isDirecteur() || isManager());
+    }
+
+    // Can edit company profile (name, siret, address...) in own company
+    function canEditCompanyProfile(companyDocId) {
+      return hasUserDoc() && companyDocId == companyId() && (isAdmin() || isGerant() || isDirecteur());
+    }
+
+    // Can manage modules/features (activate/deactivate) in own company
+    function canManageModules(companyDocId) {
+      return hasUserDoc() && companyDocId == companyId() && isGerant();
+    }
+
+    // =========================
+    // Default deny
+    // =========================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =========================
+    // USERS
+    // =========================
+    match /users/{userId} {
+      // Read:
+      // - self
+      // - super_admin
+      // - admin/gerant/directeur/manager of SAME company (for team management screens)
+      allow read: if hasUserDoc() && (
+        request.auth.uid == userId ||
+        isSuperAdmin() ||
+        (
+          (isAdmin() || isGerant() || isDirecteur() || isManager()) &&
+          isInMyCompany(resource.data.companyId)
+        )
+      );
+
+      // Create: allow user to create their own doc on first login
+      allow create: if signedIn() && request.auth.uid == userId;
+
+      // Update:
+      // - self
+      // - super_admin
+      // - (optional) admin/gerant/directeur of same company (to edit staff fields)
+      allow update: if hasUserDoc() && (
+        request.auth.uid == userId ||
+        isSuperAdmin() ||
+        (
+          (isAdmin() || isGerant() || isDirecteur()) &&
+          isInMyCompany(resource.data.companyId)
+        )
+      );
+
+      // Delete: super_admin only
+      allow delete: if isSuperAdmin();
+    }
+
+    // =========================
+    // COMPANIES
+    // =========================
+    // Expected structure:
+    // companies/{companyId}
+    // companies/{companyId}/suppliers/{supplierId}
+    // companies/{companyId}/orders/{orderId}
+    match /companies/{companyDocId} {
+
+      // Read:
+      // - super_admin: any company
+      // - others: only their own company
+      allow read: if hasUserDoc() && (isSuperAdmin() || companyDocId == companyId());
+
+      // Create company: super_admin only
+      allow create: if isSuperAdmin();
+
+      // Update company:
+      // We separate two kinds of updates by changed keys:
+      // - Modules update: requires super_admin OR gerant (own company)
+      // - Profile update (other fields): requires super_admin OR (admin/gerant/directeur) (own company)
+      //
+      // IMPORTANT: this assumes your modules are stored under a top-level "modules" map.
+      // If your field is named differently (e.g. "features"), rename it below.
+      allow update: if hasUserDoc() && (
+        isSuperAdmin() ||
+        (
+          companyDocId == companyId() &&
+          (
+            // If "modules" is modified, only gérant is allowed (within own company)
+            (
+              request.resource.data.diff(resource.data).changedKeys().hasAny(['modules'])
+              && canManageModules(companyDocId)
+            )
+            ||
+            // If "modules" is NOT modified, allow profile edits by admin/gerant/directeur
+            (
+              !request.resource.data.diff(resource.data).changedKeys().hasAny(['modules'])
+              && canEditCompanyProfile(companyDocId)
+            )
+          )
+        )
+      );
+
+      // Delete company: super_admin only
+      allow delete: if isSuperAdmin();
+
+      // ---- suppliers (per company) ----
+      match /suppliers/{supplierId} {
+        // Read: anyone in company + super_admin
+        allow read: if hasUserDoc() && (isSuperAdmin() || companyDocId == companyId());
+
+        // Write: operational roles in own company + super_admin
+        allow create, update, delete: if hasUserDoc() && (
+          isSuperAdmin() ||
+          canOperateInCompany(companyDocId)
+        );
+      }
+
+      // ---- orders (per company) ----
+      match /orders/{orderId} {
+        // Read: anyone in company + super_admin
+        allow read: if hasUserDoc() && (isSuperAdmin() || companyDocId == companyId());
+
+        // Write: operational roles in own company + super_admin
+        allow create, update, delete: if hasUserDoc() && (
+          isSuperAdmin() ||
+          canOperateInCompany(companyDocId)
+        );
+      }
+    }
+
+    // =========================
+    // PRIMES HISTORY
+    // =========================
+    match /primes_history/{primeId} {
+      // Read:
+      // - super_admin: all
+      // - others: only their own primes (employee export)
+      allow read: if hasUserDoc() && (
+        isSuperAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
+
+      // Write: super_admin only (recommended via Admin SDK / controlled API)
+      allow write: if isSuperAdmin();
+    }
+
+    // =========================
+    // SETTINGS (global)
+    // =========================
+    match /settings/{docId} {
+      // Read: signed in users
+      allow read: if hasUserDoc();
+
+      // Write: super_admin only (global collection)
+      // If you want company-scoped settings editable by gérant, move them under companies/{companyId}/settings.
+      allow write: if isSuperAdmin();
+    }
+
+    // =========================
+    // OBJECTIVES / PLANNINGS
+    // =========================
+    match /objectives/{objectiveId} {
+      allow read: if hasUserDoc() && (isSuperAdmin() || isInMyCompany(resource.data.companyId));
+      allow write: if hasUserDoc() && (
+        isSuperAdmin() ||
+        (isAdmin() || isGerant() || isDirecteur() || isManager())  // own company is checked at app layer via companyId fields
+      );
+    }
+
+    match /plannings/{planningId} {
+      allow read: if hasUserDoc() && (isSuperAdmin() || isInMyCompany(resource.data.companyId));
+      allow write: if hasUserDoc() && (
+        isSuperAdmin() ||
+        (isAdmin() || isGerant() || isDirecteur() || isManager())
+      );
+    }
+
+    // =========================
+    // PILOTAGE CONFIG (per company doc id)
+    // =========================
+    match /pilotage_config/{companyDocId} {
+      allow read: if hasUserDoc() && (isSuperAdmin() || companyDocId == companyId());
+      allow write: if hasUserDoc() && (
+        isSuperAdmin() ||
+        (companyDocId == companyId() && (isAdmin() || isGerant() || isDirecteur()))
+      );
+    }
+
+    // =========================
+    // SYSTEM LOGS / USER SESSIONS
+    // =========================
+    match /system_logs/{logId} {
+      allow read: if hasUserDoc() && isSuperAdmin();
+      allow write: if false;
+    }
+
+    match /user_sessions/{sessionId} {
+      allow read: if hasUserDoc() && isSuperAdmin();
+      allow write: if false;
+    }
+
+    // =========================
+    // CONFIG
+    // =========================
+    match /config/{document=**} {
+      allow read: if hasUserDoc();
+      allow write: if isSuperAdmin();
+    }
+  }
+}
