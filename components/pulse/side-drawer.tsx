@@ -43,6 +43,8 @@ type MenuSection = {
   icon?: any
   items: MenuItem[]
   collapsible?: boolean
+  // Contrôle d'apparition de la catégorie (modules activés par entreprise)
+  sectionModuleId?: string
 }
 
 type MenuItem = {
@@ -71,11 +73,12 @@ const menuSections: MenuSection[] = [
     title: "Gestion",
     icon: Briefcase,
     collapsible: true,
+    sectionModuleId: "menu_gestion",
     items: [
-      { href: "/commandes", icon: ShoppingCart, label: "Passer une commande", moduleId: "gestion" }, // Nouvelle page
-      { href: "/fournisseurs", icon: Truck, label: "Fournisseurs", moduleId: "fournisseurs" }, // Accès direct
-      { href: "/gestion/acces", icon: KeyRound, label: "Droits & Accès", moduleId: "parametres" }, // Accès direct
-      { href: "/gestion-fournisseurs/admin-sites", icon: Globe, label: "Outils Admin", moduleId: "sites" },
+      { href: "/commandes", icon: ShoppingCart, label: "Passer une commande", moduleId: "commandes" },
+      { href: "/fournisseurs", icon: Truck, label: "Fournisseurs", moduleId: "fournisseurs" },
+      { href: "/gestion/acces", icon: KeyRound, label: "Droits & Accès", moduleId: "acces" },
+      { href: "/gestion-fournisseurs/admin-sites", icon: Globe, label: "Outils Admin", moduleId: "outils_admin" },
       { href: "/equipes", icon: Users, label: "Équipes", moduleId: "equipes" },
     ],
   },
@@ -84,6 +87,7 @@ const menuSections: MenuSection[] = [
     title: "Outils avancés",
     icon: BarChart3,
     collapsible: true,
+    sectionModuleId: "menu_outils",
     items: [
       { href: "/pilotage", icon: BarChart3, label: "Pilotage", moduleId: "pilotage" },
       { href: "/diffusion", icon: Send, label: "Diffusion", moduleId: "diffusion" },
@@ -94,6 +98,7 @@ const menuSections: MenuSection[] = [
     title: "Administration",
     icon: Shield,
     collapsible: true,
+    sectionModuleId: "menu_admin",
     items: [
       { href: "/centre-controle", icon: Shield, label: "Centre de contrôle", moduleId: "centre_controle", badge: "Admin" },
       { href: "/parametres", icon: Settings, label: "Paramètres", moduleId: "parametres" },
@@ -160,10 +165,16 @@ export function SideDrawer({ open, onClose }: SideDrawerProps) {
   }
 
   const getVisibleSections = () => {
-    return menuSections.map(section => ({
-      ...section,
-      items: section.items.filter(checkItemVisible)
-    })).filter(section => section.items.length > 0)
+    return menuSections
+      .map((section) => {
+        const items = section.items.filter(checkItemVisible)
+        return { ...section, items }
+      })
+      .filter((section) => {
+        if (section.items.length === 0) return false
+        if (!section.sectionModuleId) return true
+        return isModuleEnabled(section.sectionModuleId)
+      })
   }
 
   const handleLogout = async () => {
