@@ -204,13 +204,23 @@ function ProductCard({
       style={{ transform: dx ? `translateX(${dx}px)` : undefined, transition: isDragging ? "none" : "transform 220ms" }}
     >
       {/* Swipe affordances */}
-      <div className={cn("absolute inset-y-0 left-0 w-20 flex items-center justify-center", dx > 8 ? "opacity-100" : "opacity-0", "transition-opacity")}
+      <div className={cn(
+        "absolute inset-y-0 left-0 w-20 flex items-center justify-center",
+        "bg-emerald-500/10",
+        dx > 8 ? "opacity-100" : "opacity-0",
+        "transition-opacity",
+      )}
         aria-hidden>
-        <div className="text-xs font-semibold text-primary">+1</div>
+        <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-200">+1</div>
       </div>
-      <div className={cn("absolute inset-y-0 right-0 w-20 flex items-center justify-center", dx < -8 ? "opacity-100" : "opacity-0", "transition-opacity")}
+      <div className={cn(
+        "absolute inset-y-0 right-0 w-20 flex items-center justify-center",
+        "bg-rose-500/10",
+        dx < -8 ? "opacity-100" : "opacity-0",
+        "transition-opacity",
+      )}
         aria-hidden>
-        <div className="text-xs font-semibold text-muted-foreground">-1</div>
+        <div className="text-xs font-semibold text-rose-700 dark:text-rose-200">-1</div>
       </div>
 
       <div className="flex items-start justify-between gap-4">
@@ -316,9 +326,14 @@ export default function CommandesPage() {
   const [productSearch, setProductSearch] = useState<string>("")
   const [orderLines, setOrderLines] = useState<OrderProduct[]>([])
 
+  // Cart summary (mobile rail)
+  const [openCartSummary, setOpenCartSummary] = useState(false)
+
   // UI micro-interactions
   const cartTargetRef = useRef<HTMLDivElement | null>(null)
   const [cartBump, setCartBump] = useState(false)
+  const francoCardRef = useRef<HTMLDivElement | null>(null)
+  const francoCelebratedRef = useRef(false)
 
   // Order details / réception
   const [openOrderDetails, setOpenOrderDetails] = useState(false)
@@ -352,6 +367,10 @@ export default function CommandesPage() {
     [suppliers, supplierId],
   )
 
+  const totalAmount = useMemo(() => {
+    return orderLines.reduce((sum, p) => sum + (Number(p.total) || 0), 0)
+  }, [orderLines])
+
   const francoThreshold = useMemo(() => getFrancoThresholdEuros(selectedSupplier), [selectedSupplier])
   const francoProgress = useMemo(() => {
     if (!francoThreshold || francoThreshold <= 0) return null
@@ -360,6 +379,66 @@ export default function CommandesPage() {
     return { pct, remaining }
   }, [francoThreshold, totalAmount])
 
+  const triggerFrancoCelebration = () => {
+    if (typeof window === "undefined") return
+    const host = francoCardRef.current
+    if (!host) return
+    try {
+      // light haptic on supported devices
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        ;(navigator as any).vibrate?.(25)
+      }
+
+      const rect = host.getBoundingClientRect()
+      const count = 14
+      for (let i = 0; i < count; i++) {
+        const p = document.createElement("div")
+        p.style.position = "fixed"
+        p.style.left = `${rect.left + rect.width * (0.2 + Math.random() * 0.6)}px`
+        p.style.top = `${rect.top + rect.height * 0.2}px`
+        p.style.width = "6px"
+        p.style.height = "10px"
+        p.style.borderRadius = "2px"
+        p.style.background = i % 3 === 0 ? "hsl(var(--primary))" : "hsl(var(--accent))"
+        p.style.zIndex = "9999"
+        p.style.pointerEvents = "none"
+        const dx = (Math.random() - 0.5) * 220
+        const dy = 220 + Math.random() * 220
+        const rot = (Math.random() - 0.5) * 240
+        p.animate(
+          [
+            { transform: "translate(-50%, -50%) scale(1)", opacity: 1 },
+            { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(${rot}deg)`, opacity: 0 },
+          ],
+          {
+            duration: 650 + Math.random() * 250,
+            easing: "cubic-bezier(.2,.9,.2,1)",
+            fill: "forwards",
+          },
+        )
+        document.body.appendChild(p)
+        window.setTimeout(() => p.remove(), 1100)
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  useEffect(() => {
+    if (!francoProgress) {
+      francoCelebratedRef.current = false
+      return
+    }
+    if (francoProgress.remaining <= 0 && !francoCelebratedRef.current) {
+      francoCelebratedRef.current = true
+      triggerFrancoCelebration()
+    }
+    if (francoProgress.remaining > 0) {
+      francoCelebratedRef.current = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [francoProgress?.remaining])
+
   const filteredLines = useMemo(() => {
     const q = productSearch.trim().toLowerCase()
     if (!q) return orderLines
@@ -367,10 +446,6 @@ export default function CommandesPage() {
       `${p.productName} ${p.reference || ""}`.toLowerCase().includes(q),
     )
   }, [orderLines, productSearch])
-
-  const totalAmount = useMemo(() => {
-    return orderLines.reduce((sum, p) => sum + (Number(p.total) || 0), 0)
-  }, [orderLines])
 
 
   const pendingReceptionOrders = useMemo(() => {
@@ -480,10 +555,18 @@ export default function CommandesPage() {
       dot.style.position = "fixed"
       dot.style.left = `${from.left + from.width / 2}px`
       dot.style.top = `${from.top + from.height / 2}px`
-      dot.style.width = "12px"
-      dot.style.height = "12px"
+      dot.style.width = "30px"
+      dot.style.height = "30px"
       dot.style.borderRadius = "9999px"
       dot.style.background = "hsl(var(--primary))"
+      dot.style.boxShadow = "0 8px 20px rgba(0,0,0,.14)"
+      dot.style.display = "flex"
+      dot.style.alignItems = "center"
+      dot.style.justifyContent = "center"
+      dot.style.color = "white"
+      dot.style.fontWeight = "700"
+      dot.style.fontSize = "16px"
+      dot.textContent = "+"
       dot.style.zIndex = "9999"
       dot.style.pointerEvents = "none"
       dot.style.transform = "translate(-50%, -50%) scale(1)"
@@ -1290,7 +1373,7 @@ export default function CommandesPage() {
         </div>
 
         {selectedSupplier && francoThreshold && francoProgress && (
-          <div className="mt-3 pulse-card p-4">
+          <div ref={francoCardRef} className="mt-3 pulse-card p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className={cn(
@@ -1367,7 +1450,8 @@ export default function CommandesPage() {
               value={ccInput}
               onChange={(e) => setCcInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
+                if (["Enter", ",", ";", "Tab"].includes(e.key)) {
+                  // Allow quick add with Enter / comma / semicolon / tab
                   e.preventDefault()
                   addCcFromInput()
                 }
@@ -1458,19 +1542,88 @@ export default function CommandesPage() {
           <div className="text-xl font-semibold tabular-nums">{formatEuro(totalAmount)}</div>
         </div>
 
-        <Button
-          onClick={handleSend}
-          className="rounded-xl gap-2 sm:min-w-[320px] justify-center"
-          disabled={!companyId || !selectedSupplier}
-        >
-          <Send className="w-4 h-4" />
-          Valider et envoyer le bon de commande (PDF)
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:min-w-[320px]">
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-xl gap-2 justify-center"
+            onClick={() => setOpenCartSummary(true)}
+            disabled={!selectedSupplier}
+          >
+            <Package className="w-4 h-4" />
+            Panier ({orderLines.filter((l) => Number(l.quantity || 0) > 0).length})
+          </Button>
+          <Button
+            onClick={handleSend}
+            className="rounded-xl gap-2 justify-center"
+            disabled={!companyId || !selectedSupplier}
+          >
+            <Send className="w-4 h-4" />
+            Envoyer (PDF)
+          </Button>
+        </div>
       </div>
     </div>
   </div>
 </SheetContent>
         </Sheet>
+
+        {/* Cart summary */}
+        <Dialog open={openCartSummary} onOpenChange={setOpenCartSummary}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Panier</DialogTitle>
+              <DialogDescription>
+                Récapitulatif des produits avec quantité &gt; 0.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-2 max-h-[55vh] overflow-y-auto">
+              {orderLines
+                .filter((l) => Number(l.quantity || 0) > 0)
+                .sort((a, b) => (a.category || "").toString().localeCompare((b.category || "").toString()))
+                .map((l) => (
+                  <div key={l.id} className="pulse-card p-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-semibold leading-tight break-words">{l.productName}</div>
+                      <div className="mt-1 text-xs text-muted-foreground flex flex-wrap items-center gap-2">
+                        <span>{(l.category || "Sans catégorie").toString()}</span>
+                        <span>•</span>
+                        <span>{formatEuro(l.unitPrice)}/{l.unit}</span>
+                        {l.packLabel ? (
+                          <>
+                            <span>•</span>
+                            <span>Colisage: {String(l.packLabel)}</span>
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-xs text-muted-foreground">Qté</div>
+                      <div className="text-sm font-bold tabular-nums">
+                        {Number(l.quantity || 0).toLocaleString("fr-FR")} {l.unit}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">{formatEuro(Number(l.total || 0))}</div>
+                    </div>
+                  </div>
+                ))}
+
+              {orderLines.filter((l) => Number(l.quantity || 0) > 0).length === 0 ? (
+                <div className="p-4 rounded-xl bg-muted text-sm text-muted-foreground">Aucun produit dans le panier.</div>
+              ) : null}
+            </div>
+
+            <DialogFooter className="gap-2">
+              <div className="mr-auto text-sm font-semibold">Total : {formatEuro(totalAmount)}</div>
+              <Button type="button" variant="outline" onClick={() => setOpenCartSummary(false)}>
+                Fermer
+              </Button>
+              <Button type="button" onClick={handleSend} disabled={!companyId || !selectedSupplier}>
+                Envoyer
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Email defaults settings */}
         <Dialog open={openEmailSettings} onOpenChange={setOpenEmailSettings}>

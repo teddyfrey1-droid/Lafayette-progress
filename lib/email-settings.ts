@@ -1,5 +1,3 @@
-"use client"
-
 import { db } from "@/lib/firebase/client"
 import { doc, getDoc, setDoc } from "firebase/firestore"
 
