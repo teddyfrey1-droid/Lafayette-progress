@@ -8,7 +8,7 @@ import { RBACProvider } from "@/components/auth/rbac-provider" // 👈 AJOUTÉ
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange={false}>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange={false}>
       <AuthProvider>
         <AuthGate>
           {/* Le système de permission est chargé une fois l'utilisateur connecté */}
