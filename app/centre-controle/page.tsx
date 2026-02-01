@@ -56,6 +56,9 @@ interface CompanyFeature {
 interface Company {
   id: string
   name: string
+  legalName?: string
+  siret?: string
+  customerNumber?: string
   logo: string
   plan: "starter" | "pro" | "enterprise"
   status: "active" | "suspended" | "trial"
@@ -369,6 +372,9 @@ function CentreControlePageContent() {
     try {
       await addDoc(collection(db, "companies"), {
         ...newCompany,
+        legalName: "",
+        siret: "",
+        customerNumber: "",
         logo: newCompany.name.substring(0, 2).toUpperCase(),
         usersCount: 0,
         createdAt: serverTimestamp(),
@@ -519,6 +525,9 @@ function CentreControlePageContent() {
         return {
           id: doc.id,
           name: d.name || "Sans nom",
+          legalName: d.legalName || "",
+          siret: d.siret || "",
+          customerNumber: d.customerNumber || "",
           logo: d.logo || "CO",
           plan: d.plan || "starter",
           status: d.status || "active",
@@ -1305,12 +1314,15 @@ function UserEditDrawer({ user, onClose, onSave }: { user: any, onClose: () => v
 
 function CompanyEditDrawer({ company, onClose, onSave }: { company: Company, onClose: () => void, onSave: (data: Partial<Company>) => void }) {
     const [name, setName] = useState(company.name);
+    const [legalName, setLegalName] = useState(company.legalName || "");
+    const [siret, setSiret] = useState(company.siret || "");
+    const [customerNumber, setCustomerNumber] = useState(company.customerNumber || "");
     const [status, setStatus] = useState(company.status);
     const [plan, setPlan] = useState(company.plan);
     const [industry, setIndustry] = useState(company.industry);
 
     const handleSave = () => {
-        onSave({ name, status, plan, industry });
+        onSave({ name, legalName, siret, customerNumber, status, plan, industry });
         onClose();
     }
 
@@ -1326,6 +1338,20 @@ function CompanyEditDrawer({ company, onClose, onSave }: { company: Company, onC
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground">Nom de la société</label>
                         <Input value={name} onChange={e => setName(e.target.value)} className="rounded-xl h-11" />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-muted-foreground">Raison sociale (pour les PDFs)</label>
+                        <Input value={legalName} onChange={e => setLegalName(e.target.value)} placeholder="Ex: TF FOOD" className="rounded-xl h-11" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-muted-foreground">SIRET</label>
+                            <Input value={siret} onChange={e => setSiret(e.target.value)} placeholder="14 chiffres" className="rounded-xl h-11" />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-muted-foreground">N° client</label>
+                            <Input value={customerNumber} onChange={e => setCustomerNumber(e.target.value)} placeholder="Ex: 12345" className="rounded-xl h-11" />
+                        </div>
                     </div>
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground">Secteur</label>

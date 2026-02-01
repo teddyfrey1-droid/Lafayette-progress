@@ -294,7 +294,7 @@ export default function CommandesPage() {
       setOrders((prev) => [newOrder, ...prev])
 
       // 2) Send email with PDF attachment
-      const orderNumber = newOrder.id.slice(-6).toUpperCase()
+      const orderNumber = (newOrder.orderNumber || newOrder.id.slice(-6)).toUpperCase()
       const token = await user?.getIdToken().catch(() => undefined)
 
       const subject = `Bon de commande ${orderNumber} — ${companyName || "Entreprise"}`
@@ -372,7 +372,7 @@ export default function CommandesPage() {
     setSendingOrderId(o.id)
     try {
       const token = await user?.getIdToken().catch(() => undefined)
-      const orderNumber = o.id.slice(-6).toUpperCase()
+      const orderNumber = (o.orderNumber || o.id.slice(-6)).toUpperCase()
       const subject = `Bon de commande ${orderNumber} — ${companyName || "Entreprise"}`
 
       const res = await fetch("/api/commandes/send-email", {
@@ -521,7 +521,7 @@ export default function CommandesPage() {
           const ccEmails = (activeOrder.ccEmails && activeOrder.ccEmails.length ? activeOrder.ccEmails : (supplier?.ccEmails || []))
 
           const token = await user?.getIdToken().catch(() => undefined)
-          const orderNumber = activeOrder.id.slice(-6).toUpperCase()
+          const orderNumber = (activeOrder.orderNumber || activeOrder.id.slice(-6)).toUpperCase()
           const subject = `Commande non conforme ${orderNumber} — ${companyName || "Entreprise"}`
 
           const res = await fetch("/api/commandes/send-nonconformity", {

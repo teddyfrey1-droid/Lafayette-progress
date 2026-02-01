@@ -152,7 +152,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Paramètres manquants" }, { status: 400 })
     }
 
-    const companyName = String(body?.companyName || "Pulse App").trim() || "Pulse App"
+    let companyName = String(body?.companyName || "Pulse App").trim() || "Pulse App"
+    let companyLegalName: string | undefined
+    let companySiret: string | undefined
+    let companyCustomerNumber: string | undefined
     const cc = normalizeEmails(body?.ccEmails)
 
     // If an order is provided, we generate and attach the PDF
@@ -162,6 +165,23 @@ export async function POST(req: Request) {
     let attachment: Array<{ name: string; content: string }> | undefined
 
     if (order && Array.isArray(order?.products)) {
+      // Fetch company legal info (for professional PDFs)
+      try {
+        const companyId = String(order?.companyId || "").trim()
+        if (companyId) {
+          const { adminDb } = await import("@/lib/firebase/admin")
+          const snap = await adminDb.collection("companies").doc(companyId).get()
+          if (snap.exists) {
+            const d: any = snap.data() || {}
+            companyName = String(d?.name || companyName).trim() || companyName
+            companyLegalName = d?.legalName ? String(d.legalName).trim() : undefined
+            companySiret = d?.siret ? String(d.siret).trim() : undefined
+            companyCustomerNumber = d?.customerNumber ? String(d.customerNumber).trim() : undefined
+          }
+        }
+      } catch (e) {
+        console.warn("Company legal info fetch failed", e)
+      }
       const orderNumber = String(order?.orderNumber || order?.id || "").trim() || "COMMANDE"
       const deliveryDateISO = String(order?.deliveryDate || "").trim()
       const createdAtISO = order?.createdAt ? String(order.createdAt) : undefined
@@ -180,6 +200,9 @@ export async function POST(req: Request) {
 
       const pdfBuffer = generateOrderPdfBuffer({
         companyName,
+        companyLegalName,
+        companySiret,
+        companyCustomerNumber,
         supplierName,
         supplierEmail: toEmail,
         orderNumber: orderNumber.toUpperCase(),

@@ -85,6 +85,8 @@ export interface SupplierProduct {
 
 export interface Order {
   id: string
+  // Human-friendly order number (e.g. A1, A2, ...)
+  orderNumber?: string
   companyId: string
   supplierId: string
   supplierName: string
@@ -103,6 +105,7 @@ export interface Order {
 interface OrdersState {
   suppliers: OrderSupplier[]
   orders: Order[]
+  nextOrderSeq?: number
 }
 
 // -------------------------
@@ -225,6 +228,7 @@ function ensureSupplierShape(s: any, companyId: string): OrderSupplier {
 function ensureOrderShape(o: any, companyId: string): Order {
   return {
     id: (o?.id || makeId("ord")).toString(),
+    orderNumber: o?.orderNumber ? String(o.orderNumber) : undefined,
     companyId,
     supplierId: (o?.supplierId || "").toString(),
     supplierName: (o?.supplierName || "").toString(),
@@ -348,7 +352,9 @@ export async function hydrateOrdersStore(companyId: string, backend?: OrdersBack
       getDocs(collection(db, "companies", companyId, "orders")),
     ])
     cache.suppliers = suppliersSnap.docs.map((d) => ensureSupplierShape({ ...(d.data() as any), id: d.id }, companyId))
-    cache.orders = ordersSnap.docs.map((d) => ensureOrderShape({ ...(d.data() as any), id: d.id }, companyId))
+    cache.orders = ordersSnap.docs
+      .filter((d) => d.id !== "__counter__")
+      .map((d) => ensureOrderShape({ ...(d.data() as any), id: d.id }, companyId))
   } catch (e) {
     console.error("hydrateOrdersStore failed", e)
   }
@@ -370,7 +376,9 @@ export async function hydrateOrdersStore(companyId: string, backend?: OrdersBack
     cache.unsubOrders = onSnapshot(
       collection(db, "companies", companyId, "orders"),
       (snap) => {
-        cache.orders = snap.docs.map((d) => ensureOrderShape({ ...(d.data() as any), id: d.id }, companyId))
+        cache.orders = snap.docs
+          .filter((d) => d.id !== "__counter__")
+          .map((d) => ensureOrderShape({ ...(d.data() as any), id: d.id }, companyId))
         dispatchChange(companyId)
       },
       (err) => {
@@ -575,20 +583,50 @@ export async function addOrder(
   backend?: OrdersBackend,
 ): Promise<Order> {
   const mode = resolveBackend(companyId, backend)
+
+  // We generate a simple, human-friendly incremental order number per company.
+  // Stored in companies/{companyId}/orders/__counter__ so that managers can create orders
+  // without requiring writes on companies/{companyId} (which is restricted by rules).
+  if (mode === "cloud") {
+    const orderRef = doc(db, "companies", companyId, "orders", makeId("ord"))
+    const counterRef = doc(db, "companies", companyId, "orders", "__counter__")
+
+    const created = await runTransaction(db, async (tx) => {
+      const counterSnap = await tx.get(counterRef)
+      const nextSeq = counterSnap.exists() ? Number((counterSnap.data() as any)?.nextSeq || 1) : 1
+      const orderNumber = `A${Math.max(1, nextSeq)}`
+
+      const newOrder: Order = {
+        ...order,
+        id: orderRef.id,
+        orderNumber,
+        companyId,
+        status: order.status || "draft",
+        createdAt: nowIso(),
+      }
+
+      tx.set(counterRef, { nextSeq: Math.max(1, nextSeq) + 1 }, { merge: true } as any)
+      tx.set(orderRef, newOrder)
+      return newOrder
+    })
+
+    return created
+  }
+
+  const state = getDemoState(companyId)
+  const nextSeq = typeof state.nextOrderSeq === "number" && Number.isFinite(state.nextOrderSeq) ? state.nextOrderSeq : 1
+  const orderNumber = `A${Math.max(1, nextSeq)}`
+  state.nextOrderSeq = Math.max(1, nextSeq) + 1
+
   const newOrder: Order = {
     ...order,
     id: makeId("ord"),
+    orderNumber,
     companyId,
     status: order.status || "draft",
     createdAt: nowIso(),
   }
 
-  if (mode === "cloud") {
-    await setDoc(doc(db, "companies", companyId, "orders", newOrder.id), newOrder)
-    return newOrder
-  }
-
-  const state = getDemoState(companyId)
   state.orders.push(newOrder)
   setDemoState(companyId, state)
   return newOrder

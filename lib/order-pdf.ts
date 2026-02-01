@@ -19,6 +19,9 @@ export type OrderPdfLine = {
 
 export type OrderPdfData = {
   companyName: string;
+  companyLegalName?: string;
+  companySiret?: string;
+  companyCustomerNumber?: string;
   supplierName: string;
   supplierEmail?: string;
   orderNumber: string;
@@ -52,34 +55,66 @@ export function generateOrderPdfBuffer(data: OrderPdfData): Buffer {
   const marginX = 40;
   let y = 40;
 
+  const companyDisplayName = (data.companyLegalName || data.companyName || "").trim() || "Entreprise";
+
   // Title
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
   doc.text("BON DE COMMANDE", marginX, y);
 
-  y += 22;
+  // Order number (top-right)
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text(`N° ${data.orderNumber}`, pageWidth - marginX, y, { align: "right" });
+
+  y += 18;
+
+  // Header box (buyer / supplier)
+  const boxTop = y + 10;
+  const boxHeight = 84;
+  doc.setDrawColor(220);
+  doc.setLineWidth(1);
+  doc.roundedRect(marginX, boxTop, pageWidth - marginX * 2, boxHeight, 10, 10);
+
+  const colGap = 16;
+  const colW = (pageWidth - marginX * 2 - colGap) / 2;
+  const leftX = marginX + 14;
+  const rightX = marginX + 14 + colW + colGap;
+  let leftY = boxTop + 18;
+  let rightY = boxTop + 18;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("ACHETEUR", leftX, leftY);
+  doc.text("FOURNISSEUR", rightX, rightY);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  leftY += 14;
+  rightY += 14;
+
+  const buyerLines = [
+    companyDisplayName,
+    data.companySiret ? `SIRET : ${String(data.companySiret).trim()}` : null,
+    data.companyCustomerNumber ? `N° client : ${String(data.companyCustomerNumber).trim()}` : null,
+  ].filter(Boolean) as string[];
+  const supplierLines = [
+    (data.supplierName || "").trim() || "Fournisseur",
+    data.supplierEmail ? `Email : ${String(data.supplierEmail).trim()}` : null,
+  ].filter(Boolean) as string[];
+
+  doc.text(buyerLines, leftX, leftY);
+  doc.text(supplierLines, rightX, rightY);
+
+  y = boxTop + boxHeight + 22;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text(`N°: ${data.orderNumber}`, marginX, y);
+  const metaLeft = `Livraison prévue : ${formatDateFR(data.deliveryDateISO)}`;
+  const metaRight = data.createdAtISO ? `Créée le : ${formatDateFR(data.createdAtISO)}` : "";
+  doc.text(metaLeft, marginX, y);
+  if (metaRight) doc.text(metaRight, pageWidth - marginX, y, { align: "right" });
 
-  const rightInfo = [
-    `Entreprise: ${data.companyName || ""}`,
-    `Fournisseur: ${data.supplierName || ""}`,
-    data.supplierEmail ? `Email: ${data.supplierEmail}` : "",
-    `Livraison: ${formatDateFR(data.deliveryDateISO)}`,
-    data.createdAtISO ? `Créée le: ${formatDateFR(data.createdAtISO)}` : "",
-  ].filter(Boolean);
-
-  // Right column
-  const rightX = pageWidth - marginX;
-  let ry = 40;
-  doc.setFontSize(10);
-  for (const line of rightInfo) {
-    doc.text(String(line), rightX, ry, { align: "right" });
-    ry += 14;
-  }
-
-  y += 20;
+  y += 14;
 
   // Table
   const body = data.lines.map((l) => [
@@ -148,6 +183,8 @@ export function generateNonConformityPdfBuffer(data: OrderPdfData): Buffer {
   const marginX = 40;
   let y = 40;
 
+  const companyDisplayName = (data.companyLegalName || data.companyName || "").trim() || "Entreprise";
+
   // Title
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
@@ -155,28 +192,59 @@ export function generateNonConformityPdfBuffer(data: OrderPdfData): Buffer {
   doc.text("COMMANDE NON CONFORME", marginX, y);
   doc.setTextColor(0, 0, 0);
 
-  y += 22;
+  // Order number (top-right)
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text(`N° ${data.orderNumber}`, pageWidth - marginX, y, { align: "right" });
+
+  y += 18;
+
+  // Header box (buyer / supplier)
+  const boxTop = y + 10;
+  const boxHeight = 84;
+  doc.setDrawColor(220);
+  doc.setLineWidth(1);
+  doc.roundedRect(marginX, boxTop, pageWidth - marginX * 2, boxHeight, 10, 10);
+
+  const colGap = 16;
+  const colW = (pageWidth - marginX * 2 - colGap) / 2;
+  const leftX = marginX + 14;
+  const rightX = marginX + 14 + colW + colGap;
+  let leftY = boxTop + 18;
+  let rightY = boxTop + 18;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("ACHETEUR", leftX, leftY);
+  doc.text("FOURNISSEUR", rightX, rightY);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  leftY += 14;
+  rightY += 14;
+
+  const buyerLines = [
+    companyDisplayName,
+    data.companySiret ? `SIRET : ${String(data.companySiret).trim()}` : null,
+    data.companyCustomerNumber ? `N° client : ${String(data.companyCustomerNumber).trim()}` : null,
+  ].filter(Boolean) as string[];
+  const supplierLines = [
+    (data.supplierName || "").trim() || "Fournisseur",
+    data.supplierEmail ? `Email : ${String(data.supplierEmail).trim()}` : null,
+  ].filter(Boolean) as string[];
+
+  doc.text(buyerLines, leftX, leftY);
+  doc.text(supplierLines, rightX, rightY);
+
+  y = boxTop + boxHeight + 22;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text(`N°: ${data.orderNumber}`, marginX, y);
+  const metaLeft = `Livraison prévue : ${formatDateFR(data.deliveryDateISO)}`;
+  const metaRight = data.createdAtISO ? `Créée le : ${formatDateFR(data.createdAtISO)}` : "";
+  doc.text(metaLeft, marginX, y);
+  if (metaRight) doc.text(metaRight, pageWidth - marginX, y, { align: "right" });
 
-  const rightInfo = [
-    `Entreprise: ${data.companyName || ""}`,
-    `Fournisseur: ${data.supplierName || ""}`,
-    data.supplierEmail ? `Email: ${data.supplierEmail}` : "",
-    `Livraison: ${formatDateFR(data.deliveryDateISO)}`,
-    data.createdAtISO ? `Créée le: ${formatDateFR(data.createdAtISO)}` : "",
-  ].filter(Boolean);
-
-  const rightX = pageWidth - marginX;
-  let ry = 40;
-  doc.setFontSize(10);
-  for (const line of rightInfo) {
-    doc.text(String(line), rightX, ry, { align: "right" });
-    ry += 14;
-  }
-
-  y += 20;
+  y += 14;
 
   // Table
   const body = data.lines.map((l) => {
