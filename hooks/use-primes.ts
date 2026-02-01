@@ -107,6 +107,7 @@ export function usePrimes() {
           });
         });
         // isManager est déjà calculé plus haut dans fetchPrimes()
+        items.sort((a,b)=>b.date.getTime()-a.date.getTime());
         const visibleItems = isManager ? items : items.filter((p) => p.status !== "pending")
         setPrimes(visibleItems);
       } catch (error) {

@@ -105,10 +105,6 @@ function TrendMiniLine({
   const MAX_SCORE = 140
   const [hoveredPoint, setHoveredPoint] = useState<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const lineGradientId = useMemo(() => `lineGradient-${Math.random().toString(36).slice(2)}`, [])
-  // SVG ids must be stable and must not contain characters like "/" coming from dates.
-  // Otherwise some browsers fall back to black fills/strokes when the gradient can't be resolved.
-  const gradientId = useMemo(() => `miniGradient-${Math.random().toString(36).slice(2)}`, [])
 
   const points = useMemo(() => {
     const hist = Array.isArray(history) ? [...history] : []
@@ -187,21 +183,21 @@ function TrendMiniLine({
         
         <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 200 64" preserveAspectRatio="none">
           <defs>
-            <linearGradient id={gradientId} x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.18" />
-              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
+            <linearGradient id={`miniGradient-${points[0]?.date}`} x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="rgb(59, 130, 246)" stopOpacity="0.15" />
+              <stop offset="100%" stopColor="rgb(59, 130, 246)" stopOpacity="0" />
             </linearGradient>
           </defs>
           
           <path 
             d={`M ${points.map((p, i) => `${(i * 200) / (points.length - 1)} ${64 - (p.score / MAX_SCORE) * 52}`).join(' L ')} L 200 64 L 0 64 Z`}
-            fill={`url(#${gradientId})`}
+            fill={`url(#miniGradient-${points[0]?.date})`}
           />
           
           <path 
             d={`M ${points.map((p, i) => `${(i * 200) / (points.length - 1)} ${64 - (p.score / MAX_SCORE) * 52}`).join(' L ')}`}
             fill="none" 
-            stroke="hsl(var(--primary))" 
+            stroke="rgb(59, 130, 246)" 
             strokeWidth="2" 
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -213,8 +209,8 @@ function TrendMiniLine({
             const isActive = hoveredPoint === i
             return (
               <g key={i}>
-                <circle cx={x} cy={y} r={isActive ? "6" : "4"} fill="hsl(var(--primary))" />
-                {isActive && <circle cx={x} cy={y} r="10" fill="hsl(var(--primary))" opacity="0.18" />}
+                <circle cx={x} cy={y} r={isActive ? "6" : "4"} fill="rgb(59, 130, 246)" />
+                {isActive && <circle cx={x} cy={y} r="10" fill="rgb(59, 130, 246)" opacity="0.2" />}
               </g>
             )
           })}
@@ -367,21 +363,21 @@ function LineChartPro({
 
         <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 400 192" preserveAspectRatio="none">
           <defs>
-            <linearGradient id={lineGradientId} x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.18" />
-              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
+            <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="rgb(59, 130, 246)" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="rgb(59, 130, 246)" stopOpacity="0" />
             </linearGradient>
           </defs>
           
           <path 
             d={`M ${points.map((p, i) => `${40 + (i * 320 / (points.length - 1))} ${192 - (p.score / MAX_SCORE) * 150}`).join(' L ')} L ${40 + 320} 192 L 40 192 Z`}
-            fill={`url(#${lineGradientId})`} 
+            fill="url(#lineGradient)" 
           />
           
           <path 
             d={`M ${points.map((p, i) => `${40 + (i * 320 / (points.length - 1))} ${192 - (p.score / MAX_SCORE) * 150}`).join(' L ')}`}
             fill="none" 
-            stroke="hsl(var(--primary))" 
+            stroke="rgb(59, 130, 246)" 
             strokeWidth="3" 
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -603,8 +599,8 @@ export default function ObjectivesPage() {
                       strokeWidth={10} 
                       showPercentage={false}
                     />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-                      <div className="text-3xl font-black leading-none bg-gradient-to-br from-primary to-accent bg-clip-text text-transparent">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <div className="text-3xl font-black bg-gradient-to-br from-primary to-accent bg-clip-text text-transparent">
                         {!principalObjective.isConfidential && <AnimatedCounter value={Math.round(clamp(principalProgressRaw, 0, 999))} suffix="%" />}
                         {principalObjective.isConfidential && <EyeOff className="w-8 h-8 text-muted-foreground/50" />}
                       </div>
@@ -786,6 +782,7 @@ export default function ObjectivesPage() {
                             size={76}
                             strokeWidth={10}
                             showPercentage
+                            label="Avancement"
                             animate={!isLocked}
                           />
                         </div>
@@ -1282,8 +1279,8 @@ function ObjectiveDetailView({ objective, onBack, onDelete, canEdit }: { objecti
         <div className="flex justify-center py-6">
           <div className="relative">
             <ProgressRing progress={progress} size={150} strokeWidth={12} showPercentage={false} />
-            <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-              <div className="text-4xl font-black leading-none bg-gradient-to-br from-primary via-purple-600 to-accent bg-clip-text text-transparent">
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <div className="text-4xl font-black bg-gradient-to-br from-primary via-purple-600 to-accent bg-clip-text text-transparent">
                 {!isConfidential && <AnimatedCounter value={Math.round(clamp(progress, 0, 999))} suffix="%" />}
                 {isConfidential && <EyeOff className="w-10 h-10 text-muted-foreground/30" />}
               </div>

@@ -5,6 +5,7 @@ import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
 import { PermissionGate } from "@/components/auth/permission-gate"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -27,6 +28,7 @@ import {
   BadgeCheck,
   CheckCircle2,
   Save,
+  X,
 } from "lucide-react"
 import {
   addOrder,
@@ -124,7 +126,8 @@ export default function CommandesPage() {
   const [supplierId, setSupplierId] = useState<string>("")
   const [deliveryDate, setDeliveryDate] = useState<string>(todayISO())
   const [notes, setNotes] = useState<string>("")
-  const [ccText, setCcText] = useState<string>("")
+  const [ccList, setCcList] = useState<string[]>([])
+  const [ccInput, setCcInput] = useState<string>("")
   const [productSearch, setProductSearch] = useState<string>("")
   const [orderLines, setOrderLines] = useState<OrderProduct[]>([])
 
@@ -211,7 +214,8 @@ export default function CommandesPage() {
   useEffect(() => {
     if (!selectedSupplier) {
       setOrderLines([])
-      setCcText("")
+      setCcList([])
+      setCcInput("")
       return
     }
 
@@ -233,7 +237,8 @@ export default function CommandesPage() {
       })),
     )
 
-    setCcText((selectedSupplier.ccEmails || []).join(", "))
+    setCcList((selectedSupplier.ccEmails || []).map((e: any) => String(e).toLowerCase()))
+    setCcInput("")
   }, [selectedSupplier])
 
   const updateQty = (lineId: string, qtyRaw: string) => {
@@ -246,6 +251,37 @@ export default function CommandesPage() {
         return { ...l, quantity: q, total }
       }),
     )
+  }
+
+  const isValidEmail = (email: string) => {
+    // Simple check (enough for UI)
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  }
+
+  const addCcFromInput = () => {
+    const parts = normalizeEmails(ccInput)
+    if (!parts.length) return
+
+    const next = [...ccList]
+    for (const raw of parts) {
+      const email = String(raw).toLowerCase()
+      if (!isValidEmail(email)) {
+        toast({
+          title: "Email invalide",
+          description: `"${raw}" n'est pas un email valide.`,
+          variant: "destructive",
+        })
+        continue
+      }
+      if (!next.includes(email)) next.push(email)
+    }
+
+    setCcList(next)
+    setCcInput("")
+  }
+
+  const removeCc = (email: string) => {
+    setCcList((prev) => prev.filter((e) => e !== email))
   }
 
   const handleSend = async () => {
@@ -275,7 +311,7 @@ export default function CommandesPage() {
       return
     }
 
-    const ccEmails = normalizeEmails(ccText)
+    const ccEmails = Array.from(new Set([...(ccList || []), ...normalizeEmails(ccInput)]))
 
     try {
       // 1) Create order (draft)
@@ -336,7 +372,8 @@ export default function CommandesPage() {
       setOpenNewOrder(false)
       setSupplierId("")
       setNotes("")
-      setCcText("")
+      setCcList([])
+      setCcInput("")
       setProductSearch("")
       setOrderLines([])
       setDeliveryDate(todayISO())
@@ -905,8 +942,45 @@ export default function CommandesPage() {
 
         <div className="space-y-2">
           <Label>Emails en copie (CC)</Label>
-          <Input placeholder="compta@..., achats@..." value={ccText} onChange={(e) => setCcText(e.target.value)} />
-          <p className="text-xs text-muted-foreground">Virgule ou point-virgule.</p>
+
+          {ccList.length ? (
+            <div className="flex flex-wrap gap-2">
+              {ccList.map((email) => (
+                <Badge key={email} variant="secondary" className="rounded-full pl-3 pr-2 py-1 flex items-center gap-1">
+                  <span className="text-xs">{email}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeCc(email)}
+                    className="ml-1 inline-flex items-center justify-center rounded-full hover:bg-background/60 p-1"
+                    aria-label={"Retirer " + email}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">Aucun email en copie.</p>
+          )}
+
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Ajouter un email (ex: compta@entreprise.com)"
+              value={ccInput}
+              onChange={(e) => setCcInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  addCcFromInput()
+                }
+              }}
+            />
+            <Button type="button" variant="secondary" className="shrink-0" onClick={addCcFromInput}>
+              <Plus className="w-4 h-4" />
+            </Button>
+          </div>
+
+          <p className="text-xs text-muted-foreground">Tu peux coller plusieurs emails (virgule, espace, point-virgule). Appuie sur +.</p>
         </div>
       </div>
 

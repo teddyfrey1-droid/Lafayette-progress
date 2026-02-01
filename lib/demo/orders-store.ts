@@ -353,7 +353,7 @@ export async function hydrateOrdersStore(companyId: string, backend?: OrdersBack
     ])
     cache.suppliers = suppliersSnap.docs.map((d) => ensureSupplierShape({ ...(d.data() as any), id: d.id }, companyId))
     cache.orders = ordersSnap.docs
-      .filter((d) => d.id !== "__counter__")
+      .filter((d) => d.id !== "order_counter")
       .map((d) => ensureOrderShape({ ...(d.data() as any), id: d.id }, companyId))
   } catch (e) {
     console.error("hydrateOrdersStore failed", e)
@@ -377,7 +377,7 @@ export async function hydrateOrdersStore(companyId: string, backend?: OrdersBack
       collection(db, "companies", companyId, "orders"),
       (snap) => {
         cache.orders = snap.docs
-          .filter((d) => d.id !== "__counter__")
+          .filter((d) => d.id !== "order_counter")
           .map((d) => ensureOrderShape({ ...(d.data() as any), id: d.id }, companyId))
         dispatchChange(companyId)
       },
@@ -585,11 +585,11 @@ export async function addOrder(
   const mode = resolveBackend(companyId, backend)
 
   // We generate a simple, human-friendly incremental order number per company.
-  // Stored in companies/{companyId}/orders/__counter__ so that managers can create orders
+  // Stored in companies/{companyId}/orders/order_counter so that managers can create orders
   // without requiring writes on companies/{companyId} (which is restricted by rules).
   if (mode === "cloud") {
     const orderRef = doc(db, "companies", companyId, "orders", makeId("ord"))
-    const counterRef = doc(db, "companies", companyId, "orders", "__counter__")
+    const counterRef = doc(db, "companies", companyId, "orders", "order_counter")
 
     const created = await runTransaction(db, async (tx) => {
       const counterSnap = await tx.get(counterRef)
