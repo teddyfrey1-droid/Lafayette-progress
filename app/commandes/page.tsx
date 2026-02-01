@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
   Dialog,
   DialogContent,
@@ -38,11 +38,6 @@ import {
   CheckCircle2,
   Save,
   X,
-  Search,
-  Gift,
-  Store,
-  ChevronRight,
-  AlertTriangle
 } from "lucide-react"
 import {
   addOrder,
@@ -70,8 +65,6 @@ import {
 
 import { cn } from "@/lib/utils"
 
-// --- UTILITAIRES DE CALCUL ET FORMATAGE (LOGIQUE INTACTE) ---
-
 function formatEuro(n: number) {
   const v = Number(n || 0)
   return `${v.toFixed(2).replace(".", ",")} €`
@@ -95,7 +88,7 @@ function convertPackToProductUnit(packQty: number | undefined, packUnitRaw: stri
   const productUnit = normalizeUnit(productUnitRaw)
   if (!packQty || !packUnit) return undefined
 
-  // Masse
+  // Mass
   if (productUnit === "KG" && (packUnit === "KG" || packUnit === "KGS")) return packQty
   if (productUnit === "KG" && (packUnit === "G" || packUnit === "GR" || packUnit === "GRS")) return packQty / 1000
   if ((productUnit === "G" || productUnit === "GR" || productUnit === "GRS") && (packUnit === "KG" || packUnit === "KGS")) return packQty * 1000
@@ -110,11 +103,12 @@ function convertPackToProductUnit(packQty: number | undefined, packUnitRaw: stri
   if (productUnit === "CL" && packUnit === "L") return packQty * 100
   if (productUnit === "CL" && packUnit === "CL") return packQty
 
-  // Unité identique
+  // Pieces-like
   if (productUnit === packUnit) return packQty
 
   return undefined
 }
+
 
 function todayISO() {
   const d = new Date()
@@ -142,25 +136,6 @@ function getFrancoThresholdEuros(supplier: OrderSupplier | null): number | null 
   return Number.isFinite(n) && n > 0 ? n : null
 }
 
-// Fonction utilitaire pour le design (Couleurs des fournisseurs)
-function getRandomColor(name: string) {
-  const colors = [
-    "bg-blue-100 text-blue-700",
-    "bg-emerald-100 text-emerald-700",
-    "bg-violet-100 text-violet-700",
-    "bg-amber-100 text-amber-700",
-    "bg-rose-100 text-rose-700",
-    "bg-cyan-100 text-cyan-700",
-  ]
-  let hash = 0
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  return colors[Math.abs(hash) % colors.length]
-}
-
-// --- COMPOSANT CARTE PRODUIT (DESIGN + LOGIQUE GESTURE) ---
-
 function ProductCard({
   line,
   step,
@@ -184,6 +159,7 @@ function ProductCard({
 
   const qty = Number(line.quantity || 0)
   const lineTotal = Number(line.total || 0)
+  const packLabel = (line.packLabel || "").toString().trim()
 
   const resetDrag = () => {
     setDx(0)
@@ -218,87 +194,107 @@ function ProductCard({
   return (
     <div
       className={cn(
-        "relative p-4 rounded-3xl bg-card border border-border/40 shadow-sm mb-3 overflow-hidden select-none touch-pan-y",
-        qty > 0 ? "ring-2 ring-primary/20 border-primary/40 bg-primary/5" : ""
+        "relative p-4",
+        "touch-pan-y select-none",
       )}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={resetDrag}
+      style={{ transform: dx ? `translateX(${dx}px)` : undefined, transition: isDragging ? "none" : "transform 220ms" }}
     >
-      {/* Swipe Backgrounds (Animations) */}
-      <div 
-        className="absolute inset-y-0 left-0 w-full bg-emerald-500 flex items-center justify-start pl-6 text-white font-bold"
-        style={{ opacity: dx > 0 ? Math.min(dx / 80, 1) : 0 }}
-      >
-        <Plus className="w-6 h-6" />
+      {/* Swipe affordances */}
+      <div className={cn(
+        "absolute inset-y-0 left-0 w-20 flex items-center justify-center",
+        "bg-emerald-500/10",
+        dx > 8 ? "opacity-100" : "opacity-0",
+        "transition-opacity",
+      )}
+        aria-hidden>
+        <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-200">+1</div>
       </div>
-      <div 
-        className="absolute inset-y-0 right-0 w-full bg-rose-500 flex items-center justify-end pr-6 text-white font-bold"
-        style={{ opacity: dx < 0 ? Math.min(Math.abs(dx) / 80, 1) : 0 }}
-      >
-        <div className="w-4 h-1 bg-white rounded-full" />
+      <div className={cn(
+        "absolute inset-y-0 right-0 w-20 flex items-center justify-center",
+        "bg-rose-500/10",
+        dx < -8 ? "opacity-100" : "opacity-0",
+        "transition-opacity",
+      )}
+        aria-hidden>
+        <div className="text-xs font-semibold text-rose-700 dark:text-rose-200">-1</div>
       </div>
 
-      <div 
-        className="relative z-10 flex items-start justify-between gap-4 transition-transform duration-200 ease-out"
-        style={{ transform: `translateX(${dx}px)` }}
-      >
-        <div className="min-w-0 flex-1">
-          <div className="font-bold text-sm leading-tight text-foreground line-clamp-2">{line.productName}</div>
-          <div className="mt-1.5 text-xs text-muted-foreground flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="rounded-md px-1.5 py-0 h-5 text-[10px] font-medium border-border/50">
-                {line.unit}
-            </Badge>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="font-medium leading-tight">{line.productName}</div>
+          <div className="mt-1 text-xs text-muted-foreground flex flex-wrap items-center gap-2">
+            <span className="truncate">{line.reference || "—"}</span>
+            <span>•</span>
             <span>{formatEuro(line.unitPrice)}/{line.unit}</span>
-            {line.packLabel && <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-md">📦 {line.packLabel}</span>}
+            {packLabel ? (
+              <>
+                <span>•</span>
+                <span>Colisage: {packLabel}</span>
+              </>
+            ) : null}
           </div>
         </div>
 
         <div className="flex flex-col items-end gap-2 shrink-0">
-           {/* Controls (+ - Input) */}
-           <div className="flex items-center bg-white rounded-xl border border-border/50 shadow-sm h-9 p-0.5">
-               <button
-                  type="button"
-                  className="w-8 h-full flex items-center justify-center text-foreground hover:bg-muted/50 rounded-lg transition-colors disabled:opacity-30"
-                  onClick={onDecrement}
-                  disabled={qty <= 0}
-               >
-                   −
-               </button>
-               <div className="w-10 h-full border-x border-border/20 flex items-center justify-center">
-                   <Input 
-                      type="number"
-                      min={0}
-                      step={step}
-                      value={qty || ""}
-                      placeholder="0"
-                      onChange={(e) => onSetQty(e.target.value)}
-                      className="w-full h-full border-0 text-center p-0 bg-transparent text-sm font-bold focus-visible:ring-0 tabular-nums"
-                   />
-               </div>
-               <button
-                  type="button"
-                  className="w-8 h-full flex items-center justify-center text-white bg-primary hover:bg-primary/90 rounded-lg shadow-sm transition-colors"
-                  onClick={(e) => onIncrement(e.currentTarget as any)}
-               >
-                   <Plus className="w-4 h-4" />
-               </button>
-           </div>
-           
-           {/* Total Price for line */}
-           {qty > 0 && (
-               <div className="text-sm font-bold text-primary tabular-nums animate-in slide-in-from-right-2 fade-in duration-300">
-                   {formatEuro(lineTotal)}
-               </div>
-           )}
+          <div className="flex items-center gap-2">
+            {packAdd !== undefined && packAdd > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-xl"
+                onClick={(e) => onAddPack(e.currentTarget as any)}
+              >
+                + colis
+              </Button>
+            )}
+
+            {/* Stepper */}
+            <div className="flex items-center rounded-xl border border-border overflow-hidden bg-background">
+              <button
+                type="button"
+                className={cn(
+                  "px-3 py-2 text-sm font-semibold",
+                  "active:scale-95 transition-transform",
+                  qty <= 0 ? "text-muted-foreground" : "text-foreground",
+                )}
+                onClick={onDecrement}
+                aria-label="Retirer"
+              >
+                −
+              </button>
+              <Input
+                type="number"
+                min={0}
+                step={step}
+                value={line.quantity}
+                onChange={(e) => onSetQty(e.target.value)}
+                className="w-20 border-0 rounded-none text-center tabular-nums"
+              />
+              <button
+                type="button"
+                className={cn(
+                  "px-3 py-2 text-sm font-semibold text-primary",
+                  "active:scale-95 transition-transform",
+                )}
+                onClick={(e) => onIncrement(e.currentTarget as any)}
+                aria-label="Ajouter"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <div className="text-sm w-24 text-right tabular-nums font-semibold">{formatEuro(lineTotal)}</div>
         </div>
       </div>
     </div>
   )
 }
-
-// --- PAGE PRINCIPALE ---
 
 export default function CommandesPage() {
   const { profile, isDemo, user, company } = useAuth()
@@ -310,92 +306,64 @@ export default function CommandesPage() {
 
   const companyName = (company?.name || (profile as any)?.companyName || "") as string
 
-  // Etats globaux
   const [loading, setLoading] = useState(true)
   const [suppliers, setSuppliers] = useState<OrderSupplier[]>([])
   const [orders, setOrders] = useState<Order[]>([])
+
   const [sendingOrderId, setSendingOrderId] = useState<string | null>(null)
 
-  // Sheet "Nouvelle Commande"
+  // New order sheet
   const [openNewOrder, setOpenNewOrder] = useState(false)
   const [supplierId, setSupplierId] = useState<string>("")
   const [deliveryDate, setDeliveryDate] = useState<string>(todayISO())
   const [notes, setNotes] = useState<string>("")
   const [ccList, setCcList] = useState<string[]>([])
   const [ccInput, setCcInput] = useState<string>("")
-  
-  // Settings Email (Dialog)
   const [openEmailSettings, setOpenEmailSettings] = useState(false)
   const [emailSettings, setEmailSettings] = useState<CompanyEmailSettings>(defaultCompanyEmailSettings())
-  const [emailSettingsDraft, setEmailSettingsDraft] = useState<CompanyEmailSettings>(defaultCompanyEmailSettings())
   const [savingEmailSettings, setSavingEmailSettings] = useState(false)
-
-  // Produits & Panier
+  const [emailSettingsDraft, setEmailSettingsDraft] = useState<CompanyEmailSettings>(defaultCompanyEmailSettings())
   const [productSearch, setProductSearch] = useState<string>("")
   const [orderLines, setOrderLines] = useState<OrderProduct[]>([])
+
+  // Cart summary (mobile rail)
   const [openCartSummary, setOpenCartSummary] = useState(false)
 
-  // Animations UI
+  // One-off CC editor (kept light in the main flow)
+  const [openCcEditor, setOpenCcEditor] = useState(false)
+
+  // UI micro-interactions
   const cartTargetRef = useRef<HTMLDivElement | null>(null)
   const [cartBump, setCartBump] = useState(false)
+  const francoCardRef = useRef<HTMLDivElement | null>(null)
   const francoCelebratedRef = useRef(false)
 
-  // Détails Commande / Réception
+  // Order details / réception
   const [openOrderDetails, setOpenOrderDetails] = useState(false)
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
   const [detailsMode, setDetailsMode] = useState<"view" | "receive">("view")
   const [receiptLines, setReceiptLines] = useState<OrderProduct[]>([])
 
-  // --- EFFETS ---
-
   useEffect(() => {
     if (!companyId) return
+    let mounted = true
     loadCompanyEmailSettings(companyId)
-      .then((s) => setEmailSettings(s))
-      .catch(() => {})
+      .then((s) => {
+        if (mounted) setEmailSettings(s)
+      })
+      .catch(() => {
+        // ignore
+      })
+    return () => {
+      mounted = false
+    }
   }, [companyId])
 
   useEffect(() => {
-    if (openEmailSettings) setEmailSettingsDraft(emailSettings)
+    if (!openEmailSettings) return
+    setEmailSettingsDraft(emailSettings)
   }, [openEmailSettings, emailSettings])
 
-  // Chargement initial
-  useEffect(() => {
-    if (!companyId) return
-    let cancelled = false
-    setLoading(true)
-    hydrateOrdersStore(companyId)
-      .then(() => {
-        if (cancelled) return
-        setSuppliers(getSuppliers(companyId))
-        setOrders(getOrders(companyId))
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => { cancelled = true }
-  }, [companyId])
-
-  // Sync auto (multi-tab)
-  useEffect(() => {
-    if (!companyId) return
-    const cid = companyId
-    const onAnyChange = (e?: any) => {
-      const eventCompanyId = e?.detail?.companyId as string | undefined
-      if (eventCompanyId && eventCompanyId !== cid) return
-      setSuppliers(getSuppliers(cid))
-      setOrders(getOrders(cid))
-    }
-    const evtName = getOrdersStoreEventName()
-    window.addEventListener(evtName, onAnyChange as any)
-    window.addEventListener("storage", onAnyChange as any)
-    return () => {
-      window.removeEventListener(evtName, onAnyChange as any)
-      window.removeEventListener("storage", onAnyChange as any)
-    }
-  }, [companyId])
-
-  // --- MEMO & CALCULS ---
 
   const selectedSupplier = useMemo(
     () => suppliers.find((s) => s.id === supplierId) || null,
@@ -414,17 +382,49 @@ export default function CommandesPage() {
     return { pct, remaining }
   }, [francoThreshold, totalAmount])
 
-  // Celebration Franco
   const triggerFrancoCelebration = () => {
     if (typeof window === "undefined") return
-    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-      ;(navigator as any).vibrate?.(50)
+    const host = francoCardRef.current
+    if (!host) return
+    try {
+      // light haptic on supported devices
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        ;(navigator as any).vibrate?.(25)
+      }
+
+      const rect = host.getBoundingClientRect()
+      const count = 14
+      for (let i = 0; i < count; i++) {
+        const p = document.createElement("div")
+        p.style.position = "fixed"
+        p.style.left = `${rect.left + rect.width * (0.2 + Math.random() * 0.6)}px`
+        p.style.top = `${rect.top + rect.height * 0.2}px`
+        p.style.width = "6px"
+        p.style.height = "10px"
+        p.style.borderRadius = "2px"
+        p.style.background = i % 3 === 0 ? "hsl(var(--primary))" : "hsl(var(--accent))"
+        p.style.zIndex = "9999"
+        p.style.pointerEvents = "none"
+        const dx = (Math.random() - 0.5) * 220
+        const dy = 220 + Math.random() * 220
+        const rot = (Math.random() - 0.5) * 240
+        p.animate(
+          [
+            { transform: "translate(-50%, -50%) scale(1)", opacity: 1 },
+            { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(${rot}deg)`, opacity: 0 },
+          ],
+          {
+            duration: 650 + Math.random() * 250,
+            easing: "cubic-bezier(.2,.9,.2,1)",
+            fill: "forwards",
+          },
+        )
+        document.body.appendChild(p)
+        window.setTimeout(() => p.remove(), 1100)
+      }
+    } catch {
+      // ignore
     }
-    toast({
-        title: "🎉 FRANCO ATTEINT !",
-        description: "Livraison offerte pour cette commande.",
-        className: "bg-emerald-600 border-none text-white",
-    })
   }
 
   useEffect(() => {
@@ -439,11 +439,73 @@ export default function CommandesPage() {
     if (francoProgress.remaining > 0) {
       francoCelebratedRef.current = false
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [francoProgress?.remaining])
 
-  // --- LOGIQUE PANIER & PRODUITS ---
+  const filteredLines = useMemo(() => {
+    const q = productSearch.trim().toLowerCase()
+    if (!q) return orderLines
+    return orderLines.filter((p) =>
+      `${p.productName} ${p.reference || ""}`.toLowerCase().includes(q),
+    )
+  }, [orderLines, productSearch])
 
-  // Rebuild lines when supplier changes
+
+  const pendingReceptionOrders = useMemo(() => {
+    return orders.filter((o) => o.status === "sent" || o.status === "confirmed")
+  }, [orders])
+
+  const deliveredOrders = useMemo(() => {
+    return orders.filter((o) => o.status === "delivered")
+  }, [orders])
+
+  const draftOrders = useMemo(() => {
+    return orders.filter((o) => o.status === "draft")
+  }, [orders])
+
+  // Load & hydrate
+  useEffect(() => {
+    if (!companyId) return
+    let cancelled = false
+
+    setLoading(true)
+    hydrateOrdersStore(companyId)
+      .then(() => {
+        if (cancelled) return
+        setSuppliers(getSuppliers(companyId))
+        setOrders(getOrders(companyId))
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [companyId])
+
+  // Sync (same tab + multi-tabs)
+  useEffect(() => {
+    if (!companyId) return
+
+    const cid = companyId
+    const onAnyChange = (e?: any) => {
+      const eventCompanyId = e?.detail?.companyId as string | undefined
+      if (eventCompanyId && eventCompanyId !== cid) return
+      setSuppliers(getSuppliers(cid))
+      setOrders(getOrders(cid))
+    }
+
+    const evtName = getOrdersStoreEventName()
+    window.addEventListener(evtName, onAnyChange as any)
+    window.addEventListener("storage", onAnyChange as any)
+    return () => {
+      window.removeEventListener(evtName, onAnyChange as any)
+      window.removeEventListener("storage", onAnyChange as any)
+    }
+  }, [companyId])
+
+  // When supplier changes, (re)build order lines from supplier products
   useEffect(() => {
     if (!selectedSupplier) {
       setOrderLines([])
@@ -486,8 +548,59 @@ export default function CommandesPage() {
     )
   }
 
-  // Animation "Fly to cart" simplifiée (juste un bump du panier)
+  const flyToTotal = (fromEl: HTMLElement | null) => {
+    if (typeof window === "undefined") return
+    if (!fromEl || !cartTargetRef.current) return
+    try {
+      const from = fromEl.getBoundingClientRect()
+      const to = cartTargetRef.current.getBoundingClientRect()
+      const dot = document.createElement("div")
+      dot.style.position = "fixed"
+      dot.style.left = `${from.left + from.width / 2}px`
+      dot.style.top = `${from.top + from.height / 2}px`
+      dot.style.width = "30px"
+      dot.style.height = "30px"
+      dot.style.borderRadius = "9999px"
+      dot.style.background = "hsl(var(--primary))"
+      dot.style.boxShadow = "0 8px 20px rgba(0,0,0,.14)"
+      dot.style.display = "flex"
+      dot.style.alignItems = "center"
+      dot.style.justifyContent = "center"
+      dot.style.color = "white"
+      dot.style.fontWeight = "700"
+      dot.style.fontSize = "16px"
+      dot.textContent = "+"
+      dot.style.zIndex = "9999"
+      dot.style.pointerEvents = "none"
+      dot.style.transform = "translate(-50%, -50%) scale(1)"
+      dot.style.transition = "transform 420ms cubic-bezier(.2,.9,.2,1), left 420ms cubic-bezier(.2,.9,.2,1), top 420ms cubic-bezier(.2,.9,.2,1), opacity 420ms"
+      document.body.appendChild(dot)
+
+      // Next frame -> animate
+      requestAnimationFrame(() => {
+        dot.style.left = `${to.left + to.width / 2}px`
+        dot.style.top = `${to.top + to.height / 2}px`
+        dot.style.transform = "translate(-50%, -50%) scale(0.6)"
+        dot.style.opacity = "0.9"
+      })
+
+      window.setTimeout(() => {
+        dot.style.opacity = "0"
+      }, 320)
+
+      window.setTimeout(() => {
+        dot.remove()
+        setCartBump(true)
+        window.setTimeout(() => setCartBump(false), 260)
+      }, 520)
+    } catch {
+      // ignore
+    }
+  }
+
   const changeQty = (lineId: string, delta: number, fromEl?: HTMLElement | null) => {
+    if (!delta) return
+    if (delta > 0) flyToTotal(fromEl || null)
     setOrderLines((prev) =>
       prev.map((l) => {
         if (l.id !== lineId) return l
@@ -496,34 +609,79 @@ export default function CommandesPage() {
         return { ...l, quantity: q, total }
       }),
     )
-    if (delta > 0) {
-        setCartBump(true)
-        setTimeout(() => setCartBump(false), 200)
+  }
+
+  const isValidEmail = (email: string) => {
+    // Simple check (enough for UI)
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  }
+
+  const addCcFromInput = () => {
+    const parts = normalizeEmails(ccInput)
+    if (!parts.length) return
+
+    const next = [...ccList]
+    for (const raw of parts) {
+      const email = String(raw).toLowerCase()
+      if (!isValidEmail(email)) {
+        toast({
+          title: "Email invalide",
+          description: `"${raw}" n'est pas un email valide.`,
+          variant: "destructive",
+        })
+        continue
+      }
+      if (!next.includes(email)) next.push(email)
+    }
+
+    setCcList(next)
+    setCcInput("")
+  }
+
+  const saveEmailDefaults = async () => {
+    if (!companyId) return
+    try {
+      setSavingEmailSettings(true)
+      const saved = await saveCompanyEmailSettings(companyId, emailSettingsDraft)
+      setEmailSettings(saved)
+      setOpenEmailSettings(false)
+      toast({ title: "✅ Réglages enregistrés", description: "Les emails par défaut seront utilisés automatiquement." })
+    } catch (e: any) {
+      console.error(e)
+      toast({ title: "Erreur", description: e?.message || "Impossible d'enregistrer les réglages.", variant: "destructive" })
+    } finally {
+      setSavingEmailSettings(false)
     }
   }
 
-  const filteredLines = useMemo(() => {
-    const q = productSearch.trim().toLowerCase()
-    if (!q) return orderLines
-    return orderLines.filter((p) =>
-      `${p.productName} ${p.reference || ""}`.toLowerCase().includes(q),
-    )
-  }, [orderLines, productSearch])
-
-
-  // --- LOGIQUE ENVOI & RECEPTION (INTACTE) ---
+  const removeCc = (email: string) => {
+    setCcList((prev) => prev.filter((e) => e !== email))
+  }
 
   const handleSend = async () => {
     if (!companyId) return
-    if (!selectedSupplier) return
+    if (!selectedSupplier) {
+      toast({ title: "Erreur", description: "Sélectionne un fournisseur.", variant: "destructive" })
+      return
+    }
+
     if (!selectedSupplier.email || !selectedSupplier.email.trim()) {
-      toast({ title: "Email manquant", description: "Le fournisseur n'a pas d'email.", variant: "destructive" })
+      toast({
+        title: "Email fournisseur manquant",
+        description: "Renseigne l'email du fournisseur dans la page Fournisseurs.",
+        variant: "destructive",
+      })
       return
     }
 
     const lines = orderLines.filter((l) => Number(l.quantity) > 0)
     if (lines.length === 0) {
-      toast({ title: "Panier vide", description: "Ajoute des produits.", variant: "destructive" })
+      toast({ title: "Erreur", description: "Ajoute au moins un produit (quantité > 0).", variant: "destructive" })
+      return
+    }
+
+    if (!deliveryDate) {
+      toast({ title: "Erreur", description: "Choisis une date de livraison.", variant: "destructive" })
       return
     }
 
@@ -531,11 +689,13 @@ export default function CommandesPage() {
     const { ccEmails, bccEmails, contactsCount } = resolveRecipients(emailSettings.order, manualCc)
 
     try {
+      // 1) Create order (draft)
       const newOrder = await addOrder(companyId, {
         supplierId: selectedSupplier.id,
         supplierName: selectedSupplier.name,
         supplierEmail: selectedSupplier.email,
         ccEmails: ccEmails.length ? ccEmails : undefined,
+        // Store BCC used for audit (supplier won't see those)
         bccEmails: bccEmails.length ? bccEmails : undefined,
         products: lines,
         totalAmount: lines.reduce((s, p) => s + (Number(p.total) || 0), 0),
@@ -546,31 +706,47 @@ export default function CommandesPage() {
 
       setOrders((prev) => [newOrder, ...prev])
 
+      // 2) Send email with PDF attachment
       const orderNumber = (newOrder.orderNumber || newOrder.id.slice(-6)).toUpperCase()
       const token = await user?.getIdToken().catch(() => undefined)
 
-      await fetch("/api/commandes/send-email", {
+      const subject = `Bon de commande ${orderNumber} — ${companyName || "Entreprise"}`
+
+      const res = await fetch("/api/commandes/send-email", {
         method: "POST",
-        headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+        headers: {
+          "content-type": "application/json",
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           toEmail: selectedSupplier.email,
           toName: selectedSupplier.name,
-          subject: `Bon de commande ${orderNumber} — ${companyName}`,
+          subject,
           companyName: companyName || "Entreprise",
           ccEmails,
           bccEmails,
-          order: { ...newOrder, orderNumber },
+          order: {
+            ...newOrder,
+            orderNumber,
+          },
         }),
       })
 
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Échec envoi email")
+      }
+
+      // 3) Mark as sent
       await markOrderAsSent(companyId, newOrder.id)
       setOrders(getOrders(companyId))
 
       toast({
         title: "✅ Commande envoyée",
-        description: `Envoyée à ${selectedSupplier.name}. ${contactsCount ? `+ Copie à vos ${contactsCount} contacts.` : ""}`,
+        description: `Bon de commande PDF envoyé à ${selectedSupplier.name}. ${contactsCount ? `Copie envoyée à vos ${contactsCount} contact(s) pré-enregistrés.` : ""}`.trim(),
       })
 
+      // Reset sheet
       setOpenNewOrder(false)
       setSupplierId("")
       setNotes("")
@@ -578,47 +754,100 @@ export default function CommandesPage() {
       setCcInput("")
       setProductSearch("")
       setOrderLines([])
+      setDeliveryDate(todayISO())
     } catch (e: any) {
-      toast({ title: "Erreur", description: e?.message || "Échec de l'envoi.", variant: "destructive" })
+      console.error(e)
+      toast({
+        title: "Erreur",
+        description: e?.message || "Impossible d'envoyer la commande.",
+        variant: "destructive",
+      })
     }
   }
 
+
   const handleResend = async (o: Order) => {
-      // Logique identique (simplifiée pour la lecture mais fonctionnelle)
-      if (!companyId) return
-      setSendingOrderId(o.id)
-      try {
-          const supplier = suppliers.find(s => s.id === o.supplierId)
-          const toEmail = o.supplierEmail || supplier?.email || ""
-          const token = await user?.getIdToken()
-          await fetch("/api/commandes/send-email", {
-              method: "POST",
-              headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-              body: JSON.stringify({
-                  toEmail,
-                  toName: o.supplierName,
-                  subject: `Bon de commande ${o.orderNumber || o.id} (Relance)`,
-                  companyName,
-                  order: o
-              })
-          })
-          toast({ title: "Bon renvoyé" })
-      } catch(e) {
-          toast({ title: "Erreur", variant: "destructive" })
-      } finally {
-          setSendingOrderId(null)
+    if (!companyId) return
+
+    const supplier = suppliers.find((s) => s.id === o.supplierId) || null
+    const toEmail = String(o.supplierEmail || supplier?.email || "").trim()
+    const toName = String(o.supplierName || supplier?.name || "Fournisseur").trim() || "Fournisseur"
+
+    if (!toEmail) {
+      toast({
+        title: "Email fournisseur manquant",
+        description: "Renseigne l'email du fournisseur dans la page Fournisseurs.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const manualCc = (o.ccEmails && o.ccEmails.length ? o.ccEmails : (supplier?.ccEmails || [])) as string[]
+    const { ccEmails, bccEmails, contactsCount } = resolveRecipients(emailSettings.order, manualCc)
+
+    setSendingOrderId(o.id)
+    try {
+      const token = await user?.getIdToken().catch(() => undefined)
+      const orderNumber = (o.orderNumber || o.id.slice(-6)).toUpperCase()
+      const subject = `Bon de commande ${orderNumber} — ${companyName || "Entreprise"}`
+
+      const res = await fetch("/api/commandes/send-email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          toEmail,
+          toName,
+          subject,
+          companyName: companyName || "Entreprise",
+          ccEmails,
+          bccEmails,
+          order: {
+            ...o,
+            supplierName: toName,
+            supplierEmail: toEmail,
+            orderNumber,
+          },
+        }),
+      })
+
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Échec envoi email")
       }
+
+      await markOrderAsSent(companyId, o.id)
+      setOrders(getOrders(companyId))
+
+      toast({
+        title: "✅ Bon renvoyé",
+        description: `Bon de commande PDF envoyé à ${toName}. ${contactsCount ? `Copie envoyée à vos ${contactsCount} contact(s) pré-enregistrés.` : ""}`.trim(),
+      })
+    } catch (e: any) {
+      console.error(e)
+      toast({
+        title: "Erreur",
+        description: e?.message || "Impossible d'envoyer la commande.",
+        variant: "destructive",
+      })
+    } finally {
+      setSendingOrderId(null)
+    }
   }
+
 
   const openDetails = (o: Order, mode: "view" | "receive") => {
     setActiveOrder(o)
     setDetailsMode(mode)
+    // Init réception lignes
     const init = (o.products || []).map((p) => ({
       ...p,
       receivedQuantity: typeof (p as any).receivedQuantity === "number" ? (p as any).receivedQuantity : Number(p.quantity || 0),
       receivedOk: typeof (p as any).receivedOk === "boolean" ? (p as any).receivedOk : undefined,
       receivedNote: typeof (p as any).receivedNote === "string" ? (p as any).receivedNote : "",
-    }))
+    })) as OrderProduct[]
     setReceiptLines(init)
     setOpenOrderDetails(true)
   }
@@ -633,448 +862,1141 @@ export default function CommandesPage() {
     )
   }
 
-  const finalizeReceipt = async () => {
-      if(!companyId || !activeOrder) return
-      try {
-          // Validation rapide
-          const hasProblems = receiptLines.some((l) => (l as any).receivedOk === false)
-          await updateOrder(companyId, activeOrder.id, {
-              products: receiptLines,
-              status: "delivered",
-              deliveredAt: new Date().toISOString()
-          } as any)
-          setOrders(getOrders(companyId))
-          toast({ title: "Réception validée !" })
-          setOpenOrderDetails(false)
-          
-          // Envoi auto du rapport (OK ou Litige)
-          const token = await user?.getIdToken()
-          const endpoint = hasProblems ? "/api/commandes/send-nonconformity" : "/api/commandes/send-receipt-ok"
-          const settings = hasProblems ? emailSettings.receiptIssue : emailSettings.receiptOk
-          const { ccEmails, bccEmails } = resolveRecipients(settings, [])
-          
-          fetch(endpoint, {
-              method: "POST",
-              headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-              body: JSON.stringify({
-                  toEmail: activeOrder.supplierEmail,
-                  toName: activeOrder.supplierName,
-                  subject: hasProblems ? "Non-conformité" : "Réception conforme",
-                  companyName,
-                  ccEmails,
-                  bccEmails,
-                  order: { ...activeOrder, products: receiptLines }
-              })
-          }).catch(console.error)
-          
-      } catch(e) {
-          toast({ title: "Erreur réception", variant: "destructive" })
-      }
+  const setLineReceipt = (lineId: string, patch: Partial<OrderProduct>) => {
+    setReceiptLines((prev) => prev.map((l) => (l.id === lineId ? { ...l, ...patch } : l)))
   }
 
-  // Listes filtrées
-  const pendingReceptionOrders = orders.filter((o) => o.status === "sent" || o.status === "confirmed")
-  const deliveredOrders = orders.filter((o) => o.status === "delivered")
-  const draftOrders = orders.filter((o) => o.status === "draft")
+  const receiptProgress = useMemo(() => {
+    const total = receiptLines.length || 0
+    const done = receiptLines.filter((l) => typeof (l as any).receivedOk === "boolean").length
+    return { total, done }
+  }, [receiptLines])
 
-  // --- RENDU ---
+  const saveReceipt = async () => {
+    if (!companyId || !activeOrder) return
+    try {
+      await saveOrderReceipt(companyId, activeOrder.id, receiptLines)
+      setOrders(getOrders(companyId))
+      toast({ title: "✅ Réception enregistrée", description: "Tu peux finaliser plus tard si besoin." })
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e?.message || "Impossible d'enregistrer la réception.", variant: "destructive" })
+    }
+  }
+
+  const finalizeReceipt = async () => {
+    if (!companyId || !activeOrder) return
+
+    // Validation: chaque ligne doit être OK ou Problème (+ note)
+    const missingChoice = receiptLines.find((l) => typeof (l as any).receivedOk !== "boolean")
+    if (missingChoice) {
+      toast({
+        title: "Il manque des validations",
+        description: "Valide chaque produit (OK ou Problème) avant de finaliser la réception.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const missingNote = receiptLines.find((l) => (l as any).receivedOk === false && !String((l as any).receivedNote || "").trim())
+    if (missingNote) {
+      toast({
+        title: "Note manquante",
+        description: "Ajoute une note pour chaque produit marqué en Problème.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const hasProblems = receiptLines.some((l) => (l as any).receivedOk === false)
+
+    try {
+      await updateOrder(companyId, activeOrder.id, {
+        products: receiptLines,
+        status: "delivered",
+        deliveredAt: new Date().toISOString(),
+      } as any)
+
+      setOrders(getOrders(companyId))
+      toast({ title: "✅ Commande réceptionnée", description: "La commande est passée dans l'historique." })
+      setOpenOrderDetails(false)
+
+      // Envoi automatique d'un PDF après validation de réception
+      if (hasProblems) {
+        try {
+          const supplier = suppliers.find((s) => s.id === activeOrder.supplierId)
+          const toEmail = String(activeOrder.supplierEmail || supplier?.email || "").trim()
+          const toName = String(activeOrder.supplierName || supplier?.name || "Fournisseur")
+          if (!toEmail) {
+            toast({
+              title: "Non-conformité non envoyée",
+              description: "Email fournisseur manquant (renseigne-le dans Fournisseurs).",
+              variant: "destructive",
+            })
+            return
+          }
+
+          const manualCc = (activeOrder.ccEmails && activeOrder.ccEmails.length ? activeOrder.ccEmails : (supplier?.ccEmails || [])) as string[]
+          const { ccEmails, bccEmails, contactsCount } = resolveRecipients(emailSettings.receiptIssue, manualCc)
+
+          const token = await user?.getIdToken().catch(() => undefined)
+          const orderNumber = (activeOrder.orderNumber || activeOrder.id.slice(-6)).toUpperCase()
+          const subject = `Commande non conforme ${orderNumber} — ${companyName || "Entreprise"}`
+
+          const res = await fetch("/api/commandes/send-nonconformity", {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              ...(token ? { authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+              toEmail,
+              toName,
+              subject,
+              companyName: companyName || "Entreprise",
+              ccEmails,
+              bccEmails,
+              order: {
+                ...activeOrder,
+                products: receiptLines,
+                supplierName: toName,
+                supplierEmail: toEmail,
+                orderNumber,
+              },
+            }),
+          })
+
+          const data = await res.json().catch(() => ({}))
+          if (!res.ok || !data?.success) throw new Error(data?.error || "Échec envoi non-conformité")
+
+          toast({
+            title: "📩 Non-conformité envoyée",
+            description: `PDF envoyé à ${toName} (lignes en rouge). ${contactsCount ? `Copie envoyée à vos ${contactsCount} contact(s) pré-enregistrés.` : ""}`.trim(),
+          })
+        } catch (e: any) {
+          console.error(e)
+          toast({
+            title: "Non-conformité",
+            description: e?.message || "Impossible d'envoyer le PDF de non-conformité (la réception reste validée).",
+            variant: "destructive",
+          })
+        }
+      } else {
+        // Réception conforme
+        try {
+          const supplier = suppliers.find((s) => s.id === activeOrder.supplierId)
+          const toEmail = String(activeOrder.supplierEmail || supplier?.email || "").trim()
+          const toName = String(activeOrder.supplierName || supplier?.name || "Fournisseur")
+          if (!toEmail) {
+            toast({
+              title: "Réception - email manquant",
+              description: "Email fournisseur manquant (renseigne-le dans Fournisseurs).",
+              variant: "destructive",
+            })
+            return
+          }
+
+          const manualCc = (activeOrder.ccEmails && activeOrder.ccEmails.length ? activeOrder.ccEmails : (supplier?.ccEmails || [])) as string[]
+          const { ccEmails, bccEmails, contactsCount } = resolveRecipients(emailSettings.receiptOk, manualCc)
+
+          const token = await user?.getIdToken().catch(() => undefined)
+          const orderNumber = (activeOrder.orderNumber || activeOrder.id.slice(-6)).toUpperCase()
+          const subject = `Réception validée ${orderNumber} — ${companyName || "Entreprise"}`
+
+          const res = await fetch("/api/commandes/send-receipt-ok", {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              ...(token ? { authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+              toEmail,
+              toName,
+              subject,
+              companyName: companyName || "Entreprise",
+              ccEmails,
+              bccEmails,
+              order: {
+                ...activeOrder,
+                products: receiptLines,
+                supplierName: toName,
+                supplierEmail: toEmail,
+                orderNumber,
+              },
+            }),
+          })
+
+          const data = await res.json().catch(() => ({}))
+          if (!res.ok || !data?.success) throw new Error(data?.error || "Échec envoi réception")
+
+          toast({
+            title: "📩 Réception confirmée",
+            description: `Bon de réception envoyé à ${toName}. ${contactsCount ? `Copie envoyée à vos ${contactsCount} contact(s) pré-enregistrés.` : ""}`.trim(),
+          })
+        } catch (e: any) {
+          console.error(e)
+          toast({
+            title: "Réception",
+            description: e?.message || "Impossible d'envoyer le PDF de réception (la réception reste validée).",
+            variant: "destructive",
+          })
+        }
+      }
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e?.message || "Impossible de finaliser la réception.", variant: "destructive" })
+    }
+  }
+
 
   return (
     <PermissionGate moduleId="commandes" redirect>
-      <div className="min-h-screen bg-muted/5 pb-28">
+      <div className="min-h-screen bg-background pb-24">
         <Header />
 
-        <main className="max-w-md mx-auto px-4 py-6 space-y-8">
-          
-          {/* 1. FOURNISSEURS (GRILLE METRO/SYSCO) */}
-          <section>
-             <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold tracking-tight text-foreground">Fournisseurs</h2>
-                <Button variant="ghost" size="sm" className="text-primary text-xs" asChild>
-                    <Link href="/fournisseurs">Gérer</Link>
-                </Button>
-             </div>
-             
-             {loading ? (
-                 <div className="flex justify-center p-8"><Loader2 className="animate-spin text-muted-foreground" /></div>
-             ) : suppliers.length === 0 ? (
-                <div className="p-6 rounded-3xl bg-white border border-dashed border-muted-foreground/30 text-center space-y-3">
-                    <Store className="w-10 h-10 mx-auto text-muted-foreground/50" />
-                    <p className="text-sm text-muted-foreground">Aucun fournisseur configuré.</p>
-                    <Button variant="outline" size="sm" asChild>
-                        <Link href="/fournisseurs">Ajouter un fournisseur</Link>
-                    </Button>
-                </div>
-             ) : (
-                <div className="grid grid-cols-2 gap-3">
-                    {/* Carte "Nouvelle Commande" Générique */}
-                    <button 
-                         onClick={() => { setSupplierId(""); setOpenNewOrder(true) }}
-                         className="col-span-2 flex items-center justify-between p-4 rounded-3xl bg-gradient-to-r from-primary to-purple-600 text-white shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-[0.98]"
-                     >
-                         <div className="flex items-center gap-3">
-                             <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
-                                 <Plus className="w-6 h-6 text-white" />
-                             </div>
-                             <div className="text-left">
-                                 <div className="font-bold text-lg">Nouvelle commande</div>
-                                 <div className="text-xs text-white/80">Choisir un fournisseur</div>
-                             </div>
-                         </div>
-                         <ChevronRight className="w-5 h-5 text-white/70" />
-                     </button>
-
-                    {/* Grille des Fournisseurs Favoris */}
-                    {suppliers.map(s => {
-                        const colorClass = getRandomColor(s.name);
-                        return (
-                            <button 
-                                key={s.id}
-                                onClick={() => { setSupplierId(s.id); setOpenNewOrder(true); }}
-                                className="group relative flex flex-col items-center justify-center p-5 rounded-3xl bg-white border border-border/50 shadow-sm hover:shadow-md transition-all active:scale-95"
-                            >
-                                <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold mb-3 shadow-inner", colorClass)}>
-                                    {s.name.substring(0, 2).toUpperCase()}
-                                </div>
-                                <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors line-clamp-1">{s.name}</span>
-                                {/* Badge promo/franco si dispo - future feature */}
-                            </button>
-                        )
-                    })}
-                </div>
-             )}
-          </section>
-
-          {/* 2. EN ATTENTE DE RÉCEPTION */}
-          <section>
-              <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
-                      <Truck className="w-5 h-5 text-primary" />
-                      En attente
-                  </h2>
-                  {pendingReceptionOrders.length > 0 && (
-                      <Badge variant="secondary" className="rounded-full px-2">{pendingReceptionOrders.length}</Badge>
-                  )}
+        <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+          {/* Hero */}
+          <div className="pulse-card p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-2">
+                <h1 className="text-2xl font-bold flex items-center gap-2">
+                  <Truck className="w-6 h-6 text-primary" />
+                  Passer une commande
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Sélectionne un fournisseur, ajuste les quantités, puis envoie un bon de commande en PDF par email.
+                </p>
               </div>
 
-              {pendingReceptionOrders.length === 0 ? (
-                  <div className="rounded-3xl bg-white p-8 text-center border border-border/40 shadow-sm">
-                      <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                           <CheckCircle2 className="w-10 h-10 text-emerald-200" />
-                      </div>
-                      <h3 className="font-bold text-foreground">Rien à réceptionner</h3>
-                      <p className="text-sm text-muted-foreground mt-1">Tout est en ordre. Votre stock est à jour !</p>
-                  </div>
-              ) : (
-                  <div className="space-y-3">
-                      {pendingReceptionOrders.map(o => (
-                          <div key={o.id} className="p-4 rounded-3xl bg-white border border-border/40 shadow-sm flex flex-col gap-3">
-                              <div className="flex items-center justify-between">
-                                  <div className="font-bold text-sm">{o.supplierName}</div>
-                                  <Badge variant="outline" className="rounded-lg text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-200">Envoyée</Badge>
-                              </div>
-                              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                                  <span>{o.deliveryDate}</span>
-                                  <span className="font-mono font-medium text-foreground">{formatEuro(o.totalAmount)}</span>
-                              </div>
-                              <div className="flex gap-2 mt-1">
-                                  <Button variant="outline" size="sm" className="flex-1 rounded-xl h-9 text-xs" onClick={() => handleResend(o)}>
-                                      Relancer
-                                  </Button>
-                                  <Button size="sm" className="flex-1 rounded-xl h-9 text-xs" onClick={() => openDetails(o, "receive")}>
-                                      Réceptionner
-                                  </Button>
-                              </div>
-                          </div>
-                      ))}
-                  </div>
-              )}
-          </section>
+              <div className="flex items-center gap-2">
+                <Link href="/fournisseurs" className="hidden sm:inline-flex">
+                  <Button variant="outline" className="rounded-xl gap-2">
+                    <Settings className="w-4 h-4" />
+                    Gérer les fournisseurs
+                  </Button>
+                </Link>
+
+                <Button onClick={() => setOpenNewOrder(true)} className="rounded-xl gap-2">
+                  <Plus className="w-4 h-4" />
+                  Nouvelle commande
+                </Button>
+              </div>
+            </div>
+
+            {!loading && suppliers.length === 0 && (
+              <div className="mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
+                <Mail className="w-5 h-5 text-amber-600 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Aucun fournisseur configuré</p>
+                  <p className="text-sm text-amber-700/90 dark:text-amber-200/80">
+                    Ajoute au moins un fournisseur et ses produits dans la page Fournisseurs.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
           
-          {/* 3. HISTORIQUE RAPIDE (Dernières reçues) */}
-          {deliveredOrders.length > 0 && (
-            <section>
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-bold tracking-tight text-muted-foreground">Historique récent</h2>
+          {/* Commandes */}
+          <section className="space-y-6">
+            {/* À réceptionner */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <Truck className="w-5 h-5 text-primary" />
+                  En attente de réception
+                </h2>
+                <p className="text-sm text-muted-foreground">{pendingReceptionOrders.length}</p>
+              </div>
+
+              {loading ? (
+                <div className="pulse-card p-6 text-sm text-muted-foreground">Chargement…</div>
+              ) : pendingReceptionOrders.length === 0 ? (
+                <div className="pulse-card p-8 flex items-start gap-3">
+                  <Package className="w-10 h-10 text-muted-foreground mt-1" />
+                  <div>
+                    <p className="font-semibold">Rien à réceptionner</p>
+                    <p className="text-sm text-muted-foreground">Les commandes envoyées apparaîtront ici jusqu’à validation.</p>
+                  </div>
                 </div>
-                <div className="space-y-2 opacity-80">
-                    {deliveredOrders.slice(0, 3).map(o => (
-                        <div key={o.id} className="flex items-center justify-between p-3 rounded-2xl bg-white/50 border border-border/30">
-                            <span className="text-sm font-medium">{o.supplierName}</span>
-                            <span className="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-md">Reçue</span>
+              ) : (
+                <div className="grid gap-3">
+                  {pendingReceptionOrders
+                    .slice()
+                    .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
+                    .map((o) => {
+                      const num = o.id.slice(-6).toUpperCase()
+                      return (
+                        <div key={o.id} className="pulse-card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <button
+                            type="button"
+                            className="text-left flex-1 min-w-0"
+                            onClick={() => openDetails(o, "view")}
+                          >
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold truncate">{o.supplierName}</span>
+                              <span className="text-xs px-2 py-1 rounded-lg bg-muted">#{num}</span>
+                              <span className="text-xs px-2 py-1 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-200">
+                                Envoyée
+                              </span>
+                            </div>
+
+                            <div className="mt-1 text-sm text-muted-foreground flex flex-wrap items-center gap-3">
+                              <span className="inline-flex items-center gap-1">
+                                <Calendar className="w-4 h-4" />
+                                Livraison : {o.deliveryDate || "—"}
+                              </span>
+                              <span>•</span>
+                              <span>Total : {formatEuro(o.totalAmount || 0)}</span>
+                            </div>
+                          </button>
+
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="rounded-xl gap-2"
+                              onClick={() => handleResend(o)}
+                              disabled={sendingOrderId === o.id}
+                            >
+                              {sendingOrderId === o.id ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Envoi…
+                                </>
+                              ) : (
+                                <>
+                                  <Mail className="w-4 h-4" />
+                                  Renvoyer le bon
+                                </>
+                              )}
+                            </Button>
+
+                            <Button size="sm" className="rounded-xl gap-2" onClick={() => openDetails(o, "receive")}>
+                              <Package className="w-4 h-4" />
+                              Réceptionner
+                            </Button>
+                          </div>
                         </div>
-                    ))}
+                      )
+                    })}
                 </div>
-            </section>
-          )}
+              )}
+            </div>
+
+            {/* Brouillons */}
+            {!loading && draftOrders.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-primary" />
+                    Brouillons
+                  </h2>
+                  <p className="text-sm text-muted-foreground">{draftOrders.length}</p>
+                </div>
+
+                <div className="grid gap-3">
+                  {draftOrders
+                    .slice()
+                    .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
+                    .map((o) => {
+                      const num = o.id.slice(-6).toUpperCase()
+                      return (
+                        <div key={o.id} className="pulse-card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <button type="button" className="text-left flex-1 min-w-0" onClick={() => openDetails(o, "view")}>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold truncate">{o.supplierName}</span>
+                              <span className="text-xs px-2 py-1 rounded-lg bg-muted">#{num}</span>
+                              <span className="text-xs px-2 py-1 rounded-lg bg-muted/40 text-muted-foreground">
+                                Brouillon
+                              </span>
+                            </div>
+                            <div className="mt-1 text-sm text-muted-foreground flex flex-wrap items-center gap-3">
+                              <span className="inline-flex items-center gap-1">
+                                <Calendar className="w-4 h-4" />
+                                Livraison : {o.deliveryDate || "—"}
+                              </span>
+                              <span>•</span>
+                              <span>Total : {formatEuro(o.totalAmount || 0)}</span>
+                            </div>
+                          </button>
+
+                          <Button
+                            size="sm"
+                            className="rounded-xl gap-2"
+                            onClick={() => handleResend(o)}
+                            disabled={sendingOrderId === o.id}
+                          >
+                            {sendingOrderId === o.id ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Envoi…
+                              </>
+                            ) : (
+                              <>
+                                <Send className="w-4 h-4" />
+                                Envoyer
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      )
+                    })}
+                </div>
+              </div>
+            )}
+
+            {/* Historique */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <BadgeCheck className="w-5 h-5 text-primary" />
+                  Commandes reçues
+                </h2>
+                <p className="text-sm text-muted-foreground">{deliveredOrders.length}</p>
+              </div>
+
+              {loading ? (
+                <div className="pulse-card p-6 text-sm text-muted-foreground">Chargement…</div>
+              ) : deliveredOrders.length === 0 ? (
+                <div className="pulse-card p-8 text-center">
+                  <Package className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-sm text-muted-foreground">Aucune commande réceptionnée pour le moment.</p>
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {deliveredOrders
+                    .slice()
+                    .sort((a, b) => (b.deliveredAt || b.createdAt || "").localeCompare(a.deliveredAt || a.createdAt || ""))
+                    .map((o) => {
+                      const num = o.id.slice(-6).toUpperCase()
+                      return (
+                        <div key={o.id} className="pulse-card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <button type="button" className="text-left flex-1 min-w-0" onClick={() => openDetails(o, "view")}>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold truncate">{o.supplierName}</span>
+                              <span className="text-xs px-2 py-1 rounded-lg bg-muted">#{num}</span>
+                              <span className="text-xs px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-200">
+                                Reçue
+                              </span>
+                            </div>
+
+                            <div className="mt-1 text-sm text-muted-foreground flex flex-wrap items-center gap-3">
+                              <span className="inline-flex items-center gap-1">
+                                <Calendar className="w-4 h-4" />
+                                Livraison : {o.deliveryDate || "—"}
+                              </span>
+                              <span>•</span>
+                              <span>Total : {formatEuro(o.totalAmount || 0)}</span>
+                            </div>
+                          </button>
+
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="rounded-xl gap-2"
+                              onClick={() => handleResend(o)}
+                              disabled={sendingOrderId === o.id}
+                            >
+                              {sendingOrderId === o.id ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Envoi…
+                                </>
+                              ) : (
+                                <>
+                                  <Mail className="w-4 h-4" />
+                                  Renvoyer le bon
+                                </>
+                              )}
+                            </Button>
+                            <Button size="sm" className="rounded-xl gap-2" variant="secondary" onClick={() => openDetails(o, "view")}>
+                              <FileText className="w-4 h-4" />
+                              Voir
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                </div>
+              )}
+            </div>
+          </section>
 
         </main>
 
-        {/* --- SHEET NOUVELLE COMMANDE --- */}
+        {/* New order sheet */}
         <Sheet open={openNewOrder} onOpenChange={setOpenNewOrder}>
-          <SheetContent side="bottom" className="h-[95vh] rounded-t-[32px] p-0 flex flex-col bg-muted/10">
-              
-              {/* Header Fixe */}
-              <div className="bg-white px-6 pt-6 pb-4 rounded-t-[32px] shadow-sm z-10">
-                 <div className="w-12 h-1.5 bg-muted rounded-full mx-auto mb-6 opacity-50" />
-                 
-                 <div className="flex items-center justify-between mb-4">
-                     <h2 className="text-2xl font-bold tracking-tight">Nouvelle commande</h2>
-                     {selectedSupplier && (
-                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                             {selectedSupplier.name.substring(0, 2).toUpperCase()}
-                         </div>
-                     )}
-                 </div>
-                 
-                 {/* Selecteur Fournisseur */}
-                 <Select value={supplierId} onValueChange={setSupplierId}>
-                    <SelectTrigger className="w-full h-12 rounded-2xl bg-muted/30 border-0 text-base font-medium px-4 mb-2">
-                        <SelectValue placeholder="Sélectionner un fournisseur" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-2xl">
-                        {suppliers.map(s => <SelectItem key={s.id} value={s.id} className="rounded-xl my-1">{s.name}</SelectItem>)}
-                    </SelectContent>
-                 </Select>
+          <SheetContent side="right" className="w-screen max-w-none h-screen p-0 sm:max-w-none">
+  <div className="flex h-full flex-col">
+    <div className="border-b border-border bg-card p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <Send className="w-5 h-5 text-primary shrink-0" />
+          <div className="min-w-0">
+            <div className="text-lg font-semibold truncate">Envoyer une commande</div>
+            <div className="text-xs text-muted-foreground truncate">
+              {selectedSupplier ? selectedSupplier.name : "Sélectionne un fournisseur"}
+            </div>
+          </div>
+        </div>
 
-                 {/* Jauge Franco "Gamifiée" */}
-                 {selectedSupplier && francoThreshold && francoProgress && (
-                     <div className="mt-3 p-1">
-                         <div className="relative h-12 bg-white rounded-2xl overflow-hidden border border-border/50 shadow-sm flex items-center px-4">
-                             {/* Background Bar Progress */}
-                             <div 
-                                className={cn("absolute inset-y-0 left-0 transition-all duration-700 ease-out", 
-                                    francoProgress.remaining <= 0 ? "bg-gradient-to-r from-emerald-400 to-teal-500" : "bg-gradient-to-r from-orange-100 to-amber-200"
-                                )}
-                                style={{ width: `${francoProgress.pct}%`, opacity: francoProgress.remaining <= 0 ? 0.2 : 0.5 }}
-                             />
-                             {/* Ligne de progression en bas */}
-                             <div 
-                                className={cn("absolute bottom-0 left-0 h-1 transition-all duration-700 ease-out", 
-                                    francoProgress.remaining <= 0 ? "bg-emerald-500" : "bg-primary"
-                                )}
-                                style={{ width: `${francoProgress.pct}%` }}
-                             />
+        {/* Total is shown in the bottom bar; keep the header clean */}
+      </div>
+    </div>
 
-                             <div className="relative z-10 flex-1 flex items-center justify-between text-sm font-medium">
-                                 <span className={cn("transition-colors", francoProgress.remaining <= 0 ? "text-emerald-700 font-bold" : "text-muted-foreground")}>
-                                     {francoProgress.remaining <= 0 ? "🎉 Livraison offerte !" : `Encore ${formatEuro(francoProgress.remaining)} pour le franco`}
-                                 </span>
-                                 <div className={cn("flex items-center gap-1.5 px-2 py-1 rounded-lg", francoProgress.remaining <= 0 ? "bg-emerald-100 text-emerald-800" : "bg-white text-primary shadow-sm")}>
-                                     {francoProgress.remaining <= 0 ? <Gift className="w-4 h-4 animate-bounce" /> : <Truck className="w-3.5 h-3.5" />}
-                                     <span>{francoProgress.pct}%</span>
-                                 </div>
-                             </div>
-                         </div>
-                     </div>
-                 )}
-              </div>
+    <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div className="space-y-2">
+        <Label>Fournisseur</Label>
+        <Select value={supplierId} onValueChange={setSupplierId}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Sélectionner un fournisseur" />
+          </SelectTrigger>
+          <SelectContent>
+            {suppliers.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-              {/* Contenu Scrollable */}
-              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
-                 {selectedSupplier ? (
-                     <>
-                        {/* Options Livraison & Email */}
-                        <div className="grid grid-cols-2 gap-3">
-                           <div className="space-y-1.5">
-                               <Label className="text-xs font-semibold text-muted-foreground ml-1 uppercase tracking-wide">Date</Label>
-                               <div className="relative">
-                                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                   <Input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} className="pl-10 rounded-2xl bg-white border-border/50 h-11 text-sm font-medium shadow-sm" />
-                               </div>
-                           </div>
-                           <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-muted-foreground ml-1 uppercase tracking-wide">Copie</Label>
-                                <Button variant="outline" className="w-full justify-start text-left font-normal rounded-2xl h-11 bg-white border-border/50 shadow-sm px-3" onClick={() => setOpenEmailSettings(true)}>
-                                    <div className="flex items-center gap-2 overflow-hidden">
-                                        <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 text-blue-600">
-                                            <Mail className="w-3.5 h-3.5" />
-                                        </div>
-                                        <span className="truncate text-xs">
-                                            {emailSettings.order.emails.length > 0 ? `${emailSettings.order.emails.length} contact(s)` : "Aucune copie"}
-                                        </span>
-                                    </div>
-                                </Button>
-                           </div>
-                        </div>
+        <div className="text-xs text-muted-foreground flex items-center gap-2">
+          <Settings className="w-3.5 h-3.5" />
+          Les produits / emails se configurent dans{" "}
+          <Link href="/fournisseurs" className="underline">
+            Fournisseurs
+          </Link>
+          .
+        </div>
 
-                        {/* Search */}
-                        <div className="relative sticky top-0 z-20 pt-2 pb-1 bg-muted/10 backdrop-blur-sm">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                            <Input 
-                                placeholder="Rechercher un produit..." 
-                                value={productSearch} 
-                                onChange={(e) => setProductSearch(e.target.value)}
-                                className="pl-10 h-12 rounded-2xl bg-white border-0 shadow-sm text-base"
-                            />
-                        </div>
-
-                        {/* Liste Produits */}
-                        <div className="space-y-4 pb-24">
-                             {filteredLines.length > 0 ? (
-                                 filteredLines.map(line => {
-                                    const step = unitStep(line.unit)
-                                    return (
-                                        <ProductCard 
-                                            key={line.id} 
-                                            line={line} 
-                                            step={step} 
-                                            packAdd={convertPackToProductUnit(line.packQuantity, line.packUnit, line.unit)}
-                                            onSetQty={(v) => updateQty(line.id, v)}
-                                            onIncrement={(el) => changeQty(line.id, step, el)}
-                                            onDecrement={() => changeQty(line.id, -step)}
-                                            onAddPack={(el) => {
-                                                const p = convertPackToProductUnit(line.packQuantity, line.packUnit, line.unit);
-                                                if(p) changeQty(line.id, p, el)
-                                            }}
-                                        />
-                                    )
-                                 })
-                             ) : (
-                                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                                     <Search className="w-12 h-12 opacity-20 mb-3" />
-                                     <p className="text-sm">Aucun produit trouvé.</p>
-                                 </div>
-                             )}
-                        </div>
-                     </>
-                 ) : (
-                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50">
-                         <Store className="w-16 h-16 mb-4 stroke-1" />
-                         <p>Sélectionnez un fournisseur pour commencer</p>
-                     </div>
-                 )}
-              </div>
-
-              {/* Footer Flottant (Total & Action) */}
-              {selectedSupplier && (
-                  <div className="absolute bottom-6 left-4 right-4 z-30">
-                      <div className="bg-foreground text-background p-2 pl-6 pr-2 rounded-[28px] shadow-2xl flex items-center justify-between" ref={cartTargetRef}>
-                          <div className={cn("flex flex-col transition-transform duration-200", cartBump ? "scale-110" : "")}>
-                              <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-bold">Total Estimé</span>
-                              <span className="text-xl font-bold tabular-nums leading-none text-white">{formatEuro(totalAmount)}</span>
-                          </div>
-                          <Button 
-                              size="lg" 
-                              className="rounded-[22px] px-8 h-14 bg-primary hover:bg-primary/90 text-white font-bold shadow-lg shadow-primary/25 transition-all active:scale-95"
-                              onClick={handleSend}
-                              disabled={totalAmount <= 0}
-                          >
-                              <span className="mr-2">Envoyer</span>
-                              <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
-                                <Send className="w-3.5 h-3.5" />
-                              </div>
-                          </Button>
-                      </div>
-                  </div>
-              )}
-
-          </SheetContent>
-        </Sheet>
-        
-        {/* Dialog Email Rapide */}
-        <Dialog open={openEmailSettings} onOpenChange={setOpenEmailSettings}>
-            <DialogContent className="rounded-3xl max-w-sm">
-                <DialogHeader>
-                    <DialogTitle>Emails automatiques (Copie)</DialogTitle>
-                    <DialogDescription>
-                        Les adresses ci-dessous recevront une copie cachée (BCC) de la commande.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                    <Textarea 
-                        value={emailSettingsDraft.order.emails.join(", ")}
-                        onChange={(e) => setEmailSettingsDraft(prev => ({...prev, order: {...prev.order, emails: normalizeEmails(e.target.value)}}))}
-                        className="min-h-[100px] rounded-2xl bg-muted/30 border-0 resize-none p-4"
-                        placeholder="compta@restaurant.com, chef@restaurant.com..."
-                    />
-                    <Button 
-                        onClick={() => { 
-                            saveCompanyEmailSettings(companyId as string, emailSettingsDraft); 
-                            setOpenEmailSettings(false); 
-                            toast({title: "Sauvegardé", description: "Préférences mises à jour."})
-                        }} 
-                        className="w-full rounded-xl h-12"
-                    >
-                        Enregistrer
-                    </Button>
+        {selectedSupplier && francoThreshold && francoProgress && (
+          <div ref={francoCardRef} className="mt-3 pulse-card p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className={cn(
+                  "text-sm font-semibold",
+                  francoProgress.remaining <= 0 ? "text-emerald-700 dark:text-emerald-200" : "",
+                )}>
+                  {francoProgress.remaining <= 0 ? "Franco atteint 🎉" : "Objectif franco"}
                 </div>
-            </DialogContent>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Seuil fournisseur : {formatEuro(francoThreshold)}
+                </div>
+              </div>
+              <div className="text-right">
+                {francoProgress.remaining <= 0 ? (
+                  <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-200">OK</div>
+                ) : (
+                  <div className="text-xs font-semibold">-{formatEuro(francoProgress.remaining)}</div>
+                )}
+              </div>
+            </div>
+            <div className="mt-3">
+              <Progress value={francoProgress.pct} />
+              <div className="mt-1 text-[11px] text-muted-foreground">{francoProgress.pct}%</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Date de livraison</Label>
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-muted-foreground" />
+            <Input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <Label>Emails</Label>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 rounded-lg gap-2"
+                onClick={() => setOpenEmailSettings(true)}
+                title="Réglages emails automatiques"
+              >
+                <Settings className="w-4 h-4" />
+                Réglages
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-8 px-3 rounded-lg gap-2"
+                onClick={() => setOpenCcEditor(true)}
+                title="Ajouter des emails ponctuels en copie"
+              >
+                <Plus className="w-4 h-4" />
+                Copie ({ccList.length})
+              </Button>
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Auto : {emailSettings.order.emails.length} contact(s) ({emailSettings.order.mode.toUpperCase()}).
+            {" "}Copie ponctuelle : {ccList.length}.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Notes (optionnel)</Label>
+        <Textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Ex: Merci de livrer avant 10h…"
+          className="min-h-[80px]"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Produits</Label>
+
+        <Input placeholder="Rechercher un produit…" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} />
+
+        {!selectedSupplier ? (
+          <div className="p-4 rounded-xl bg-muted text-sm text-muted-foreground">
+            Sélectionne un fournisseur pour voir ses produits.
+          </div>
+        ) : (selectedSupplier.products?.length || 0) === 0 ? (
+          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-sm">
+            Aucun produit configuré pour ce fournisseur. Ajoute des produits dans la page Fournisseurs.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {(() => {
+              const groups = new Map<string, typeof filteredLines>()
+              for (const line of filteredLines) {
+                const cat = (line.category || "Sans catégorie").toString().trim() || "Sans catégorie"
+                if (!groups.has(cat)) groups.set(cat, [])
+                groups.get(cat)!.push(line)
+              }
+              return Array.from(groups.entries())
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([cat, items]) => (
+                  <div key={cat} className="pulse-card p-0 overflow-hidden">
+                    <div className="px-4 py-2 border-b border-border bg-muted/30 flex items-center justify-between">
+                      <div className="text-xs font-semibold tracking-wide uppercase">{cat}</div>
+                      <div className="text-xs text-muted-foreground">{items.length}</div>
+                    </div>
+
+                    <div className="divide-y divide-border">
+                      {items.map((p) => {
+                        const step = unitStep(p.unit)
+                        const packAdd = convertPackToProductUnit(p.packQuantity, p.packUnit, p.unit)
+                        return (
+                          <ProductCard
+                            key={p.id}
+                            line={p}
+                            step={step}
+                            packAdd={packAdd}
+                            onSetQty={(v) => updateQty(p.id, v)}
+                            onDecrement={() => changeQty(p.id, -step)}
+                            onIncrement={(fromEl) => changeQty(p.id, step, fromEl)}
+                            onAddPack={(fromEl) => {
+                              if (packAdd !== undefined && packAdd > 0) changeQty(p.id, packAdd, fromEl)
+                            }}
+                          />
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))
+            })()}
+          </div>
+        )}
+      </div>
+    </div>
+
+    <div className="border-t border-border bg-card p-4">
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+        <div
+          ref={cartTargetRef}
+          className={cn(
+            "flex items-center justify-between sm:block transition-transform",
+            cartBump ? "scale-[1.02]" : "scale-100",
+          )}
+        >
+          <div className="text-xs text-muted-foreground">Total</div>
+          <div className="text-xl font-semibold tabular-nums">{formatEuro(totalAmount)}</div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:min-w-[320px]">
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-xl gap-2 justify-center"
+            onClick={() => setOpenCartSummary(true)}
+            disabled={!selectedSupplier}
+          >
+            <Package className="w-4 h-4" />
+            Panier ({orderLines.filter((l) => Number(l.quantity || 0) > 0).length})
+          </Button>
+          <Button
+            onClick={handleSend}
+            className="rounded-xl gap-2 justify-center"
+            disabled={!companyId || !selectedSupplier}
+          >
+            <Send className="w-4 h-4" />
+            Envoyer (PDF)
+          </Button>
+        </div>
+      </div>
+    </div>
+  </div>
+</SheetContent>
+        </Sheet>
+
+        {/* Cart summary */}
+        <Dialog open={openCartSummary} onOpenChange={setOpenCartSummary}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Panier</DialogTitle>
+              <DialogDescription>
+                Récapitulatif des produits avec quantité &gt; 0.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-2 max-h-[55vh] overflow-y-auto">
+              {orderLines
+                .filter((l) => Number(l.quantity || 0) > 0)
+                .sort((a, b) => (a.category || "").toString().localeCompare((b.category || "").toString()))
+                .map((l) => (
+                  <div key={l.id} className="pulse-card p-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-semibold leading-tight break-words">{l.productName}</div>
+                      <div className="mt-1 text-xs text-muted-foreground flex flex-wrap items-center gap-2">
+                        <span>{(l.category || "Sans catégorie").toString()}</span>
+                        <span>•</span>
+                        <span>{formatEuro(l.unitPrice)}/{l.unit}</span>
+                        {l.packLabel ? (
+                          <>
+                            <span>•</span>
+                            <span>Colisage: {String(l.packLabel)}</span>
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-xs text-muted-foreground">Qté</div>
+                      <div className="text-sm font-bold tabular-nums">
+                        {Number(l.quantity || 0).toLocaleString("fr-FR")} {l.unit}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">{formatEuro(Number(l.total || 0))}</div>
+                    </div>
+                  </div>
+                ))}
+
+              {orderLines.filter((l) => Number(l.quantity || 0) > 0).length === 0 ? (
+                <div className="p-4 rounded-xl bg-muted text-sm text-muted-foreground">Aucun produit dans le panier.</div>
+              ) : null}
+            </div>
+
+            <DialogFooter className="gap-2">
+              <div className="mr-auto text-sm font-semibold">Total : {formatEuro(totalAmount)}</div>
+              <Button type="button" variant="outline" onClick={() => setOpenCartSummary(false)}>
+                Fermer
+              </Button>
+              <Button type="button" onClick={handleSend} disabled={!companyId || !selectedSupplier}>
+                Envoyer
+              </Button>
+            </DialogFooter>
+          </DialogContent>
         </Dialog>
 
-        {/* Sheet Détails / Réception */}
-        <Sheet open={openOrderDetails} onOpenChange={setOpenOrderDetails}>
-            <SheetContent side="bottom" className="h-[95vh] rounded-t-[32px] p-0 flex flex-col bg-muted/10">
-                <div className="bg-white px-6 pt-6 pb-4 rounded-t-[32px] shadow-sm">
-                    <div className="w-12 h-1.5 bg-muted rounded-full mx-auto mb-6 opacity-50" />
-                    <div className="flex items-center justify-between mb-2">
-                        <h2 className="text-xl font-bold">{activeOrder?.supplierName}</h2>
-                        {activeOrder?.status === "sent" && <Badge variant="secondary">Envoyée</Badge>}
-                        {activeOrder?.status === "delivered" && <Badge className="bg-emerald-500 hover:bg-emerald-600">Reçue</Badge>}
-                    </div>
-                    <div className="text-sm text-muted-foreground flex gap-4">
-                        <span>{activeOrder?.deliveryDate}</span>
-                        <span>{formatEuro(activeOrder?.totalAmount || 0)}</span>
-                    </div>
-                    
-                    {detailsMode === "receive" && (
-                         <div className="mt-4 flex gap-3">
-                             <Button variant="outline" className="flex-1 rounded-xl" onClick={markAllOk}>Tout Valider</Button>
-                         </div>
-                    )}
+        {/* One-off CC editor (kept out of the main flow) */}
+        <Dialog open={openCcEditor} onOpenChange={setOpenCcEditor}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Emails en copie (ponctuels)</DialogTitle>
+              <DialogDescription>
+                Ajoute des emails pour cette commande uniquement. Les destinataires automatiques se gèrent via « Réglages ».
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3">
+              {ccList.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {ccList.map((email) => (
+                    <Badge key={email} variant="secondary" className="rounded-full pl-3 pr-2 py-1 flex items-center gap-1">
+                      <span className="text-xs">{email}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeCc(email)}
+                        className="ml-1 inline-flex items-center justify-center rounded-full hover:bg-background/60 p-1"
+                        aria-label={"Retirer " + email}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
                 </div>
-                
-                <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                    {receiptLines.map(line => {
-                        const isProblem = (line as any).receivedOk === false
-                        const isOk = (line as any).receivedOk === true
-                        return (
-                            <div key={line.id} className="p-4 rounded-3xl bg-white border border-border/40 shadow-sm">
-                                <div className="flex justify-between mb-2">
-                                    <span className="font-bold text-sm">{line.productName}</span>
-                                    <span className="text-sm">{formatEuro(line.total)}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3 bg-muted/20 p-2 rounded-xl">
-                                    <div className="text-xs text-muted-foreground">
-                                        Commandé: <span className="font-bold text-foreground">{line.quantity} {line.unit}</span>
-                                    </div>
-                                    {detailsMode === "receive" ? (
-                                        <div className="flex gap-2">
-                                            <Button size="sm" variant={isOk ? "default" : "outline"} className={cn("rounded-lg h-8 px-3", isOk && "bg-emerald-500 hover:bg-emerald-600")} onClick={() => {
-                                                setReceiptLines(prev => prev.map(l => l.id === line.id ? { ...l, receivedOk: true } : l))
-                                            }}>OK</Button>
-                                            <Button size="sm" variant={isProblem ? "destructive" : "outline"} className="rounded-lg h-8 px-3" onClick={() => {
-                                                setReceiptLines(prev => prev.map(l => l.id === line.id ? { ...l, receivedOk: false } : l))
-                                            }}>⚠️</Button>
-                                        </div>
-                                    ) : (
-                                        <div className="text-xs font-bold">
-                                            {isOk ? <span className="text-emerald-600">Reçu OK</span> : <span className="text-red-600">Problème</span>}
-                                        </div>
-                                    )}
-                                </div>
-                                {isProblem && detailsMode === "receive" && (
-                                    <Textarea 
-                                        className="mt-2 text-xs bg-red-50 border-red-100" 
-                                        placeholder="Décrire le problème..."
-                                        value={(line as any).receivedNote || ""}
-                                        onChange={(e) => setReceiptLines(prev => prev.map(l => l.id === line.id ? { ...l, receivedNote: e.target.value } : l))}
-                                    />
-                                )}
-                            </div>
-                        )
-                    })}
-                </div>
-                
-                {detailsMode === "receive" && (
-                    <div className="p-4 bg-white border-t border-border">
-                        <Button className="w-full h-12 rounded-xl text-lg font-bold" onClick={finalizeReceipt}>
-                            Valider la réception
-                        </Button>
+              ) : (
+                <div className="p-3 rounded-xl bg-muted text-sm text-muted-foreground">Aucun email en copie pour cette commande.</div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Ajouter un email (ex: compta@entreprise.com)"
+                  value={ccInput}
+                  onChange={(e) => setCcInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (["Enter", ",", ";", "Tab"].includes(e.key)) {
+                      e.preventDefault()
+                      addCcFromInput()
+                    }
+                  }}
+                />
+                <Button type="button" variant="secondary" className="shrink-0" onClick={addCcFromInput}>
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Tu peux coller plusieurs emails (virgule, espace, point-virgule). Appuie sur +.
+              </p>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpenCcEditor(false)}>
+                Fermer
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Email defaults settings */}
+        <Dialog open={openEmailSettings} onOpenChange={setOpenEmailSettings}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Réglages emails automatiques</DialogTitle>
+              <DialogDescription>
+                Configure les destinataires internes par défaut (CC ou BCC). Ils seront ajoutés automatiquement lors de l’envoi.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {(
+                [
+                  { key: "order" as const, label: "Bon de commande" },
+                  { key: "receiptOk" as const, label: "Réception conforme" },
+                  { key: "receiptIssue" as const, label: "Non-conformité" },
+                ]
+              ).map((cfg) => (
+                <div key={cfg.key} className="pulse-card p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-semibold">{cfg.label}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Mode</span>
+                      <Select
+                        value={emailSettingsDraft[cfg.key].mode}
+                        onValueChange={(v) =>
+                          setEmailSettingsDraft((prev) => ({
+                            ...prev,
+                            [cfg.key]: { ...prev[cfg.key], mode: (v as EmailMode) || "bcc" },
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="h-8 w-[110px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="bcc">BCC (discret)</SelectItem>
+                          <SelectItem value="cc">CC (visible)</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
+                  </div>
+
+                  <Textarea
+                    value={emailSettingsDraft[cfg.key].emails.join(", ")}
+                    onChange={(e) =>
+                      setEmailSettingsDraft((prev) => ({
+                        ...prev,
+                        [cfg.key]: {
+                          ...prev[cfg.key],
+                          emails: normalizeEmails(e.target.value),
+                        },
+                      }))
+                    }
+                    placeholder="ex: compta@entreprise.com, manager@entreprise.com"
+                    className="min-h-[70px]"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Sépare par virgule / espace / point-virgule. (BCC recommandé pour ne pas exposer les emails internes au fournisseur.)
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button type="button" variant="outline" onClick={() => setOpenEmailSettings(false)}>
+                Annuler
+              </Button>
+              <Button type="button" onClick={saveEmailDefaults} disabled={savingEmailSettings}>
+                {savingEmailSettings ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Enregistrement…
+                  </>
+                ) : (
+                  "Enregistrer"
                 )}
-            </SheetContent>
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Order details / réception */}
+        <Sheet open={openOrderDetails} onOpenChange={setOpenOrderDetails}>
+          <SheetContent side="bottom" className="w-screen max-w-none h-screen p-0 sm:max-w-none">
+            <div className="flex h-full flex-col">
+              <div className="border-b border-border bg-card p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-primary" />
+                      <div className="text-lg font-semibold truncate">
+                        {activeOrder ? `${activeOrder.supplierName}` : "Commande"}
+                      </div>
+                      {activeOrder && (
+                        <span className="text-xs px-2 py-1 rounded-lg bg-muted">
+                          #{activeOrder.id.slice(-6).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground flex flex-wrap items-center gap-3">
+                      <span className="inline-flex items-center gap-1">
+                        <Calendar className="w-4 h-4" />
+                        Livraison : {activeOrder?.deliveryDate || "—"}
+                      </span>
+                      <span>•</span>
+                      <span>Total : {formatEuro(activeOrder?.totalAmount || 0)}</span>
+                      {activeOrder?.status === "delivered" && (
+                        <>
+                          <span>•</span>
+                          <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-300">
+                            <BadgeCheck className="w-4 h-4" />
+                            Reçue
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {detailsMode === "receive" && (
+                      <Button variant="outline" className="rounded-xl gap-2" onClick={markAllOk}>
+                        <CheckCircle2 className="w-4 h-4" />
+                        Tout OK
+                      </Button>
+                    )}
+                    <Button variant="outline" className="rounded-xl" onClick={() => setOpenOrderDetails(false)}>
+                      Fermer
+                    </Button>
+                  </div>
+                </div>
+
+                {detailsMode === "receive" && (
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="text-xs text-muted-foreground">
+                      Validation : <span className="font-semibold text-foreground">{receiptProgress.done}</span> /{" "}
+                      <span className="font-semibold text-foreground">{receiptProgress.total}</span>
+                    </div>
+                    <div className="w-40">
+                      <Progress value={receiptProgress.total ? (receiptProgress.done / receiptProgress.total) * 100 : 0} className="h-2" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {activeOrder && activeOrder.notes && (
+                  <div className="pulse-card p-4 border border-border/50">
+                    <div className="text-xs font-semibold text-muted-foreground mb-1">Notes</div>
+                    <div className="text-sm whitespace-pre-wrap">{activeOrder.notes}</div>
+                  </div>
+                )}
+
+                {activeOrder ? (
+                  <div className="space-y-3">
+                    {(() => {
+                      const groups = new Map<string, OrderProduct[]>()
+                      for (const l of receiptLines) {
+                        const cat = (l.category || "Sans catégorie").toString().trim() || "Sans catégorie"
+                        if (!groups.has(cat)) groups.set(cat, [])
+                        groups.get(cat)!.push(l)
+                      }
+                      const sorted = Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+                      return sorted.map(([cat, items]) => (
+                        <div key={cat} className="pulse-card p-0 overflow-hidden">
+                          <div className="px-4 py-2 border-b border-border bg-muted/30 flex items-center justify-between">
+                            <div className="text-xs font-semibold tracking-wide uppercase">{cat}</div>
+                            <div className="text-xs text-muted-foreground">{items.length}</div>
+                          </div>
+
+                          <div className="divide-y divide-border">
+                            {items.map((p) => {
+                              const orderedQty = Number(p.quantity || 0)
+                              const receivedQty = typeof (p as any).receivedQuantity === "number" ? (p as any).receivedQuantity : orderedQty
+                              const receivedOk = (p as any).receivedOk as boolean | undefined
+                              const isProblem = receivedOk === false
+                              const isOk = receivedOk === true
+
+                              return (
+                                <div key={p.id} className="p-4 flex flex-col gap-3">
+                                  <div className="flex items-start justify-between gap-4">
+                                    <div className="min-w-0">
+                                      <div className="font-semibold leading-tight break-words">{p.productName}</div>
+                                      <div className="mt-1 text-xs text-muted-foreground flex flex-wrap items-center gap-2">
+                                        <span className="truncate">{p.reference || "—"}</span>
+                                        <span>•</span>
+                                        <span>{formatEuro(p.unitPrice)}/{p.unit}</span>
+                                        {p.packLabel ? (
+                                          <>
+                                            <span>•</span>
+                                            <span>Colisage : {p.packLabel}</span>
+                                          </>
+                                        ) : null}
+                                      </div>
+                                    </div>
+
+                                    <div className="text-right shrink-0">
+                                      <div className="text-xs text-muted-foreground">Total</div>
+                                      <div className="text-sm font-semibold tabular-nums">{formatEuro(Number(p.total || 0))}</div>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <div className="pulse-card p-3 bg-muted/20 border border-border/50">
+                                      <div className="text-[11px] text-muted-foreground">Commandé</div>
+                                      <div className="text-sm font-bold tabular-nums">
+                                        {orderedQty.toLocaleString("fr-FR")} {p.unit}
+                                      </div>
+                                    </div>
+
+                                    <div className="pulse-card p-3 bg-muted/20 border border-border/50">
+                                      <div className="text-[11px] text-muted-foreground">Reçu</div>
+                                      {detailsMode === "receive" ? (
+                                        <Input
+                                          type="number"
+                                          min={0}
+                                          step={unitStep(p.unit)}
+                                          value={receivedQty}
+                                          onChange={(e) => setLineReceipt(p.id, { receivedQuantity: Number(e.target.value) })}
+                                          className="mt-1"
+                                        />
+                                      ) : (
+                                        <div className="text-sm font-bold tabular-nums mt-1">
+                                          {(typeof (p as any).receivedQuantity === "number"
+                                            ? (p as any).receivedQuantity
+                                            : orderedQty
+                                          ).toLocaleString("fr-FR")}{" "}
+                                          {p.unit}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="pulse-card p-3 bg-muted/20 border border-border/50">
+                                      <div className="text-[11px] text-muted-foreground">Statut</div>
+
+                                      {detailsMode === "receive" ? (
+                                        <div className="mt-1 flex gap-2">
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant={isOk ? "default" : "outline"}
+                                            className="rounded-xl flex-1"
+                                            onClick={() => setLineReceipt(p.id, { receivedOk: true, receivedNote: "" })}
+                                          >
+                                            OK
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant={isProblem ? "destructive" : "outline"}
+                                            className="rounded-xl flex-1"
+                                            onClick={() => setLineReceipt(p.id, { receivedOk: false })}
+                                          >
+                                            Problème
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <div className="mt-1">
+                                          {receivedOk === true ? (
+                                            <span className="text-xs font-bold px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-200">
+                                              OK
+                                            </span>
+                                          ) : receivedOk === false ? (
+                                            <span className="text-xs font-bold px-2 py-1 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-200">
+                                              Problème
+                                            </span>
+                                          ) : (
+                                            <span className="text-xs font-bold px-2 py-1 rounded-full bg-muted/40 text-muted-foreground">
+                                              —
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {detailsMode === "receive" && isProblem && (
+                                    <div className="space-y-2">
+                                      <Label>Note (obligatoire si problème)</Label>
+                                      <Textarea
+                                        value={String((p as any).receivedNote || "")}
+                                        onChange={(e) => setLineReceipt(p.id, { receivedNote: e.target.value })}
+                                        placeholder="Ex: Manque 2kg, carton abîmé, produit non conforme…"
+                                        className="min-h-[70px]"
+                                      />
+                                    </div>
+                                  )}
+
+                                  {detailsMode !== "receive" && receivedOk === false && String((p as any).receivedNote || "").trim() && (
+                                    <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20">
+                                      <div className="text-xs font-bold text-rose-700 dark:text-rose-200 mb-1">Note</div>
+                                      <div className="text-sm text-rose-900 dark:text-rose-50 whitespace-pre-wrap">
+                                        {String((p as any).receivedNote || "")}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))
+                    })()}
+                  </div>
+                ) : (
+                  <div className="pulse-card p-6 text-sm text-muted-foreground">Aucune commande sélectionnée.</div>
+                )}
+              </div>
+
+              {detailsMode === "receive" && (
+                <div className="border-t border-border bg-card p-4">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                    <Button variant="outline" className="rounded-xl gap-2" onClick={saveReceipt}>
+                      <Save className="w-4 h-4" />
+                      Enregistrer (sans finaliser)
+                    </Button>
+                    <Button className="rounded-xl gap-2 sm:min-w-[320px] justify-center" onClick={finalizeReceipt}>
+                      <BadgeCheck className="w-4 h-4" />
+                      Valider la réception
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </SheetContent>
         </Sheet>
+
 
         <BottomNav />
       </div>
