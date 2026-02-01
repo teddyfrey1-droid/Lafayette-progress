@@ -761,6 +761,7 @@ function ProductsDrawer({
 }) {
   const [search, setSearch] = useState("")
   const [showImport, setShowImport] = useState(false)
+  const [editingProductId, setEditingProductId] = useState<string | null>(null)
 
   const [productForm, setProductForm] = useState<Partial<SupplierProduct>>({
     name: "",
@@ -769,9 +770,13 @@ function ProductsDrawer({
     unit: "u",
     imageUrl: "",
     category: "",
+    packLabel: "",
+    packQuantity: undefined,
+    packUnit: "",
   })
 
   const [importText, setImportText] = useState("")
+  const [importItems, setImportItems] = useState<any[] | null>(null)
   const [importUnit, setImportUnit] = useState("u")
   const [importHint, setImportHint] = useState<string | null>(null)
 
@@ -800,40 +805,130 @@ function ProductsDrawer({
     return Number.isFinite(n) ? n : 0
   }
 
+
+const looksLikeUrl = (v: string) => {
+  const s = (v || "").toString().trim().toLowerCase()
+  return s.startsWith("http://") || s.startsWith("https://") || s.includes("://")
+}
+
+const normalizeUnit = (u: string) => (u || "").toString().trim().toUpperCase()
+
+const parsePack = (labelRaw: string, productUnitRaw: string) => {
+  const label = (labelRaw || "").toString().trim()
+  if (!label) return { packLabel: "", packQuantity: undefined as number | undefined, packUnit: "" }
+
+  const productUnit = normalizeUnit(productUnitRaw)
+
+  const s = label.toLowerCase().replace(",", ".")
+  // Pattern multiplication like 100gX5
+  const mult = s.match(/(\d+(?:\.\d+)?)\s*(kg|kgs|g|grs|gr|l|ml|cl)\s*[x\*]\s*(\d+(?:\.\d+)?)/i)
+  if (mult) {
+    const a = Number(mult[1])
+    const u = mult[2]
+    const b = Number(mult[3])
+    const qty = Number.isFinite(a) && Number.isFinite(b) ? a * b : undefined
+    return { packLabel: label, packQuantity: qty, packUnit: normalizeUnit(u) || productUnit }
+  }
+
+  // Simple qty + unit (ex: 10kg, 500grs, 12 pce)
+  const m = s.match(/(\d+(?:\.\d+)?)\s*(kg|kgs|g|grs|gr|l|ml|cl|pce|pcs|pc|u|unite|unit|piece|pieces)/i)
+  if (m) {
+    const qty = Number(m[1])
+    const u = m[2]
+    return { packLabel: label, packQuantity: Number.isFinite(qty) ? qty : undefined, packUnit: normalizeUnit(u) || productUnit }
+  }
+
+  // Fallback: keep label only
+  return { packLabel: label, packQuantity: undefined as number | undefined, packUnit: productUnit }
+}
+
   const parseBulk = (raw: string) => {
     const lines = (raw || "")
       .split(/\r?\n/)
       .map((l) => l.trim())
       .filter(Boolean)
 
-    const items: Array<{ reference?: string; name: string; unitPrice: number; unit: string; imageUrl?: string; category?: string }> = []
+    const items: Array<{ reference?: string; name: string; unitPrice: number; unit: string; packLabel?: string; packQuantity?: number; packUnit?: string; imageUrl?: string; category?: string }> = []
     for (const line of lines) {
-      const parts = line.split(/[;\t,]/).map((p) => p.trim())
+      const parts = line.split(/[;\t]/).map((p) => p.trim())
       if (parts.length < 3) continue
-      const reference = (parts[0] || "").trim()
-      const name = (parts[1] || "").trim()
-      const unitPrice = parseNumber(parts[2] || "")
-      const unit = (parts[3] || "").trim() || importUnit || "u"
-      const imageUrl = (parts[4] || "").trim()
-      const category = (parts[5] || "").trim()
+const reference = (parts[0] || "").trim()
+const name = (parts[1] || "").trim()
+const unitPrice = parseNumber(parts[2] || "")
+const unit = (parts[3] || "").trim() || importUnit || "u"
 
-      if (!name) continue
-      items.push({ reference, name, unitPrice, unit, imageUrl: imageUrl || undefined, category: category || undefined })
+const p4 = (parts[4] || "").trim()
+const p5 = (parts[5] || "").trim()
+const p6 = (parts[6] || "").trim()
+
+let packLabel = ""
+let imageUrl = ""
+let category = ""
+
+if (p4 && looksLikeUrl(p4)) {
+  // Old format: ref;name;price;unit;imageUrl;category
+  imageUrl = p4
+  category = p5
+} else {
+  // New format: ref;name;price;unit;colisage;imageUrl;category
+  packLabel = p4
+  if (p5 && looksLikeUrl(p5)) {
+    imageUrl = p5
+    category = p6
+  } else {
+    category = p5
+  }
+}
+
+if (!name) continue
+const pack = parsePack(packLabel, unit)
+items.push({
+  reference,
+  name,
+  unitPrice,
+  unit,
+  packLabel: pack.packLabel || undefined,
+  packQuantity: pack.packQuantity,
+  packUnit: pack.packUnit || undefined,
+  imageUrl: imageUrl || undefined,
+  category: category || undefined,
+})
     }
     return items
   }
 
-  const handleAddOne = async () => {
-    if (!supplier?.id) return
-    const name = (productForm.name || "").toString().trim()
-    if (!name) return alert("Nom produit requis")
-    const unitPrice = Number(productForm.unitPrice || 0)
-    const unit = (productForm.unit || "u").toString()
-    const reference = (productForm.reference || "").toString().trim()
-    const imageUrl = (productForm.imageUrl || "").toString().trim()
-    const category = (productForm.category || "").toString().trim()
+const handleSaveProduct = async () => {
+  if (!supplier?.id) return
+  const name = (productForm.name || "").toString().trim()
+  if (!name) return alert("Nom produit requis")
+  const unitPrice = Number(productForm.unitPrice || 0)
+  const unit = (productForm.unit || "u").toString().trim() || "u"
+  const reference = (productForm.reference || "").toString().trim()
+  const imageUrl = (productForm.imageUrl || "").toString().trim()
+  const category = (productForm.category || "").toString().trim()
+  const packLabel = (productForm.packLabel || "").toString().trim()
+  const packQuantity = productForm.packQuantity !== undefined && productForm.packQuantity !== null ? Number(productForm.packQuantity) : undefined
+  const packUnit = (productForm.packUnit || "").toString().trim()
 
-    try {
+  const pack = packLabel ? parsePack(packLabel, unit) : { packLabel: "", packQuantity: undefined as number | undefined, packUnit: "" }
+  const finalPackLabel = packLabel || pack.packLabel || ""
+  const finalPackQty = Number.isFinite(Number(packQuantity)) ? Number(packQuantity) : pack.packQuantity
+  const finalPackUnit = packUnit || pack.packUnit || unit
+
+  try {
+    if (editingProductId) {
+      await updateProduct(companyId, supplier.id, editingProductId, {
+        name,
+        unitPrice,
+        unit,
+        reference: reference || undefined,
+        imageUrl: imageUrl || undefined,
+        category: category || undefined,
+        packLabel: finalPackLabel || undefined,
+        packQuantity: finalPackQty,
+        packUnit: finalPackUnit || undefined,
+      } as any)
+    } else {
       await addProduct(companyId, supplier.id, {
         name,
         reference: reference || undefined,
@@ -841,14 +936,41 @@ function ProductsDrawer({
         unitPrice,
         unit,
         category: category || undefined,
-      })
-      setProductForm({ name: "", reference: "", unitPrice: 0, unit, imageUrl: "", category: "" })
-      onRefresh()
-    } catch (e) {
-      console.error(e)
-      alert("Impossible d'ajouter le produit.")
+        packLabel: finalPackLabel || undefined,
+        packQuantity: finalPackQty,
+        packUnit: finalPackUnit || undefined,
+      } as any)
     }
+
+    setProductForm({ name: "", reference: "", unitPrice: 0, unit, imageUrl: "", category: "", packLabel: "", packQuantity: undefined, packUnit: "" })
+    setEditingProductId(null)
+    onRefresh()
+  } catch (e) {
+    console.error(e)
+    alert(editingProductId ? "Impossible de mettre à jour le produit." : "Impossible d'ajouter le produit.")
   }
+}
+
+const startEdit = (p: SupplierProduct) => {
+  setEditingProductId(p.id)
+  setProductForm({
+    name: p.name || "",
+    reference: (p.reference || "") as any,
+    unitPrice: Number(p.unitPrice || 0) as any,
+    unit: (p.unit || "u") as any,
+    imageUrl: (p.imageUrl || "") as any,
+    category: (p.category || "") as any,
+    packLabel: (p as any).packLabel || "",
+    packQuantity: (p as any).packQuantity,
+    packUnit: (p as any).packUnit || "",
+  } as any)
+}
+
+const cancelEdit = () => {
+  setEditingProductId(null)
+  setProductForm({ name: "", reference: "", unitPrice: 0, unit: "u", imageUrl: "", category: "", packLabel: "", packQuantity: undefined, packUnit: "" })
+}
+
 
   const handleDeleteProduct = async (productId: string) => {
     if (!supplier?.id) return
@@ -864,8 +986,8 @@ function ProductsDrawer({
 
   const handleImport = async () => {
     if (!supplier?.id) return
-    const items = parseBulk(importText)
-    if (items.length === 0) return alert("Aucun produit détecté. Format attendu : Référence;Nom;Prix (Unit;ImageUrl;Catégorie optionnels)")
+    const items = (importItems && importItems.length ? importItems : parseBulk(importText))
+    if (items.length === 0) return alert("Aucun produit détecté. Format attendu : Référence;Nom;Prix;Unité;Colisage (optionnel);ImageUrl (optionnel);Catégorie (optionnel)")
     try {
       const byRef = new Map<string, SupplierProduct>()
       for (const p of products) {
@@ -887,7 +1009,10 @@ function ProductsDrawer({
             reference: it.reference || existing.reference,
             imageUrl: it.imageUrl || existing.imageUrl,
             category: it.category || (existing as any).category,
-          })
+            packLabel: (it as any).packLabel || (existing as any).packLabel,
+            packQuantity: (it as any).packQuantity ?? (existing as any).packQuantity,
+            packUnit: (it as any).packUnit || (existing as any).packUnit,
+          } as any)
           updated += 1
         } else {
           await addProduct(companyId, supplier.id, {
@@ -897,7 +1022,10 @@ function ProductsDrawer({
             reference: it.reference || undefined,
             imageUrl: it.imageUrl || undefined,
             category: it.category || undefined,
-          })
+            packLabel: (it as any).packLabel || undefined,
+            packQuantity: (it as any).packQuantity,
+            packUnit: (it as any).packUnit || undefined,
+          } as any)
           created += 1
         }
       }
@@ -905,6 +1033,7 @@ function ProductsDrawer({
       onRefresh()
       setShowImport(false)
       setImportText("")
+      setImportItems(null)
       setImportHint(null)
       alert(`Import terminé : ${created} créé(s), ${updated} mis à jour.`)
     } catch (e) {
@@ -925,8 +1054,9 @@ function ProductsDrawer({
         const unit = (it.unit || importUnit || "u").toString().trim() || "u"
         const img = (it.imageUrl || "").toString().trim()
         const cat = (it.category || "").toString().trim()
-        // IMPORTANT: la catégorie est en 6e colonne (après ImageUrl) pour rester compatible avec parseBulk
-        return [ref, name, price, unit, img, cat].join(";")
+        const pack = ((it as any).packLabel || "").toString().trim()
+        // Format : ref;nom;prix;unité;colisage;imageUrl;catégorie
+        return [ref, name, price, unit, pack, img, cat].join(";")
       })
       .join("\n")
   }
@@ -977,7 +1107,7 @@ function ProductsDrawer({
     if (headerIdx < 0) headerIdx = 0
 
     let currentCategory = ""
-    const items: Array<{ reference?: string; name: string; unitPrice: number; unit: string; category?: string }> = []
+    const items: Array<{ reference?: string; name: string; unitPrice: number; unit: string; packLabel?: string; packQuantity?: number; packUnit?: string; category?: string }> = []
 
     for (let i = headerIdx + 1; i < rows.length; i++) {
       const row = rows[i] || []
@@ -988,6 +1118,7 @@ function ProductsDrawer({
       const b = row[1]
       const d = row[3]
       const e = row[4]
+      const f = row[5]
 
       const aStr = norm(a)
       const bStr = norm(b)
@@ -1006,13 +1137,19 @@ function ProductsDrawer({
       const unitPrice = parseNumber(dStr)
       const unit = norm(e) || importUnit || "u"
 
-      items.push({
-        reference: reference || undefined,
-        name,
-        unitPrice,
-        unit,
-        category: currentCategory || undefined,
-      })
+const packLabel = norm(f)
+const pack = parsePack(packLabel, unit)
+
+items.push({
+  reference: reference || undefined,
+  name,
+  unitPrice,
+  unit,
+  packLabel: pack.packLabel || undefined,
+  packQuantity: pack.packQuantity,
+  packUnit: pack.packUnit || undefined,
+  category: currentCategory || undefined,
+})
     }
 
     return items
@@ -1032,12 +1169,14 @@ function ProductsDrawer({
         }
 
         const cats = Array.from(new Set(items.map((it) => (it.category || "").toString().trim()).filter(Boolean)))
-        setImportText(buildImportTextFromItems(items))
+        setImportItems(items as any)
+        setImportText(buildImportTextFromItems(items as any))
         setImportHint(`${items.length} produit(s) détecté(s)${cats.length ? ` • ${cats.length} catégorie(s)` : ""}`)
         return
       }
 
       const text = await f.text()
+      setImportItems(null)
       setImportText(text)
       setImportHint(`Fichier chargé : ${f.name}`)
     } catch (e) {
@@ -1106,22 +1245,82 @@ function ProductsDrawer({
                 <Input type="number" value={String(productForm.unitPrice ?? 0)} onChange={(e) => setProductForm({ ...productForm, unitPrice: Number(e.target.value || 0) })} className="rounded-xl mt-1" />
               </div>
               <div>
-                <label className="text-sm font-medium">Unité</label>
-                <Input value={(productForm.unit || "u") as any} onChange={(e) => setProductForm({ ...productForm, unit: e.target.value })} className="rounded-xl mt-1" />
+                <label className="text-sm font-medium">Unité de facturation</label>
+                <Input
+                  value={(productForm.unit || "u") as any}
+                  onChange={(e) => setProductForm({ ...productForm, unit: e.target.value })}
+                  className="rounded-xl mt-1"
+                  placeholder="Ex: KG, G, PCE, SAC, BOTTE…"
+                />
               </div>
+
               <div>
-                <label className="text-sm font-medium">Image (URL)</label>
-                <Input value={(productForm.imageUrl || "") as any} onChange={(e) => setProductForm({ ...productForm, imageUrl: e.target.value })} className="rounded-xl mt-1" />
+                <label className="text-sm font-medium">Colisage</label>
+                <Input
+                  value={(productForm.packLabel || "") as any}
+                  onChange={(e) => setProductForm({ ...productForm, packLabel: e.target.value })}
+                  className="rounded-xl mt-1"
+                  placeholder="Ex: Colis 10kg, Sac 500grs, 12 pièces…"
+                />
               </div>
+
+              <div>
+                <label className="text-sm font-medium">Qté colis (optionnel)</label>
+                <Input
+                  type="number"
+                  value={productForm.packQuantity === undefined || productForm.packQuantity === null ? "" : String(productForm.packQuantity)}
+                  onChange={(e) => setProductForm({ ...productForm, packQuantity: e.target.value === "" ? undefined : Number(e.target.value) })}
+                  className="rounded-xl mt-1"
+                  placeholder="Ex: 10"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium">Unité colis (optionnel)</label>
+                <Input
+                  value={(productForm.packUnit || "") as any}
+                  onChange={(e) => setProductForm({ ...productForm, packUnit: e.target.value })}
+                  className="rounded-xl mt-1"
+                  placeholder="Ex: KG, G, PCE…"
+                />
+              </div>
+
+              <div className="col-span-2">
+                <label className="text-sm font-medium">Image (URL)</label>
+                <Input
+                  value={(productForm.imageUrl || "") as any}
+                  onChange={(e) => setProductForm({ ...productForm, imageUrl: e.target.value })}
+                  className="rounded-xl mt-1"
+                />
+              </div>
+
               <div className="col-span-2">
                 <label className="text-sm font-medium">Catégorie</label>
-                <Input value={(productForm.category || "") as any} onChange={(e) => setProductForm({ ...productForm, category: e.target.value })} className="rounded-xl mt-1" placeholder="Ex: LEGUMES, FRUITS, MAREE…" />
+                <Input
+                  value={(productForm.category || "") as any}
+                  onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                  className="rounded-xl mt-1"
+                  placeholder="Ex: LEGUMES, FRUITS, MAREE…"
+                />
               </div>
             </div>
 
-            <div className="flex justify-end">
-              <Button size="sm" className="rounded-xl" onClick={handleAddOne} disabled={!canEdit}>
-                <Plus className="w-4 h-4 mr-2" /> Ajouter
+            <div className="flex items-center justify-end gap-2">
+              {editingProductId && (
+                <Button variant="outline" size="sm" className="rounded-xl" onClick={cancelEdit}>
+                  Annuler
+                </Button>
+              )}
+              <Button size="sm" className="rounded-xl" onClick={handleSaveProduct} disabled={!canEdit}>
+                {editingProductId ? (
+                  <>
+                    <Check className="w-4 h-4 mr-2" /> Mettre à jour
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" /> Ajouter
+                  </>
+                )}
               </Button>
             </div>
           </div>
@@ -1151,18 +1350,33 @@ function ProductsDrawer({
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{p.name}</p>
                           <p className="text-xs text-muted-foreground truncate">
-                            {p.reference ? `Ref: ${p.reference} • ` : ""}{p.unitPrice.toLocaleString("fr-FR")} € / {p.unit || "u"}
+                            {p.reference ? `Ref: ${p.reference} • ` : ""}
+                            {p.unitPrice.toLocaleString("fr-FR")} € / {p.unit || "u"}
+                            {(p as any).packLabel ? ` • ${(p as any).packLabel}` : ""}
                           </p>
                         </div>
                         {canEdit && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="rounded-lg text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                            onClick={() => handleDeleteProduct(p.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className={cn(
+                                "rounded-lg",
+                                editingProductId === p.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"
+                              )}
+                              onClick={() => startEdit(p)}
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="rounded-lg text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                              onClick={() => handleDeleteProduct(p.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         )}
                       </div>
                     ))}
@@ -1180,6 +1394,7 @@ function ProductsDrawer({
               className="fixed inset-0 bg-black/60 z-[60]"
               onClick={() => {
                 setImportHint(null)
+                setImportItems(null)
                 setShowImport(false)
               }}
             />
@@ -1205,7 +1420,7 @@ function ProductsDrawer({
               <div className="p-4 space-y-4 pb-10">
                 <div className="pulse-card p-4 space-y-3">
                   <p className="text-sm text-muted-foreground">
-                    Format : <span className="font-medium">Référence;Nom;Prix</span> (Unit;ImageUrl;Catégorie optionnels)
+                    Format : <span className="font-medium">Référence;Nom;Prix;Unité</span> (Colisage;ImageUrl;Catégorie optionnels)
                   </p>
 
                   <div className="grid grid-cols-2 gap-3">

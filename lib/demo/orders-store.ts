@@ -35,6 +35,10 @@ export interface OrderProduct {
   quantity: number
   unitPrice: number
   unit: string
+  category?: string
+  packLabel?: string
+  packQuantity?: number
+  packUnit?: string
   total: number
 }
 
@@ -69,6 +73,9 @@ export interface SupplierProduct {
   unitPrice: number
   unit: string
   category?: string
+  packLabel?: string
+  packQuantity?: number
+  packUnit?: string
   minQuantity?: number
 }
 
@@ -202,6 +209,9 @@ function ensureSupplierShape(s: any, companyId: string): OrderSupplier {
       unitPrice: Number(p?.unitPrice || 0),
       unit: (p?.unit || "").toString(),
       category: p?.category,
+      packLabel: p?.packLabel,
+      packQuantity: p?.packQuantity ? Number(p.packQuantity) : undefined,
+      packUnit: p?.packUnit,
       minQuantity: p?.minQuantity ? Number(p.minQuantity) : undefined,
     })),
     createdAt: (s?.createdAt || nowIso()).toString(),

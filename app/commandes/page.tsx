@@ -41,6 +41,46 @@ function formatEuro(n: number) {
   return `${v.toFixed(2).replace(".", ",")} €`
 }
 
+function normalizeUnit(u: string) {
+  return (u || "").toString().trim().toUpperCase()
+}
+
+function unitStep(unitRaw: string) {
+  const u = normalizeUnit(unitRaw)
+  if (u === "KG") return 0.1
+  if (u === "G" || u === "GR" || u === "GRS") return 10
+  if (u === "L") return 0.1
+  if (u === "ML" || u === "CL") return 10
+  return 1
+}
+
+function convertPackToProductUnit(packQty: number | undefined, packUnitRaw: string | undefined, productUnitRaw: string) {
+  const packUnit = normalizeUnit(packUnitRaw || "")
+  const productUnit = normalizeUnit(productUnitRaw)
+  if (!packQty || !packUnit) return undefined
+
+  // Mass
+  if (productUnit === "KG" && (packUnit === "KG" || packUnit === "KGS")) return packQty
+  if (productUnit === "KG" && (packUnit === "G" || packUnit === "GR" || packUnit === "GRS")) return packQty / 1000
+  if ((productUnit === "G" || productUnit === "GR" || productUnit === "GRS") && (packUnit === "KG" || packUnit === "KGS")) return packQty * 1000
+  if ((productUnit === "G" || productUnit === "GR" || productUnit === "GRS") && (packUnit === "G" || packUnit === "GR" || packUnit === "GRS")) return packQty
+
+  // Volume
+  if (productUnit === "L" && packUnit === "L") return packQty
+  if (productUnit === "L" && packUnit === "ML") return packQty / 1000
+  if (productUnit === "L" && packUnit === "CL") return packQty / 100
+  if (productUnit === "ML" && packUnit === "L") return packQty * 1000
+  if (productUnit === "ML" && packUnit === "ML") return packQty
+  if (productUnit === "CL" && packUnit === "L") return packQty * 100
+  if (productUnit === "CL" && packUnit === "CL") return packQty
+
+  // Pieces-like
+  if (productUnit === packUnit) return packQty
+
+  return undefined
+}
+
+
 function todayISO() {
   const d = new Date()
   const yyyy = d.getFullYear()
@@ -158,6 +198,10 @@ export default function CommandesPage() {
         quantity: 0,
         unitPrice: Number(p.unitPrice || 0),
         unit: p.unit || "u",
+        category: (p as any).category,
+        packLabel: (p as any).packLabel,
+        packQuantity: (p as any).packQuantity,
+        packUnit: (p as any).packUnit,
         total: 0,
       })),
     )
@@ -470,121 +514,190 @@ export default function CommandesPage() {
 
         {/* New order sheet */}
         <Sheet open={openNewOrder} onOpenChange={setOpenNewOrder}>
-          <SheetContent side="right" className="w-full sm:max-w-xl">
-            <SheetHeader>
-              <SheetTitle className="flex items-center gap-2">
-                <Send className="w-5 h-5 text-primary" />
-                Envoyer une commande
-              </SheetTitle>
-            </SheetHeader>
-
-            <div className="mt-6 space-y-6">
-              <div className="space-y-2">
-                <Label>Fournisseur</Label>
-                <Select value={supplierId} onValueChange={setSupplierId}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Sélectionner un fournisseur" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {suppliers.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <div className="text-xs text-muted-foreground flex items-center gap-2">
-                  <Settings className="w-3.5 h-3.5" />
-                  Les produits / emails se configurent dans <Link href="/fournisseurs" className="underline">Fournisseurs</Link>.
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Date de livraison</Label>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <Input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Emails en copie (CC)</Label>
-                  <Input
-                    placeholder="compta@..., achats@..."
-                    value={ccText}
-                    onChange={(e) => setCcText(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">Virgule ou point-virgule.</p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Notes (optionnel)</Label>
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Ex: Merci de livrer avant 10h…"
-                  className="min-h-[80px]"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Produits</Label>
-                  <span className="text-sm font-semibold">{formatEuro(totalAmount)}</span>
-                </div>
-                <Input
-                  placeholder="Rechercher un produit…"
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                />
-
-                {!selectedSupplier ? (
-                  <div className="p-4 rounded-xl bg-muted text-sm text-muted-foreground">
-                    Sélectionne un fournisseur pour voir ses produits.
-                  </div>
-                ) : (selectedSupplier.products?.length || 0) === 0 ? (
-                  <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-sm">
-                    Aucun produit configuré pour ce fournisseur. Ajoute des produits dans la page Fournisseurs.
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-[42vh] overflow-auto pr-1">
-                    {filteredLines.map((p) => (
-                      <div key={p.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border bg-card">
-                        <div className="min-w-0">
-                          <div className="font-medium truncate">{p.productName}</div>
-                          <div className="text-xs text-muted-foreground flex items-center gap-2">
-                            <span className="truncate">{p.reference || "—"}</span>
-                            <span>•</span>
-                            <span>{formatEuro(p.unitPrice)}/{p.unit}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            min={0}
-                            step={1}
-                            value={p.quantity}
-                            onChange={(e) => updateQty(p.id, e.target.value)}
-                            className="w-24"
-                          />
-                          <div className="text-sm w-24 text-right tabular-nums">{formatEuro(p.total)}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <Button onClick={handleSend} className="w-full rounded-xl gap-2" disabled={!companyId}>
-                <Send className="w-4 h-4" />
-                Envoyer le bon de commande (PDF)
-              </Button>
+          <SheetContent side="right" className="w-screen max-w-none h-screen p-0 sm:max-w-none">
+  <div className="flex h-full flex-col">
+    <div className="border-b border-border bg-card p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <Send className="w-5 h-5 text-primary shrink-0" />
+          <div className="min-w-0">
+            <div className="text-lg font-semibold truncate">Envoyer une commande</div>
+            <div className="text-xs text-muted-foreground truncate">
+              {selectedSupplier ? selectedSupplier.name : "Sélectionne un fournisseur"}
             </div>
-          </SheetContent>
+          </div>
+        </div>
+
+        <div className="text-right">
+          <div className="text-xs text-muted-foreground">Total</div>
+          <div className="text-base font-semibold tabular-nums">{formatEuro(totalAmount)}</div>
+        </div>
+      </div>
+    </div>
+
+    <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div className="space-y-2">
+        <Label>Fournisseur</Label>
+        <Select value={supplierId} onValueChange={setSupplierId}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Sélectionner un fournisseur" />
+          </SelectTrigger>
+          <SelectContent>
+            {suppliers.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="text-xs text-muted-foreground flex items-center gap-2">
+          <Settings className="w-3.5 h-3.5" />
+          Les produits / emails se configurent dans{" "}
+          <Link href="/fournisseurs" className="underline">
+            Fournisseurs
+          </Link>
+          .
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Date de livraison</Label>
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-muted-foreground" />
+            <Input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Emails en copie (CC)</Label>
+          <Input placeholder="compta@..., achats@..." value={ccText} onChange={(e) => setCcText(e.target.value)} />
+          <p className="text-xs text-muted-foreground">Virgule ou point-virgule.</p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Notes (optionnel)</Label>
+        <Textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Ex: Merci de livrer avant 10h…"
+          className="min-h-[80px]"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Produits</Label>
+
+        <Input placeholder="Rechercher un produit…" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} />
+
+        {!selectedSupplier ? (
+          <div className="p-4 rounded-xl bg-muted text-sm text-muted-foreground">
+            Sélectionne un fournisseur pour voir ses produits.
+          </div>
+        ) : (selectedSupplier.products?.length || 0) === 0 ? (
+          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-sm">
+            Aucun produit configuré pour ce fournisseur. Ajoute des produits dans la page Fournisseurs.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {(() => {
+              const groups = new Map<string, typeof filteredLines>()
+              for (const line of filteredLines) {
+                const cat = (line.category || "Sans catégorie").toString().trim() || "Sans catégorie"
+                if (!groups.has(cat)) groups.set(cat, [])
+                groups.get(cat)!.push(line)
+              }
+              return Array.from(groups.entries())
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([cat, items]) => (
+                  <div key={cat} className="pulse-card p-0 overflow-hidden">
+                    <div className="px-4 py-2 border-b border-border bg-muted/30 flex items-center justify-between">
+                      <div className="text-xs font-semibold tracking-wide uppercase">{cat}</div>
+                      <div className="text-xs text-muted-foreground">{items.length}</div>
+                    </div>
+
+                    <div className="divide-y divide-border">
+                      {items.map((p) => {
+                        const step = unitStep(p.unit)
+                        const packAdd = convertPackToProductUnit(p.packQuantity, p.packUnit, p.unit)
+                        const packLabel = (p.packLabel || "").toString().trim()
+                        const lineTotal = Number(p.total || 0)
+                        return (
+                          <div key={p.id} className="p-4 flex items-start justify-between gap-4">
+                            <div className="min-w-0">
+                              <div className="font-medium leading-tight">{p.productName}</div>
+                              <div className="mt-1 text-xs text-muted-foreground flex flex-wrap items-center gap-2">
+                                <span className="truncate">{p.reference || "—"}</span>
+                                <span>•</span>
+                                <span>{formatEuro(p.unitPrice)}/{p.unit}</span>
+                                {packLabel ? (
+                                  <>
+                                    <span>•</span>
+                                    <span>Colisage: {packLabel}</span>
+                                  </>
+                                ) : null}
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col items-end gap-2 shrink-0">
+                              <div className="flex items-center gap-2">
+                                {packAdd !== undefined && packAdd > 0 && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="rounded-xl"
+                                    onClick={() => updateQty(p.id, String(Number(p.quantity || 0) + packAdd))}
+                                  >
+                                    + colis
+                                  </Button>
+                                )}
+
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step={step}
+                                  value={p.quantity}
+                                  onChange={(e) => updateQty(p.id, e.target.value)}
+                                  className="w-24"
+                                />
+                              </div>
+
+                              <div className="text-sm w-24 text-right tabular-nums">{formatEuro(lineTotal)}</div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))
+            })()}
+          </div>
+        )}
+      </div>
+    </div>
+
+    <div className="border-t border-border bg-card p-4">
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+        <div className="flex items-center justify-between sm:block">
+          <div className="text-xs text-muted-foreground">Total</div>
+          <div className="text-xl font-semibold tabular-nums">{formatEuro(totalAmount)}</div>
+        </div>
+
+        <Button
+          onClick={handleSend}
+          className="rounded-xl gap-2 sm:min-w-[320px] justify-center"
+          disabled={!companyId || !selectedSupplier}
+        >
+          <Send className="w-4 h-4" />
+          Valider et envoyer le bon de commande (PDF)
+        </Button>
+      </div>
+    </div>
+  </div>
+</SheetContent>
         </Sheet>
 
         <BottomNav />
