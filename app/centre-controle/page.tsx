@@ -425,18 +425,39 @@ function CentreControlePageContent() {
     }
   }
 
-  const toggleFeature = async (companyId: string, featureId: string) => {
-    const company = companiesState.find(c => c.id === companyId)
-    if (!company) return
-    // IMPORTANT: never persist non-serializable fields (like React icon components) to Firestore.
-    const updatedFeatures = company.features.map(f => f.id === featureId ? { ...f, enabled: !f.enabled } : f)
-    const serializableFeatures = updatedFeatures.map(f => ({ id: f.id, enabled: Boolean(f.enabled) }))
-    try {
-        await updateDoc(doc(db, "companies", companyId), { features: serializableFeatures })
-        if (selectedCompany?.id === companyId) setSelectedCompany({ ...company, features: updatedFeatures })
-        toast({ title: "Module mis à jour" })
-    } catch (error) { toast({ title: "Erreur", variant: "destructive" }) }
+  const toggleFeature = async (companyId: string, featureId: string, nextEnabled?: boolean) => {
+  const company = companiesState.find((c) => c.id === companyId)
+  if (!company) return
+
+  // IMPORTANT: never persist non-serializable fields (like React icon components) to Firestore.
+  const updatedFeatures = (company.features || []).map((f) =>
+    f.id === featureId ? { ...f, enabled: typeof nextEnabled === "boolean" ? nextEnabled : !Boolean(f.enabled) } : f
+  )
+
+  const serializableFeatures = updatedFeatures.map((f) => ({
+    id: String(f.id),
+    enabled: Boolean(f.enabled),
+  }))
+
+  // Extra safety: ensure payload contains no Symbols / Functions (Firestore would crash on non-serializables)
+  const payload = JSON.parse(JSON.stringify({ features: serializableFeatures }))
+
+  try {
+    await updateDoc(doc(db, "companies", companyId), payload)
+
+    // Optimistic UI update (also updated by onSnapshot)
+    setCompaniesState((prev) =>
+      prev.map((c) => (c.id === companyId ? { ...c, features: updatedFeatures } : c))
+    )
+    if (selectedCompany?.id === companyId) setSelectedCompany({ ...company, features: updatedFeatures })
+
+    toast({ title: "Module mis à jour", variant: "success" })
+  } catch (error) {
+    toast({ title: "Erreur lors de la mise à jour du module", variant: "destructive" })
+    // eslint-disable-next-line no-console
+    console.error("toggleFeature error", error)
   }
+}
 
   // --- DATA FETCHING ---
 
@@ -581,7 +602,7 @@ function CentreControlePageContent() {
                       </div>
                       <p className="text-sm font-medium">{feature.name}</p>
                     </div>
-                    <Switch checked={feature.enabled} onCheckedChange={() => toggleFeature(selectedCompany.id, feature.id)} />
+                    <Switch checked={feature.enabled} onCheckedChange={(v) => toggleFeature(selectedCompany.id, feature.id, Boolean(v))} />
                   </div>
               ))}
             </div>
