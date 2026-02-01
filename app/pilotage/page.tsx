@@ -685,37 +685,39 @@ export default function PilotagePage() {
                   </div>
 
                   {/* Edition budget (rôles encadrants) */}
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <div className="flex-1">
+                  <div className="mt-4 space-y-3">
+                    <div className="">
                       <p className="text-xs font-semibold">Budget max</p>
                       <p className="text-[11px] text-muted-foreground">Modifie le plafond global (ex: 2000€)</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                       <Input
                         type="number"
                         value={budgetMax}
                         onChange={(e) => setBudgetMax(Number(e.target.value))}
-                        className="w-28 h-9 rounded-xl text-right"
+                        className="w-full sm:w-32 h-10 rounded-xl text-right"
                         disabled={!canEditBudget}
                       />
-                      <Button
-                        size="sm"
-                        className="rounded-xl"
+                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:ml-auto">
+                        <Button
+                          size="sm"
+                          className="rounded-xl"
                         onClick={handleUpdateBaseHours}
                         disabled={!canEditBudget}
-                      >
-                        <Save className="w-4 h-4 mr-2" />
-                        Enregistrer
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="rounded-xl"
-                        onClick={() => setShowEditHours(true)}
-                      >
-                        <Edit3 className="w-4 h-4 mr-2" />
-                        Réglages
-                      </Button>
+                        >
+                          <Save className="w-4 h-4 mr-2" />
+                          Enregistrer
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-xl"
+                          onClick={() => setShowEditHours(true)}
+                        >
+                          <Edit3 className="w-4 h-4 mr-2" />
+                          Réglages
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>

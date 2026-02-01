@@ -149,11 +149,21 @@ function TrendMiniLine({
   }
 
   const trend = points.length > 1 ? ((points[points.length - 1].value - points[0].value) / points[0].value) * 100 : 0
+  const safeTrend = Number.isFinite(trend) ? trend : 0
 
-  const handleInteraction = (e: React.MouseEvent | React.TouchEvent) => {
+  const getClientX = (e: any): number | null => {
+    // iOS can fire touch events where touches[] is empty; changedTouches is safer.
+    if (e?.touches?.length) return e.touches[0].clientX
+    if (e?.changedTouches?.length) return e.changedTouches[0].clientX
+    if (typeof e?.clientX === "number") return e.clientX
+    return null
+  }
+
+  const handleInteraction = (e: any) => {
     if (!containerRef.current) return
     const rect = containerRef.current.getBoundingClientRect()
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientX = getClientX(e)
+    if (clientX === null || !Number.isFinite(rect.width) || rect.width <= 0) return
     const x = clientX - rect.left
     const relativeX = x / rect.width
     const index = Math.round(relativeX * (points.length - 1))
@@ -165,8 +175,8 @@ function TrendMiniLine({
     <div className="mt-3 space-y-2">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">Évolution</p>
-        <span className={cn("text-xs font-bold", trend >= 0 ? "text-green-600" : "text-red-600")}>
-          {trend >= 0 ? "+" : ""}{trend.toFixed(1)}%
+        <span className={cn("text-xs font-bold", safeTrend >= 0 ? "text-green-600" : "text-red-600")}>
+          {safeTrend >= 0 ? "+" : ""}{safeTrend.toFixed(1)}%
         </span>
       </div>
       
@@ -184,8 +194,8 @@ function TrendMiniLine({
         <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 200 64" preserveAspectRatio="none">
           <defs>
             <linearGradient id={`miniGradient-${points[0]?.date}`} x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="rgb(59, 130, 246)" stopOpacity="0.15" />
-              <stop offset="100%" stopColor="rgb(59, 130, 246)" stopOpacity="0" />
+              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.18" />
+              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
             </linearGradient>
           </defs>
           
@@ -197,7 +207,7 @@ function TrendMiniLine({
           <path 
             d={`M ${points.map((p, i) => `${(i * 200) / (points.length - 1)} ${64 - (p.score / MAX_SCORE) * 52}`).join(' L ')}`}
             fill="none" 
-            stroke="rgb(59, 130, 246)" 
+            stroke="hsl(var(--primary))" 
             strokeWidth="2" 
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -209,8 +219,8 @@ function TrendMiniLine({
             const isActive = hoveredPoint === i
             return (
               <g key={i}>
-                <circle cx={x} cy={y} r={isActive ? "6" : "4"} fill="rgb(59, 130, 246)" />
-                {isActive && <circle cx={x} cy={y} r="10" fill="rgb(59, 130, 246)" opacity="0.2" />}
+                <circle cx={x} cy={y} r={isActive ? "6" : "4"} fill="hsl(var(--primary))" />
+                {isActive && <circle cx={x} cy={y} r="10" fill="hsl(var(--primary))" opacity="0.18" />}
               </g>
             )
           })}
@@ -308,12 +318,26 @@ function LineChartPro({
   const avgValue = points.reduce((acc, p) => acc + p.value, 0) / points.length
   const trend = points.length > 1 ? ((points[points.length - 1].value - points[0].value) / points[0].value) * 100 : 0
 
-  const handleInteraction = (e: React.MouseEvent | React.TouchEvent) => {
+  const safeTrend = Number.isFinite(trend) ? trend : 0
+
+  const getClientX = (e: any): number | null => {
+    // iOS can fire touch events where touches[] is empty; changedTouches is safer.
+    if (e?.touches?.length) return e.touches[0].clientX
+    if (e?.changedTouches?.length) return e.changedTouches[0].clientX
+    if (typeof e?.clientX === "number") return e.clientX
+    return null
+  }
+
+  const handleInteraction = (e: any) => {
     if (!containerRef.current) return
     const rect = containerRef.current.getBoundingClientRect()
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientX = getClientX(e)
+    if (clientX === null || !Number.isFinite(rect.width) || rect.width <= 0) return
     const x = clientX - rect.left
-    const relativeX = (x - 40) / 320
+    // Keep padding similar to the SVG viewBox (40px left, 40px right).
+    const leftPad = 40
+    const usableWidth = Math.max(1, rect.width - leftPad * 2)
+    const relativeX = (x - leftPad) / usableWidth
     const index = Math.round(relativeX * (points.length - 1))
     const clampedIndex = Math.max(0, Math.min(points.length - 1, index))
     setHoveredPoint(clampedIndex)
@@ -331,8 +355,8 @@ function LineChartPro({
         </div>
         <div className="text-right">
           <div className="text-xs text-muted-foreground">Tendance</div>
-          <div className={cn("text-lg font-bold", trend >= 0 ? "text-green-600" : "text-red-600")}>
-            {trend >= 0 ? "+" : ""}{trend.toFixed(1)}%
+          <div className={cn("text-lg font-bold", safeTrend >= 0 ? "text-green-600" : "text-red-600")}>
+            {safeTrend >= 0 ? "+" : ""}{safeTrend.toFixed(1)}%
           </div>
         </div>
       </div>
@@ -364,8 +388,8 @@ function LineChartPro({
         <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 400 192" preserveAspectRatio="none">
           <defs>
             <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="rgb(59, 130, 246)" stopOpacity="0.2" />
-              <stop offset="100%" stopColor="rgb(59, 130, 246)" stopOpacity="0" />
+              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
             </linearGradient>
           </defs>
           
@@ -377,7 +401,7 @@ function LineChartPro({
           <path 
             d={`M ${points.map((p, i) => `${40 + (i * 320 / (points.length - 1))} ${192 - (p.score / MAX_SCORE) * 150}`).join(' L ')}`}
             fill="none" 
-            stroke="rgb(59, 130, 246)" 
+            stroke="hsl(var(--primary))" 
             strokeWidth="3" 
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -394,11 +418,11 @@ function LineChartPro({
                   cx={x} 
                   cy={y} 
                   r={isActive ? "8" : isLast ? "6" : "4"} 
-                  fill={isLast || isActive ? "rgb(59, 130, 246)" : "white"} 
-                  stroke="rgb(59, 130, 246)" 
+                  fill={isLast || isActive ? "hsl(var(--primary))" : "hsl(var(--background))"} 
+                  stroke="hsl(var(--primary))" 
                   strokeWidth="2"
                 />
-                {(isLast || isActive) && <circle cx={x} cy={y} r="12" fill="rgb(59, 130, 246)" opacity="0.2" />}
+                {(isLast || isActive) && <circle cx={x} cy={y} r="12" fill="hsl(var(--primary))" opacity="0.18" />}
               </g>
             )
           })}
