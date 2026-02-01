@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/components/auth/auth-provider"
 import Link from "next/link"
@@ -23,6 +24,9 @@ import {
   Send,
   Settings,
   Truck,
+  BadgeCheck,
+  CheckCircle2,
+  Save,
 } from "lucide-react"
 import {
   addOrder,
@@ -31,6 +35,9 @@ import {
   getSuppliers,
   hydrateOrdersStore,
   markOrderAsSent,
+  markOrderAsDelivered,
+  saveOrderReceipt,
+  updateOrder,
   Order,
   OrderProduct,
   OrderSupplier,
@@ -121,6 +128,13 @@ export default function CommandesPage() {
   const [productSearch, setProductSearch] = useState<string>("")
   const [orderLines, setOrderLines] = useState<OrderProduct[]>([])
 
+  // Order details / réception
+  const [openOrderDetails, setOpenOrderDetails] = useState(false)
+  const [activeOrder, setActiveOrder] = useState<Order | null>(null)
+  const [detailsMode, setDetailsMode] = useState<"view" | "receive">("view")
+  const [receiptLines, setReceiptLines] = useState<OrderProduct[]>([])
+
+
   const selectedSupplier = useMemo(
     () => suppliers.find((s) => s.id === supplierId) || null,
     [suppliers, supplierId],
@@ -137,6 +151,19 @@ export default function CommandesPage() {
   const totalAmount = useMemo(() => {
     return orderLines.reduce((sum, p) => sum + (Number(p.total) || 0), 0)
   }, [orderLines])
+
+
+  const pendingReceptionOrders = useMemo(() => {
+    return orders.filter((o) => o.status === "sent" || o.status === "confirmed")
+  }, [orders])
+
+  const deliveredOrders = useMemo(() => {
+    return orders.filter((o) => o.status === "delivered")
+  }, [orders])
+
+  const draftOrders = useMemo(() => {
+    return orders.filter((o) => o.status === "draft")
+  }, [orders])
 
   // Load & hydrate
   useEffect(() => {
@@ -393,6 +420,154 @@ export default function CommandesPage() {
     }
   }
 
+
+  const openDetails = (o: Order, mode: "view" | "receive") => {
+    setActiveOrder(o)
+    setDetailsMode(mode)
+    // Init réception lignes
+    const init = (o.products || []).map((p) => ({
+      ...p,
+      receivedQuantity: typeof (p as any).receivedQuantity === "number" ? (p as any).receivedQuantity : Number(p.quantity || 0),
+      receivedOk: typeof (p as any).receivedOk === "boolean" ? (p as any).receivedOk : undefined,
+      receivedNote: typeof (p as any).receivedNote === "string" ? (p as any).receivedNote : "",
+    })) as OrderProduct[]
+    setReceiptLines(init)
+    setOpenOrderDetails(true)
+  }
+
+  const markAllOk = () => {
+    setReceiptLines((prev) =>
+      prev.map((l) => ({
+        ...l,
+        receivedOk: true,
+        receivedQuantity: typeof l.receivedQuantity === "number" ? l.receivedQuantity : Number(l.quantity || 0),
+      })),
+    )
+  }
+
+  const setLineReceipt = (lineId: string, patch: Partial<OrderProduct>) => {
+    setReceiptLines((prev) => prev.map((l) => (l.id === lineId ? { ...l, ...patch } : l)))
+  }
+
+  const receiptProgress = useMemo(() => {
+    const total = receiptLines.length || 0
+    const done = receiptLines.filter((l) => typeof (l as any).receivedOk === "boolean").length
+    return { total, done }
+  }, [receiptLines])
+
+  const saveReceipt = async () => {
+    if (!companyId || !activeOrder) return
+    try {
+      await saveOrderReceipt(companyId, activeOrder.id, receiptLines)
+      setOrders(getOrders(companyId))
+      toast({ title: "✅ Réception enregistrée", description: "Tu peux finaliser plus tard si besoin." })
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e?.message || "Impossible d'enregistrer la réception.", variant: "destructive" })
+    }
+  }
+
+  const finalizeReceipt = async () => {
+    if (!companyId || !activeOrder) return
+
+    // Validation: chaque ligne doit être OK ou Problème (+ note)
+    const missingChoice = receiptLines.find((l) => typeof (l as any).receivedOk !== "boolean")
+    if (missingChoice) {
+      toast({
+        title: "Il manque des validations",
+        description: "Valide chaque produit (OK ou Problème) avant de finaliser la réception.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const missingNote = receiptLines.find((l) => (l as any).receivedOk === false && !String((l as any).receivedNote || "").trim())
+    if (missingNote) {
+      toast({
+        title: "Note manquante",
+        description: "Ajoute une note pour chaque produit marqué en Problème.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const hasProblems = receiptLines.some((l) => (l as any).receivedOk === false)
+
+    try {
+      await updateOrder(companyId, activeOrder.id, {
+        products: receiptLines,
+        status: "delivered",
+        deliveredAt: new Date().toISOString(),
+      } as any)
+
+      setOrders(getOrders(companyId))
+      toast({ title: "✅ Commande réceptionnée", description: "La commande est passée dans l'historique." })
+      setOpenOrderDetails(false)
+
+      // Si non-conformité : envoi d'un PDF au fournisseur (lignes en rouge)
+      if (hasProblems) {
+        try {
+          const supplier = suppliers.find((s) => s.id === activeOrder.supplierId)
+          const toEmail = String(activeOrder.supplierEmail || supplier?.email || "").trim()
+          const toName = String(activeOrder.supplierName || supplier?.name || "Fournisseur")
+          if (!toEmail) {
+            toast({
+              title: "Non-conformité non envoyée",
+              description: "Email fournisseur manquant (renseigne-le dans Fournisseurs).",
+              variant: "destructive",
+            })
+            return
+          }
+
+          const ccEmails = (activeOrder.ccEmails && activeOrder.ccEmails.length ? activeOrder.ccEmails : (supplier?.ccEmails || []))
+
+          const token = await user?.getIdToken().catch(() => undefined)
+          const orderNumber = activeOrder.id.slice(-6).toUpperCase()
+          const subject = `Commande non conforme ${orderNumber} — ${companyName || "Entreprise"}`
+
+          const res = await fetch("/api/commandes/send-nonconformity", {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              ...(token ? { authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+              toEmail,
+              toName,
+              subject,
+              companyName: companyName || "Entreprise",
+              ccEmails,
+              order: {
+                ...activeOrder,
+                products: receiptLines,
+                supplierName: toName,
+                supplierEmail: toEmail,
+                orderNumber,
+              },
+            }),
+          })
+
+          const data = await res.json().catch(() => ({}))
+          if (!res.ok || !data?.success) throw new Error(data?.error || "Échec envoi non-conformité")
+
+          toast({
+            title: "📩 Non-conformité envoyée",
+            description: `PDF envoyé à ${toName} (lignes en rouge).`,
+          })
+        } catch (e: any) {
+          console.error(e)
+          toast({
+            title: "Non-conformité",
+            description: e?.message || "Impossible d'envoyer le PDF de non-conformité (la réception reste validée).",
+            variant: "destructive",
+          })
+        }
+      }
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e?.message || "Impossible de finaliser la réception.", variant: "destructive" })
+    }
+  }
+
+
   return (
     <PermissionGate page="commandes">
       <div className="min-h-screen bg-background pb-24">
@@ -440,54 +615,134 @@ export default function CommandesPage() {
             )}
           </div>
 
-          {/* Orders list */}
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <FileText className="w-5 h-5 text-primary" />
-                Historique
-              </h2>
-              <p className="text-sm text-muted-foreground">{orders.length} commande(s)</p>
-            </div>
-
-            {loading ? (
-              <div className="pulse-card p-6 text-sm text-muted-foreground">Chargement…</div>
-            ) : orders.length === 0 ? (
-              <div className="pulse-card p-8 text-center">
-                <Package className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-                <p className="text-sm text-muted-foreground">Aucune commande pour le moment.</p>
+          
+          {/* Commandes */}
+          <section className="space-y-6">
+            {/* À réceptionner */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <Truck className="w-5 h-5 text-primary" />
+                  En attente de réception
+                </h2>
+                <p className="text-sm text-muted-foreground">{pendingReceptionOrders.length}</p>
               </div>
-            ) : (
-              <div className="grid gap-3">
-                {orders
-                  .slice()
-                  .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
-                  .map((o) => {
-                    const num = o.id.slice(-6).toUpperCase()
-                    const status = o.status === "sent" ? "Envoyée" : "Brouillon"
-                    return (
-                      <div key={o.id} className="pulse-card p-5 flex items-start justify-between gap-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold">{o.supplierName}</span>
-                            <span className="text-xs px-2 py-1 rounded-lg bg-muted">#{num}</span>
-                            <span className={"text-xs px-2 py-1 rounded-lg " + (o.status === "sent" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-200" : "bg-amber-500/10 text-amber-700 dark:text-amber-200")}>{status}</span>
-                          </div>
-                          <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-3">
-                            <span className="inline-flex items-center gap-1">
-                              <Calendar className="w-4 h-4" />
-                              Livraison : {o.deliveryDate || "—"}
-                            </span>
-                            <span>•</span>
-                            <span>Total : {formatEuro(o.totalAmount || 0)}</span>
+
+              {loading ? (
+                <div className="pulse-card p-6 text-sm text-muted-foreground">Chargement…</div>
+              ) : pendingReceptionOrders.length === 0 ? (
+                <div className="pulse-card p-8 flex items-start gap-3">
+                  <Package className="w-10 h-10 text-muted-foreground mt-1" />
+                  <div>
+                    <p className="font-semibold">Rien à réceptionner</p>
+                    <p className="text-sm text-muted-foreground">Les commandes envoyées apparaîtront ici jusqu’à validation.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {pendingReceptionOrders
+                    .slice()
+                    .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
+                    .map((o) => {
+                      const num = o.id.slice(-6).toUpperCase()
+                      return (
+                        <div key={o.id} className="pulse-card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <button
+                            type="button"
+                            className="text-left flex-1 min-w-0"
+                            onClick={() => openDetails(o, "view")}
+                          >
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold truncate">{o.supplierName}</span>
+                              <span className="text-xs px-2 py-1 rounded-lg bg-muted">#{num}</span>
+                              <span className="text-xs px-2 py-1 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-200">
+                                Envoyée
+                              </span>
+                            </div>
+
+                            <div className="mt-1 text-sm text-muted-foreground flex flex-wrap items-center gap-3">
+                              <span className="inline-flex items-center gap-1">
+                                <Calendar className="w-4 h-4" />
+                                Livraison : {o.deliveryDate || "—"}
+                              </span>
+                              <span>•</span>
+                              <span>Total : {formatEuro(o.totalAmount || 0)}</span>
+                            </div>
+                          </button>
+
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="rounded-xl gap-2"
+                              onClick={() => handleResend(o)}
+                              disabled={sendingOrderId === o.id}
+                            >
+                              {sendingOrderId === o.id ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Envoi…
+                                </>
+                              ) : (
+                                <>
+                                  <Mail className="w-4 h-4" />
+                                  Renvoyer le bon
+                                </>
+                              )}
+                            </Button>
+
+                            <Button size="sm" className="rounded-xl gap-2" onClick={() => openDetails(o, "receive")}>
+                              <Package className="w-4 h-4" />
+                              Réceptionner
+                            </Button>
                           </div>
                         </div>
+                      )
+                    })}
+                </div>
+              )}
+            </div>
 
-                        <div className="flex flex-col items-end gap-2">
+            {/* Brouillons */}
+            {!loading && draftOrders.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-primary" />
+                    Brouillons
+                  </h2>
+                  <p className="text-sm text-muted-foreground">{draftOrders.length}</p>
+                </div>
+
+                <div className="grid gap-3">
+                  {draftOrders
+                    .slice()
+                    .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
+                    .map((o) => {
+                      const num = o.id.slice(-6).toUpperCase()
+                      return (
+                        <div key={o.id} className="pulse-card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <button type="button" className="text-left flex-1 min-w-0" onClick={() => openDetails(o, "view")}>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold truncate">{o.supplierName}</span>
+                              <span className="text-xs px-2 py-1 rounded-lg bg-muted">#{num}</span>
+                              <span className="text-xs px-2 py-1 rounded-lg bg-muted/40 text-muted-foreground">
+                                Brouillon
+                              </span>
+                            </div>
+                            <div className="mt-1 text-sm text-muted-foreground flex flex-wrap items-center gap-3">
+                              <span className="inline-flex items-center gap-1">
+                                <Calendar className="w-4 h-4" />
+                                Livraison : {o.deliveryDate || "—"}
+                              </span>
+                              <span>•</span>
+                              <span>Total : {formatEuro(o.totalAmount || 0)}</span>
+                            </div>
+                          </button>
+
                           <Button
                             size="sm"
                             className="rounded-xl gap-2"
-                            variant={o.status === "sent" ? "outline" : "default"}
                             onClick={() => handleResend(o)}
                             disabled={sendingOrderId === o.id}
                           >
@@ -498,18 +753,96 @@ export default function CommandesPage() {
                               </>
                             ) : (
                               <>
-                                <Mail className="w-4 h-4" />
-                                {o.status === "sent" ? "Renvoyer" : "Envoyer"}
+                                <Send className="w-4 h-4" />
+                                Envoyer
                               </>
                             )}
                           </Button>
                         </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                </div>
               </div>
             )}
+
+            {/* Historique */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <BadgeCheck className="w-5 h-5 text-primary" />
+                  Commandes reçues
+                </h2>
+                <p className="text-sm text-muted-foreground">{deliveredOrders.length}</p>
+              </div>
+
+              {loading ? (
+                <div className="pulse-card p-6 text-sm text-muted-foreground">Chargement…</div>
+              ) : deliveredOrders.length === 0 ? (
+                <div className="pulse-card p-8 text-center">
+                  <Package className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-sm text-muted-foreground">Aucune commande réceptionnée pour le moment.</p>
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {deliveredOrders
+                    .slice()
+                    .sort((a, b) => (b.deliveredAt || b.createdAt || "").localeCompare(a.deliveredAt || a.createdAt || ""))
+                    .map((o) => {
+                      const num = o.id.slice(-6).toUpperCase()
+                      return (
+                        <div key={o.id} className="pulse-card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <button type="button" className="text-left flex-1 min-w-0" onClick={() => openDetails(o, "view")}>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold truncate">{o.supplierName}</span>
+                              <span className="text-xs px-2 py-1 rounded-lg bg-muted">#{num}</span>
+                              <span className="text-xs px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-200">
+                                Reçue
+                              </span>
+                            </div>
+
+                            <div className="mt-1 text-sm text-muted-foreground flex flex-wrap items-center gap-3">
+                              <span className="inline-flex items-center gap-1">
+                                <Calendar className="w-4 h-4" />
+                                Livraison : {o.deliveryDate || "—"}
+                              </span>
+                              <span>•</span>
+                              <span>Total : {formatEuro(o.totalAmount || 0)}</span>
+                            </div>
+                          </button>
+
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="rounded-xl gap-2"
+                              onClick={() => handleResend(o)}
+                              disabled={sendingOrderId === o.id}
+                            >
+                              {sendingOrderId === o.id ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Envoi…
+                                </>
+                              ) : (
+                                <>
+                                  <Mail className="w-4 h-4" />
+                                  Renvoyer le bon
+                                </>
+                              )}
+                            </Button>
+                            <Button size="sm" className="rounded-xl gap-2" variant="secondary" onClick={() => openDetails(o, "view")}>
+                              <FileText className="w-4 h-4" />
+                              Voir
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                </div>
+              )}
+            </div>
           </section>
+
         </main>
 
         {/* New order sheet */}
@@ -699,6 +1032,252 @@ export default function CommandesPage() {
   </div>
 </SheetContent>
         </Sheet>
+
+        {/* Order details / réception */}
+        <Sheet open={openOrderDetails} onOpenChange={setOpenOrderDetails}>
+          <SheetContent side="bottom" className="w-screen max-w-none h-screen p-0 sm:max-w-none">
+            <div className="flex h-full flex-col">
+              <div className="border-b border-border bg-card p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-primary" />
+                      <div className="text-lg font-semibold truncate">
+                        {activeOrder ? `${activeOrder.supplierName}` : "Commande"}
+                      </div>
+                      {activeOrder && (
+                        <span className="text-xs px-2 py-1 rounded-lg bg-muted">
+                          #{activeOrder.id.slice(-6).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground flex flex-wrap items-center gap-3">
+                      <span className="inline-flex items-center gap-1">
+                        <Calendar className="w-4 h-4" />
+                        Livraison : {activeOrder?.deliveryDate || "—"}
+                      </span>
+                      <span>•</span>
+                      <span>Total : {formatEuro(activeOrder?.totalAmount || 0)}</span>
+                      {activeOrder?.status === "delivered" && (
+                        <>
+                          <span>•</span>
+                          <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-300">
+                            <BadgeCheck className="w-4 h-4" />
+                            Reçue
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {detailsMode === "receive" && (
+                      <Button variant="outline" className="rounded-xl gap-2" onClick={markAllOk}>
+                        <CheckCircle2 className="w-4 h-4" />
+                        Tout OK
+                      </Button>
+                    )}
+                    <Button variant="outline" className="rounded-xl" onClick={() => setOpenOrderDetails(false)}>
+                      Fermer
+                    </Button>
+                  </div>
+                </div>
+
+                {detailsMode === "receive" && (
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="text-xs text-muted-foreground">
+                      Validation : <span className="font-semibold text-foreground">{receiptProgress.done}</span> /{" "}
+                      <span className="font-semibold text-foreground">{receiptProgress.total}</span>
+                    </div>
+                    <div className="w-40">
+                      <Progress value={receiptProgress.total ? (receiptProgress.done / receiptProgress.total) * 100 : 0} className="h-2" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {activeOrder && activeOrder.notes && (
+                  <div className="pulse-card p-4 border border-border/50">
+                    <div className="text-xs font-semibold text-muted-foreground mb-1">Notes</div>
+                    <div className="text-sm whitespace-pre-wrap">{activeOrder.notes}</div>
+                  </div>
+                )}
+
+                {activeOrder ? (
+                  <div className="space-y-3">
+                    {(() => {
+                      const groups = new Map<string, OrderProduct[]>()
+                      for (const l of receiptLines) {
+                        const cat = (l.category || "Sans catégorie").toString().trim() || "Sans catégorie"
+                        if (!groups.has(cat)) groups.set(cat, [])
+                        groups.get(cat)!.push(l)
+                      }
+                      const sorted = Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+                      return sorted.map(([cat, items]) => (
+                        <div key={cat} className="pulse-card p-0 overflow-hidden">
+                          <div className="px-4 py-2 border-b border-border bg-muted/30 flex items-center justify-between">
+                            <div className="text-xs font-semibold tracking-wide uppercase">{cat}</div>
+                            <div className="text-xs text-muted-foreground">{items.length}</div>
+                          </div>
+
+                          <div className="divide-y divide-border">
+                            {items.map((p) => {
+                              const orderedQty = Number(p.quantity || 0)
+                              const receivedQty = typeof (p as any).receivedQuantity === "number" ? (p as any).receivedQuantity : orderedQty
+                              const receivedOk = (p as any).receivedOk as boolean | undefined
+                              const isProblem = receivedOk === false
+                              const isOk = receivedOk === true
+
+                              return (
+                                <div key={p.id} className="p-4 flex flex-col gap-3">
+                                  <div className="flex items-start justify-between gap-4">
+                                    <div className="min-w-0">
+                                      <div className="font-semibold leading-tight break-words">{p.productName}</div>
+                                      <div className="mt-1 text-xs text-muted-foreground flex flex-wrap items-center gap-2">
+                                        <span className="truncate">{p.reference || "—"}</span>
+                                        <span>•</span>
+                                        <span>{formatEuro(p.unitPrice)}/{p.unit}</span>
+                                        {p.packLabel ? (
+                                          <>
+                                            <span>•</span>
+                                            <span>Colisage : {p.packLabel}</span>
+                                          </>
+                                        ) : null}
+                                      </div>
+                                    </div>
+
+                                    <div className="text-right shrink-0">
+                                      <div className="text-xs text-muted-foreground">Total</div>
+                                      <div className="text-sm font-semibold tabular-nums">{formatEuro(Number(p.total || 0))}</div>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <div className="pulse-card p-3 bg-muted/20 border border-border/50">
+                                      <div className="text-[11px] text-muted-foreground">Commandé</div>
+                                      <div className="text-sm font-bold tabular-nums">
+                                        {orderedQty.toLocaleString("fr-FR")} {p.unit}
+                                      </div>
+                                    </div>
+
+                                    <div className="pulse-card p-3 bg-muted/20 border border-border/50">
+                                      <div className="text-[11px] text-muted-foreground">Reçu</div>
+                                      {detailsMode === "receive" ? (
+                                        <Input
+                                          type="number"
+                                          min={0}
+                                          step={unitStep(p.unit)}
+                                          value={receivedQty}
+                                          onChange={(e) => setLineReceipt(p.id, { receivedQuantity: Number(e.target.value) })}
+                                          className="mt-1"
+                                        />
+                                      ) : (
+                                        <div className="text-sm font-bold tabular-nums mt-1">
+                                          {(typeof (p as any).receivedQuantity === "number"
+                                            ? (p as any).receivedQuantity
+                                            : orderedQty
+                                          ).toLocaleString("fr-FR")}{" "}
+                                          {p.unit}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="pulse-card p-3 bg-muted/20 border border-border/50">
+                                      <div className="text-[11px] text-muted-foreground">Statut</div>
+
+                                      {detailsMode === "receive" ? (
+                                        <div className="mt-1 flex gap-2">
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant={isOk ? "default" : "outline"}
+                                            className="rounded-xl flex-1"
+                                            onClick={() => setLineReceipt(p.id, { receivedOk: true, receivedNote: "" })}
+                                          >
+                                            OK
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant={isProblem ? "destructive" : "outline"}
+                                            className="rounded-xl flex-1"
+                                            onClick={() => setLineReceipt(p.id, { receivedOk: false })}
+                                          >
+                                            Problème
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <div className="mt-1">
+                                          {receivedOk === true ? (
+                                            <span className="text-xs font-bold px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-200">
+                                              OK
+                                            </span>
+                                          ) : receivedOk === false ? (
+                                            <span className="text-xs font-bold px-2 py-1 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-200">
+                                              Problème
+                                            </span>
+                                          ) : (
+                                            <span className="text-xs font-bold px-2 py-1 rounded-full bg-muted/40 text-muted-foreground">
+                                              —
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {detailsMode === "receive" && isProblem && (
+                                    <div className="space-y-2">
+                                      <Label>Note (obligatoire si problème)</Label>
+                                      <Textarea
+                                        value={String((p as any).receivedNote || "")}
+                                        onChange={(e) => setLineReceipt(p.id, { receivedNote: e.target.value })}
+                                        placeholder="Ex: Manque 2kg, carton abîmé, produit non conforme…"
+                                        className="min-h-[70px]"
+                                      />
+                                    </div>
+                                  )}
+
+                                  {detailsMode !== "receive" && receivedOk === false && String((p as any).receivedNote || "").trim() && (
+                                    <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20">
+                                      <div className="text-xs font-bold text-rose-700 dark:text-rose-200 mb-1">Note</div>
+                                      <div className="text-sm text-rose-900 dark:text-rose-50 whitespace-pre-wrap">
+                                        {String((p as any).receivedNote || "")}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))
+                    })()}
+                  </div>
+                ) : (
+                  <div className="pulse-card p-6 text-sm text-muted-foreground">Aucune commande sélectionnée.</div>
+                )}
+              </div>
+
+              {detailsMode === "receive" && (
+                <div className="border-t border-border bg-card p-4">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                    <Button variant="outline" className="rounded-xl gap-2" onClick={saveReceipt}>
+                      <Save className="w-4 h-4" />
+                      Enregistrer (sans finaliser)
+                    </Button>
+                    <Button className="rounded-xl gap-2 sm:min-w-[320px] justify-center" onClick={finalizeReceipt}>
+                      <BadgeCheck className="w-4 h-4" />
+                      Valider la réception
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+
 
         <BottomNav />
       </div>

@@ -681,186 +681,183 @@ export default function ObjectivesPage() {
             )}
           </section>
 
-          {/* 🔥 OBJECTIFS SECONDAIRES - CARROUSEL AMÉLIORÉ */}
+          {
+          {/* 🎯 OBJECTIFS SECONDAIRES */}
           <section className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Target className="w-5 h-5 text-accent" />
-                <h2 className="font-semibold text-lg">Objectifs Secondaires</h2>
+                <h2 className="font-semibold text-lg">Objectifs secondaires</h2>
               </div>
+
               {secondaryObjectives.length > 0 && (
                 <Badge variant="secondary" className="text-xs font-semibold">
-                  {currentIndex + 1} / {secondaryObjectives.length}
+                  {secondaryObjectives.length} actif(s)
                 </Badge>
               )}
             </div>
 
             {secondaryObjectives.length > 0 ? (
-              <div className="relative">
-                {/* Gradient fade à droite */}
-                {secondaryObjectives.length > 1 && (
-                  <>
-                    <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-background via-background/80 to-transparent z-10 pointer-events-none rounded-r-2xl" />
-                    
-                    {/* Indicateur swipe animé */}
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 z-20 pointer-events-none">
-                      <div className="flex items-center gap-0.5 animate-pulse">
-                        <ChevronRight className="w-5 h-5 text-primary" />
-                        <ChevronRight className="w-5 h-5 text-primary -ml-3" />
-                      </div>
-                    </div>
-                  </>
-                )}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {secondaryObjectives.map((obj: any, index: number) => {
+                  const current = Number(obj.current || 0)
+                  const target = Number(obj.target || 1)
+                  const isConfidential = obj.isConfidential || obj.hideRevenue
 
-                {/* Carrousel horizontal */}
-                <div 
-                  ref={scrollRef}
-                  className="overflow-x-auto overflow-y-hidden hide-scrollbar snap-x snap-mandatory pb-2"
-                >
-                  <div className="flex gap-4 pr-20">
-                    {secondaryObjectives.map((obj: any, index: number) => {
-                      const current = Number(obj.current || 0)
-                      const target = Number(obj.target || 1)
-                      const isConfidential = obj.isConfidential || obj.hideRevenue
-                      
-                      const progressRaw = computeProgressPct(current, target, obj.direction)
-                      const progressBar = clamp(progressRaw, 0, 100)
-                      const status = getObjectiveStatus(progressRaw, obj.direction)
+                  const progressRaw = computeProgressPct(current, target, obj.direction)
+                  const progressBar = clamp(progressRaw, 0, 100)
+                  const status = getObjectiveStatus(progressRaw, obj.direction)
 
-                      const nextPalierS = obj.paliers
-                        ? [...obj.paliers]
-                            .map((p: any) => ({ ...p, threshold: Number(p.threshold || 0) }))
-                            .sort((a: any, b: any) => (obj.direction === "descending" ? b.threshold - a.threshold : a.threshold - b.threshold))
-                            .find((p: any) => (obj.direction === "descending" ? current > Number(p.threshold) : current < Number(p.threshold)))
-                        : undefined
-                      
-                      const isLocked = !isPrincipalMet
+                  const nextPalierS = obj.paliers
+                    ? [...obj.paliers]
+                        .map((p: any) => ({ ...p, threshold: Number(p.threshold || 0) }))
+                        .sort((a: any, b: any) =>
+                          obj.direction === "descending" ? b.threshold - a.threshold : a.threshold - b.threshold,
+                        )
+                        .find((p: any) =>
+                          obj.direction === "descending" ? current > Number(p.threshold) : current < Number(p.threshold),
+                        )
+                    : undefined
 
-                      return (
-                        <div 
-                          key={obj.id}
-                          className="snap-start shrink-0 first:ml-0"
-                          style={{ width: 'calc(100% - 80px)' }}
-                        >
-                          <div 
-                            className={cn(
-                              "pulse-card p-5 h-full cursor-pointer transition-all duration-300 relative overflow-hidden",
-                              "border-2",
-                              isLocked && "opacity-50 grayscale cursor-not-allowed border-border/50",
-                              !isLocked && "hover:shadow-xl hover:scale-[1.02] border-accent/30"
-                            )}
-                            onClick={() => !isLocked && obj?.id && setSelectedObjectiveId(obj.id)}
-                          >
-                            {/* Badge numéro */}
-                            <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
-                              <span className="text-xs font-black text-accent">{index + 1}</span>
+                  const isLocked = !isPrincipalMet
+
+                  return (
+                    <div
+                      key={obj.id}
+                      className={cn(
+                        "pulse-card p-6 transition-all duration-300 relative overflow-hidden border-2",
+                        isLocked && "opacity-60 grayscale cursor-not-allowed border-border/50",
+                        !isLocked && "hover:shadow-xl hover:scale-[1.01] cursor-pointer border-accent/30",
+                      )}
+                      onClick={() => !isLocked && obj?.id && setSelectedObjectiveId(obj.id)}
+                    >
+                      {/* Overlay lock */}
+                      {isLocked && (
+                        <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] flex items-center justify-center z-10">
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center">
+                              <Lock className="w-6 h-6 text-amber-600" />
                             </div>
-
-                            {isLocked && (
-                              <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] flex items-center justify-center z-10">
-                                <div className="flex flex-col items-center gap-2">
-                                  <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center">
-                                    <Lock className="w-6 h-6 text-amber-600" />
-                                  </div>
-                                  <p className="text-xs font-bold text-amber-600">En attente du principal</p>
-                                </div>
-                              </div>
-                            )}
-
-                            <div className="space-y-4">
-                              {/* Header avec icône + titre */}
-                              <div className="flex items-start gap-3">
-                                <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-md", status.bg)}>
-                                  <TrendingUp className={cn("w-7 h-7", status.tone)} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <h3 className="font-bold text-base truncate">{obj.title}</h3>
-                                  <p className="text-xs text-muted-foreground truncate mt-0.5">{obj.description}</p>
-                                  {!isConfidential && (
-                                    <div className={cn("inline-flex items-center gap-1 mt-2 px-2 py-1 rounded-full text-[10px] font-bold", status.bg, status.tone)}>
-                                      {Math.round(clamp(progressRaw, 0, 999))}% • {status.label}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Progression */}
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between text-xs">
-                                  <span className="font-medium text-muted-foreground">Progression</span>
-                                  <span className="font-bold">
-                                    {isConfidential 
-                                      ? `${Math.round(clamp(progressRaw, 0, 999))}%` 
-                                      : `${current.toLocaleString()} / ${target.toLocaleString()} ${obj.unit}`}
-                                  </span>
-                                </div>
-                                <Progress value={progressBar} className={cn("h-3", `[&>div]:bg-gradient-to-r [&>div]:${getProgressColor(progressRaw)}`)} />
-                              </div>
-
-                              {/* Prochain palier si existe */}
-                              {nextPalierS && !isLocked && (
-                                <div className="p-3 rounded-xl bg-gradient-to-r from-accent/10 to-primary/10 border border-accent/20 flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <Award className="w-4 h-4 text-accent" />
-                                    <div>
-                                      <p className="text-[10px] text-muted-foreground font-medium">Prochain palier</p>
-                                      <p className="text-xs font-bold">{nextPalierS.name}</p>
-                                    </div>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="text-lg font-black bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
-                                      +{nextPalierS.reward}€
-                                    </p>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Mini graphique */}
-                              <div className="pt-3 border-t border-border/30">
-                                <TrendMiniLine 
-                                  history={obj.history} 
-                                  current={current} 
-                                  target={target} 
-                                  direction={obj.direction} 
-                                  unit={obj.unit} 
-                                  periodStart={computeObjectivePeriod(obj).isIndefinite ? null : computeObjectivePeriod(obj).start} 
-                                  periodEnd={computeObjectivePeriod(obj).isIndefinite ? null : computeObjectivePeriod(obj).end} 
-                                />
-                              </div>
-                            </div>
+                            <p className="text-xs font-bold text-amber-600">En attente du principal</p>
                           </div>
                         </div>
-                      )
-                    })}
-                  </div>
-                </div>
+                      )}
 
-                {/* 🎯 INDICATEURS DE PAGINATION CLIQUABLES */}
-                {secondaryObjectives.length > 1 && (
-                  <div className="flex items-center justify-center gap-2 mt-4">
-                    {secondaryObjectives.map((_, index) => (
-                      <button
-                        key={index}
-                        onClick={() => scrollToIndex(index)}
-                        className={cn(
-                          "h-2 rounded-full transition-all duration-300 cursor-pointer hover:opacity-80 active:scale-95",
-                          index === currentIndex 
-                            ? "w-8 bg-gradient-to-r from-accent to-primary" 
-                            : "w-2 bg-muted-foreground/30 hover:bg-muted-foreground/50"
-                        )}
-                        aria-label={`Aller à l'objectif ${index + 1}`}
-                      />
-                    ))}
-                  </div>
-                )}
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black px-2 py-1 rounded-full bg-accent/15 text-accent">
+                              #{index + 1}
+                            </span>
+
+                            {(obj.category || "").toString().trim() && (
+                              <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-muted/40 text-muted-foreground">
+                                {String(obj.category)}
+                              </span>
+                            )}
+
+                            {!isConfidential && (
+                              <span className={cn("text-[10px] font-bold px-2 py-1 rounded-full", status.bg, status.tone)}>
+                                {status.label}
+                              </span>
+                            )}
+
+                            {isConfidential && (
+                              <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-muted/40 text-muted-foreground">
+                                {Math.round(clamp(progressRaw, 0, 999))}%
+                              </span>
+                            )}
+                          </div>
+
+                          <h3 className="text-lg font-black leading-tight break-words">{obj.title}</h3>
+                          <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">{obj.description}</p>
+                        </div>
+
+                        {/* Progress ring */}
+                        <div className="shrink-0">
+                          <ProgressRing
+                            progress={clamp(progressRaw, 0, 999)}
+                            size={76}
+                            strokeWidth={10}
+                            showPercentage
+                            label="Avancement"
+                            animate={!isLocked}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Values + progress */}
+                      <div className="mt-4 space-y-2">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span className="font-medium">Actuel</span>
+                          <span className="font-semibold text-foreground tabular-nums">
+                            {isConfidential ? "—" : `${current.toLocaleString()} ${obj.unit || ""}`}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span className="font-medium">Objectif</span>
+                          <span className="font-semibold text-foreground tabular-nums">
+                            {isConfidential ? "—" : `${target.toLocaleString()} ${obj.unit || ""}`}
+                          </span>
+                        </div>
+                        <Progress
+                          value={progressBar}
+                          className={cn("h-3", `[&>div]:bg-gradient-to-r [&>div]:${getProgressColor(progressRaw)}`)}
+                        />
+                      </div>
+
+                      {/* Next milestone */}
+                      {nextPalierS && !isLocked && (
+                        <div className="mt-4 p-3 rounded-2xl bg-gradient-to-r from-accent/10 to-primary/10 border border-accent/20 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Award className="w-4 h-4 text-accent" />
+                            <div className="min-w-0">
+                              <p className="text-[10px] text-muted-foreground font-medium">Prochain palier</p>
+                              <p className="text-xs font-bold truncate">{nextPalierS.name}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-black bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
+                              +{nextPalierS.reward}€
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Mini graph */}
+                      <div className="mt-4 pt-4 border-t border-border/30">
+                        <TrendMiniLine
+                          history={obj.history}
+                          current={current}
+                          target={target}
+                          direction={obj.direction}
+                          unit={obj.unit}
+                          periodStart={principalPeriod?.isIndefinite ? null : (principalPeriod?.start ?? null)}
+                          periodEnd={principalPeriod?.end ?? null}
+                        />
+                      </div>
+
+                      <div className="mt-4 flex items-center justify-between">
+                        <div className="text-xs text-muted-foreground">
+                          Clique pour ouvrir le détail
+                        </div>
+                        <div className="inline-flex items-center gap-1 text-xs font-bold text-primary">
+                          Voir
+                          <ChevronRight className="w-4 h-4" />
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             ) : (
-              <div className="pulse-card p-8 text-center border-dashed border-2">
-                <Target className="w-10 h-10 mx-auto mb-2 opacity-30 text-muted-foreground"/>
-                <p className="text-sm text-muted-foreground">Aucun objectif secondaire pour le moment</p>
+              <div className="pulse-card p-10 text-center text-muted-foreground border-dashed border-2">
+                <Target className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p className="font-medium">Aucun objectif secondaire pour le moment</p>
               </div>
             )}
           </section>
+
 
           <div className="pulse-card p-4 bg-blue-500/5 border border-blue-500/20">
             <div className="flex items-start gap-3">

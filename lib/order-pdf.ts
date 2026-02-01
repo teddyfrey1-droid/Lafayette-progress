@@ -11,6 +11,10 @@ export type OrderPdfLine = {
   unit: string;
   unitPrice: number;
   total: number;
+  // Optional receipt control fields
+  receivedQuantity?: number;
+  receivedOk?: boolean;
+  receivedNote?: string;
 };
 
 export type OrderPdfData = {
@@ -23,6 +27,8 @@ export type OrderPdfData = {
   notes?: string;
   lines: OrderPdfLine[];
   totalAmount: number;
+  // When true, render a "commande non conforme" receipt report.
+  nonConformity?: boolean;
 };
 
 function formatEuro(n: number) {
@@ -127,6 +133,121 @@ export function generateOrderPdfBuffer(data: OrderPdfData): Buffer {
   }
 
   // Footer
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.text("Document généré via Pulse App", marginX, doc.internal.pageSize.getHeight() - 24);
+
+  const arrayBuffer = doc.output("arraybuffer");
+  return Buffer.from(new Uint8Array(arrayBuffer));
+}
+
+export function generateNonConformityPdfBuffer(data: OrderPdfData): Buffer {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginX = 40;
+  let y = 40;
+
+  // Title
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(180, 0, 0);
+  doc.text("COMMANDE NON CONFORME", marginX, y);
+  doc.setTextColor(0, 0, 0);
+
+  y += 22;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(`N°: ${data.orderNumber}`, marginX, y);
+
+  const rightInfo = [
+    `Entreprise: ${data.companyName || ""}`,
+    `Fournisseur: ${data.supplierName || ""}`,
+    data.supplierEmail ? `Email: ${data.supplierEmail}` : "",
+    `Livraison: ${formatDateFR(data.deliveryDateISO)}`,
+    data.createdAtISO ? `Créée le: ${formatDateFR(data.createdAtISO)}` : "",
+  ].filter(Boolean);
+
+  const rightX = pageWidth - marginX;
+  let ry = 40;
+  doc.setFontSize(10);
+  for (const line of rightInfo) {
+    doc.text(String(line), rightX, ry, { align: "right" });
+    ry += 14;
+  }
+
+  y += 20;
+
+  // Table
+  const body = data.lines.map((l) => {
+    const receivedQty = typeof l.receivedQuantity === "number" ? l.receivedQuantity : undefined;
+    const status = typeof l.receivedOk === "boolean" ? (l.receivedOk ? "OK" : "PROBLÈME") : "";
+    return [
+      l.reference || "",
+      l.productName,
+      `${l.quantity} ${l.unit}`,
+      receivedQty !== undefined ? `${receivedQty} ${l.unit}` : "",
+      status,
+      l.receivedNote ? String(l.receivedNote) : "",
+    ];
+  });
+
+  autoTable(doc, {
+    startY: y + 10,
+    head: [["Référence", "Produit", "Qté cmd", "Qté reçue", "Statut", "Note"]],
+    body,
+    styles: {
+      font: "helvetica",
+      fontSize: 9,
+      cellPadding: 6,
+      overflow: "linebreak",
+      valign: "top",
+    },
+    headStyles: {
+      fillColor: [20, 20, 20],
+      textColor: 255,
+      fontStyle: "bold",
+    },
+    columnStyles: {
+      0: { cellWidth: 80 },
+      1: { cellWidth: 190 },
+      2: { halign: "center", cellWidth: 70 },
+      3: { halign: "center", cellWidth: 70 },
+      4: { halign: "center", cellWidth: 70 },
+      5: { cellWidth: 120 },
+    },
+    didParseCell: (hookData: any) => {
+      if (hookData.section !== "body") return;
+      const rowIndex = hookData.row.index;
+      const line = data.lines[rowIndex];
+      if (!line) return;
+      if (line.receivedOk === false) {
+        // Red text for problems
+        hookData.cell.styles.textColor = [180, 0, 0];
+      }
+    },
+  });
+
+  const finalY = (doc as any).lastAutoTable?.finalY || y + 200;
+
+  // Summary
+  const problemCount = data.lines.filter((l) => l.receivedOk === false).length;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(180, 0, 0);
+  doc.text(`Anomalies signalées: ${problemCount}`, marginX, finalY + 28);
+  doc.setTextColor(0, 0, 0);
+
+  if (data.notes && data.notes.trim()) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const noteY = finalY + 54;
+    doc.text("Notes commande:", marginX, noteY);
+    doc.setFontSize(9);
+    const wrapped = doc.splitTextToSize(data.notes.trim(), pageWidth - marginX * 2);
+    doc.text(wrapped, marginX, noteY + 14);
+  }
+
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.text("Document généré via Pulse App", marginX, doc.internal.pageSize.getHeight() - 24);

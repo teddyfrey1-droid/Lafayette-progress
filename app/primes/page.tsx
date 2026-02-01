@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
 import { PermissionGate } from "@/components/auth/permission-gate"
@@ -26,7 +26,7 @@ function statusMeta(status: string) {
   switch (status) {
     case "paid": return { label: "Payée", icon: CheckCircle2, className: "bg-emerald-500/15 text-emerald-700 border-emerald-500/20" }
     case "validated": return { label: "Validée", icon: BadgeCheck, className: "bg-blue-500/15 text-blue-700 border-blue-500/20" }
-    default: return { label: "En cours", icon: Clock, className: "bg-amber-500/15 text-amber-700 border-amber-500/20" }
+    default: return { label: "En attente", icon: Clock, className: "bg-amber-500/15 text-amber-700 border-amber-500/20" }
   }
 }
 
@@ -41,6 +41,27 @@ export default function PrimesPage() {
   // États locaux pour le formulaire d'édition
   const [editAmount, setEditAmount] = useState<string>("")
   const [editStatus, setEditStatus] = useState<string>("")
+
+
+  const isManager = !!user.isManagerOrAdmin
+
+  const pendingPrimes = useMemo(() => primes.filter((p) => p.status === "pending"), [primes])
+  const settledPrimes = useMemo(() => primes.filter((p) => p.status !== "pending"), [primes])
+
+  const [tab, setTab] = useState<"pending" | "history">(() => (pendingPrimes.length > 0 ? "pending" : "history"))
+
+  useEffect(() => {
+    if (!isManager) return
+    // Si on n'a plus de primes en attente, on bascule sur l'historique
+    if (tab === "pending" && pendingPrimes.length === 0) setTab("history")
+    if (tab === "history" && pendingPrimes.length > 0 && settledPrimes.length === 0) setTab("pending")
+  }, [isManager, pendingPrimes.length, settledPrimes.length, tab])
+
+  const displayedPrimes = useMemo(() => {
+    if (!isManager) return primes
+    return tab === "pending" ? pendingPrimes : settledPrimes
+  }, [isManager, primes, tab, pendingPrimes, settledPrimes])
+
 
   const companyId = useMemo(() => ((profile as any)?.companyId as string | undefined) || "demo-company", [profile])
 
@@ -186,6 +207,17 @@ export default function PrimesPage() {
     await deletePrime(selectedPrime.id);
     setSelectedPrime(null);
   }
+
+
+  const setPrimeStatus = async (nextStatus: PrimeHistory["status"]) => {
+    if (!selectedPrime) return
+    try {
+      await updatePrime(selectedPrime.id, { status: nextStatus })
+      setSelectedPrime({ ...selectedPrime, status: nextStatus })
+    } catch (e) {
+      alert("Erreur lors de la mise à jour du statut")
+    }
+  }
   
   return (
     <PermissionGate moduleId="primes" redirect>
@@ -218,6 +250,43 @@ export default function PrimesPage() {
             )}
           </div>
 
+
+          {isManager && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setTab("pending")}
+                className={cn(
+                  "px-3 py-2 rounded-xl text-sm font-semibold border transition-all",
+                  tab === "pending"
+                    ? "bg-amber-500/15 text-amber-800 dark:text-amber-200 border-amber-500/25 shadow-sm"
+                    : "bg-muted/30 text-muted-foreground border-border hover:bg-muted/50",
+                )}
+              >
+                En attente
+                {pendingPrimes.length > 0 && (
+                  <span className="ml-2 inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full text-xs font-black bg-amber-500 text-white">
+                    {pendingPrimes.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTab("history")}
+                className={cn(
+                  "px-3 py-2 rounded-xl text-sm font-semibold border transition-all",
+                  tab === "history"
+                    ? "bg-primary/10 text-primary border-primary/20 shadow-sm"
+                    : "bg-muted/30 text-muted-foreground border-border hover:bg-muted/50",
+                )}
+              >
+                Historique
+                <span className="ml-2 text-xs font-bold text-muted-foreground">{settledPrimes.length}</span>
+              </button>
+            </div>
+          )}
+
           <section className="space-y-3">
              {loading ? (
                 <p className="text-center text-muted-foreground py-10">Chargement...</p>
@@ -227,7 +296,7 @@ export default function PrimesPage() {
                 </div>
              ) : (
               <div className="space-y-3">
-                {primes.map((p) => {
+                {displayedPrimes.map((p) => {
                   const meta = statusMeta(p.status)
                   const Icon = meta.icon
                   return (
@@ -300,7 +369,7 @@ export default function PrimesPage() {
                           value={editStatus}
                           onChange={(e) => setEditStatus(e.target.value)}
                        >
-                          <option value="pending">En cours</option>
+                          <option value="pending">En attente</option>
                           <option value="validated">Validée</option>
                           <option value="paid">Payée</option>
                        </select>
@@ -326,13 +395,46 @@ export default function PrimesPage() {
 
                     {/* Actions Admin */}
                     {user.isManagerOrAdmin && (
-                      <div className="border-t pt-4 mt-4">
-                        <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Administration</p>
+                      <div className="border-t pt-4 mt-4 space-y-3">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Validation</p>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <Button
+                            variant="outline"
+                            className="rounded-xl"
+                            onClick={() => setPrimeStatus("pending")}
+                            disabled={selectedPrime.status === "pending"}
+                          >
+                            <Clock className="w-4 h-4 mr-2" />
+                            Mettre en attente
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            className="rounded-xl"
+                            onClick={() => setPrimeStatus("validated")}
+                            disabled={selectedPrime.status === "validated" || selectedPrime.status === "paid"}
+                          >
+                            <BadgeCheck className="w-4 h-4 mr-2" />
+                            Valider
+                          </Button>
+
+                          <Button
+                            className="rounded-xl"
+                            onClick={() => setPrimeStatus("paid")}
+                            disabled={selectedPrime.status === "paid"}
+                          >
+                            <CheckCircle2 className="w-4 h-4 mr-2" />
+                            Marquer payée
+                          </Button>
+                        </div>
+
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-2">Administration</p>
                         <div className="flex gap-3">
-                          <Button variant="outline" className="flex-1" onClick={() => handleEditClick(selectedPrime)}>
+                          <Button variant="outline" className="flex-1 rounded-xl" onClick={() => handleEditClick(selectedPrime)}>
                             <Pencil className="w-4 h-4 mr-2" /> Modifier
                           </Button>
-                          <Button variant="destructive" className="flex-1" onClick={handleDelete}>
+                          <Button variant="destructive" className="flex-1 rounded-xl" onClick={handleDelete}>
                             <Trash2 className="w-4 h-4 mr-2" /> Supprimer
                           </Button>
                         </div>

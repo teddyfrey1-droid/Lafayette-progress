@@ -39,7 +39,8 @@ export function usePrimes() {
       const load = () => {
         const all = demoGetPrimes(companyId)
         const isManager = userData?.role === "admin" || userData?.role === "gerant"
-        const filtered = isManager ? all : all.filter((p: any) => p.userId === userData?.uid)
+        const base = isManager ? all : all.filter((p: any) => p.userId === userData?.uid)
+        const filtered = isManager ? base : base.filter((p: any) => p.status !== "pending")
         const items: PrimeHistory[] = filtered
           .map((p: any) => ({
             id: p.id,
@@ -101,7 +102,9 @@ export function usePrimes() {
             userId: data.userId
           });
         });
-        setPrimes(items);
+        const isManager = userData?.role === "admin" || userData?.role === "gerant"
+        const visibleItems = isManager ? items : items.filter((p) => p.status !== "pending")
+        setPrimes(visibleItems);
       } catch (error) {
         console.error("Erreur chargement primes:", error);
       } finally {

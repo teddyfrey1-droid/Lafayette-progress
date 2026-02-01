@@ -40,6 +40,10 @@ export interface OrderProduct {
   packQuantity?: number
   packUnit?: string
   total: number
+  // Réception / contrôle
+  receivedQuantity?: number
+  receivedOk?: boolean
+  receivedNote?: string
 }
 
 export interface OrderSupplier {
@@ -93,6 +97,7 @@ export interface Order {
   notes?: string
   createdAt: string
   sentAt?: string
+  deliveredAt?: string
 }
 
 interface OrdersState {
@@ -232,6 +237,7 @@ function ensureOrderShape(o: any, companyId: string): Order {
     notes: o?.notes,
     createdAt: (o?.createdAt || nowIso()).toString(),
     sentAt: o?.sentAt,
+    deliveredAt: o?.deliveredAt,
   }
 }
 
@@ -622,3 +628,24 @@ export async function markOrderAsSent(companyId: string, orderId: string, backen
     backend,
   )
 }
+
+
+export async function markOrderAsDelivered(companyId: string, orderId: string, backend?: OrdersBackend) {
+  await updateOrder(
+    companyId,
+    orderId,
+    { status: "delivered", deliveredAt: nowIso() },
+    backend,
+  )
+}
+
+export async function saveOrderReceipt(
+  companyId: string,
+  orderId: string,
+  products: OrderProduct[],
+  backend?: OrdersBackend,
+) {
+  // On sauvegarde les infos de réception ligne par ligne, sans changer le statut.
+  await updateOrder(companyId, orderId, { products } as any, backend)
+}
+
