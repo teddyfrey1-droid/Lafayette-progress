@@ -681,7 +681,6 @@ export default function ObjectivesPage() {
             )}
           </section>
 
-          {
           {/* 🎯 OBJECTIFS SECONDAIRES */}
           <section className="space-y-4">
             <div className="flex items-center justify-between">
