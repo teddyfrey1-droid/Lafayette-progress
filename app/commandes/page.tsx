@@ -569,7 +569,7 @@ export default function CommandesPage() {
 
 
   return (
-    <PermissionGate page="commandes">
+    <PermissionGate moduleId="commandes" redirect>
       <div className="min-h-screen bg-background pb-24">
         <Header />
 

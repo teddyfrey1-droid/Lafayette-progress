@@ -150,3 +150,81 @@ export const generatePrimePDF = (data: PrimePDFData) => {
   const safeMonth = data.month.replace(/[^a-z0-9]/gi, '_').toLowerCase()
   doc.save(`prime_${safeName}_${safeMonth}.pdf`)
 }
+
+interface PrimesExportPDFData {
+  companyName: string
+  exportedBy: string
+  periodLabel: string
+  primes: Array<{
+    month: string
+    user?: string
+    status: string
+    amount: number
+  }>
+}
+
+export const generatePrimesExportPDF = (data: PrimesExportPDFData) => {
+  const doc = new jsPDF()
+  const pulsePurple = "#7A2FF0"
+  const textDark = "#111827"
+
+  // Entête
+  doc.setFontSize(18)
+  doc.setTextColor(textDark)
+  doc.setFont("helvetica", "bold")
+  doc.text("Export Primes", 14, 18)
+
+  doc.setFontSize(10)
+  doc.setFont("helvetica", "normal")
+  doc.setTextColor(100)
+  doc.text(data.companyName, 14, 25)
+  doc.text(`Période : ${data.periodLabel}`, 14, 30)
+  doc.text(`Exporté par : ${data.exportedBy}`, 14, 35)
+  doc.text(`Le : ${new Date().toLocaleDateString("fr-FR")}`, 14, 40)
+
+  const rows = data.primes.map((p) => [
+    p.month,
+    p.user || "-",
+    String(p.status || "").toUpperCase(),
+    `${Number(p.amount || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €`,
+  ])
+
+  autoTable(doc, {
+    startY: 50,
+    head: [["Mois", "Collaborateur", "Statut", "Montant"]],
+    body: rows,
+    theme: "grid",
+    headStyles: {
+      fillColor: pulsePurple,
+      textColor: 255,
+      fontStyle: "bold",
+      halign: "left",
+      cellPadding: 8,
+    },
+    columnStyles: {
+      0: { cellWidth: 40 },
+      1: { cellWidth: "auto" },
+      2: { cellWidth: 30, halign: "center" },
+      3: { cellWidth: 35, halign: "right", fontStyle: "bold" },
+    },
+    styles: {
+      cellPadding: 6,
+      fontSize: 10,
+      lineColor: [230, 230, 230],
+      lineWidth: 0.1,
+    },
+  })
+
+  const total = data.primes.reduce((s, p) => s + Number(p.amount || 0), 0)
+  const finalY = ((doc as any).lastAutoTable?.finalY || 50) + 12
+  doc.setFontSize(12)
+  doc.setTextColor(100)
+  doc.text("Total", 160, finalY, { align: "right" })
+  doc.setFontSize(16)
+  doc.setTextColor(pulsePurple)
+  doc.setFont("helvetica", "bold")
+  doc.text(`${total.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €`, 196, finalY, { align: "right" })
+
+  const safe = data.companyName.replace(/[^a-z0-9]/gi, "_").toLowerCase()
+  doc.save(`primes_${safe}.pdf`)
+}

@@ -19,7 +19,10 @@ import { db } from "@/lib/firebase/client"
 import { collection, getDocs, query, where } from "firebase/firestore"
 import { readDemoState } from "@/lib/demo/local-demo-store"
 // ✅ Import du générateur PDF
-import { generatePrimePDF } from "@/lib/pdf-export"
+import { generatePrimePDF, generatePrimesExportPDF } from "@/lib/pdf-export"
+import { usePermissions } from "@/hooks/use-permissions"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 // Fonction utilitaire pour l'affichage (inchangée)
 function statusMeta(status: string) {
@@ -33,6 +36,7 @@ function statusMeta(status: string) {
 export default function PrimesPage() {
   const { profile, company, isDemo } = useAuth()
   const user = useCurrentUser()
+  const { canEdit } = usePermissions()
   const { primes, loading, updatePrime, deletePrime } = usePrimes()
   
   const [selectedPrime, setSelectedPrime] = useState<PrimeHistory | null>(null)
@@ -43,12 +47,31 @@ export default function PrimesPage() {
   const [editStatus, setEditStatus] = useState<string>("")
 
 
-  const isManager = !!user.isManagerOrAdmin
+  const role = String((user as any)?.role || "").toLowerCase()
+  const isManager = canEdit("primes") || ["manager", "directeur", "gerant", "admin", "super_admin"].includes(role)
 
   const pendingPrimes = useMemo(() => primes.filter((p) => p.status === "pending"), [primes])
   const settledPrimes = useMemo(() => primes.filter((p) => p.status !== "pending"), [primes])
 
   const [tab, setTab] = useState<"pending" | "history">(() => (pendingPrimes.length > 0 ? "pending" : "history"))
+
+  // --- EXPORT PDF (multi) ---
+  const [exportOpen, setExportOpen] = useState(false)
+  const [exportMode, setExportMode] = useState<"all" | "one" | "range">("all")
+  const months = useMemo(() => {
+    const uniq = new Map<string, number>()
+    for (const p of primes) {
+      const t = p.date instanceof Date ? p.date.getTime() : new Date(p.date as any).getTime()
+      const prev = uniq.get(p.month)
+      if (!prev || t > prev) uniq.set(p.month, t)
+    }
+    return Array.from(uniq.entries())
+      .sort((a, b) => a[1] - b[1]) // du plus ancien au plus récent
+      .map(([m]) => m)
+  }, [primes])
+  const [exportMonth, setExportMonth] = useState<string>("")
+  const [exportFrom, setExportFrom] = useState<string>("")
+  const [exportTo, setExportTo] = useState<string>("")
 
   useEffect(() => {
     if (!isManager) return
@@ -64,6 +87,88 @@ export default function PrimesPage() {
 
 
   const companyId = useMemo(() => ((profile as any)?.companyId as string | undefined) || "demo-company", [profile])
+
+  const companyName =
+    ((company as any)?.name as string | undefined) ||
+    ((company as any)?.companyName as string | undefined) ||
+    ((profile as any)?.companyName as string | undefined) ||
+    ((profile as any)?.company as string | undefined) ||
+    "Mon Établissement"
+
+  const exportedBy = user.displayName || user.email || "Utilisateur"
+
+  const buildSelection = () => {
+    if (exportMode === "all") return primes
+    if (exportMode === "one") return primes.filter((p) => p.month === exportMonth)
+    // range
+    const iFrom = months.indexOf(exportFrom)
+    const iTo = months.indexOf(exportTo)
+    if (iFrom === -1 || iTo === -1) return primes
+    const start = Math.min(iFrom, iTo)
+    const end = Math.max(iFrom, iTo)
+    const set = new Set(months.slice(start, end + 1))
+    return primes.filter((p) => set.has(p.month))
+  }
+
+  const handleExportPDFMulti = async () => {
+    const selected = buildSelection()
+    if (selected.length === 0) return
+
+    const statusLabels: Record<string, string> = {
+      pending: "En attente",
+      validated: "Validée",
+      paid: "Payée",
+    }
+
+    // --- Récupération des noms salariés (optionnel) ---
+    const ids = Array.from(new Set(selected.map((p) => p.userId).filter(Boolean))) as string[]
+    const nameById: Record<string, string> = {}
+
+    if (ids.length > 0) {
+      if (isDemo) {
+        const demo = readDemoState(companyId)
+        for (const m of demo?.members || []) {
+          nameById[m.id] = m.displayName
+        }
+      } else {
+        try {
+          const chunks: string[][] = []
+          for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10))
+          for (const chunk of chunks) {
+            const q = query(collection(db, "users"), where("uid", "in", chunk))
+            const snap = await getDocs(q)
+            snap.forEach((d) => {
+              const data = d.data() as any
+              const display = data.displayName || data.firstName || data.email || d.id
+              nameById[data.uid || d.id] = String(display)
+            })
+          }
+        } catch (e) {
+          // on continue sans noms
+          console.warn("Export PDF primes: impossible de récupérer les noms", e)
+        }
+      }
+    }
+
+    const periodLabel =
+      exportMode === "all"
+        ? "Depuis le début"
+        : exportMode === "one"
+          ? exportMonth
+          : `${exportFrom} → ${exportTo}`
+
+    generatePrimesExportPDF({
+      companyName,
+      exportedBy,
+      periodLabel,
+      primes: selected.map((p) => ({
+        month: p.month,
+        user: (p.userId ? nameById[p.userId] : "") || (p.userId ? p.userId : ""),
+        status: statusLabels[p.status] || p.status,
+        amount: p.amount,
+      })),
+    })
+  }
 
   // --- NOUVEAU : GESTION PDF ---
   const handleExportPDF = () => {
@@ -181,6 +286,92 @@ export default function PrimesPage() {
     )
   }
 
+  const handleExportPrimesPDF = async () => {
+    if (primes.length === 0) return
+
+    const companyName =
+      ((company as any)?.name as string | undefined) ||
+      ((company as any)?.companyName as string | undefined) ||
+      ((profile as any)?.companyName as string | undefined) ||
+      ((profile as any)?.company as string | undefined) ||
+      "Mon Établissement"
+
+    const exportedBy = user.displayName || user.email || "Utilisateur"
+
+    // Récupération des noms (si possible)
+    const ids = Array.from(new Set(primes.map((p) => p.userId).filter(Boolean))) as string[]
+    const nameById: Record<string, string> = {}
+
+    if (ids.length > 0) {
+      if (isDemo) {
+        const demo = readDemoState(companyId)
+        for (const m of demo?.members || []) {
+          nameById[m.id] = m.displayName
+        }
+      } else {
+        try {
+          const chunks: string[][] = []
+          for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10))
+          for (const chunk of chunks) {
+            const q = query(collection(db, "users"), where("uid", "in", chunk))
+            const snap = await getDocs(q)
+            snap.forEach((d) => {
+              const data = d.data() as any
+              const uid = (data?.uid || d.id) as string
+              const dn = (data?.displayName || data?.name || "").toString().trim()
+              const email = (data?.email || "").toString().trim()
+              nameById[uid] = dn || email || uid
+            })
+          }
+        } catch (e) {
+          console.warn("Export PDF: impossible de charger les noms utilisateurs", e)
+        }
+      }
+    }
+
+    const monthIndex: Record<string, number> = {}
+    months.forEach((m, i) => (monthIndex[m] = i))
+
+    let selected = [...primes]
+    let label = "Tout"
+    if (exportMode === "one" && exportMonth) {
+      selected = primes.filter((p) => p.month === exportMonth)
+      label = exportMonth
+    }
+    if (exportMode === "range" && exportFrom && exportTo) {
+      const a = monthIndex[exportFrom]
+      const b = monthIndex[exportTo]
+      if (Number.isFinite(a) && Number.isFinite(b)) {
+        const min = Math.min(a, b)
+        const max = Math.max(a, b)
+        const allowed = new Set(months.slice(min, max + 1))
+        selected = primes.filter((p) => allowed.has(p.month))
+        label = `${months[min]} → ${months[max]}`
+      }
+    }
+
+    const statusLabels: Record<string, string> = {
+      pending: "En attente",
+      validated: "Validée",
+      paid: "Payée",
+    }
+
+    generatePrimesExportPDF({
+      companyName,
+      exportedBy,
+      periodLabel: label,
+      primes: selected
+        .slice()
+        .sort((a, b) => a.date.getTime() - b.date.getTime())
+        .map((p) => ({
+          month: p.month,
+          user: p.userId ? nameById[p.userId] : user.displayName || "-",
+          status: statusLabels[p.status] || p.status,
+          amount: p.amount,
+        })),
+    })
+  }
+
   // Gestion de l'édition
   const handleEditClick = (p: PrimeHistory) => {
     setEditAmount(p.amount.toString())
@@ -232,20 +423,26 @@ export default function PrimesPage() {
                 Historique des Primes
               </h1>
               <p className="text-sm text-muted-foreground mt-0.5">
-                 {user.isManagerOrAdmin ? "Gestion et historique des primes." : "Consultez vos anciennes primes."}
+                 {isManager ? "Gestion et historique des primes." : "Consultez vos anciennes primes."}
               </p>
             </div>
             
-            {/* Bouton Export CSV - Visible pour managers/admins */}
-            {primes.length > 0 && (
+            {/* Export PDF (sélection de période) */}
+            {isManager && primes.length > 0 && (
               <Button 
                 variant="outline" 
                 size="sm" 
                 className="rounded-xl gap-2"
-                onClick={handleExportCSV}
+                onClick={() => {
+                  setExportOpen(true)
+                  setExportMode("all")
+                  setExportMonth(months[months.length - 1] || "")
+                  setExportFrom(months[0] || "")
+                  setExportTo(months[months.length - 1] || "")
+                }}
               >
                 <Download className="w-4 h-4" />
-                Export CSV
+                Export PDF
               </Button>
             )}
           </div>
@@ -337,6 +534,82 @@ export default function PrimesPage() {
           </section>
         </main>
 
+        <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+          <DialogContent className="max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle>Exporter les primes en PDF</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Type d'export</Label>
+                <Select value={exportMode} onValueChange={(v) => setExportMode(v as any)}>
+                  <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tout (depuis le début)</SelectItem>
+                    <SelectItem value="one">Un mois</SelectItem>
+                    <SelectItem value="range">Plage de mois</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {exportMode === "one" && (
+                <div className="space-y-2">
+                  <Label>Mois</Label>
+                  <Select value={exportMonth} onValueChange={setExportMonth}>
+                    <SelectTrigger className="rounded-xl"><SelectValue placeholder="Choisir un mois" /></SelectTrigger>
+                    <SelectContent>
+                      {months.map((m) => (
+                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {exportMode === "range" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Du</Label>
+                    <Select value={exportFrom} onValueChange={setExportFrom}>
+                      <SelectTrigger className="rounded-xl"><SelectValue placeholder="Début" /></SelectTrigger>
+                      <SelectContent>
+                        {months.map((m) => (
+                          <SelectItem key={m} value={m}>{m}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Au</Label>
+                    <Select value={exportTo} onValueChange={setExportTo}>
+                      <SelectTrigger className="rounded-xl"><SelectValue placeholder="Fin" /></SelectTrigger>
+                      <SelectContent>
+                        {months.map((m) => (
+                          <SelectItem key={m} value={m}>{m}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="gap-2 sm:justify-between">
+              <Button variant="outline" className="flex-1" onClick={() => setExportOpen(false)}>Annuler</Button>
+              <Button
+                className="flex-1"
+                onClick={async () => {
+                  await handleExportPrimesPDF()
+                  setExportOpen(false)
+                }}
+              >
+                Exporter
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <BottomNav />
 
         {/* DRAWER DE DÉTAIL / ÉDITION */}
@@ -394,7 +667,7 @@ export default function PrimesPage() {
                     </Button>
 
                     {/* Actions Admin */}
-                    {user.isManagerOrAdmin && (
+                    {isManager && (
                       <div className="border-t pt-4 mt-4 space-y-3">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Validation</p>
 

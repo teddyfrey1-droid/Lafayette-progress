@@ -10,9 +10,30 @@ export interface CompanyModuleDefinition {
   aliases?: string[]
 }
 
-// ⚠️ Les IDs doivent correspondre aux moduleId utilisés par PermissionGate / usePermissions.
-// On utilise des aliases pour accepter les anciennes valeurs stockées dans companies.features.
+// ⚠️ Les IDs doivent correspondre aux `moduleId` utilisés par PermissionGate / usePermissions
+// et aux `moduleId` du menu (SideDrawer). Les `aliases` permettent de migrer des valeurs
+// anciennes stockées dans `companies.features`.
 export const COMPANY_MODULES: CompanyModuleDefinition[] = [
+  // Pages principales
+  {
+    id: "dashboard",
+    name: "Tableau de bord",
+    description: "Vue d'ensemble",
+    isDefault: true,
+    aliases: ["tableau_de_bord", "tableau-de-bord"],
+  },
+  {
+    id: "objectifs",
+    name: "Objectifs",
+    description: "Objectifs et suivi",
+    isDefault: true,
+  },
+  {
+    id: "primes",
+    name: "Primes",
+    description: "Primes & historique",
+    isDefault: true,
+  },
   {
     id: "sites",
     name: "Sites & Contacts",
@@ -20,43 +41,54 @@ export const COMPANY_MODULES: CompanyModuleDefinition[] = [
     isDefault: true,
     aliases: ["sites-contacts", "sites_contacts", "sites-contacts-utiles"],
   },
+
+  // Commandes / fournisseurs
+  {
+    id: "commandes",
+    name: "Passer une commande",
+    description: "Création & réception des commandes",
+    isDefault: true,
+    aliases: ["orders", "commande", "passer-une-commande", "passer_une_commande"],
+  },
   {
     id: "fournisseurs",
     name: "Fournisseurs",
-    description: "Gestion des contacts fournisseurs",
+    description: "Fournisseurs & produits",
     isDefault: true,
   },
-  {
-    id: "objectifs",
-    name: "Objectifs",
-    description: "Suivi des objectifs et paliers",
-    isDefault: true,
-  },
-  {
-    id: "primes",
-    name: "Primes",
-    description: "Historique et calcul des primes",
-    isDefault: true,
-  },
+
+  // Équipes / gestion
   {
     id: "equipes",
     name: "Équipes",
-    description: "Gestion des collaborateurs",
+    description: "Gestion des membres",
     isDefault: true,
   },
   {
-    id: "diffusion",
-    name: "Relevés température",
-    description: "Suivi des températures frigos",
-    isDefault: false,
-  },
-  {
     id: "gestion",
-    name: "Hub de Gestion",
+    name: "Gestion",
     description: "Hub de gestion & opérations",
     isDefault: true,
     aliases: ["gestion-fournisseurs", "hub-gestion", "hub_gestion"],
   },
+
+  // Droits / outils admin
+  {
+    id: "acces",
+    name: "Droits & Accès",
+    description: "Gestion des autorisations",
+    isDefault: true,
+    aliases: ["droits", "droits-acces", "permissions", "rbac"],
+  },
+  {
+    id: "outils_admin",
+    name: "Outils Admin",
+    description: "Outils administratifs (sites, configs)",
+    isDefault: true,
+    aliases: ["admin_tools", "admin-sites", "outils-admin"],
+  },
+
+  // Outils avancés
   {
     id: "pilotage",
     name: "Pilotage",
@@ -64,16 +96,47 @@ export const COMPANY_MODULES: CompanyModuleDefinition[] = [
     isDefault: false,
   },
   {
-    id: "parametres",
-    name: "Paramètres",
-    description: "Paramètres et utilisateurs",
+    id: "diffusion",
+    name: "Diffusion",
+    description: "Diffusion / relevés / emails",
     isDefault: false,
   },
+
+  // Paramètres / notifications
   {
     id: "notifications",
     name: "Notifications",
     description: "Centre de notifications",
     isDefault: true,
+  },
+  {
+    id: "parametres",
+    name: "Paramètres",
+    description: "Paramètres et utilisateurs",
+    isDefault: false,
+  },
+
+  // Contrôle d'affichage des catégories du menu (dropdown)
+  {
+    id: "menu_gestion",
+    name: "Catégorie menu : Gestion",
+    description: "Afficher la catégorie Gestion dans le menu",
+    isDefault: true,
+    aliases: ["menu-gestion"],
+  },
+  {
+    id: "menu_outils",
+    name: "Catégorie menu : Outils avancés",
+    description: "Afficher la catégorie Outils avancés dans le menu",
+    isDefault: true,
+    aliases: ["menu-outils", "menu-outils-avances"],
+  },
+  {
+    id: "menu_admin",
+    name: "Catégorie menu : Administration",
+    description: "Afficher la catégorie Administration dans le menu",
+    isDefault: true,
+    aliases: ["menu-administration"],
   },
 ]
 

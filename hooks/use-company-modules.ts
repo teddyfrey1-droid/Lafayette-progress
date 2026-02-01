@@ -46,8 +46,6 @@ export function useCompanyModules() {
       if (enabled) set.add(def.id)
     }
 
-    // Modules toujours visibles
-    set.add("dashboard")
     // Ne jamais bloquer le centre de contrôle à cause d'une config entreprise
     set.add("centre_controle")
     // ✅ FIX: Toujours autoriser les paramètres et notifications de base
@@ -64,7 +62,7 @@ export function useCompanyModules() {
     // ✅ FIX: En cours de chargement, autoriser pour éviter l'écran noir
     if (loading || companyLoading) return true
     if (!enabledSet) return true
-    if (id === "dashboard" || id === "centre_controle" || id === "parametres" || id === "notifications") return true
+    if (id === "centre_controle" || id === "parametres" || id === "notifications") return true
     return enabledSet.has(id)
   }
 

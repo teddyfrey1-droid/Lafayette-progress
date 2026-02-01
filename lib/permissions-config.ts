@@ -25,11 +25,14 @@ export const MODULES: ModuleDefinition[] = [
   { id: "primes", name: "Primes", description: "Primes & historique", icon: "Trophy" },
   { id: "equipes", name: "Equipes", description: "Gestion des membres", icon: "Users" },
   { id: "gestion", name: "Gestion", description: "Gestion & operations", icon: "ClipboardList" },
+  { id: "commandes", name: "Passer une commande", description: "Création & réception des commandes", icon: "ShoppingCart" },
   { id: "fournisseurs", name: "Fournisseurs", description: "Fournisseurs et commandes", icon: "Truck" },
   { id: "sites", name: "Sites / Contacts", description: "Sites & contacts utiles", icon: "MapPin" },
   { id: "diffusion", name: "Diffusion", description: "Emails / notifications", icon: "Mail" },
   { id: "notifications", name: "Notifications", description: "Centre de notifications", icon: "Bell" },
   { id: "pilotage", name: "Pilotage", description: "Pilotage & simulateur", icon: "Gauge" },
+  { id: "acces", name: "Droits & Accès", description: "Gestion des permissions", icon: "KeyRound" },
+  { id: "outils_admin", name: "Outils Admin", description: "Outils administratifs", icon: "Shield" },
   { id: "centre_controle", name: "Centre de controle", description: "Console admin", icon: "Shield" },
   { id: "parametres", name: "Parametres", description: "Parametres et utilisateurs", icon: "Settings" },
   { id: "history_edit", name: "Historique", description: "Modifier/supprimer l'historique", icon: "History" },
@@ -70,6 +73,10 @@ export const DEFAULT_PERMISSIONS: Record<string, ModulePermission> = {
     view: ["assistant_manager", "manager", "directeur", "gerant", "admin", "super_admin"],
     edit: ["manager", "directeur", "gerant", "admin", "super_admin"],
   },
+  commandes: {
+    view: ["assistant_manager", "manager", "directeur", "gerant", "admin", "super_admin"],
+    edit: ["manager", "directeur", "gerant", "admin", "super_admin"],
+  },
   fournisseurs: {
     view: ["assistant_manager", "manager", "directeur", "gerant", "admin", "super_admin"],
     edit: ["manager", "directeur", "gerant", "admin", "super_admin"],
@@ -87,6 +94,14 @@ export const DEFAULT_PERMISSIONS: Record<string, ModulePermission> = {
     edit: ["assistant_manager", "manager", "directeur", "gerant", "admin", "super_admin"],
   },
   pilotage: {
+    view: ["manager", "directeur", "gerant", "admin", "super_admin"],
+    edit: ["directeur", "gerant", "admin", "super_admin"],
+  },
+  acces: {
+    view: ["manager", "directeur", "gerant", "admin", "super_admin"],
+    edit: ["directeur", "gerant", "admin", "super_admin"],
+  },
+  outils_admin: {
     view: ["manager", "directeur", "gerant", "admin", "super_admin"],
     edit: ["directeur", "gerant", "admin", "super_admin"],
   },

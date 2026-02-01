@@ -12,7 +12,7 @@ import {
   XCircle, Activity, TrendingUp, LogIn, LogOut, Monitor, Smartphone, MapPin,
   Calendar, Mail, Phone, ArrowLeft, Settings, History, BarChart3, Globe,
   Truck, Target, Coins, FileText, Plus, Trash2, Briefcase, AlertCircle,
-  ClipboardList, Bell,
+  ClipboardList, Bell, LayoutDashboard, ShoppingCart,
   PieChart, UserX, MoreHorizontal, ChevronDown, KeyRound, Send, Loader2,
   User, Lock, Save, X, Clock, FileEdit, Zap, MousePointerClick, CalendarDays, Laptop, UserPlus
 } from "lucide-react"
@@ -128,17 +128,33 @@ interface GroupedCompanyLog {
 // --- CONFIGURATION ---
 
 const defaultFeatures: Omit<CompanyFeature, "enabled">[] = [
-  // ✅ IDs alignés avec les moduleId du système de permissions
-  { id: "sites", name: "Sites & Contacts", description: "Raccourcis et contacts utiles", icon: Globe, isDefault: true },
-  { id: "fournisseurs", name: "Fournisseurs", description: "Gestion des contacts fournisseurs", icon: Truck, isDefault: true },
+  // ✅ IDs alignés avec les moduleId du système de permissions + menu
+  // Pages principales
+  { id: "dashboard", name: "Tableau de bord", description: "Vue d'ensemble", icon: LayoutDashboard, isDefault: true },
   { id: "objectifs", name: "Objectifs", description: "Suivi des objectifs et paliers", icon: Target, isDefault: true },
   { id: "primes", name: "Primes", description: "Historique et calcul des primes", icon: Coins, isDefault: true },
+  { id: "sites", name: "Sites & Contacts", description: "Raccourcis et contacts utiles", icon: Globe, isDefault: true },
+
+  // Gestion
+  { id: "gestion", name: "Gestion", description: "Hub de gestion & opérations", icon: ClipboardList, isDefault: true },
+  { id: "commandes", name: "Passer une commande", description: "Créer, envoyer, réceptionner", icon: ShoppingCart, isDefault: true },
+  { id: "fournisseurs", name: "Fournisseurs", description: "Produits & fournisseurs", icon: Truck, isDefault: true },
+  { id: "acces", name: "Droits & Accès", description: "Gestion des permissions", icon: KeyRound, isDefault: true },
+  { id: "outils_admin", name: "Outils Admin", description: "Outils administratifs", icon: Shield, isDefault: true },
   { id: "equipes", name: "Équipes", description: "Gestion des collaborateurs", icon: Users, isDefault: true },
-  { id: "diffusion", name: "Relevés température", description: "Suivi des températures frigos", icon: FileText, isDefault: false },
-  { id: "gestion", name: "Hub de Gestion", description: "Hub de gestion & opérations", icon: ClipboardList, isDefault: true },
+
+  // Outils avancés
   { id: "pilotage", name: "Pilotage", description: "Pilotage & simulateur", icon: BarChart3, isDefault: false },
-  { id: "parametres", name: "Paramètres", description: "Paramètres et utilisateurs", icon: Settings, isDefault: false },
+  { id: "diffusion", name: "Diffusion", description: "Emails / relevés / diffusion", icon: Send, isDefault: false },
+
+  // Système
   { id: "notifications", name: "Notifications", description: "Centre de notifications", icon: Bell, isDefault: true },
+  { id: "parametres", name: "Paramètres", description: "Paramètres et utilisateurs", icon: Settings, isDefault: false },
+
+  // Contrôle apparition des catégories de menu
+  { id: "menu_gestion", name: "Menu : Gestion", description: "Afficher la catégorie Gestion", icon: Briefcase, isDefault: true },
+  { id: "menu_outils", name: "Menu : Outils avancés", description: "Afficher la catégorie Outils avancés", icon: BarChart3, isDefault: true },
+  { id: "menu_admin", name: "Menu : Administration", description: "Afficher la catégorie Administration", icon: Shield, isDefault: true },
 ]
 
 type TabType = "overview" | "companies" | "users" | "logs"
@@ -593,19 +609,67 @@ function CentreControlePageContent() {
 
           <div className="pulse-card p-4">
             <h2 className="font-semibold mb-4 flex items-center gap-2"><Settings className="w-4 h-4 text-primary" /> Modules activés</h2>
-            <div className="space-y-3">
-              {selectedCompany.features.map((feature) => (
-                  <div key={feature.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/30">
-                    <div className="flex items-center gap-3">
-                      <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", feature.enabled ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
-                        <feature.icon className="w-4 h-4" />
-                      </div>
-                      <p className="text-sm font-medium">{feature.name}</p>
+            {(() => {
+              const groups: { id: string; title: string; items: any[] }[] = [
+                { id: "main", title: "Principal", items: [] },
+                { id: "gestion", title: "Gestion", items: [] },
+                { id: "outils", title: "Outils avancés", items: [] },
+                { id: "system", title: "Système", items: [] },
+                { id: "menu", title: "Menu (catégories)", items: [] },
+              ]
+
+              const pick = (id: string) => {
+                if (["dashboard", "objectifs", "primes", "sites"].includes(id)) return "main"
+                if (["gestion", "commandes", "fournisseurs", "acces", "outils_admin", "equipes"].includes(id)) return "gestion"
+                if (["pilotage", "diffusion"].includes(id)) return "outils"
+                if (["menu_gestion", "menu_outils", "menu_admin"].includes(id)) return "menu"
+                return "system"
+              }
+
+              for (const f of selectedCompany.features) {
+                const g = groups.find((x) => x.id === pick(f.id))
+                if (g) g.items.push(f)
+              }
+
+              const renderFeature = (feature: any) => (
+                <div key={feature.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center",
+                      feature.enabled ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                    )}>
+                      <feature.icon className="w-4 h-4" />
                     </div>
-                    <Switch checked={feature.enabled} onCheckedChange={(v) => toggleFeature(selectedCompany.id, feature.id, Boolean(v))} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium leading-tight">{feature.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{feature.description}</p>
+                    </div>
                   </div>
-              ))}
-            </div>
+                  <Switch
+                    checked={feature.enabled}
+                    onCheckedChange={(v) => toggleFeature(selectedCompany.id, feature.id, Boolean(v))}
+                  />
+                </div>
+              )
+
+              return (
+                <Accordion type="multiple" className="w-full">
+                  {groups.filter((g) => g.items.length > 0).map((g) => (
+                    <AccordionItem key={g.id} value={g.id} className="border-none">
+                      <AccordionTrigger className="px-1 py-2 text-sm font-semibold hover:no-underline">
+                        {g.title}
+                        <span className="ml-2 text-xs font-bold text-muted-foreground">({g.items.length})</span>
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-2">
+                        <div className="space-y-3">
+                          {g.items.map(renderFeature)}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              )
+            })()}
           </div>
 
           <div className="pulse-card p-4">

@@ -24,9 +24,9 @@ export interface PrimeHistory {
 }
 
 export function usePrimes() {
-  // On récupère l'utilisateur pour savoir s'il est admin ou employé
-  const { userData, loading: authLoading } = useCurrentUser();
-  const { profile, isDemo } = useAuth();
+  // Utilisateur courant (profil + role)
+  const userData: any = useCurrentUser();
+  const { profile, isDemo, loading: authLoading } = useAuth();
   const [primes, setPrimes] = useState<PrimeHistory[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -38,7 +38,8 @@ export function usePrimes() {
       const companyId = (profile as any).companyId as string
       const load = () => {
         const all = demoGetPrimes(companyId)
-        const isManager = userData?.role === "admin" || userData?.role === "gerant"
+        const role = String(userData?.role || "").toLowerCase()
+        const isManager = ["manager", "directeur", "gerant", "admin", "super_admin"].includes(role)
         const base = isManager ? all : all.filter((p: any) => p.userId === userData?.uid)
         const filtered = isManager ? base : base.filter((p: any) => p.status !== "pending")
         const items: PrimeHistory[] = filtered
@@ -66,7 +67,10 @@ export function usePrimes() {
 
         // --- OPTIMISATION N°2 : LE FILTRAGE INTELLIGENT ---
         
-        if (userData?.role === "admin" || userData?.role === "gerant") {
+        const role = String(userData?.role || "").toLowerCase()
+        const isManager = ["manager", "directeur", "gerant", "admin", "super_admin"].includes(role)
+
+        if (isManager) {
           // L'admin voit TOUT, mais limité aux 50 dernières (pour ne pas tout casser)
           q = query(
             collection(db, "primes_history"),
@@ -102,7 +106,7 @@ export function usePrimes() {
             userId: data.userId
           });
         });
-        const isManager = userData?.role === "admin" || userData?.role === "gerant"
+        const isManager = ["manager", "directeur", "gerant", "admin", "super_admin"].includes(role)
         const visibleItems = isManager ? items : items.filter((p) => p.status !== "pending")
         setPrimes(visibleItems);
       } catch (error) {
@@ -113,7 +117,7 @@ export function usePrimes() {
     };
 
     fetchPrimes();
-  }, [userData, authLoading, isDemo, (profile as any)?.companyId]);
+  }, [userData?.uid, userData?.role, isDemo, (profile as any)?.companyId]);
 
   // --- ACTIONS (Restent identiques) ---
 
