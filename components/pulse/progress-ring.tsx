@@ -123,9 +123,15 @@ export function ProgressRing({
       <div className="absolute inset-0 flex flex-col items-center justify-center p-2">
         {showPercentage && (
           <>
-            <span className={cn(percentageFontSize, "font-bold tracking-tight")}>{Math.round(clamp(progress, 0, 999))}%</span>
+            <span
+              className={cn(percentageFontSize, "font-bold tracking-tight leading-none relative -top-1")}
+            >
+              {Math.round(clamp(progress, 0, 999))}%
+            </span>
             {progress > 100 && (
-              <span className="text-[10px] font-bold text-primary -mt-0.5">+{Math.round(clamp(progress - 100, 0, 999))}%</span>
+              <span className="text-[10px] font-bold text-primary -mt-0.5 leading-none relative -top-1">
+                +{Math.round(clamp(progress - 100, 0, 999))}%
+              </span>
             )}
           </>
         )}
