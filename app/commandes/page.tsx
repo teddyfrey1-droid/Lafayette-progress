@@ -70,7 +70,7 @@ import {
 
 import { cn } from "@/lib/utils"
 
-// --- UTILITAIRES DE CALCUL ET FORMATAGE ---
+// --- UTILITAIRES DE CALCUL ET FORMATAGE (LOGIQUE INTACTE) ---
 
 function formatEuro(n: number) {
   const v = Number(n || 0)
@@ -142,6 +142,7 @@ function getFrancoThresholdEuros(supplier: OrderSupplier | null): number | null 
   return Number.isFinite(n) && n > 0 ? n : null
 }
 
+// Fonction utilitaire pour le design (Couleurs des fournisseurs)
 function getRandomColor(name: string) {
   const colors = [
     "bg-blue-100 text-blue-700",
@@ -158,7 +159,7 @@ function getRandomColor(name: string) {
   return colors[Math.abs(hash) % colors.length]
 }
 
-// --- COMPOSANT CARTE PRODUIT (LUDIQUE) ---
+// --- COMPOSANT CARTE PRODUIT (DESIGN + LOGIQUE GESTURE) ---
 
 function ProductCard({
   line,
@@ -225,7 +226,7 @@ function ProductCard({
       onPointerUp={handlePointerUp}
       onPointerCancel={resetDrag}
     >
-      {/* Swipe Backgrounds */}
+      {/* Swipe Backgrounds (Animations) */}
       <div 
         className="absolute inset-y-0 left-0 w-full bg-emerald-500 flex items-center justify-start pl-6 text-white font-bold"
         style={{ opacity: dx > 0 ? Math.min(dx / 80, 1) : 0 }}
@@ -255,7 +256,7 @@ function ProductCard({
         </div>
 
         <div className="flex flex-col items-end gap-2 shrink-0">
-           {/* Controls */}
+           {/* Controls (+ - Input) */}
            <div className="flex items-center bg-white rounded-xl border border-border/50 shadow-sm h-9 p-0.5">
                <button
                   type="button"
@@ -510,7 +511,7 @@ export default function CommandesPage() {
   }, [orderLines, productSearch])
 
 
-  // --- LOGIQUE ENVOI & RECEPTION ---
+  // --- LOGIQUE ENVOI & RECEPTION (INTACTE) ---
 
   const handleSend = async () => {
     if (!companyId) return
