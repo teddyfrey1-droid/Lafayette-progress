@@ -329,6 +329,9 @@ export default function CommandesPage() {
   // Cart summary (mobile rail)
   const [openCartSummary, setOpenCartSummary] = useState(false)
 
+  // One-off CC editor (kept light in the main flow)
+  const [openCcEditor, setOpenCcEditor] = useState(false)
+
   // UI micro-interactions
   const cartTargetRef = useRef<HTMLDivElement | null>(null)
   const [cartBump, setCartBump] = useState(false)
@@ -1337,13 +1340,7 @@ export default function CommandesPage() {
           </div>
         </div>
 
-        <div
-          ref={cartTargetRef}
-          className={cn("text-right transition-transform", cartBump ? "scale-105" : "scale-100")}
-        >
-          <div className="text-xs text-muted-foreground">Total</div>
-          <div className="text-base font-semibold tabular-nums">{formatEuro(totalAmount)}</div>
-        </div>
+        {/* Total is shown in the bottom bar; keep the header clean */}
       </div>
     </div>
 
@@ -1412,57 +1409,38 @@ export default function CommandesPage() {
         </div>
 
         <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <Label>Emails de confirmation</Label>
-            <Button type="button" variant="ghost" size="sm" className="h-8 px-2 rounded-lg gap-2" onClick={() => setOpenEmailSettings(true)}>
-              <Settings className="w-4 h-4" />
-              Réglages
-            </Button>
+          <div className="flex items-center justify-between gap-3">
+            <Label>Emails</Label>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 rounded-lg gap-2"
+                onClick={() => setOpenEmailSettings(true)}
+                title="Réglages emails automatiques"
+              >
+                <Settings className="w-4 h-4" />
+                Réglages
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-8 px-3 rounded-lg gap-2"
+                onClick={() => setOpenCcEditor(true)}
+                title="Ajouter des emails ponctuels en copie"
+              >
+                <Plus className="w-4 h-4" />
+                Copie ({ccList.length})
+              </Button>
+            </div>
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Envoi auto : {emailSettings.order.emails.length} contact(s) ({emailSettings.order.mode.toUpperCase()})
+            Auto : {emailSettings.order.emails.length} contact(s) ({emailSettings.order.mode.toUpperCase()}).
+            {" "}Copie ponctuelle : {ccList.length}.
           </p>
-
-          {ccList.length ? (
-            <div className="flex flex-wrap gap-2">
-              {ccList.map((email) => (
-                <Badge key={email} variant="secondary" className="rounded-full pl-3 pr-2 py-1 flex items-center gap-1">
-                  <span className="text-xs">{email}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeCc(email)}
-                    className="ml-1 inline-flex items-center justify-center rounded-full hover:bg-background/60 p-1"
-                    aria-label={"Retirer " + email}
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">Aucun email en copie.</p>
-          )}
-
-          <div className="flex items-center gap-2">
-            <Input
-              placeholder="Ajouter un email (ex: compta@entreprise.com)"
-              value={ccInput}
-              onChange={(e) => setCcInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (["Enter", ",", ";", "Tab"].includes(e.key)) {
-                  // Allow quick add with Enter / comma / semicolon / tab
-                  e.preventDefault()
-                  addCcFromInput()
-                }
-              }}
-            />
-            <Button type="button" variant="secondary" className="shrink-0" onClick={addCcFromInput}>
-              <Plus className="w-4 h-4" />
-            </Button>
-          </div>
-
-          <p className="text-xs text-muted-foreground">Tu peux coller plusieurs emails (virgule, espace, point-virgule). Appuie sur +.</p>
         </div>
       </div>
 
@@ -1537,7 +1515,13 @@ export default function CommandesPage() {
 
     <div className="border-t border-border bg-card p-4">
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-        <div className="flex items-center justify-between sm:block">
+        <div
+          ref={cartTargetRef}
+          className={cn(
+            "flex items-center justify-between sm:block transition-transform",
+            cartBump ? "scale-[1.02]" : "scale-100",
+          )}
+        >
           <div className="text-xs text-muted-foreground">Total</div>
           <div className="text-xl font-semibold tabular-nums">{formatEuro(totalAmount)}</div>
         </div>
@@ -1620,6 +1604,67 @@ export default function CommandesPage() {
               </Button>
               <Button type="button" onClick={handleSend} disabled={!companyId || !selectedSupplier}>
                 Envoyer
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* One-off CC editor (kept out of the main flow) */}
+        <Dialog open={openCcEditor} onOpenChange={setOpenCcEditor}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Emails en copie (ponctuels)</DialogTitle>
+              <DialogDescription>
+                Ajoute des emails pour cette commande uniquement. Les destinataires automatiques se gèrent via « Réglages ».
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3">
+              {ccList.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {ccList.map((email) => (
+                    <Badge key={email} variant="secondary" className="rounded-full pl-3 pr-2 py-1 flex items-center gap-1">
+                      <span className="text-xs">{email}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeCc(email)}
+                        className="ml-1 inline-flex items-center justify-center rounded-full hover:bg-background/60 p-1"
+                        aria-label={"Retirer " + email}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-muted text-sm text-muted-foreground">Aucun email en copie pour cette commande.</div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Ajouter un email (ex: compta@entreprise.com)"
+                  value={ccInput}
+                  onChange={(e) => setCcInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (["Enter", ",", ";", "Tab"].includes(e.key)) {
+                      e.preventDefault()
+                      addCcFromInput()
+                    }
+                  }}
+                />
+                <Button type="button" variant="secondary" className="shrink-0" onClick={addCcFromInput}>
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Tu peux coller plusieurs emails (virgule, espace, point-virgule). Appuie sur +.
+              </p>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpenCcEditor(false)}>
+                Fermer
               </Button>
             </DialogFooter>
           </DialogContent>

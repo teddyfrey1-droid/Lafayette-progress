@@ -191,17 +191,30 @@ function TrendMiniLine({
       >
         <div className="absolute left-0 right-0 border-t border-dashed border-primary/30" style={{ bottom: `${(100 / MAX_SCORE) * 100}%` }} />
         
+        {/**
+         * IMPORTANT:
+         * SVG gradient IDs must be valid (no spaces, slashes, etc.).
+         * Some browsers can fallback the fill to black if the <linearGradient> id
+         * is invalid or cannot be resolved.
+         */}
         <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 200 64" preserveAspectRatio="none">
           <defs>
-            <linearGradient id={`miniGradient-${points[0]?.date}`} x1="0%" y1="0%" x2="0%" y2="100%">
+            {(() => {
+              const raw = String(points[0]?.date ?? "")
+              const safe = raw.replace(/[^a-zA-Z0-9_-]/g, "")
+              const id = `miniGradient-${safe || "default"}-${points.length}`
+              return (
+                <linearGradient id={id} x1="0%" y1="0%" x2="0%" y2="100%">
               <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.18" />
               <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
-            </linearGradient>
+                </linearGradient>
+              )
+            })()}
           </defs>
           
           <path 
             d={`M ${points.map((p, i) => `${(i * 200) / (points.length - 1)} ${64 - (p.score / MAX_SCORE) * 52}`).join(' L ')} L 200 64 L 0 64 Z`}
-            fill={`url(#miniGradient-${points[0]?.date})`}
+            fill={`url(#miniGradient-${String(points[0]?.date ?? "").replace(/[^a-zA-Z0-9_-]/g, "") || "default"}-${points.length})`}
           />
           
           <path 
