@@ -697,8 +697,11 @@ export default function ObjectivesPage() {
             </div>
 
             {secondaryObjectives.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {secondaryObjectives.map((obj: any, index: number) => {
+              <>
+                {/* Mobile: swipe horizontal (plus lisible et évite une page trop longue) */}
+                <div className="md:hidden -mx-4 px-4">
+                  <div className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory">
+                    {secondaryObjectives.map((obj: any, index: number) => {
                   const current = Number(obj.current || 0)
                   const target = Number(obj.target || 1)
                   const isConfidential = obj.isConfidential || obj.hideRevenue
@@ -720,16 +723,16 @@ export default function ObjectivesPage() {
 
                   const isLocked = !isPrincipalMet
 
-                  return (
-                    <div
-                      key={obj.id}
-                      className={cn(
-                        "pulse-card p-6 transition-all duration-300 relative overflow-hidden border-2",
-                        isLocked && "opacity-60 grayscale cursor-not-allowed border-border/50",
-                        !isLocked && "hover:shadow-xl hover:scale-[1.01] cursor-pointer border-accent/30",
-                      )}
-                      onClick={() => !isLocked && obj?.id && setSelectedObjectiveId(obj.id)}
-                    >
+                      return (
+                        <div
+                          key={obj.id}
+                          className={cn(
+                            "pulse-card p-6 transition-all duration-300 relative overflow-hidden border-2 snap-start min-w-[320px] w-[320px]",
+                            isLocked && "opacity-60 grayscale cursor-not-allowed border-border/50",
+                            !isLocked && "hover:shadow-xl hover:scale-[1.01] cursor-pointer border-accent/30",
+                          )}
+                          onClick={() => !isLocked && obj?.id && setSelectedObjectiveId(obj.id)}
+                        >
                       {/* Overlay lock */}
                       {isLocked && (
                         <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] flex items-center justify-center z-10">
@@ -845,10 +848,140 @@ export default function ObjectivesPage() {
                           <ChevronRight className="w-4 h-4" />
                         </div>
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-2">Glisse vers la droite pour voir les autres objectifs.</p>
+                </div>
+
+                {/* Desktop: grille */}
+                <div className="hidden md:grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {secondaryObjectives.map((obj: any, index: number) => {
+                    const current = Number(obj.current || 0)
+                    const target = Number(obj.target || 1)
+                    const isConfidential = obj.isConfidential || obj.hideRevenue
+
+                    const progressRaw = computeProgressPct(current, target, obj.direction)
+                    const progressBar = clamp(progressRaw, 0, 100)
+                    const status = getObjectiveStatus(progressRaw, obj.direction)
+
+                    const nextPalierS = obj.paliers
+                      ? [...obj.paliers]
+                          .map((p: any) => ({ ...p, threshold: Number(p.threshold || 0) }))
+                          .sort((a: any, b: any) =>
+                            obj.direction === "descending" ? b.threshold - a.threshold : a.threshold - b.threshold,
+                          )
+                          .find((p: any) =>
+                            obj.direction === "descending" ? current > Number(p.threshold) : current < Number(p.threshold),
+                          )
+                      : undefined
+
+                    const isLocked = !isPrincipalMet
+
+                    return (
+                      <div
+                        key={obj.id}
+                        className={cn(
+                          "pulse-card p-6 transition-all duration-300 relative overflow-hidden border-2",
+                          isLocked && "opacity-60 grayscale cursor-not-allowed border-border/50",
+                          !isLocked && "hover:shadow-xl hover:scale-[1.01] cursor-pointer border-accent/30",
+                        )}
+                        onClick={() => !isLocked && obj?.id && setSelectedObjectiveId(obj.id)}
+                      >
+                        {/* Overlay lock */}
+                        {isLocked && (
+                          <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] flex items-center justify-center z-10">
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                <Lock className="w-6 h-6 text-amber-600" />
+                              </div>
+                              <p className="text-xs font-bold text-amber-600">En attente du principal</p>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-black px-2 py-1 rounded-full bg-accent/15 text-accent">
+                                #{index + 1}
+                              </span>
+
+                              {(obj.category || "").toString().trim() && (
+                                <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-muted/40 text-muted-foreground">
+                                  {String(obj.category)}
+                                </span>
+                              )}
+
+                              {!isConfidential && (
+                                <span className={cn("text-[10px] font-bold px-2 py-1 rounded-full", status.bg, status.tone)}>
+                                  {status.label}
+                                </span>
+                              )}
+                            </div>
+                            <h3 className="text-xl font-bold leading-tight">{obj.title}</h3>
+                            <p className="text-xs text-muted-foreground leading-relaxed">{obj.description}</p>
+                          </div>
+
+                          <div className="shrink-0">
+                            <div className="relative">
+                              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-accent/20 to-primary/20 flex items-center justify-center">
+                                <div className="w-16 h-16 rounded-full bg-background flex items-center justify-center">
+                                  <span className="font-black text-lg">{Math.round(progressBar)}%</span>
+                                </div>
+                              </div>
+                              <div
+                                className="absolute inset-0 rounded-full"
+                                style={{
+                                  background: `conic-gradient(var(--accent) ${Math.round(progressBar) * 3.6}deg, transparent 0deg)`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-5 space-y-3">
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Actuel</p>
+                              <p className="font-bold">
+                                {isConfidential ? "•••" : current.toLocaleString()} {obj.unit}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-muted-foreground">Objectif</p>
+                              <p className="font-bold">
+                                {isConfidential ? "•••" : target.toLocaleString()} {obj.unit}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="h-3 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-accent to-primary rounded-full transition-all duration-700"
+                              style={{ width: `${progressBar}%` }}
+                            />
+                          </div>
+
+                          {nextPalierS && (
+                            <div className="mt-3 p-3 rounded-xl bg-muted/30 border border-border flex items-center justify-between">
+                              <div>
+                                <p className="text-[11px] text-muted-foreground font-semibold">Prochain palier</p>
+                                <p className="text-sm font-bold">{nextPalierS.name}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-[11px] text-muted-foreground">+{Number(nextPalierS.reward || 0)}€</p>
+                                <p className="text-sm font-bold">{Number(nextPalierS.threshold || 0).toLocaleString()} {obj.unit}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
             ) : (
               <div className="pulse-card p-10 text-center text-muted-foreground border-dashed border-2">
                 <Target className="w-12 h-12 mx-auto mb-3 opacity-30" />

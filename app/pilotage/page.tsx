@@ -77,6 +77,12 @@ export default function PilotagePage() {
   const { objectives: liveObjectives, loading: loadingObj } = useObjectives()
   const { toast } = useToast()
 
+  // Autoriser la modification du budget max (et de la base heures) pour les rôles d'encadrement.
+  // (On reste volontairement permissif côté UI; les règles Firestore restent la vraie sécurité.)
+  const canEditBudget = ["manager", "directeur", "gerant", "admin", "super_admin"].includes(
+    String(profile?.role || "").toLowerCase(),
+  )
+
   const [objectives, setObjectives] = useState<any[]>([])
 
   const [activeTab, setActiveTab] = useState<TabValue>("objectifs")
@@ -650,15 +656,82 @@ export default function PilotagePage() {
         )}
 
         {activeTab === "budget" && (
-           <div className="space-y-6 animate-in fade-in">
+           <div className="space-y-6 animate-in fade-in pb-28">
                 <div className="grid grid-cols-3 gap-3">
                     <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none"><div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center mb-2"><Target className="w-4 h-4 text-purple-500" /></div><span className="text-xl font-bold">{simulationData.activeObjectivesCount}</span><span className="text-[10px] text-muted-foreground uppercase font-bold">Objectifs</span></div>
                     <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none"><div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center mb-2"><Euro className="w-4 h-4 text-blue-500" /></div><span className="text-xl font-bold">{simulationData.totalCostPerPerson}€</span><span className="text-[10px] text-muted-foreground uppercase font-bold">Max / Pers</span></div>
                     <div className="pulse-card p-4 flex flex-col items-center justify-center text-center bg-muted/10 border-none"><div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center mb-2"><Users className="w-4 h-4 text-emerald-500" /></div><span className="text-xl font-bold">{teamMembers.length}</span><span className="text-[10px] text-muted-foreground uppercase font-bold">Équipe</span></div>
                 </div>
-                <div className={cn("p-5 rounded-2xl border transition-all duration-500", simulationData.isOverBudget ? "bg-red-500/10 border-red-500/30" : "bg-emerald-500/10 border-emerald-500/30")}><div className="flex justify-between items-center mb-3"><div className="flex items-center gap-2"><div className={cn("p-2 rounded-lg", simulationData.isOverBudget ? "bg-red-500 text-white" : "bg-emerald-500 text-white")}><Wallet className="w-5 h-5" /></div><div><h3 className="font-bold text-sm">{simulationData.isOverBudget ? "Attention Budget !" : "Budget Maîtrisé"}</h3><p className="text-xs text-muted-foreground">Coût total estimé</p></div></div><div className="text-right"><span className={cn("text-2xl font-black", simulationData.isOverBudget ? "text-red-500" : "text-emerald-500")}>{simulationData.teamTotalCost}€</span><p className="text-[10px] text-muted-foreground">sur {budgetMax}€ max</p></div></div><div className="relative h-4 bg-background/50 rounded-full overflow-hidden border border-black/5 dark:border-white/5"><div className={cn("absolute left-0 top-0 bottom-0 transition-all duration-500", simulationData.isOverBudget ? "bg-red-500" : "bg-emerald-500")} style={{ width: `${Math.min(100, simulationData.budgetUsage)}%` }} /><div className="absolute top-0 bottom-0 w-0.5 bg-foreground/30 z-10" style={{ left: '100%' }} /></div></div>
+                <div className={cn("p-5 rounded-2xl border transition-all duration-500", simulationData.isOverBudget ? "bg-red-500/10 border-red-500/30" : "bg-emerald-500/10 border-emerald-500/30")}>
+                  <div className="flex justify-between items-start gap-3 mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className={cn("p-2 rounded-lg", simulationData.isOverBudget ? "bg-red-500 text-white" : "bg-emerald-500 text-white")}>
+                        <Wallet className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-sm">{simulationData.isOverBudget ? "Attention Budget !" : "Budget Maîtrisé"}</h3>
+                        <p className="text-xs text-muted-foreground">Coût total estimé</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className={cn("text-2xl font-black", simulationData.isOverBudget ? "text-red-500" : "text-emerald-500")}>{simulationData.teamTotalCost}€</span>
+                      <p className="text-[10px] text-muted-foreground">sur {budgetMax}€ max</p>
+                    </div>
+                  </div>
+
+                  <div className="relative h-4 bg-background/50 rounded-full overflow-hidden border border-black/5 dark:border-white/5">
+                    <div className={cn("absolute left-0 top-0 bottom-0 transition-all duration-500", simulationData.isOverBudget ? "bg-red-500" : "bg-emerald-500")} style={{ width: `${Math.min(100, simulationData.budgetUsage)}%` }} />
+                    <div className="absolute top-0 bottom-0 w-0.5 bg-foreground/30 z-10" style={{ left: '100%' }} />
+                  </div>
+
+                  {/* Edition budget (rôles encadrants) */}
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold">Budget max</p>
+                      <p className="text-[11px] text-muted-foreground">Modifie le plafond global (ex: 2000€)</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        value={budgetMax}
+                        onChange={(e) => setBudgetMax(Number(e.target.value))}
+                        className="w-28 h-9 rounded-xl text-right"
+                        disabled={!canEditBudget}
+                      />
+                      <Button
+                        size="sm"
+                        className="rounded-xl"
+                        onClick={handleUpdateBaseHours}
+                        disabled={!canEditBudget}
+                      >
+                        <Save className="w-4 h-4 mr-2" />
+                        Enregistrer
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-xl"
+                        onClick={() => setShowEditHours(true)}
+                      >
+                        <Edit3 className="w-4 h-4 mr-2" />
+                        Réglages
+                      </Button>
+                    </div>
+                  </div>
+                </div>
                 <div className="pulse-card p-5 bg-card border-border"><div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center"><Edit3 className="w-5 h-5 text-purple-500" /></div><div><h3 className="font-semibold text-sm">Ajuster les primes</h3><p className="text-xs text-muted-foreground">Simulez l'impact financier</p></div></div><div className="space-y-3">{sortedObjectives.map((obj: any) => { const isExpanded = expandedSim === obj.id; const currentSimReward = obj.paliers?.reduce((acc: number, p: any) => acc + (simulatedPaliers[obj.id]?.[p.id] ?? p.reward), 0) || 0; return (<div key={obj.id} className="bg-muted/30 rounded-xl border border-border/50 overflow-hidden transition-all"><div className="p-3 flex items-center justify-between cursor-pointer hover:bg-muted/50" onClick={() => setExpandedSim(isExpanded ? null : obj.id)}><div className="flex items-center gap-3">{obj.type === 'principal' ? <Crown className="w-4 h-4 text-amber-500"/> : <Target className="w-4 h-4 text-purple-400"/>}<span className="text-sm font-medium">{obj.title}</span></div><div className="flex items-center gap-3"><Badge variant="outline" className="bg-background text-purple-500 border-purple-200">{currentSimReward}€</Badge>{isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground"/> : <ChevronDown className="w-4 h-4 text-muted-foreground"/>}</div></div>{isExpanded && obj.paliers && (<div className="p-4 space-y-6 bg-background/50 border-t border-border/50 animate-in slide-in-from-top-2">{(!obj.paliers || obj.paliers.length === 0) && (<div className="text-center py-2"><p className="text-xs text-muted-foreground mb-2">Aucun palier configuré.</p><Button size="sm" variant="outline" onClick={() => setShowAddPalier(obj.id)}>Ajouter un palier</Button></div>)}{obj.paliers.map((p: any, idx: number) => { const val = simulatedPaliers[obj.id]?.[p.id] ?? p.reward; return (<div key={p.id} className="space-y-3"><div className="flex justify-between items-center text-xs"><div className="flex items-center gap-2"><span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">{idx + 1}</span><span className="font-medium">{p.name} <span className="text-muted-foreground">({p.threshold} {obj.unit})</span></span></div><div className="flex gap-2"><span className="font-bold text-lg text-primary">{val}€</span><Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => setEditingPalier({ objectiveId: obj.id, palierId: p.id, name: p.name, threshold: p.threshold, reward: p.reward })}><Edit3 className="w-3 h-3"/></Button></div></div><Slider value={[val]} max={500} step={5} onValueChange={(vals) => handleSimulateChange(obj.id, p.id, vals[0])} className="py-1" /></div>)})} {obj.paliers && obj.paliers.length > 0 && (<Button size="sm" variant="ghost" className="w-full text-xs text-muted-foreground h-8 mt-2" onClick={() => setShowAddPalier(obj.id)}><Plus className="w-3 h-3 mr-1"/> Ajouter un autre palier</Button>)}</div>)}</div>)})}</div></div>
-                <div className="fixed bottom-[88px] left-4 right-4 max-w-lg mx-auto bg-card border border-border rounded-2xl p-4 shadow-2xl z-10 animate-in slide-in-from-bottom-4"><div className="space-y-3"><div className="flex justify-between items-center text-sm"><span className="text-muted-foreground">Coût max par personne (35h)</span><span className="font-bold">{simulationData.totalCostPerPerson}€</span></div><Button className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-lg shadow-purple-500/20" onClick={handleSaveSimulation}><Save className="w-4 h-4 mr-2"/> Valider cette configuration</Button></div></div><div className="h-32"/>
+                {/* CTA qui ne chevauche pas : reste dans le flux, mais se "colle" en bas lors du scroll */}
+                <div className="sticky bottom-24 mt-4 bg-card/95 backdrop-blur border border-border rounded-2xl p-4 shadow-2xl z-10">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground">Coût max par personne ({baseHours}h)</span>
+                      <span className="font-bold">{simulationData.totalCostPerPerson}€</span>
+                    </div>
+                    <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-lg shadow-purple-500/20" onClick={handleSaveSimulation}>
+                      <Save className="w-4 h-4 mr-2" /> Valider cette configuration
+                    </Button>
+                  </div>
+                </div>
            </div>
         )}
 
@@ -699,9 +772,32 @@ export default function PilotagePage() {
           <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
             <h2 className="font-semibold mb-4 text-lg">Configuration Générale</h2>
             <div className="space-y-4">
-              <div><Label className="text-sm">Heures temps plein (référence)</Label><Input type="number" value={baseHours} onChange={(e) => setBaseHours(Number(e.target.value))} className="rounded-xl mt-2" /></div>
-              <div><Label className="text-sm">Budget Max Global (€)</Label><Input type="number" value={budgetMax} onChange={(e) => setBudgetMax(Number(e.target.value))} className="rounded-xl mt-2" /></div>
-              <Button className="w-full rounded-xl" onClick={handleUpdateBaseHours}><Save className="w-4 h-4 mr-2" /> Enregistrer</Button>
+              <div>
+                <Label className="text-sm">Heures temps plein (référence)</Label>
+                <Input
+                  type="number"
+                  value={baseHours}
+                  onChange={(e) => setBaseHours(Number(e.target.value))}
+                  className="rounded-xl mt-2"
+                  disabled={!canEditBudget}
+                />
+              </div>
+              <div>
+                <Label className="text-sm">Budget Max Global (€)</Label>
+                <Input
+                  type="number"
+                  value={budgetMax}
+                  onChange={(e) => setBudgetMax(Number(e.target.value))}
+                  className="rounded-xl mt-2"
+                  disabled={!canEditBudget}
+                />
+              </div>
+              <Button className="w-full rounded-xl" onClick={handleUpdateBaseHours} disabled={!canEditBudget}>
+                <Save className="w-4 h-4 mr-2" /> Enregistrer
+              </Button>
+              {!canEditBudget && (
+                <p className="text-xs text-muted-foreground">Seuls les rôles gérant/directeur/manager peuvent modifier ces réglages.</p>
+              )}
             </div>
           </div>
         </div>
