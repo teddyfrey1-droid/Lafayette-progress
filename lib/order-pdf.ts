@@ -323,3 +323,115 @@ export function generateNonConformityPdfBuffer(data: OrderPdfData): Buffer {
   const arrayBuffer = doc.output("arraybuffer");
   return Buffer.from(new Uint8Array(arrayBuffer));
 }
+
+// Receipt confirmation (all lines OK)
+export function generateReceiptOkPdfBuffer(data: OrderPdfData): Buffer {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginX = 40;
+  let y = 40;
+
+  const companyDisplayName = (data.companyLegalName || data.companyName || "").trim() || "Entreprise";
+
+  // Title
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(0, 110, 70);
+  doc.text("BON DE RÉCEPTION", marginX, y);
+  doc.setTextColor(0, 0, 0);
+
+  // Order number (top-right)
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text(`N° ${data.orderNumber}`, pageWidth - marginX, y, { align: "right" });
+
+  y += 18;
+
+  // Header box (buyer / supplier)
+  const boxTop = y + 10;
+  const boxHeight = 84;
+  doc.setDrawColor(220);
+  doc.setLineWidth(1);
+  doc.roundedRect(marginX, boxTop, pageWidth - marginX * 2, boxHeight, 10, 10);
+
+  const colGap = 16;
+  const colW = (pageWidth - marginX * 2 - colGap) / 2;
+  const leftX = marginX + 14;
+  const rightX = marginX + 14 + colW + colGap;
+  let leftY = boxTop + 18;
+  let rightY = boxTop + 18;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("ACHETEUR", leftX, leftY);
+  doc.text("FOURNISSEUR", rightX, rightY);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  leftY += 14;
+  rightY += 14;
+
+  const buyerLines = [
+    companyDisplayName,
+    data.companySiret ? `SIRET : ${String(data.companySiret).trim()}` : null,
+    data.companyCustomerNumber ? `N° client : ${String(data.companyCustomerNumber).trim()}` : null,
+  ].filter(Boolean) as string[];
+  const supplierLines = [
+    (data.supplierName || "").trim() || "Fournisseur",
+    data.supplierEmail ? `Email : ${String(data.supplierEmail).trim()}` : null,
+  ].filter(Boolean) as string[];
+
+  doc.text(buyerLines, leftX, leftY);
+  doc.text(supplierLines, rightX, rightY);
+
+  y = boxTop + boxHeight + 22;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const metaLeft = `Livraison prévue : ${formatDateFR(data.deliveryDateISO)}`;
+  const metaRight = data.createdAtISO ? `Commande créée le : ${formatDateFR(data.createdAtISO)}` : "";
+  doc.text(metaLeft, marginX, y);
+  if (metaRight) doc.text(metaRight, pageWidth - marginX, y, { align: "right" });
+
+  y += 14;
+
+  const body = data.lines.map((l) => [
+    l.reference || "",
+    l.productName,
+    `${l.quantity} ${l.unit}`,
+    `${typeof l.receivedQuantity === "number" ? l.receivedQuantity : l.quantity} ${l.unit}`,
+  ]);
+
+  autoTable(doc, {
+    startY: y + 10,
+    head: [["Référence", "Produit", "Commandé", "Reçu"]],
+    body,
+    styles: {
+      font: "helvetica",
+      fontSize: 9,
+      cellPadding: 6,
+      overflow: "linebreak",
+    },
+    headStyles: {
+      fillColor: [0, 110, 70],
+      textColor: 255,
+      fontStyle: "bold",
+    },
+    columnStyles: {
+      0: { cellWidth: 90 },
+      1: { cellWidth: 280 },
+      2: { halign: "center", cellWidth: 90 },
+      3: { halign: "center", cellWidth: 90 },
+    },
+  });
+
+  const finalY = (doc as any).lastAutoTable?.finalY || y + 200;
+
+  // Footer
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.text("Document généré via Pulse App", marginX, doc.internal.pageSize.getHeight() - 24);
+
+  const arrayBuffer = doc.output("arraybuffer");
+  return Buffer.from(new Uint8Array(arrayBuffer));
+}

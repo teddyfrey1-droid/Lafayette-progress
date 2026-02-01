@@ -97,6 +97,7 @@ async function sendBrevoEmail(params: {
   toEmail: string
   toName?: string
   cc?: Array<{ email: string; name?: string }>
+  bcc?: Array<{ email: string; name?: string }>
   subject: string
   htmlContent: string
   attachment?: Array<{ name: string; content: string }>
@@ -119,6 +120,7 @@ async function sendBrevoEmail(params: {
         sender: { name: params.senderName, email: params.senderEmail || DEFAULT_SENDER_EMAIL },
         to: [{ email: params.toEmail, name: params.toName || params.toEmail }],
         cc: params.cc && params.cc.length ? params.cc : undefined,
+        bcc: params.bcc && params.bcc.length ? params.bcc : undefined,
         subject: params.subject,
         htmlContent: params.htmlContent,
         attachment: params.attachment && params.attachment.length ? params.attachment : undefined,
@@ -157,6 +159,7 @@ export async function POST(req: Request) {
     let companySiret: string | undefined
     let companyCustomerNumber: string | undefined
     const cc = normalizeEmails(body?.ccEmails)
+    const bcc = normalizeEmails(body?.bccEmails)
 
     // If an order is provided, we generate and attach the PDF
     const order = body?.order as any | undefined
@@ -238,6 +241,7 @@ export async function POST(req: Request) {
       toEmail,
       toName,
       cc,
+      bcc,
       subject,
       htmlContent,
       attachment,

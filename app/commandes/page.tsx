@@ -9,6 +9,14 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
@@ -44,6 +52,15 @@ import {
   OrderProduct,
   OrderSupplier,
 } from "@/lib/demo/orders-store"
+
+import {
+  defaultCompanyEmailSettings,
+  loadCompanyEmailSettings,
+  saveCompanyEmailSettings,
+  resolveRecipients,
+  type CompanyEmailSettings,
+  type EmailMode,
+} from "@/lib/email-settings"
 
 function formatEuro(n: number) {
   const v = Number(n || 0)
@@ -128,6 +145,10 @@ export default function CommandesPage() {
   const [notes, setNotes] = useState<string>("")
   const [ccList, setCcList] = useState<string[]>([])
   const [ccInput, setCcInput] = useState<string>("")
+  const [openEmailSettings, setOpenEmailSettings] = useState(false)
+  const [emailSettings, setEmailSettings] = useState<CompanyEmailSettings>(defaultCompanyEmailSettings())
+  const [savingEmailSettings, setSavingEmailSettings] = useState(false)
+  const [emailSettingsDraft, setEmailSettingsDraft] = useState<CompanyEmailSettings>(defaultCompanyEmailSettings())
   const [productSearch, setProductSearch] = useState<string>("")
   const [orderLines, setOrderLines] = useState<OrderProduct[]>([])
 
@@ -136,6 +157,26 @@ export default function CommandesPage() {
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
   const [detailsMode, setDetailsMode] = useState<"view" | "receive">("view")
   const [receiptLines, setReceiptLines] = useState<OrderProduct[]>([])
+
+  useEffect(() => {
+    if (!companyId) return
+    let mounted = true
+    loadCompanyEmailSettings(companyId)
+      .then((s) => {
+        if (mounted) setEmailSettings(s)
+      })
+      .catch(() => {
+        // ignore
+      })
+    return () => {
+      mounted = false
+    }
+  }, [companyId])
+
+  useEffect(() => {
+    if (!openEmailSettings) return
+    setEmailSettingsDraft(emailSettings)
+  }, [openEmailSettings, emailSettings])
 
 
   const selectedSupplier = useMemo(
@@ -280,6 +321,22 @@ export default function CommandesPage() {
     setCcInput("")
   }
 
+  const saveEmailDefaults = async () => {
+    if (!companyId) return
+    try {
+      setSavingEmailSettings(true)
+      const saved = await saveCompanyEmailSettings(companyId, emailSettingsDraft)
+      setEmailSettings(saved)
+      setOpenEmailSettings(false)
+      toast({ title: "✅ Réglages enregistrés", description: "Les emails par défaut seront utilisés automatiquement." })
+    } catch (e: any) {
+      console.error(e)
+      toast({ title: "Erreur", description: e?.message || "Impossible d'enregistrer les réglages.", variant: "destructive" })
+    } finally {
+      setSavingEmailSettings(false)
+    }
+  }
+
   const removeCc = (email: string) => {
     setCcList((prev) => prev.filter((e) => e !== email))
   }
@@ -311,7 +368,8 @@ export default function CommandesPage() {
       return
     }
 
-    const ccEmails = Array.from(new Set([...(ccList || []), ...normalizeEmails(ccInput)]))
+    const manualCc = Array.from(new Set([...(ccList || []), ...normalizeEmails(ccInput)]))
+    const { ccEmails, bccEmails, contactsCount } = resolveRecipients(emailSettings.order, manualCc)
 
     try {
       // 1) Create order (draft)
@@ -320,6 +378,8 @@ export default function CommandesPage() {
         supplierName: selectedSupplier.name,
         supplierEmail: selectedSupplier.email,
         ccEmails: ccEmails.length ? ccEmails : undefined,
+        // Store BCC used for audit (supplier won't see those)
+        bccEmails: bccEmails.length ? bccEmails : undefined,
         products: lines,
         totalAmount: lines.reduce((s, p) => s + (Number(p.total) || 0), 0),
         deliveryDate,
@@ -347,6 +407,7 @@ export default function CommandesPage() {
           subject,
           companyName: companyName || "Entreprise",
           ccEmails,
+          bccEmails,
           order: {
             ...newOrder,
             orderNumber,
@@ -365,7 +426,7 @@ export default function CommandesPage() {
 
       toast({
         title: "✅ Commande envoyée",
-        description: `Bon de commande PDF envoyé à ${selectedSupplier.name}.`,
+        description: `Bon de commande PDF envoyé à ${selectedSupplier.name}. ${contactsCount ? `Copie envoyée à vos ${contactsCount} contact(s) pré-enregistrés.` : ""}`.trim(),
       })
 
       // Reset sheet
@@ -404,7 +465,8 @@ export default function CommandesPage() {
       return
     }
 
-    const ccEmails = (o.ccEmails && o.ccEmails.length ? o.ccEmails : (supplier?.ccEmails || []))
+    const manualCc = (o.ccEmails && o.ccEmails.length ? o.ccEmails : (supplier?.ccEmails || [])) as string[]
+    const { ccEmails, bccEmails, contactsCount } = resolveRecipients(emailSettings.order, manualCc)
 
     setSendingOrderId(o.id)
     try {
@@ -424,6 +486,7 @@ export default function CommandesPage() {
           subject,
           companyName: companyName || "Entreprise",
           ccEmails,
+          bccEmails,
           order: {
             ...o,
             supplierName: toName,
@@ -443,7 +506,7 @@ export default function CommandesPage() {
 
       toast({
         title: "✅ Bon renvoyé",
-        description: `Bon de commande PDF envoyé à ${toName}.`,
+        description: `Bon de commande PDF envoyé à ${toName}. ${contactsCount ? `Copie envoyée à vos ${contactsCount} contact(s) pré-enregistrés.` : ""}`.trim(),
       })
     } catch (e: any) {
       console.error(e)
@@ -540,7 +603,7 @@ export default function CommandesPage() {
       toast({ title: "✅ Commande réceptionnée", description: "La commande est passée dans l'historique." })
       setOpenOrderDetails(false)
 
-      // Si non-conformité : envoi d'un PDF au fournisseur (lignes en rouge)
+      // Envoi automatique d'un PDF après validation de réception
       if (hasProblems) {
         try {
           const supplier = suppliers.find((s) => s.id === activeOrder.supplierId)
@@ -555,7 +618,8 @@ export default function CommandesPage() {
             return
           }
 
-          const ccEmails = (activeOrder.ccEmails && activeOrder.ccEmails.length ? activeOrder.ccEmails : (supplier?.ccEmails || []))
+          const manualCc = (activeOrder.ccEmails && activeOrder.ccEmails.length ? activeOrder.ccEmails : (supplier?.ccEmails || [])) as string[]
+          const { ccEmails, bccEmails, contactsCount } = resolveRecipients(emailSettings.receiptIssue, manualCc)
 
           const token = await user?.getIdToken().catch(() => undefined)
           const orderNumber = (activeOrder.orderNumber || activeOrder.id.slice(-6)).toUpperCase()
@@ -573,6 +637,7 @@ export default function CommandesPage() {
               subject,
               companyName: companyName || "Entreprise",
               ccEmails,
+              bccEmails,
               order: {
                 ...activeOrder,
                 products: receiptLines,
@@ -588,13 +653,73 @@ export default function CommandesPage() {
 
           toast({
             title: "📩 Non-conformité envoyée",
-            description: `PDF envoyé à ${toName} (lignes en rouge).`,
+            description: `PDF envoyé à ${toName} (lignes en rouge). ${contactsCount ? `Copie envoyée à vos ${contactsCount} contact(s) pré-enregistrés.` : ""}`.trim(),
           })
         } catch (e: any) {
           console.error(e)
           toast({
             title: "Non-conformité",
             description: e?.message || "Impossible d'envoyer le PDF de non-conformité (la réception reste validée).",
+            variant: "destructive",
+          })
+        }
+      } else {
+        // Réception conforme
+        try {
+          const supplier = suppliers.find((s) => s.id === activeOrder.supplierId)
+          const toEmail = String(activeOrder.supplierEmail || supplier?.email || "").trim()
+          const toName = String(activeOrder.supplierName || supplier?.name || "Fournisseur")
+          if (!toEmail) {
+            toast({
+              title: "Réception - email manquant",
+              description: "Email fournisseur manquant (renseigne-le dans Fournisseurs).",
+              variant: "destructive",
+            })
+            return
+          }
+
+          const manualCc = (activeOrder.ccEmails && activeOrder.ccEmails.length ? activeOrder.ccEmails : (supplier?.ccEmails || [])) as string[]
+          const { ccEmails, bccEmails, contactsCount } = resolveRecipients(emailSettings.receiptOk, manualCc)
+
+          const token = await user?.getIdToken().catch(() => undefined)
+          const orderNumber = (activeOrder.orderNumber || activeOrder.id.slice(-6)).toUpperCase()
+          const subject = `Réception validée ${orderNumber} — ${companyName || "Entreprise"}`
+
+          const res = await fetch("/api/commandes/send-receipt-ok", {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              ...(token ? { authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+              toEmail,
+              toName,
+              subject,
+              companyName: companyName || "Entreprise",
+              ccEmails,
+              bccEmails,
+              order: {
+                ...activeOrder,
+                products: receiptLines,
+                supplierName: toName,
+                supplierEmail: toEmail,
+                orderNumber,
+              },
+            }),
+          })
+
+          const data = await res.json().catch(() => ({}))
+          if (!res.ok || !data?.success) throw new Error(data?.error || "Échec envoi réception")
+
+          toast({
+            title: "📩 Réception confirmée",
+            description: `Bon de réception envoyé à ${toName}. ${contactsCount ? `Copie envoyée à vos ${contactsCount} contact(s) pré-enregistrés.` : ""}`.trim(),
+          })
+        } catch (e: any) {
+          console.error(e)
+          toast({
+            title: "Réception",
+            description: e?.message || "Impossible d'envoyer le PDF de réception (la réception reste validée).",
             variant: "destructive",
           })
         }
@@ -941,7 +1066,17 @@ export default function CommandesPage() {
         </div>
 
         <div className="space-y-2">
-          <Label>Emails en copie (CC)</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label>Emails de confirmation</Label>
+            <Button type="button" variant="ghost" size="sm" className="h-8 px-2 rounded-lg gap-2" onClick={() => setOpenEmailSettings(true)}>
+              <Settings className="w-4 h-4" />
+              Réglages
+            </Button>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Envoi auto : {emailSettings.order.emails.length} contact(s) ({emailSettings.order.mode.toUpperCase()})
+          </p>
 
           {ccList.length ? (
             <div className="flex flex-wrap gap-2">
@@ -1106,6 +1241,88 @@ export default function CommandesPage() {
   </div>
 </SheetContent>
         </Sheet>
+
+        {/* Email defaults settings */}
+        <Dialog open={openEmailSettings} onOpenChange={setOpenEmailSettings}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Réglages emails automatiques</DialogTitle>
+              <DialogDescription>
+                Configure les destinataires internes par défaut (CC ou BCC). Ils seront ajoutés automatiquement lors de l’envoi.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {(
+                [
+                  { key: "order" as const, label: "Bon de commande" },
+                  { key: "receiptOk" as const, label: "Réception conforme" },
+                  { key: "receiptIssue" as const, label: "Non-conformité" },
+                ]
+              ).map((cfg) => (
+                <div key={cfg.key} className="pulse-card p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-semibold">{cfg.label}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Mode</span>
+                      <Select
+                        value={emailSettingsDraft[cfg.key].mode}
+                        onValueChange={(v) =>
+                          setEmailSettingsDraft((prev) => ({
+                            ...prev,
+                            [cfg.key]: { ...prev[cfg.key], mode: (v as EmailMode) || "bcc" },
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="h-8 w-[110px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="bcc">BCC (discret)</SelectItem>
+                          <SelectItem value="cc">CC (visible)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <Textarea
+                    value={emailSettingsDraft[cfg.key].emails.join(", ")}
+                    onChange={(e) =>
+                      setEmailSettingsDraft((prev) => ({
+                        ...prev,
+                        [cfg.key]: {
+                          ...prev[cfg.key],
+                          emails: normalizeEmails(e.target.value),
+                        },
+                      }))
+                    }
+                    placeholder="ex: compta@entreprise.com, manager@entreprise.com"
+                    className="min-h-[70px]"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Sépare par virgule / espace / point-virgule. (BCC recommandé pour ne pas exposer les emails internes au fournisseur.)
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button type="button" variant="outline" onClick={() => setOpenEmailSettings(false)}>
+                Annuler
+              </Button>
+              <Button type="button" onClick={saveEmailDefaults} disabled={savingEmailSettings}>
+                {savingEmailSettings ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Enregistrement…
+                  </>
+                ) : (
+                  "Enregistrer"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Order details / réception */}
         <Sheet open={openOrderDetails} onOpenChange={setOpenOrderDetails}>

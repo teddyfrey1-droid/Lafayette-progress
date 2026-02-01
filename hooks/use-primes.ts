@@ -110,8 +110,34 @@ export function usePrimes() {
         items.sort((a,b)=>b.date.getTime()-a.date.getTime());
         const visibleItems = isManager ? items : items.filter((p) => p.status !== "pending")
         setPrimes(visibleItems);
-      } catch (error) {
-        console.error("Erreur chargement primes:", error);
+      } catch (error: any) {
+        // Fallback: some queries (where + orderBy) may require a composite index.
+        // If the index doesn't exist yet, we gracefully degrade to a simpler query.
+        const msg = String(error?.message || "")
+        if (msg.toLowerCase().includes("requires an index") && userData?.uid) {
+          try {
+            const qFallback = query(collection(db, "primes_history"), where("userId", "==", userData.uid), limit(50))
+            const snap = await getDocs(qFallback)
+            const items: PrimeHistory[] = []
+            snap.forEach((d) => {
+              const data = d.data() as any
+              items.push({
+                id: d.id,
+                month: data.month,
+                amount: data.amount,
+                status: data.status,
+                date: data.date?.toDate ? data.date.toDate() : new Date(),
+                userId: data.userId,
+              })
+            })
+            items.sort((a, b) => b.date.getTime() - a.date.getTime())
+            setPrimes(items.filter((p) => p.status !== "pending"))
+          } catch (e2) {
+            console.error("Erreur chargement primes (fallback):", e2)
+          }
+        } else {
+          console.error("Erreur chargement primes:", error);
+        }
       } finally {
         setLoading(false);
       }

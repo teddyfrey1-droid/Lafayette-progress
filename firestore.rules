@@ -187,6 +187,18 @@ service cloud.firestore {
           canOperateInCompany(companyDocId)
         );
       }
+
+      // ---- company settings (emails, etc.) ----
+      match /settings/{settingId} {
+        // Read: anyone in company + super_admin
+        allow read: if hasUserDoc() && (isSuperAdmin() || companyDocId == companyId());
+
+        // Write: super_admin or (admin/gerant/directeur) in own company
+        allow create, update, delete: if hasUserDoc() && (
+          isSuperAdmin() ||
+          (companyDocId == companyId() && canEditCompanyProfile(companyDocId))
+        );
+      }
     }
 
     // =========================

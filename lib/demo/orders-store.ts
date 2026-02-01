@@ -92,6 +92,7 @@ export interface Order {
   supplierName: string
   supplierEmail?: string
   ccEmails?: string[]
+  bccEmails?: string[]
   products: OrderProduct[]
   totalAmount: number
   deliveryDate: string

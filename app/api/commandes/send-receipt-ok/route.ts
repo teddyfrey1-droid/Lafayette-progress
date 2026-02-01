@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server"
-import { generateNonConformityPdfBuffer } from "@/lib/order-pdf"
+import { generateReceiptOkPdfBuffer } from "@/lib/order-pdf"
 
-// Firebase Admin requiert l'environnement Node.js (pas Edge)
 export const runtime = "nodejs"
 
-// Reprend la même sécurité optionnelle que /send-email
 async function enforceAuthIfEnabled(req: Request) {
   const requireAuth = process.env.ORDER_EMAIL_REQUIRE_AUTH === "true"
   if (!requireAuth) return null
@@ -28,7 +26,7 @@ async function enforceAuthIfEnabled(req: Request) {
     await adminAuth.verifyIdToken(token)
     return null
   } catch (e) {
-    console.error("ORDER nonconformity auth failed", e)
+    console.error("Receipt email auth failed", e)
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
   }
 }
@@ -50,45 +48,18 @@ function normalizeEmails(raw: unknown): Array<{ email: string; name?: string }> 
     }
     return out
   }
-
   if (typeof raw === "string") {
-    const parts = raw
+    return raw
       .split(/[;,\s]+/)
       .map((s) => s.trim())
       .filter(Boolean)
-    return parts.map((email) => ({ email }))
+      .map((email) => ({ email }))
   }
-
   return []
-}
-
-function getBaseHtml(title: string, contentHtml: string) {
-  const currentYear = new Date().getFullYear()
-  return `
-    <!DOCTYPE html>
-    <html style="font-family: sans-serif;">
-    <body style="background: #f4f4f5; padding: 40px 0; margin: 0;">
-      <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e4e4e7;">
-        <div style="background: #991b1b; padding: 26px 0; text-align: center; color: #ffffff;">
-          <div style="font-weight: 700; letter-spacing: .3px;">${title}</div>
-        </div>
-        <div style="padding: 26px 24px; color: #18181b;">
-          <div style="font-size: 14px; line-height: 1.6; color: #52525b;">
-            ${contentHtml}
-          </div>
-        </div>
-        <div style="background: #fafafa; padding: 16px; text-align: center; font-size: 12px; color: #a1a1aa; border-top: 1px solid #f4f4f5;">
-          © ${currentYear} Pulse’ App.
-        </div>
-      </div>
-    </body>
-    </html>
-  `
 }
 
 async function sendBrevoEmail(params: {
   senderName: string
-  senderEmail?: string
   toEmail: string
   toName?: string
   cc?: Array<{ email: string; name?: string }>
@@ -112,7 +83,7 @@ async function sendBrevoEmail(params: {
         "api-key": apiKey,
       },
       body: JSON.stringify({
-        sender: { name: params.senderName, email: params.senderEmail || DEFAULT_SENDER_EMAIL },
+        sender: { name: params.senderName, email: DEFAULT_SENDER_EMAIL },
         to: [{ email: params.toEmail, name: params.toName || params.toEmail }],
         cc: params.cc && params.cc.length ? params.cc : undefined,
         bcc: params.bcc && params.bcc.length ? params.bcc : undefined,
@@ -132,6 +103,17 @@ async function sendBrevoEmail(params: {
   }
 }
 
+function baseHtml(content: string) {
+  const y = new Date().getFullYear()
+  return `<!doctype html><html><body style="font-family:system-ui;background:#f4f4f5;padding:32px 0;margin:0;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;border:1px solid #e4e4e7;overflow:hidden;">
+    <div style="padding:18px 20px;background:#0f172a;color:#fff;font-weight:700;">Confirmation de réception</div>
+    <div style="padding:20px;color:#0f172a;font-size:14px;line-height:1.6;">${content}</div>
+    <div style="padding:14px 20px;background:#fafafa;border-top:1px solid #f4f4f5;color:#71717a;font-size:12px;text-align:center;">© ${y} Pulse App</div>
+  </div>
+  </body></html>`
+}
+
 export async function POST(req: Request) {
   const authResp = await enforceAuthIfEnabled(req)
   if (authResp) return authResp
@@ -142,19 +124,24 @@ export async function POST(req: Request) {
     const toEmail = String(body?.toEmail || "").trim()
     const toName = body?.toName ? String(body.toName) : undefined
     const subject = String(body?.subject || "").trim()
-    let companyName = String(body?.companyName || "Pulse App").trim() || "Pulse App"
-    let companyLegalName: string | undefined
-    let companySiret: string | undefined
-    let companyCustomerNumber: string | undefined
-    const cc = normalizeEmails(body?.ccEmails)
-    const bcc = normalizeEmails(body?.bccEmails)
-
-    const order = body?.order as any | undefined
-    if (!toEmail || !subject || !order || !Array.isArray(order?.products)) {
+    if (!toEmail || !subject) {
       return NextResponse.json({ success: false, error: "Paramètres manquants" }, { status: 400 })
     }
 
-    // Fetch company legal info for professional PDF header (best-effort)
+    const cc = normalizeEmails(body?.ccEmails)
+    const bcc = normalizeEmails(body?.bccEmails)
+
+    const order = body?.order as any
+    if (!order || !Array.isArray(order?.products)) {
+      return NextResponse.json({ success: false, error: "Commande manquante" }, { status: 400 })
+    }
+
+    let companyName = String(body?.companyName || "Entreprise").trim() || "Entreprise"
+    let companyLegalName: string | undefined
+    let companySiret: string | undefined
+    let companyCustomerNumber: string | undefined
+
+    // Fetch company legal info
     try {
       const companyId = String(order?.companyId || "").trim()
       if (companyId) {
@@ -185,13 +172,11 @@ export async function POST(req: Request) {
       unitPrice: Number(p?.unitPrice || 0),
       total: Number(p?.total || 0),
       receivedQuantity: typeof p?.receivedQuantity === "number" ? Number(p.receivedQuantity) : undefined,
-      receivedOk: typeof p?.receivedOk === "boolean" ? Boolean(p.receivedOk) : undefined,
-      receivedNote: p?.receivedNote ? String(p.receivedNote) : undefined,
     }))
 
-    const totalAmount = Number(order?.totalAmount || 0)
+    const totalAmount = Number(order?.totalAmount || lines.reduce((s: number, l: any) => s + (Number(l.total) || 0), 0))
 
-    const pdfBuffer = generateNonConformityPdfBuffer({
+    const pdfBuffer = generateReceiptOkPdfBuffer({
       companyName,
       companyLegalName,
       companySiret,
@@ -201,23 +186,15 @@ export async function POST(req: Request) {
       orderNumber: orderNumber.toUpperCase(),
       createdAtISO,
       deliveryDateISO,
-      notes: order?.notes ? String(order.notes) : undefined,
       lines,
       totalAmount,
     })
 
-    const filename = `Commande_non_conforme_${orderNumber.toUpperCase().replace(/[^A-Z0-9_-]/g, "_")}.pdf`
+    const filename = `Bon_de_reception_${orderNumber.toUpperCase().replace(/[^A-Z0-9_-]/g, "_")}.pdf`
     const attachment = [{ name: filename, content: pdfBuffer.toString("base64") }]
 
-    const problemCount = lines.filter((l: any) => l.receivedOk === false).length
-    const htmlContent = getBaseHtml(
-      "Commande non conforme",
-      `Bonjour,<br><br>
-      Nous constatons des <strong>non-conformités</strong> sur la commande <strong>${orderNumber.toUpperCase()}</strong>.<br>
-      Merci de trouver en pièce jointe le détail (lignes en <span style="color:#991b1b;"><strong>rouge</strong></span>).<br><br>
-      <strong>Anomalies signalées :</strong> ${problemCount}<br>
-      <strong>Entreprise :</strong> ${companyName}<br><br>
-      Merci de nous indiquer la marche à suivre (avoir / remplacement / reliquat).`,
+    const htmlContent = baseHtml(
+      `Bonjour,<br><br>La réception de la commande <strong>${orderNumber.toUpperCase()}</strong> a été validée par <strong>${companyName}</strong>.<br><br>Vous trouverez le bon de réception en pièce jointe.<br><br>Merci.`,
     )
 
     await sendBrevoEmail({
@@ -233,7 +210,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    console.error("Erreur envoi non-conformité:", error)
+    console.error("Erreur envoi réception:", error)
     return NextResponse.json({ success: false, error: error?.message || "Erreur serveur" }, { status: 500 })
   }
 }
