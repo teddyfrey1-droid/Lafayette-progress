@@ -52,6 +52,8 @@ export interface OrderSupplier {
   name: string
   email: string
   ccEmails?: string[]
+  /** Franco de port en euros (utilisé pour l'UI "palier") */
+  francoThreshold?: number
   phone?: string
   address?: string
   contactName?: string
@@ -191,12 +193,27 @@ function setDemoState(companyId: string, state: OrdersState) {
 
 function ensureSupplierShape(s: any, companyId: string): OrderSupplier {
   const products = Array.isArray(s?.products) ? s.products : []
+  const rawFrancoThreshold = s?.francoThreshold
+  const parsedFromString = (() => {
+    const txt = (s?.franco || "").toString()
+    const m = txt.replace(/\s/g, "").match(/([0-9]+(?:[\.,][0-9]+)?)/)
+    if (!m) return undefined
+    const v = Number(String(m[1]).replace(",", "."))
+    return Number.isFinite(v) ? v : undefined
+  })()
+
+  const francoThreshold = (() => {
+    const v = Number(rawFrancoThreshold)
+    if (Number.isFinite(v) && v > 0) return v
+    return parsedFromString
+  })()
   return {
     id: (s?.id || makeId("sup")).toString(),
     companyId,
     name: (s?.name || "").toString(),
     email: (s?.email || "").toString(),
     ccEmails: Array.isArray(s?.ccEmails) ? s.ccEmails.map((e: any) => String(e).trim()).filter(Boolean) : undefined,
+    francoThreshold,
     phone: s?.phone,
     address: s?.address,
     contactName: s?.contactName,

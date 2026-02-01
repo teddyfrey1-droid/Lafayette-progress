@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import type React from "react"
 import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
 import { PermissionGate } from "@/components/auth/permission-gate"
@@ -62,6 +63,8 @@ import {
   type EmailMode,
 } from "@/lib/email-settings"
 
+import { cn } from "@/lib/utils"
+
 function formatEuro(n: number) {
   const v = Number(n || 0)
   return `${v.toFixed(2).replace(".", ",")} €`
@@ -122,6 +125,167 @@ function normalizeEmails(raw: string) {
     .filter(Boolean)
 }
 
+function getFrancoThresholdEuros(supplier: OrderSupplier | null): number | null {
+  if (!supplier) return null
+  const v = Number((supplier as any).francoThreshold)
+  if (Number.isFinite(v) && v > 0) return v
+  const raw = (supplier.franco || "").toString()
+  const m = raw.replace(/\s/g, "").match(/([0-9]+(?:[\.,][0-9]+)?)/)
+  if (!m) return null
+  const n = Number(String(m[1]).replace(",", "."))
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+function ProductCard({
+  line,
+  step,
+  packAdd,
+  onIncrement,
+  onDecrement,
+  onSetQty,
+  onAddPack,
+}: {
+  line: OrderProduct
+  step: number
+  packAdd: number | undefined
+  onIncrement: (fromEl: HTMLElement | null) => void
+  onDecrement: () => void
+  onSetQty: (qtyRaw: string) => void
+  onAddPack: (fromEl: HTMLElement | null) => void
+}) {
+  const startX = useRef<number | null>(null)
+  const [dx, setDx] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+
+  const qty = Number(line.quantity || 0)
+  const lineTotal = Number(line.total || 0)
+  const packLabel = (line.packLabel || "").toString().trim()
+
+  const resetDrag = () => {
+    setDx(0)
+    setIsDragging(false)
+    startX.current = null
+  }
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    startX.current = e.clientX
+    setIsDragging(true)
+  }
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging || startX.current === null) return
+    const next = e.clientX - startX.current
+    const clamped = Math.max(-90, Math.min(90, next))
+    setDx(clamped)
+  }
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (!isDragging) return
+    const finalDx = dx
+    const target = e.currentTarget as HTMLElement
+    resetDrag()
+    if (finalDx > 60) {
+      onIncrement(target)
+    } else if (finalDx < -60) {
+      onDecrement()
+    }
+  }
+
+  return (
+    <div
+      className={cn(
+        "relative p-4",
+        "touch-pan-y select-none",
+      )}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={resetDrag}
+      style={{ transform: dx ? `translateX(${dx}px)` : undefined, transition: isDragging ? "none" : "transform 220ms" }}
+    >
+      {/* Swipe affordances */}
+      <div className={cn("absolute inset-y-0 left-0 w-20 flex items-center justify-center", dx > 8 ? "opacity-100" : "opacity-0", "transition-opacity")}
+        aria-hidden>
+        <div className="text-xs font-semibold text-primary">+1</div>
+      </div>
+      <div className={cn("absolute inset-y-0 right-0 w-20 flex items-center justify-center", dx < -8 ? "opacity-100" : "opacity-0", "transition-opacity")}
+        aria-hidden>
+        <div className="text-xs font-semibold text-muted-foreground">-1</div>
+      </div>
+
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="font-medium leading-tight">{line.productName}</div>
+          <div className="mt-1 text-xs text-muted-foreground flex flex-wrap items-center gap-2">
+            <span className="truncate">{line.reference || "—"}</span>
+            <span>•</span>
+            <span>{formatEuro(line.unitPrice)}/{line.unit}</span>
+            {packLabel ? (
+              <>
+                <span>•</span>
+                <span>Colisage: {packLabel}</span>
+              </>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <div className="flex items-center gap-2">
+            {packAdd !== undefined && packAdd > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-xl"
+                onClick={(e) => onAddPack(e.currentTarget as any)}
+              >
+                + colis
+              </Button>
+            )}
+
+            {/* Stepper */}
+            <div className="flex items-center rounded-xl border border-border overflow-hidden bg-background">
+              <button
+                type="button"
+                className={cn(
+                  "px-3 py-2 text-sm font-semibold",
+                  "active:scale-95 transition-transform",
+                  qty <= 0 ? "text-muted-foreground" : "text-foreground",
+                )}
+                onClick={onDecrement}
+                aria-label="Retirer"
+              >
+                −
+              </button>
+              <Input
+                type="number"
+                min={0}
+                step={step}
+                value={line.quantity}
+                onChange={(e) => onSetQty(e.target.value)}
+                className="w-20 border-0 rounded-none text-center tabular-nums"
+              />
+              <button
+                type="button"
+                className={cn(
+                  "px-3 py-2 text-sm font-semibold text-primary",
+                  "active:scale-95 transition-transform",
+                )}
+                onClick={(e) => onIncrement(e.currentTarget as any)}
+                aria-label="Ajouter"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <div className="text-sm w-24 text-right tabular-nums font-semibold">{formatEuro(lineTotal)}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function CommandesPage() {
   const { profile, isDemo, user, company } = useAuth()
   const { toast } = useToast()
@@ -151,6 +315,10 @@ export default function CommandesPage() {
   const [emailSettingsDraft, setEmailSettingsDraft] = useState<CompanyEmailSettings>(defaultCompanyEmailSettings())
   const [productSearch, setProductSearch] = useState<string>("")
   const [orderLines, setOrderLines] = useState<OrderProduct[]>([])
+
+  // UI micro-interactions
+  const cartTargetRef = useRef<HTMLDivElement | null>(null)
+  const [cartBump, setCartBump] = useState(false)
 
   // Order details / réception
   const [openOrderDetails, setOpenOrderDetails] = useState(false)
@@ -183,6 +351,14 @@ export default function CommandesPage() {
     () => suppliers.find((s) => s.id === supplierId) || null,
     [suppliers, supplierId],
   )
+
+  const francoThreshold = useMemo(() => getFrancoThresholdEuros(selectedSupplier), [selectedSupplier])
+  const francoProgress = useMemo(() => {
+    if (!francoThreshold || francoThreshold <= 0) return null
+    const pct = Math.min(100, Math.round((totalAmount / francoThreshold) * 100))
+    const remaining = Math.max(0, francoThreshold - totalAmount)
+    return { pct, remaining }
+  }, [francoThreshold, totalAmount])
 
   const filteredLines = useMemo(() => {
     const q = productSearch.trim().toLowerCase()
@@ -288,6 +464,61 @@ export default function CommandesPage() {
       prev.map((l) => {
         if (l.id !== lineId) return l
         const q = Number.isFinite(qty) ? Math.max(0, qty) : 0
+        const total = q * (Number(l.unitPrice) || 0)
+        return { ...l, quantity: q, total }
+      }),
+    )
+  }
+
+  const flyToTotal = (fromEl: HTMLElement | null) => {
+    if (typeof window === "undefined") return
+    if (!fromEl || !cartTargetRef.current) return
+    try {
+      const from = fromEl.getBoundingClientRect()
+      const to = cartTargetRef.current.getBoundingClientRect()
+      const dot = document.createElement("div")
+      dot.style.position = "fixed"
+      dot.style.left = `${from.left + from.width / 2}px`
+      dot.style.top = `${from.top + from.height / 2}px`
+      dot.style.width = "12px"
+      dot.style.height = "12px"
+      dot.style.borderRadius = "9999px"
+      dot.style.background = "hsl(var(--primary))"
+      dot.style.zIndex = "9999"
+      dot.style.pointerEvents = "none"
+      dot.style.transform = "translate(-50%, -50%) scale(1)"
+      dot.style.transition = "transform 420ms cubic-bezier(.2,.9,.2,1), left 420ms cubic-bezier(.2,.9,.2,1), top 420ms cubic-bezier(.2,.9,.2,1), opacity 420ms"
+      document.body.appendChild(dot)
+
+      // Next frame -> animate
+      requestAnimationFrame(() => {
+        dot.style.left = `${to.left + to.width / 2}px`
+        dot.style.top = `${to.top + to.height / 2}px`
+        dot.style.transform = "translate(-50%, -50%) scale(0.6)"
+        dot.style.opacity = "0.9"
+      })
+
+      window.setTimeout(() => {
+        dot.style.opacity = "0"
+      }, 320)
+
+      window.setTimeout(() => {
+        dot.remove()
+        setCartBump(true)
+        window.setTimeout(() => setCartBump(false), 260)
+      }, 520)
+    } catch {
+      // ignore
+    }
+  }
+
+  const changeQty = (lineId: string, delta: number, fromEl?: HTMLElement | null) => {
+    if (!delta) return
+    if (delta > 0) flyToTotal(fromEl || null)
+    setOrderLines((prev) =>
+      prev.map((l) => {
+        if (l.id !== lineId) return l
+        const q = Math.max(0, Number(l.quantity || 0) + delta)
         const total = q * (Number(l.unitPrice) || 0)
         return { ...l, quantity: q, total }
       }),
@@ -1023,7 +1254,10 @@ export default function CommandesPage() {
           </div>
         </div>
 
-        <div className="text-right">
+        <div
+          ref={cartTargetRef}
+          className={cn("text-right transition-transform", cartBump ? "scale-105" : "scale-100")}
+        >
           <div className="text-xs text-muted-foreground">Total</div>
           <div className="text-base font-semibold tabular-nums">{formatEuro(totalAmount)}</div>
         </div>
@@ -1054,6 +1288,35 @@ export default function CommandesPage() {
           </Link>
           .
         </div>
+
+        {selectedSupplier && francoThreshold && francoProgress && (
+          <div className="mt-3 pulse-card p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className={cn(
+                  "text-sm font-semibold",
+                  francoProgress.remaining <= 0 ? "text-emerald-700 dark:text-emerald-200" : "",
+                )}>
+                  {francoProgress.remaining <= 0 ? "Franco atteint 🎉" : "Objectif franco"}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Seuil fournisseur : {formatEuro(francoThreshold)}
+                </div>
+              </div>
+              <div className="text-right">
+                {francoProgress.remaining <= 0 ? (
+                  <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-200">OK</div>
+                ) : (
+                  <div className="text-xs font-semibold">-{formatEuro(francoProgress.remaining)}</div>
+                )}
+              </div>
+            </div>
+            <div className="mt-3">
+              <Progress value={francoProgress.pct} />
+              <div className="mt-1 text-[11px] text-muted-foreground">{francoProgress.pct}%</div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1164,52 +1427,19 @@ export default function CommandesPage() {
                       {items.map((p) => {
                         const step = unitStep(p.unit)
                         const packAdd = convertPackToProductUnit(p.packQuantity, p.packUnit, p.unit)
-                        const packLabel = (p.packLabel || "").toString().trim()
-                        const lineTotal = Number(p.total || 0)
                         return (
-                          <div key={p.id} className="p-4 flex items-start justify-between gap-4">
-                            <div className="min-w-0">
-                              <div className="font-medium leading-tight">{p.productName}</div>
-                              <div className="mt-1 text-xs text-muted-foreground flex flex-wrap items-center gap-2">
-                                <span className="truncate">{p.reference || "—"}</span>
-                                <span>•</span>
-                                <span>{formatEuro(p.unitPrice)}/{p.unit}</span>
-                                {packLabel ? (
-                                  <>
-                                    <span>•</span>
-                                    <span>Colisage: {packLabel}</span>
-                                  </>
-                                ) : null}
-                              </div>
-                            </div>
-
-                            <div className="flex flex-col items-end gap-2 shrink-0">
-                              <div className="flex items-center gap-2">
-                                {packAdd !== undefined && packAdd > 0 && (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="rounded-xl"
-                                    onClick={() => updateQty(p.id, String(Number(p.quantity || 0) + packAdd))}
-                                  >
-                                    + colis
-                                  </Button>
-                                )}
-
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  step={step}
-                                  value={p.quantity}
-                                  onChange={(e) => updateQty(p.id, e.target.value)}
-                                  className="w-24"
-                                />
-                              </div>
-
-                              <div className="text-sm w-24 text-right tabular-nums">{formatEuro(lineTotal)}</div>
-                            </div>
-                          </div>
+                          <ProductCard
+                            key={p.id}
+                            line={p}
+                            step={step}
+                            packAdd={packAdd}
+                            onSetQty={(v) => updateQty(p.id, v)}
+                            onDecrement={() => changeQty(p.id, -step)}
+                            onIncrement={(fromEl) => changeQty(p.id, step, fromEl)}
+                            onAddPack={(fromEl) => {
+                              if (packAdd !== undefined && packAdd > 0) changeQty(p.id, packAdd, fromEl)
+                            }}
+                          />
                         )
                       })}
                     </div>

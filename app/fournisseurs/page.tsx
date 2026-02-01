@@ -37,6 +37,7 @@ interface Fournisseur {
   name: string
   email: string
   ccEmails?: string[]
+  francoThreshold?: number
   commercial?: string
   phone: string
   deliveryDays: string[]
@@ -499,6 +500,11 @@ function FournisseurDrawer({
   const [orderBefore, setOrderBefore] = useState(fournisseur?.orderBefore || "")
   const [minOrder, setMinOrder] = useState(fournisseur?.minOrder || "")
   const [franco, setFranco] = useState(fournisseur?.franco || "")
+  const [francoThreshold, setFrancoThreshold] = useState(
+    fournisseur?.francoThreshold !== undefined && fournisseur?.francoThreshold !== null
+      ? String(fournisseur.francoThreshold)
+      : "",
+  )
   const [deliveryTime, setDeliveryTime] = useState(fournisseur?.deliveryTime || "")
 
   const toggleDay = (day: string) => {
@@ -527,11 +533,18 @@ function FournisseurDrawer({
 
     const ccEmails = parseCc(ccText)
 
+    const francoEuro = (() => {
+      const v = Number(String(francoThreshold).replace(",", "."))
+      if (!String(francoThreshold).trim()) return undefined
+      return Number.isFinite(v) && v > 0 ? v : undefined
+    })()
+
     onSave({
       id: fournisseur?.id || "",
       name: cleanName,
       email: cleanEmail,
       ccEmails: ccEmails.length ? ccEmails : undefined,
+      francoThreshold: francoEuro,
       commercial: commercial || undefined,
       phone: cleanPhone,
       deliveryDays,
@@ -728,6 +741,21 @@ function FournisseurDrawer({
                   placeholder="Ex: 200€"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Franco (€) pour l'objectif (commande)</label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                value={francoThreshold}
+                onChange={(e) => setFrancoThreshold(e.target.value)}
+                className="rounded-xl mt-1"
+                placeholder="Ex: 200"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Utilisé pour afficher la progression vers le franco pendant la prise de commande.
+              </p>
             </div>
           </div>
 
