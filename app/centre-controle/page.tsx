@@ -428,9 +428,11 @@ function CentreControlePageContent() {
   const toggleFeature = async (companyId: string, featureId: string) => {
     const company = companiesState.find(c => c.id === companyId)
     if (!company) return
+    // IMPORTANT: never persist non-serializable fields (like React icon components) to Firestore.
     const updatedFeatures = company.features.map(f => f.id === featureId ? { ...f, enabled: !f.enabled } : f)
+    const serializableFeatures = updatedFeatures.map(f => ({ id: f.id, enabled: Boolean(f.enabled) }))
     try {
-        await updateDoc(doc(db, "companies", companyId), { features: updatedFeatures })
+        await updateDoc(doc(db, "companies", companyId), { features: serializableFeatures })
         if (selectedCompany?.id === companyId) setSelectedCompany({ ...company, features: updatedFeatures })
         toast({ title: "Module mis à jour" })
     } catch (error) { toast({ title: "Erreur", variant: "destructive" }) }
