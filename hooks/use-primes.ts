@@ -106,7 +106,7 @@ export function usePrimes() {
             userId: data.userId
           });
         });
-        const isManager = ["manager", "directeur", "gerant", "admin", "super_admin"].includes(role)
+        // isManager est déjà calculé plus haut dans fetchPrimes()
         const visibleItems = isManager ? items : items.filter((p) => p.status !== "pending")
         setPrimes(visibleItems);
       } catch (error) {
