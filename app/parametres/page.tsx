@@ -5,109 +5,90 @@ import { useTheme } from "next-themes"
 import { useRouter } from "next/navigation"
 import { 
   User, Shield, Link as LinkIcon, Sliders, Users, Moon, Bell, 
-  Palette, HelpCircle, LogOut, ChevronRight
+  Palette, HelpCircle, LogOut, ChevronRight, Mail
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Header } from "@/components/pulse/header"
 import { BottomNav } from "@/components/pulse/bottom-nav"
+import { useState } from "react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { defaultCompanyEmailSettings, loadCompanyEmailSettings, saveCompanyEmailSettings, CompanyEmailSettings } from "@/lib/email-settings"
+import { useToast } from "@/hooks/use-toast"
 
 export default function SettingsPage() {
-  const { profile, signOut } = useAuth()
+  const { profile, signOut, user } = useAuth()
   const { theme, setTheme } = useTheme()
   const router = useRouter()
+  const { toast } = useToast()
+  
+  const [openEmails, setOpenEmails] = useState(false)
+  const [emailSettings, setEmailSettings] = useState<CompanyEmailSettings>(defaultCompanyEmailSettings())
 
-  // Calcul des initiales
+  const handleOpenEmails = async () => {
+      if(profile?.companyId) {
+          try {
+             const s = await loadCompanyEmailSettings(profile.companyId)
+             setEmailSettings(s)
+          } catch(e) {}
+      }
+      setOpenEmails(true)
+  }
+  
+  const saveEmails = async () => {
+      if(profile?.companyId) {
+          await saveCompanyEmailSettings(profile.companyId, emailSettings)
+          toast({ title: "Sauvegardé", description: "Les destinataires ont été mis à jour." })
+          setOpenEmails(false)
+      }
+  }
+
   const initials = profile?.displayName 
     ? profile.displayName.split(" ").map((n:string) => n[0]).join("").substring(0, 2).toUpperCase()
     : (profile?.email?.substring(0, 2).toUpperCase() || "??")
 
-  // Vérification rôle admin/gérant
-  const isAdmin = ['admin', 'super_admin', 'gerant'].includes(profile?.role || '');
-
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <div className="min-h-screen bg-muted/5 pb-32">
       <Header />
 
       <main className="px-4 py-6 max-w-lg mx-auto space-y-8">
-        
         <div>
             <h1 className="text-2xl font-bold tracking-tight">Paramètres</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Gérez votre compte et préférences</p>
         </div>
 
-        {/* SECTION COMPTE */}
+        {/* COMPTE */}
         <section className="space-y-3">
             <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">Compte</h2>
-            
-            {/* Carte Profil */}
-            <div className="pulse-card p-4 flex items-center gap-4 cursor-pointer hover:bg-muted/50 transition-colors">
-                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-white text-lg font-bold shadow-lg shadow-primary/20">
+            <div className="pulse-card p-4 flex items-center gap-4 bg-white rounded-3xl shadow-sm border border-border/40">
+                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-primary text-lg font-bold">
                     {initials}
                 </div>
-                <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-lg truncate">{profile?.displayName || "Utilisateur"}</h3>
-                    <p className="text-sm text-muted-foreground truncate">{profile?.email}</p>
-                    <div className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase border border-primary/20">
-                        {profile?.role || "Employé"}
-                    </div>
+                <div>
+                    <h3 className="font-bold text-lg">{profile?.displayName || "Utilisateur"}</h3>
+                    <p className="text-sm text-muted-foreground">{profile?.email}</p>
                 </div>
             </div>
+        </section>
 
-            {/* Menu Sécurité (Correction du lien) */}
-            <div className="pulse-card overflow-hidden">
-                <MenuItem 
-                    icon={Shield} 
-                    label="Sécurité" 
-                    subLabel="Mot de passe et authentification"
-                    onClick={() => router.push('/parametres/securite')}
+        {/* FONCTIONNALITÉS */}
+        <section className="space-y-3">
+            <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">Fonctionnalités</h2>
+            <div className="bg-white rounded-3xl overflow-hidden border border-border/40 shadow-sm divide-y divide-border/30">
+                 {/* LE BOUTON MAGIQUE POUR LES EMAILS */}
+                 <MenuItem 
+                    icon={Mail} 
+                    label="Notifications & Rapports" 
+                    subLabel="Gérer les destinataires automatiques (CC/BCC)"
+                    onClick={handleOpenEmails}
                 />
             </div>
         </section>
 
-        {/* SECTION ADMINISTRATION */}
-        {isAdmin && (
-            <section className="space-y-3">
-                <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">Administration</h2>
-                <div className="pulse-card overflow-hidden divide-y divide-border/50">
-                    <MenuItem 
-                        icon={LinkIcon} 
-                        label="Intégrations API" 
-                        subLabel="Combo, Zelty, Uber Eats..."
-                        onClick={() => router.push('/parametres/integrations-api')}
-                    />
-                    <MenuItem 
-                        icon={Sliders} 
-                        label="Configuration objectifs" 
-                        subLabel="Paramètres avancés des objectifs"
-                        onClick={() => router.push('/parametres/objectifs')}
-                    />
-                    <MenuItem 
-                        icon={Users} 
-                        label="Utilisateurs & Rôles" 
-                        subLabel="Gérer les accès et permissions"
-                        onClick={() => router.push('/parametres/utilisateurs')}
-                    />
-                </div>
-            </section>
-        )}
-
-        {/* PRÉFÉRENCES */}
-        <section className="space-y-3">
-            <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">Préférences</h2>
-            <div className="pulse-card p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500"><Moon className="w-4 h-4" /></div>
-                    <div><p className="font-medium text-sm">Mode sombre</p><p className="text-xs text-muted-foreground">Apparence de l'application</p></div>
-                </div>
-                <Switch checked={theme === 'dark'} onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')} />
-            </div>
-        </section>
-
-        {/* SECTION SUPPORT */}
+        {/* SUPPORT - Conservé comme demandé */}
         <section className="space-y-3">
             <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">Support</h2>
-            <div className="pulse-card overflow-hidden divide-y divide-border/50">
+            <div className="bg-white rounded-3xl overflow-hidden border border-border/40 shadow-sm divide-y divide-border/30">
                 <MenuItem icon={Bell} label="Notifications" subLabel="Gérer les alertes" />
                 <MenuItem icon={Palette} label="Thème" subLabel="Personnaliser l'apparence" />
                 <MenuItem icon={HelpCircle} label="Aide" subLabel="FAQ et documentation" />
@@ -115,14 +96,46 @@ export default function SettingsPage() {
         </section>
 
         {/* DÉCONNEXION */}
-        <div className="pt-4 text-center pb-6">
+        <div className="pt-4">
             <Button variant="destructive" className="w-full h-12 rounded-xl" onClick={() => signOut()}>
                 <LogOut className="w-4 h-4 mr-2" /> Se déconnecter
             </Button>
-            <p className="text-xs text-muted-foreground font-medium mt-4">Pulse v2.0.0 - Janvier 2026</p>
         </div>
 
       </main>
+
+      {/* DIALOGUE EMAILS SIMPLIFIÉ */}
+      <Dialog open={openEmails} onOpenChange={setOpenEmails}>
+          <DialogContent className="rounded-3xl max-w-sm">
+              <DialogHeader>
+                  <DialogTitle>Rapports automatiques</DialogTitle>
+                  <DialogDescription>
+                      Les adresses ci-dessous recevront une copie de tous les bons de commande et réceptions.
+                  </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                  <div>
+                      <label className="text-xs font-semibold mb-1 block">Emails (séparés par virgule)</label>
+                      <Textarea 
+                          className="rounded-xl bg-muted/30 border-0 min-h-[100px]" 
+                          placeholder="compta@monresto.fr, chef@monresto.fr"
+                          value={emailSettings.order.emails.join(", ")}
+                          onChange={(e) => {
+                              const val = e.target.value.split(/[,;\s]+/).filter(Boolean)
+                              setEmailSettings(prev => ({
+                                  ...prev, 
+                                  order: { ...prev.order, emails: val },
+                                  receiptOk: { ...prev.receiptOk, emails: val }, // Sync simple pour l'utilisateur
+                                  receiptIssue: { ...prev.receiptIssue, emails: val }
+                              }))
+                          }}
+                      />
+                  </div>
+                  <Button onClick={saveEmails} className="w-full rounded-xl">Enregistrer</Button>
+              </div>
+          </DialogContent>
+      </Dialog>
+
       <BottomNav />
     </div>
   )
@@ -130,10 +143,10 @@ export default function SettingsPage() {
 
 function MenuItem({ icon: Icon, label, subLabel, onClick }: any) {
     return (
-        <button onClick={onClick} className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors text-left">
+        <button onClick={onClick} className="w-full p-4 flex items-center justify-between hover:bg-muted/30 transition-colors text-left">
             <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-foreground"><Icon className="w-4 h-4" /></div>
-                <div><p className="font-medium text-sm">{label}</p>{subLabel && <p className="text-xs text-muted-foreground">{subLabel}</p>}</div>
+                <div className="w-9 h-9 rounded-xl bg-muted/50 flex items-center justify-center text-foreground"><Icon className="w-4 h-4" /></div>
+                <div><p className="font-semibold text-sm">{label}</p>{subLabel && <p className="text-xs text-muted-foreground">{subLabel}</p>}</div>
             </div>
             <ChevronRight className="w-4 h-4 text-muted-foreground/50" />
         </button>
